@@ -1,0 +1,12 @@
+[submodule "deps/ckb-c-stdlib"]
+	path = deps/ckb-c-stdlib
+	url = https://github.com/thewawar/ckb-c-stdlib.git
+[submodule "deps/ethash"]
+	path = deps/ethash
+	url = https://github.com/TheWaWaR/ethash
+[submodule "deps/intx"]
+	path = deps/intx
+	url = https://github.com/chfast/intx
+[submodule "deps/evmone"]
+	path = deps/evmone
+	url = https://github.com/ethereum/evmone
