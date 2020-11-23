@@ -33,8 +33,8 @@ all-via-docker: generate-protocol
 	mkdir -p build
 	docker run --rm -v `pwd`:/code ${BUILDER_DOCKER} bash -c "cd /code && make"
 
-build/generator.so: generator.c $(ALL_OBJS)
-	$(CXX) $(CFLAGS) $(LDFLAGS) -shared -o $@ generator.c $(ALL_OBJS)
+build/generator.so: polyjuice-generator.c $(ALL_OBJS)
+	$(CXX) $(CFLAGS) $(LDFLAGS) -shared -o $@ $<
 	$(OBJCOPY) --only-keep-debug $@ $@.debug
 	$(OBJCOPY) --strip-debug --strip-all $@
 
