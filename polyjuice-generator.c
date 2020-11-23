@@ -31,6 +31,7 @@ static void debug_print_int(const char *prefix, int64_t ret) {
   ckb_debug(debug_buffer);
 }
 
+/* FIXME */
 struct evmc_host_context {};
 
 int init_message(struct evmc_message *msg, gw_context_t* ctx) {
@@ -40,7 +41,7 @@ int init_message(struct evmc_message *msg, gw_context_t* ctx) {
   } else if (ctx->call_context.call_type == GW_CALL_TYPE_HANDLE_MESSAGE) {
     msg->kind = EVMC_CALL;
   } else {
-    /* invalid call_type */
+    /* ERROR: invalid call_type */
     return -1;
   }
 
@@ -78,6 +79,96 @@ int init_message(struct evmc_message *msg, gw_context_t* ctx) {
   msg->create2_salt = evmc_bytes32{};
 }
 
+////////////////////////////////////////////////////////////////////////////
+//// Callbacks
+////////////////////////////////////////////////////////////////////////////
+struct evmc_tx_context get_tx_context(struct evmc_host_context* context) {
+  struct evmc_tx_context tx_ctx{};
+  /* FIXME */
+  return tx_ctx;
+}
+
+bool account_exists(struct evmc_host_context* context,
+                    const evmc_address* address) {
+  /* FIXME */
+  return true;
+}
+
+evmc_bytes32 get_storage(struct evmc_host_context* context,
+                         const evmc_address* address,
+                         const evmc_bytes32* key) {
+  evmc_bytes32 value{};
+  /* FIXME */
+  return value;
+}
+
+enum evmc_storage_status set_storage(struct evmc_host_context* context,
+                                     const evmc_address* address,
+                                     const evmc_bytes32* key,
+                                     const evmc_bytes32* value) {
+  /* FIXME */
+  return EVMC_STORAGE_ADDED;
+}
+
+size_t get_code_size(struct evmc_host_context* context,
+                     const evmc_address* address) {
+  /* FIXME */
+  return 0;
+}
+
+evmc_bytes32 get_code_hash(struct evmc_host_context* context,
+                           const evmc_address* address) {
+  evmc_bytes32 hash{};
+  /* FIXME */
+  return hash;
+}
+
+size_t copy_code(struct evmc_host_context* context,
+                 const evmc_address* address,
+                 size_t code_offset,
+                 uint8_t* buffer_data,
+                 size_t buffer_size) {
+  /* FIXME: */
+  return 0;
+}
+
+evmc_uint256be get_balance(struct evmc_host_context* context,
+                           const evmc_address* address) {
+  evmc_uint256be balance{};
+  /* FIXME */
+  return balance;
+}
+
+void selfdestruct(struct evmc_host_context* context,
+                  const evmc_address* address,
+                  const evmc_address* beneficiary) {
+  /* FIXME */
+  return;
+}
+
+struct evmc_result call(struct evmc_host_context* context,
+                        const struct evmc_message* msg) {
+  /* FIXME */
+  struct evmc_result res;
+  return res;
+}
+
+evmc_bytes32 get_block_hash(struct evmc_host_context* context, int64_t number) {
+  /* FIXME */
+  evmc_bytes32 block_hash{};
+  return block_hash;
+}
+
+void emit_log(struct evmc_host_context* context,
+              const evmc_address* address,
+              const uint8_t* data,
+              size_t data_size,
+              const evmc_bytes32 topics[],
+              size_t topics_count) {
+  /* FIXME */
+  return;
+}
+
 __attribute__((visibility("default"))) int gw_construct(gw_context_t * ctx) {
   return 0;
 }
@@ -86,7 +177,7 @@ __attribute__((visibility("default"))) int gw_construct(gw_context_t * ctx) {
 __attribute__((visibility("default"))) int gw_handle_message(gw_context_t* ctx) {
   int ret;
   struct evmc_vm *vm = evmc_create_evmone();
-  struct evmc_host_interface interface;
+  struct evmc_host_interface interface = { account_exists, get_storage, set_storage, get_balance, get_code_size, get_code_hash, copy_code, selfdestruct, call, get_tx_context, get_block_hash, emit_log};
   struct evmc_host_context context;
   struct evmc_message msg;
   ret = init_message(&msg, ctx);
@@ -99,3 +190,4 @@ __attribute__((visibility("default"))) int gw_handle_message(gw_context_t* ctx) 
   struct evmc_result res = vm->execute(vm, &interface, &context, EVMC_MAX_REVISION, &msg, code_data, code_size);
   return (int)res.status_code;
 }
+
