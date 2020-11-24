@@ -139,7 +139,7 @@ int sys_get_account_script(gw_context_t *ctx, uint32_t account_id, uint32_t * le
  * @param number     The number of the layer 2 block
  * @return           The status code, 0 is success
  */
-int sys_get_block_hash(gw_context_t *ctx, uint8_t[32] block_hash, int64_t number);
+int sys_get_block_hash(gw_context_t *ctx, int64_t number, uint8_t[32] block_hash);
 
 /**
  * Emit a log (EVM LOG0, LOG1, LOGn in polyjuice)
@@ -149,7 +149,7 @@ int sys_get_block_hash(gw_context_t *ctx, uint8_t[32] block_hash, int64_t number
  * @param data_length    The length of the log data
  * @return               The status code, 0 is success
  */
-int sys_log(gw_context_t *ctx, const uint8_t *data, uint32_t data_length);
+int sys_log(gw_context_t *ctx, uint32_t data_length, const uint8_t *data);
 ```
 
 ### Get Information (EVM terminology)

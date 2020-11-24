@@ -32,7 +32,10 @@ static void debug_print_int(const char *prefix, int64_t ret) {
 }
 
 /* FIXME */
-struct evmc_host_context {};
+struct evmc_host_context {
+  gw_context_t* gw_ctx;
+  evmc_address tx_origin;
+};
 
 int init_message(struct evmc_message *msg, gw_context_t* ctx) {
   /* TODO: support CREATE2, DELEGATECALL, CALLCODE */
@@ -52,18 +55,22 @@ int init_message(struct evmc_message *msg, gw_context_t* ctx) {
 
   /* == Args decoder */
   uint8_t *args = ctx->call_context.args;
-  /* args[0..4] */
-  uint32_t flags = *((uint32_t *)args);
-  /* args[5] */
-  uint32_t depth = (uint32_t)args[5];
-  /* args[6..38] */
-  evmc_uint256be value = *((evmc_uint256be *)(args + 5));
-  /* args[38..42] */
-  uint32_t input_size = *((uint32_t *)(args + 5 + 32));
-  /* args[42..42+input_size] */
-  uint8_t *input_data = args + 5 + 32 + 4;
+  size_t tx_origin_len = 0;
+  /* args[0] */
+  uint32_t depth = (uint32_t)args[0];
+  if (depth > 0) {
+    tx_origin_len = 20;
+  }
+  /* args[1..5] */
+  uint32_t flags = *((uint32_t *)args + 1 + tx_origin_len);
+  /* args[5..37] */
+  evmc_uint256be value = *((evmc_uint256be *)(args + 1 + tx_origin_len + 4));
+  /* args[37..41] */
+  uint32_t input_size = *((uint32_t *)(args + 1 + tx_origin_len + 4 + 32));
+  /* args[41..41+input_size] */
+  uint8_t *input_data = args + 1 + tx_origin_len + 4 + 32 + 4;
 
-  if (ctx->call_context.args_len != (input_size + 41)) {
+  if (ctx->call_context.args_len != (input_size + 41 + tx_origin_len)) {
     /* ERROR: Invalid args_len */
     return -1;
   }
@@ -77,6 +84,7 @@ int init_message(struct evmc_message *msg, gw_context_t* ctx) {
   msg->sender = sender;
   msg->destination = destination;
   msg->create2_salt = evmc_bytes32{};
+  return 0;
 }
 
 ////////////////////////////////////////////////////////////////////////////
@@ -84,7 +92,25 @@ int init_message(struct evmc_message *msg, gw_context_t* ctx) {
 ////////////////////////////////////////////////////////////////////////////
 struct evmc_tx_context get_tx_context(struct evmc_host_context* context) {
   struct evmc_tx_context tx_ctx{};
-  /* FIXME */
+  /* gas price = 1 */
+  tx_ctx.tx_gas_price.bytes[31] = 0x01;
+  tx_ctx.tx_origin = context->tx_origin;
+  /* FIXME: get coinbase by aggregator id */
+  memset(tx_ctx.block_coinbase.bytes, 0, 20);
+  tx_ctx.block_number = context->gw_ctx->block_info.number;
+  tx_ctx.block_timestamp = context->gw_ctx->block_info.timestamp;
+  tx_ctx.block_gas_limit = 10000000000;
+  /* 2500000000000000, TODO: read from aggregator */
+  tx_ctx.block_difficulty = {0x00, 0x00, 0x00, 0x00,
+                             0x00, 0x00, 0x00, 0x00,
+                             0x00, 0x00, 0x00, 0x00,
+                             0x00, 0x00, 0x00, 0x00,
+                             0x00, 0x00, 0x00, 0x00,
+                             0x00, 0x00, 0x00, 0x00,
+                             0x00, 0x08, 0xe1, 0xbc,
+                             0x9b, 0xf0, 0x40, 0x00,};
+  /* chain id = 1 */
+  tx_ctx.chain_id.bytes[31] = 0x01;
   return tx_ctx;
 }
 
@@ -178,12 +204,17 @@ __attribute__((visibility("default"))) int gw_handle_message(gw_context_t* ctx) 
   int ret;
   struct evmc_vm *vm = evmc_create_evmone();
   struct evmc_host_interface interface = { account_exists, get_storage, set_storage, get_balance, get_code_size, get_code_hash, copy_code, selfdestruct, call, get_tx_context, get_block_hash, emit_log};
-  struct evmc_host_context context;
+
   struct evmc_message msg;
   ret = init_message(&msg, ctx);
   if (ret != 0) {
     return ret;
   }
+  evmc_address tx_origin = msg.sender;
+  if (msg.depth > 0 ) {
+    memcpy(tx_origin.bytes, ctx->call_context.args + 1, 20);
+  }
+  struct evmc_host_context context { ctx, tx_origin };
 
   uint8_t *code_data = NULL;
   uint32_t code_size = 0;
