@@ -100,11 +100,12 @@ typedef int (*gw_get_account_nonce_fn)(void *ctx, uint32_t account_id, uint32_t 
  *
  * @param ctx        The godwoken context
  * @param account_id The account id
- * @param len        The length of the script
+ * @param len        The length of the script to load
+ * @param offset     The offset of the script to load
  * @param script     The pointer of the script to save the result
  * @return           The status code, 0 is success
  */
-typedef int (*gw_get_account_script_fn)(void *ctx, uint32_t account_id, uint32_t * len, uint8_t * script);
+typedef int (*gw_get_account_script_fn)(void *ctx, uint32_t account_id, uint32_t * len, size_t offset, uint8_t * script);
 
 /**
  * Get layer 2 block hash by number
