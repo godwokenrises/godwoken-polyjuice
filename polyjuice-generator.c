@@ -18,6 +18,7 @@
 /* account script buffer sisze: 32KB */
 #define ACCOUNT_SCRIPT_BUFSIZE 32768
 
+/*
 static char debug_buffer[64 * 1024];
 static void debug_print_data(const char *prefix,
                              const uint8_t *data,
@@ -34,8 +35,8 @@ static void debug_print_int(const char *prefix, int64_t ret) {
   sprintf(debug_buffer, "%s => %ld", prefix, ret);
   ckb_debug(debug_buffer);
 }
+*/
 
-/* FIXME */
 struct evmc_host_context {
   gw_context_t* gw_ctx;
   evmc_address tx_origin;
@@ -55,8 +56,12 @@ int init_message(struct evmc_message *msg, gw_context_t* ctx) {
 
   evmc_address sender;
   evmc_address destination;
-  ctx->sys_get_address_by_account_id((void *)ctx, ctx->call_context.from_id, sender.bytes);
-  ctx->sys_get_address_by_account_id((void *)ctx, ctx->call_context.to_id, destination.bytes);
+  uint8_t sender_script_hash[32];
+  uint8_t dest_script_hash[32];
+  ctx->sys_get_script_hash_by_account_id((void *)ctx, ctx->call_context.from_id, sender_script_hash);
+  ctx->sys_get_script_hash_by_account_id((void *)ctx, ctx->call_context.to_id, dest_script_hash);
+  memcpy(sender.bytes, sender_script_hash, 20);
+  memcpy(destination.bytes, dest_script_hash, 20);
 
   /* == Args decoder */
   uint8_t *args = ctx->call_context.args;
@@ -95,6 +100,13 @@ int init_message(struct evmc_message *msg, gw_context_t* ctx) {
 void release_result(const struct evmc_result* result) {
   free((void *)result->output_data);
   return;
+}
+
+int get_account_id_by_address(gw_context_t *ctx, const evmc_address* address, uint32_t *account_id) {
+  uint8_t script_hash[32];
+  memcpy(script_hash, address->bytes, 20);
+  memset(script_hash + 20, 0, 12);
+  return ctx->sys_get_account_id_by_script_hash((void *)ctx, script_hash, account_id);
 }
 
 int load_account_script(gw_context_t *gw_ctx, uint32_t account_id, uint8_t **code, size_t *code_size) {
@@ -156,9 +168,7 @@ struct evmc_tx_context get_tx_context(struct evmc_host_context* context) {
 bool account_exists(struct evmc_host_context* context,
                     const evmc_address* address) {
   uint32_t account_id;
-  int ret = context->gw_ctx->sys_get_account_id_by_address((void *)context->gw_ctx,
-                                                           (uint8_t *)address->bytes,
-                                                           &account_id);
+  int ret = get_account_id_by_address(context->gw_ctx, address, &account_id);
   return ret == 0;
 }
 
@@ -190,9 +200,7 @@ enum evmc_storage_status set_storage(struct evmc_host_context* context,
 size_t get_code_size(struct evmc_host_context* context,
                      const evmc_address* address) {
   uint32_t account_id = 0;
-  int ret = context->gw_ctx->sys_get_account_id_by_address((void *)context->gw_ctx,
-                                                           (uint8_t *)address->bytes,
-                                                           &account_id);
+  int ret = get_account_id_by_address(context->gw_ctx, address, &account_id);
   if (ret != 0) {
     context->error_code = ret;
     return 0;
@@ -212,9 +220,7 @@ evmc_bytes32 get_code_hash(struct evmc_host_context* context,
                            const evmc_address* address) {
   evmc_bytes32 hash{};
   uint32_t account_id = 0;
-  int ret = context->gw_ctx->sys_get_account_id_by_address((void *)context->gw_ctx,
-                                                           (uint8_t *)address->bytes,
-                                                           &account_id);
+  int ret = get_account_id_by_address(context->gw_ctx, address, &account_id);
   if (ret != 0) {
     context->error_code = ret;
     return hash;
@@ -241,9 +247,7 @@ size_t copy_code(struct evmc_host_context* context,
                  size_t buffer_size) {
 
   uint32_t account_id = 0;
-  int ret = context->gw_ctx->sys_get_account_id_by_address((void *)context->gw_ctx,
-                                                           (uint8_t *)address->bytes,
-                                                           &account_id);
+  int ret = get_account_id_by_address(context->gw_ctx, address, &account_id);
   if (ret != 0) {
     return (size_t)ret;
   }
@@ -264,9 +268,7 @@ evmc_uint256be get_balance(struct evmc_host_context* context,
                            const evmc_address* address) {
   evmc_uint256be balance{};
   uint32_t account_id;
-  int ret = context->gw_ctx->sys_get_account_id_by_address((void *)context->gw_ctx,
-                                                           (uint8_t *)address->bytes,
-                                                           &account_id);
+  int ret = get_account_id_by_address(context->gw_ctx, address, &account_id);
   if (ret != 0) {
     return balance;
   }
@@ -288,9 +290,7 @@ struct evmc_result call(struct evmc_host_context* context,
   struct evmc_result res;
 
   uint32_t to_id;
-  ret = context->gw_ctx->sys_get_account_id_by_address((void *)context->gw_ctx,
-                                                       (uint8_t *)msg->destination.bytes,
-                                                       &to_id);
+  ret = get_account_id_by_address(context->gw_ctx, &(msg->destination), &to_id);
   if (ret != 0) {
     context->error_code = ret;
     res.status_code = EVMC_REVERT;
@@ -324,6 +324,8 @@ struct evmc_result call(struct evmc_host_context* context,
      How to handle create account action?
      ==> Add a API: sys_create(ctx, args, args_len, receipt);
   */
+
+  /* FIXME: handle transfer logic */
 
   return res;
 }
@@ -372,21 +374,22 @@ void emit_log(struct evmc_host_context* context,
 }
 
 
+/* parse args then create contract */
 __attribute__((visibility("default"))) int gw_construct(gw_context_t * ctx) {
-  return 0;
-}
-
-/* parse args then call another contract */
-__attribute__((visibility("default"))) int gw_handle_message(gw_context_t* ctx) {
   int ret;
-  struct evmc_vm *vm = evmc_create_evmone();
-  struct evmc_host_interface interface = { account_exists, get_storage, set_storage, get_balance, get_code_size, get_code_hash, copy_code, selfdestruct, call, get_tx_context, get_block_hash, emit_log};
-
   struct evmc_message msg;
   ret = init_message(&msg, ctx);
   if (ret != 0) {
     return ret;
   }
+  if (msg.kind != EVMC_CREATE) {
+    /* TODO: Invalid call type or NOT supported yet */
+    return -1;
+  }
+
+  struct evmc_vm *vm = evmc_create_evmone();
+  struct evmc_host_interface interface = { account_exists, get_storage, set_storage, get_balance, get_code_size, get_code_hash, copy_code, selfdestruct, call, get_tx_context, get_block_hash, emit_log};
+
   evmc_address tx_origin = msg.sender;
   if (msg.depth > 0 ) {
     memcpy(tx_origin.bytes, ctx->call_context.args + 1, 20);
@@ -394,13 +397,54 @@ __attribute__((visibility("default"))) int gw_handle_message(gw_context_t* ctx) 
   struct evmc_host_context context { ctx, tx_origin, 0 };
 
   uint8_t *code_data = NULL;
-  size_t code_size;
+  size_t code_size = 0;
+  struct evmc_result res = vm->execute(vm, &interface, &context, EVMC_MAX_REVISION, &msg, code_data, code_size);
+  free(code_data);
+  if (context.error_code != 0)  {
+    return context.error_code;
+  }
+  /* FIXME: handle created address */
+
+  gw_call_receipt_t *receipt = (gw_call_receipt_t *)ctx->sys_context;
+  receipt->return_data_len = (uint32_t)res.output_size;
+  memcpy(receipt->return_data, res.output_data, res.output_size);
+  return (int)res.status_code;
+}
+
+/* parse args then call contract */
+__attribute__((visibility("default"))) int gw_handle_message(gw_context_t* ctx) {
+  int ret;
+  struct evmc_message msg;
+  ret = init_message(&msg, ctx);
+  if (ret != 0) {
+    return ret;
+  }
+  if (msg.kind != EVMC_CALL) {
+    /* TODO: Invalid call type or NOT supported yet */
+    return -1;
+  }
+
+  struct evmc_vm *vm = evmc_create_evmone();
+  struct evmc_host_interface interface = { account_exists, get_storage, set_storage, get_balance, get_code_size, get_code_hash, copy_code, selfdestruct, call, get_tx_context, get_block_hash, emit_log};
+
+  evmc_address tx_origin = msg.sender;
+  if (msg.depth > 0 ) {
+    memcpy(tx_origin.bytes, ctx->call_context.args + 1, 20);
+  }
+  struct evmc_host_context context { ctx, tx_origin, 0 };
+
+  uint8_t *code_data = NULL;
+  size_t code_size = 0;
   ret = load_account_script(ctx, ctx->call_context.to_id, &code_data, &code_size);
   if (ret != 0) {
     return ret;
   }
   struct evmc_result res = vm->execute(vm, &interface, &context, EVMC_MAX_REVISION, &msg, code_data, code_size);
   free(code_data);
+  if (context.error_code != 0)  {
+    return context.error_code;
+  }
+
   gw_call_receipt_t *receipt = (gw_call_receipt_t *)ctx->sys_context;
   receipt->return_data_len = (uint32_t)res.output_size;
   memcpy(receipt->return_data, res.output_data, res.output_size);
