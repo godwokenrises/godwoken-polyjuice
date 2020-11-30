@@ -43,6 +43,16 @@ struct evmc_host_context {
   int error_code;
 };
 
+/**
+   Message = [
+     depth: u16, (little endian)
+     tx_origin: Option<H160>,
+     flags: u8,
+     value: U256 (big endian),
+     input_size: u32, (little endian)
+     input_data: [u8],
+   ]
+ */
 int init_message(struct evmc_message *msg, gw_context_t* ctx) {
   /* TODO: support CREATE2, DELEGATECALL, CALLCODE */
   if (ctx->call_context.call_type == GW_CALL_TYPE_CONSTRUCT) {
@@ -71,16 +81,16 @@ int init_message(struct evmc_message *msg, gw_context_t* ctx) {
   if (depth > 0) {
     tx_origin_len = 20;
   }
-  /* args[2..6] */
-  uint32_t flags = *((uint32_t *)args + 2 + tx_origin_len);
-  /* args[6..38] */
-  evmc_uint256be value = *((evmc_uint256be *)(args + 2 + tx_origin_len + 4));
-  /* args[38..42] */
-  uint32_t input_size = *((uint32_t *)(args + 2 + tx_origin_len + 4 + 32));
-  /* args[42..42+input_size] */
-  uint8_t *input_data = args + 2 + tx_origin_len + 4 + 32 + 4;
+  /* args[2..3] */
+  uint8_t flags = *(args + 2 + tx_origin_len);
+  /* args[3..35] */
+  evmc_uint256be value = *((evmc_uint256be *)(args + 2 + tx_origin_len + 1));
+  /* args[35..39] */
+  uint32_t input_size = *((uint32_t *)(args + 2 + tx_origin_len + 1 + 32));
+  /* args[39..39+input_size] */
+  uint8_t *input_data = args + 2 + tx_origin_len + 1 + 32 + 4;
 
-  if (ctx->call_context.args_len != (input_size + 42 + tx_origin_len)) {
+  if (ctx->call_context.args_len != (input_size + 39 + tx_origin_len)) {
     /* ERROR: Invalid args_len */
     return -1;
   }
@@ -298,16 +308,17 @@ struct evmc_result call(struct evmc_host_context* context,
   }
 
   gw_call_receipt_t receipt;
-  uint32_t args_len = (uint32_t)msg->input_size + 42 + 20;
+  uint32_t args_len = (uint32_t)msg->input_size + 39 + 20;
   uint8_t *args = (uint8_t *)malloc(args_len);
+  uint8_t flags_u8 = (uint8_t)msg->flags;
   uint16_t depth_u16 = (uint16_t)msg->depth;
   uint32_t input_size_u32 = (uint32_t)msg->input_size;
   memcpy(args, (uint8_t *)(&depth_u16), 2);
   memcpy(args + 2, context->tx_origin.bytes, 20);
-  memcpy(args + 2 + 20, (uint8_t *)(&msg->flags), 4);
-  memcpy(args + 2 + 20 + 4, msg->value.bytes, 32);
-  memcpy(args + 2 + 20 + 4 + 32, (uint8_t *)(&input_size_u32), 4);
-  memcpy(args + 2 + 20 + 4 + 32 + 4, msg->input_data, msg->input_size);
+  memcpy(args + 2 + 20, &flags_u8, 1);
+  memcpy(args + 2 + 20 + 1, msg->value.bytes, 32);
+  memcpy(args + 2 + 20 + 1 + 32, (uint8_t *)(&input_size_u32), 4);
+  memcpy(args + 2 + 20 + 1 + 32 + 4, msg->input_data, msg->input_size);
   ret = context->gw_ctx->sys_call((void *)context->gw_ctx, to_id, args, args_len, &receipt);
   if (ret != 0) {
     context->error_code = ret;
@@ -376,9 +387,12 @@ void emit_log(struct evmc_host_context* context,
 
 /* parse args then create contract */
 __attribute__((visibility("default"))) int gw_construct(gw_context_t * ctx) {
+  ckb_debug("BEGIN gw_construct");
   int ret;
   struct evmc_message msg;
+  ckb_debug("BEGIN init_message()");
   ret = init_message(&msg, ctx);
+  ckb_debug("END init_message()");
   if (ret != 0) {
     return ret;
   }
@@ -398,7 +412,10 @@ __attribute__((visibility("default"))) int gw_construct(gw_context_t * ctx) {
 
   uint8_t *code_data = NULL;
   size_t code_size = 0;
+
+  ckb_debug("BEGIN vm->execute()");
   struct evmc_result res = vm->execute(vm, &interface, &context, EVMC_MAX_REVISION, &msg, code_data, code_size);
+  ckb_debug("END vm->execute()");
   free(code_data);
   if (context.error_code != 0)  {
     return context.error_code;
@@ -408,6 +425,7 @@ __attribute__((visibility("default"))) int gw_construct(gw_context_t * ctx) {
   gw_call_receipt_t *receipt = (gw_call_receipt_t *)ctx->sys_context;
   receipt->return_data_len = (uint32_t)res.output_size;
   memcpy(receipt->return_data, res.output_data, res.output_size);
+  ckb_debug("END gw_construct");
   return (int)res.status_code;
 }
 
