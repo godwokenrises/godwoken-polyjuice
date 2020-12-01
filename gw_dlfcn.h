@@ -232,7 +232,7 @@ int ckb_dlopen(uint32_t id, uint8_t *aligned_addr, size_t aligned_size,
         }
         relocation_size -= load_size;
         current_offset += len;
-        for (int j = 0; j < load_size; j++) {
+        for (size_t j = 0; j < load_size; j++) {
           Elf64_Rela *r = &relocations[j];
           if (r->r_info != R_RISCV_RELATIVE) {
             /* Only relative relocation is supported now, we might add more

@@ -1,5 +1,5 @@
-TARGET := riscv64-unknown-linux-gnu
-# TARGET := riscv64-unknown-elf
+# TARGET := riscv64-unknown-linux-gnu
+TARGET := riscv64-unknown-elf
 CC := $(TARGET)-gcc
 CXX := $(TARGET)-g++
 LD := $(TARGET)-gcc
@@ -11,7 +11,7 @@ CFLAGS_INTX := -Ideps/intx/lib/intx -Ideps/intx/include
 CFLAGS_ETHASH := -Ideps/ethash/include -Ideps/ethash/lib/ethash -Ideps/ethash/lib/keccak -Ideps/ethash/lib/support
 CFLAGS_EVMONE := -Ideps/evmone/lib/evmone -Ideps/evmone/include -Ideps/evmone/evmc/include
 CFLAGS_SECP := -isystem deps/secp256k1/src -isystem deps/secp256k1
-CFLAGS := -fPIC -O3 -I build $(CFLAGS_CKB_STD) $(CFLAGS_EVMONE) $(CFLAGS_INTX) $(CFLAGS_ETHASH) $(CFLAGS_SECP) -Wall -g
+CFLAGS := -O3 $(CFLAGS_CKB_STD) $(CFLAGS_EVMONE) $(CFLAGS_INTX) $(CFLAGS_ETHASH) $(CFLAGS_SECP) -Wall -g
 CXXFLAGS := $(CFLAGS) -std=c++1z
 LDFLAGS := -fdata-sections -ffunction-sections -Wl,--gc-sections
 SECP256K1_SRC := deps/secp256k1/src/ecmult_static_pre_context.h
@@ -20,21 +20,21 @@ MOLC := moleculec
 MOLC_VERSION := 0.6.1
 PROTOCOL_SCHEMA_DIR := ./schemas
 
-ALL_OBJS := build/evmone.o build/analysis.o build/execution.o build/instructions.o build/div.o build/keccak.o build/keccakf800.o build/keccakf1600.o
+ALL_OBJS := build/evmone.o build/analysis.o build/execution.o build/instructions.o build/instructions_calls.o build/div.o build/keccak.o build/keccakf800.o build/keccakf1600.o
 
 # docker pull nervos/ckb-riscv-gnu-toolchain:gnu-bionic-20191012
-BUILDER_DOCKER := nervos/ckb-riscv-gnu-toolchain@sha256:aae8a3f79705f67d505d1f1d5ddc694a4fd537ed1c7e9622420a470d59ba2ec3
+# BUILDER_DOCKER := nervos/ckb-riscv-gnu-toolchain@sha256:aae8a3f79705f67d505d1f1d5ddc694a4fd537ed1c7e9622420a470d59ba2ec3
 # docker pull nervos/ckb-riscv-gnu-toolchain:bionic-20190702
-# BUILDER_DOCKER := nervos/ckb-riscv-gnu-toolchain@sha256:7b168b4b109a0f741078a71b7c4dddaf1d283a5244608f7851f5714fbad273ba
+BUILDER_DOCKER := nervos/ckb-riscv-gnu-toolchain@sha256:7b168b4b109a0f741078a71b7c4dddaf1d283a5244608f7851f5714fbad273ba
 
-all: build/generator.so build/blockchain.h build/godwoken.h
+all: build/generator build/blockchain.h build/godwoken.h
 
 all-via-docker: generate-protocol
 	mkdir -p build
 	docker run --rm -v `pwd`:/code ${BUILDER_DOCKER} bash -c "cd /code && make"
 
-build/generator.so: polyjuice-generator.c $(ALL_OBJS)
-	$(CXX) $(CFLAGS) $(LDFLAGS) -shared -o $@ $<
+build/generator: generator.c polyjuice.h $(ALL_OBJS)
+	$(CXX) $(CFLAGS) $(LDFLAGS) -I. -Ibuild -o $@ generator.c $(ALL_OBJS)
 	$(OBJCOPY) --only-keep-debug $@ $@.debug
 	$(OBJCOPY) --strip-debug --strip-all $@
 
@@ -45,6 +45,8 @@ build/analysis.o: deps/evmone/lib/evmone/analysis.cpp
 build/execution.o: deps/evmone/lib/evmone/execution.cpp
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -c -o $@ $<
 build/instructions.o: deps/evmone/lib/evmone/instructions.cpp
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -c -o $@ $<
+build/instructions_calls.o: deps/evmone/lib/evmone/instructions_calls.cpp
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -c -o $@ $<
 
 build/keccak.o: deps/ethash/lib/keccak/keccak.c build/keccakf800.o build/keccakf1600.o

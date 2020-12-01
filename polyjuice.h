@@ -1,5 +1,3 @@
-#define __SHARED_LIBRARY__ 1
-
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
@@ -18,24 +16,15 @@
 /* account script buffer sisze: 32KB */
 #define ACCOUNT_SCRIPT_BUFSIZE 32768
 
-/*
-static char debug_buffer[64 * 1024];
-static void debug_print_data(const char *prefix,
-                             const uint8_t *data,
-                             uint32_t data_len) {
-  int offset = 0;
-  offset += sprintf(debug_buffer, "%s 0x", prefix);
-  for (size_t i = 0; i < data_len; i++) {
-    offset += sprintf(debug_buffer + offset, "%02x", data[i]);
-  }
-  debug_buffer[offset] = '\0';
-  ckb_debug(debug_buffer);
+static uint8_t polyjuice_script_hash[32] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
+                                            0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff,};
+
+
+bool is_polyjuice_script_hash(const uint8_t script_hash[32]) {
+  return memcmp(script_hash, polyjuice_script_hash, 32) == 0;
 }
-static void debug_print_int(const char *prefix, int64_t ret) {
-  sprintf(debug_buffer, "%s => %ld", prefix, ret);
-  ckb_debug(debug_buffer);
-}
-*/
 
 struct evmc_host_context {
   gw_context_t* gw_ctx;
@@ -386,7 +375,7 @@ void emit_log(struct evmc_host_context* context,
 
 
 /* parse args then create contract */
-__attribute__((visibility("default"))) int gw_construct(gw_context_t * ctx) {
+int gw_construct(gw_context_t * ctx) {
   ckb_debug("BEGIN gw_construct");
   int ret;
   struct evmc_message msg;
@@ -430,7 +419,7 @@ __attribute__((visibility("default"))) int gw_construct(gw_context_t * ctx) {
 }
 
 /* parse args then call contract */
-__attribute__((visibility("default"))) int gw_handle_message(gw_context_t* ctx) {
+int gw_handle_message(gw_context_t* ctx) {
   int ret;
   struct evmc_message msg;
   ret = init_message(&msg, ctx);
@@ -469,3 +458,9 @@ __attribute__((visibility("default"))) int gw_handle_message(gw_context_t* ctx) 
   return (int)res.status_code;
 }
 
+int gw_polyjuice_construct(gw_context_t * ctx) {
+  return gw_construct(ctx);
+}
+int gw_polyjuice_handle_message(gw_context_t* ctx) {
+  return gw_handle_message(ctx);
+}
