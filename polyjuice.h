@@ -13,18 +13,28 @@
 #include <evmc/evmc.h>
 #include <evmone/evmone.h>
 
+static char debug_buffer[64 * 1024];
+static void debug_print_data(const char *prefix,
+                             const uint8_t *data,
+                             uint32_t data_len) {
+  int offset = 0;
+  offset += sprintf(debug_buffer, "%s 0x", prefix);
+  for (size_t i = 0; i < data_len; i++) {
+    offset += sprintf(debug_buffer + offset, "%02x", data[i]);
+  }
+  debug_buffer[offset] = '\0';
+  ckb_debug(debug_buffer);
+}
+static void debug_print_int(const char *prefix, int64_t ret) {
+  sprintf(debug_buffer, "%s => %ld", prefix, ret);
+  ckb_debug(debug_buffer);
+}
+
 /* account script buffer sisze: 32KB */
 #define ACCOUNT_SCRIPT_BUFSIZE 32768
 
-static uint8_t polyjuice_script_hash[32] = {0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                                            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                                            0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
-                                            0x00, 0x08, 0x00, 0x00, 0x00, 0x00, 0x00, 0xff,};
-
-
-bool is_polyjuice_script_hash(const uint8_t script_hash[32]) {
-  return memcmp(script_hash, polyjuice_script_hash, 32) == 0;
-}
+int gw_construct(gw_context_t * ctx);
+int gw_handle_message(gw_context_t* ctx);
 
 struct evmc_host_context {
   gw_context_t* gw_ctx;
@@ -56,28 +66,42 @@ int init_message(struct evmc_message *msg, gw_context_t* ctx) {
   evmc_address sender;
   evmc_address destination;
   uint8_t sender_script_hash[32];
-  uint8_t dest_script_hash[32];
+  debug_print_int("get script hash of from account: ", ctx->call_context.from_id);
   ctx->sys_get_script_hash_by_account_id((void *)ctx, ctx->call_context.from_id, sender_script_hash);
-  ctx->sys_get_script_hash_by_account_id((void *)ctx, ctx->call_context.to_id, dest_script_hash);
   memcpy(sender.bytes, sender_script_hash, 20);
-  memcpy(destination.bytes, dest_script_hash, 20);
+  debug_print_data("sender", sender.bytes, 20);
+  if (msg->kind == EVMC_CREATE) {
+    uint8_t dest_script_hash[32];
+    debug_print_int("get script hash of to account: ", ctx->call_context.to_id);
+    ctx->sys_get_script_hash_by_account_id((void *)ctx, ctx->call_context.to_id, dest_script_hash);
+    memcpy(destination.bytes, dest_script_hash, 20);
+    debug_print_data("destination", destination.bytes, 20);
+  } else {
+    memset(destination.bytes, 0, 20);
+  }
 
+  debug_print_int("args_len", ctx->call_context.args_len);
   /* == Args decoder */
   uint8_t *args = ctx->call_context.args;
   size_t tx_origin_len = 0;
   /* args[0..2] */
   uint32_t depth = (uint32_t)(*(uint16_t *)args);
+  debug_print_int("depth", depth);
   if (depth > 0) {
     tx_origin_len = 20;
   }
   /* args[2..3] */
   uint8_t flags = *(args + 2 + tx_origin_len);
+  debug_print_int("flags", flags);
   /* args[3..35] */
   evmc_uint256be value = *((evmc_uint256be *)(args + 2 + tx_origin_len + 1));
+  debug_print_data("value", value.bytes, 32);
   /* args[35..39] */
   uint32_t input_size = *((uint32_t *)(args + 2 + tx_origin_len + 1 + 32));
+  debug_print_int("input_size", input_size);
   /* args[39..39+input_size] */
   uint8_t *input_data = args + 2 + tx_origin_len + 1 + 32 + 4;
+  debug_print_data("input_data", input_data, input_size);
 
   if (ctx->call_context.args_len != (input_size + 39 + tx_origin_len)) {
     /* ERROR: Invalid args_len */
@@ -149,7 +173,7 @@ struct evmc_tx_context get_tx_context(struct evmc_host_context* context) {
   /* gas price = 1 */
   tx_ctx.tx_gas_price.bytes[31] = 0x01;
   tx_ctx.tx_origin = context->tx_origin;
-  /* FIXME: get coinbase by aggregator id */
+  /* TODO: get coinbase by aggregator id */
   memset(tx_ctx.block_coinbase.bytes, 0, 20);
   tx_ctx.block_number = context->gw_ctx->block_info.number;
   tx_ctx.block_timestamp = context->gw_ctx->block_info.timestamp;
@@ -192,7 +216,7 @@ enum evmc_storage_status set_storage(struct evmc_host_context* context,
   if (ret != 0) {
     context->error_code = ret;
   }
-  /* FIXME: more rich evmc_storage_status */
+  /* TODO: more rich evmc_storage_status */
   return EVMC_STORAGE_ADDED;
 }
 
@@ -287,16 +311,16 @@ struct evmc_result call(struct evmc_host_context* context,
                         const struct evmc_message* msg) {
   int ret;
   struct evmc_result res;
+  gw_context_t *gw_ctx = context->gw_ctx;
 
   uint32_t to_id;
-  ret = get_account_id_by_address(context->gw_ctx, &(msg->destination), &to_id);
+  ret = get_account_id_by_address(gw_ctx, &(msg->destination), &to_id);
   if (ret != 0) {
     context->error_code = ret;
     res.status_code = EVMC_REVERT;
     return res;
   }
 
-  gw_call_receipt_t receipt;
   uint32_t args_len = (uint32_t)msg->input_size + 39 + 20;
   uint8_t *args = (uint8_t *)malloc(args_len);
   uint8_t flags_u8 = (uint8_t)msg->flags;
@@ -308,7 +332,27 @@ struct evmc_result call(struct evmc_host_context* context,
   memcpy(args + 2 + 20 + 1, msg->value.bytes, 32);
   memcpy(args + 2 + 20 + 1 + 32, (uint8_t *)(&input_size_u32), 4);
   memcpy(args + 2 + 20 + 1 + 32 + 4, msg->input_data, msg->input_size);
-  ret = context->gw_ctx->sys_call((void *)context->gw_ctx, to_id, args, args_len, &receipt);
+
+  /* prepare context */
+  uint32_t from_id = gw_ctx->call_context.to_id;
+  gw_call_receipt_t receipt;
+  gw_context_t sub_gw_ctx;
+  receipt.return_data_len = 0;
+  sub_gw_ctx.sys_context = &receipt;
+  ret = gw_create_sub_context(gw_ctx, &sub_gw_ctx, from_id, to_id, args, args_len);
+  if (ret != 0) {
+    context->error_code = ret;
+    res.status_code = EVMC_REVERT;
+    return res;
+  }
+
+  if (msg->kind == EVMC_CALL) {
+    ret = gw_handle_message(&sub_gw_ctx);
+  } else if (msg->kind == EVMC_CREATE) {
+    ret = gw_construct(&sub_gw_ctx);
+  } else {
+    ret = -1;
+  }
   if (ret != 0) {
     context->error_code = ret;
     res.status_code = EVMC_REVERT;
@@ -399,22 +443,25 @@ int gw_construct(gw_context_t * ctx) {
   }
   struct evmc_host_context context { ctx, tx_origin, 0 };
 
-  uint8_t *code_data = NULL;
-  size_t code_size = 0;
+  const uint8_t *code_data = msg.input_data;
+  size_t code_size = msg.input_size;
+  msg.input_data = NULL;
+  msg.input_size = 0;
 
   ckb_debug("BEGIN vm->execute()");
   struct evmc_result res = vm->execute(vm, &interface, &context, EVMC_MAX_REVISION, &msg, code_data, code_size);
   ckb_debug("END vm->execute()");
-  free(code_data);
   if (context.error_code != 0)  {
     return context.error_code;
   }
   /* FIXME: handle created address */
 
   gw_call_receipt_t *receipt = (gw_call_receipt_t *)ctx->sys_context;
+  debug_print_int("output size", res.output_size);
   receipt->return_data_len = (uint32_t)res.output_size;
   memcpy(receipt->return_data, res.output_data, res.output_size);
   ckb_debug("END gw_construct");
+  debug_print_int("status_code", res.status_code);
   return (int)res.status_code;
 }
 
@@ -453,8 +500,10 @@ int gw_handle_message(gw_context_t* ctx) {
   }
 
   gw_call_receipt_t *receipt = (gw_call_receipt_t *)ctx->sys_context;
+  debug_print_int("output size", res.output_size);
   receipt->return_data_len = (uint32_t)res.output_size;
   memcpy(receipt->return_data, res.output_data, res.output_size);
+  debug_print_int("status_code", res.status_code);
   return (int)res.status_code;
 }
 

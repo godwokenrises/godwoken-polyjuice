@@ -21,6 +21,8 @@
 /* internal syscall only for generator */
 #define GW_SYS_LOAD_CALLCONTEXT 4051
 #define GW_SYS_LOAD_BLOCKINFO 4052
+#define GW_SYS_LOAD_SCRIPT_HASH_BY_ACCOUNT_ID 4053
+#define GW_SYS_LOAD_ACCOUNT_ID_BY_SCRIPT_HASH 4054
 #define GW_SYS_LOAD_PROGRAM_AS_DATA 4061
 #define GW_SYS_LOAD_PROGRAM_AS_CODE 4062
 
@@ -62,6 +64,16 @@ int sys_set_program_return_data(void *ctx, uint8_t *data, uint32_t len) {
   receipt->return_data_len = len;
   memcpy(receipt->return_data, data, len);
   return 0;
+}
+
+/* Get account id by account script_hash */
+int sys_get_account_id_by_script_hash(void *ctx, uint8_t script_hash[32], uint32_t * account_id) {
+  return syscall(GW_SYS_LOAD_ACCOUNT_ID_BY_SCRIPT_HASH, script_hash, account_id, 0, 0, 0, 0);
+}
+
+/* Get account script_hash by account id */
+int sys_get_script_hash_by_account_id(void *ctx, uint32_t account_id, uint8_t script_hash[32]) {
+  return syscall(GW_SYS_LOAD_SCRIPT_HASH_BY_ACCOUNT_ID, account_id, script_hash, 0, 0, 0, 0);
 }
 
 /* set program return data */
@@ -135,6 +147,7 @@ int invoke_polyjuice_contract_func(gw_context_t *ctx) {
   }
 }
 
+/* In polyjuice only use sys_call to query/transfer balance (sudt/CKB/others) */
 int sys_call(void *ctx, uint32_t to_id, uint8_t *args, uint32_t args_len,
              gw_call_receipt_t *receipt) {
   if (ctx == NULL) {
@@ -153,39 +166,27 @@ int sys_call(void *ctx, uint32_t to_id, uint8_t *args, uint32_t args_len,
   receipt->return_data_len = 0;
   sub_gw_ctx.sys_context = receipt;
 
-  uint8_t script_hash[32];
-  ret = gw_ctx->sys_get_script_hash_by_account_id(ctx, to_id, script_hash);
+  /* load code_hash */
+  void *handle = NULL;
+  uint64_t consumed_size = 0;
+
+  uint64_t buffer_size =
+    gw_ctx->code_buffer_len - gw_ctx->code_buffer_used_size;
+  ret =
+    ckb_dlopen(to_id, gw_ctx->code_buffer + gw_ctx->code_buffer_used_size,
+               buffer_size, &handle, &consumed_size);
   if (ret != 0) {
     return ret;
   }
-  if (is_polyjuice_script_hash(script_hash)) {
-    ret = gw_handle_message(&sub_gw_ctx);
-    if (ret != 0) {
-      return ret;
-    }
-  } else {
-    /* load code_hash */
-    void *handle = NULL;
-    uint64_t consumed_size = 0;
+  if (consumed_size > buffer_size) {
+    return GW_ERROR_INVALID_DATA;
+  }
+  gw_ctx->code_buffer_used_size += consumed_size;
 
-    uint64_t buffer_size =
-      gw_ctx->code_buffer_len - gw_ctx->code_buffer_used_size;
-    ret =
-      ckb_dlopen(to_id, gw_ctx->code_buffer + gw_ctx->code_buffer_used_size,
-                 buffer_size, &handle, &consumed_size);
-    if (ret != 0) {
-      return ret;
-    }
-    if (consumed_size > buffer_size) {
-      return GW_ERROR_INVALID_DATA;
-    }
-    gw_ctx->code_buffer_used_size += consumed_size;
-
-    /* Run contract */
-    ret = invoke_contract_func(&sub_gw_ctx, handle);
-    if (ret != 0) {
-      return ret;
-    }
+  /* Run contract */
+  ret = invoke_contract_func(&sub_gw_ctx, handle);
+  if (ret != 0) {
+    return ret;
   }
 
   return 0;
@@ -204,6 +205,10 @@ int main() {
   context.sys_store = sys_store;
   context.sys_set_program_return_data = sys_set_program_return_data;
   context.sys_call = sys_call;
+  /* TODO: sys_create */
+  context.sys_get_account_id_by_script_hash = sys_get_account_id_by_script_hash;
+  context.sys_get_script_hash_by_account_id = sys_get_script_hash_by_account_id;
+  /* FIXME: get account script */
 
   uint8_t call_context[CALL_CONTEXT_LEN];
   uint64_t len = CALL_CONTEXT_LEN;
@@ -250,44 +255,13 @@ int main() {
   }
 
   /* load layer2 contract */
-  uint32_t id = context.call_context.to_id;
-  uint8_t script_hash[32];
-  ret = context.sys_get_script_hash_by_account_id((void *)(&context), id, script_hash);
+  ret = invoke_polyjuice_contract_func(&context);
   if (ret != 0) {
     return ret;
   }
-  if (is_polyjuice_script_hash(script_hash)) {
-    ret = invoke_polyjuice_contract_func(&context);
-    if (ret != 0) {
-      return ret;
-    }
-  } else {
-    void *handle = NULL;
-    uint64_t consumed_size = 0;
-    ckb_debug("BEGIN ckb_dlopen()");
-    ret = ckb_dlopen(id, code_buffer, CODE_SIZE, &handle, &consumed_size);
-    ckb_debug("END ckb_dlopen()");
-    if (ret != 0) {
-      return ret;
-    }
 
-    if (consumed_size > CODE_SIZE) {
-      return GW_ERROR_DYNAMIC_LINKING;
-    }
-
-    context.code_buffer = code_buffer;
-    context.code_buffer_len = CODE_SIZE;
-    context.code_buffer_used_size = consumed_size;
-
-    /* run contract */
-    ckb_debug("BEGIN invoke_contract_func()");
-    ret = invoke_contract_func(&context, handle);
-    ckb_debug("END invoke_contract_func()");
-    if (ret != 0) {
-      return ret;
-    }
-  }
-
+  debug_print_data("return data", receipt.return_data, receipt.return_data_len);
+  debug_print_int("return data length", receipt.return_data_len);
   /* Return data from receipt */
   ret = _set_program_return_data(receipt.return_data, receipt.return_data_len);
   if (ret != 0) {
