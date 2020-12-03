@@ -1,0 +1,19 @@
+[package]
+name = "godwoken-polyjuice"
+version = "0.0.1"
+authors = ["Nervos Core Dev <dev@nervos.org>"]
+edition = "2018"
+build = "build.rs"
+license = "MIT"
+description = "Polyjuice scripts for godwoken"
+repository = "https://github.com/thewawar/godwoken-polyjuice"
+include = ["src/**/*", "Cargo.toml", "build.rs", "build/generator"]
+
+[dependencies]
+includedir = "0.5.0"
+phf = "0.7.21"
+
+[build-dependencies]
+includedir_codegen = "0.5.0"
+blake2b-rs = "0.1.5"
+faster-hex = "0.4.1"
