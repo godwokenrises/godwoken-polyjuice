@@ -63,18 +63,15 @@ int init_message(struct evmc_message *msg, gw_context_t* ctx) {
     return -1;
   }
 
+  /* FIXME: Check from_id and to_id code hash, ONLY ALLOW: [polyjuice, sudt] */
   evmc_address sender;
   evmc_address destination;
-  uint8_t sender_script_hash[32];
   debug_print_int("get script hash of from account: ", ctx->call_context.from_id);
-  ctx->sys_get_script_hash_by_account_id((void *)ctx, ctx->call_context.from_id, sender_script_hash);
-  memcpy(sender.bytes, sender_script_hash, 20);
+  memcpy(sender.bytes, (uint8_t *)(&ctx->call_context.from_id), 4);
   debug_print_data("sender", sender.bytes, 20);
   if (msg->kind == EVMC_CREATE) {
-    uint8_t dest_script_hash[32];
     debug_print_int("get script hash of to account: ", ctx->call_context.to_id);
-    ctx->sys_get_script_hash_by_account_id((void *)ctx, ctx->call_context.to_id, dest_script_hash);
-    memcpy(destination.bytes, dest_script_hash, 20);
+    memcpy(destination.bytes, (uint8_t *)(&ctx->call_context.to_id), 4);
     debug_print_data("destination", destination.bytes, 20);
   } else {
     memset(destination.bytes, 0, 20);
@@ -126,42 +123,68 @@ void release_result(const struct evmc_result* result) {
 }
 
 int get_account_id_by_address(gw_context_t *ctx, const evmc_address* address, uint32_t *account_id) {
-  uint8_t script_hash[32];
-  memcpy(script_hash, address->bytes, 20);
-  memset(script_hash + 20, 0, 12);
-  return ctx->sys_get_account_id_by_script_hash((void *)ctx, script_hash, account_id);
+  for (size_t i = 4; i < 20; i++) {
+    if (address->bytes[i] != 0) {
+      /* ERROR: invalid polyjuice address */
+      return -1;
+    }
+  }
+  *account_id = *((uint32_t *)(address->bytes));
+  return 0;
 }
 
-int load_account_script(gw_context_t *gw_ctx, uint32_t account_id, uint8_t **code, size_t *code_size) {
+int load_account_code(gw_context_t *gw_ctx,
+                      uint32_t account_id,
+                      uint8_t **data_buffer,
+                      uint8_t **code,
+                      size_t *code_size) {
   int ret;
   size_t total_size = 0;
   size_t buffer_size = ACCOUNT_SCRIPT_BUFSIZE;
   uint32_t len = (uint32_t) buffer_size;
   uint8_t *buffer = (uint8_t *)malloc(buffer_size);
+  uint8_t *ptr = buffer;
   size_t offset = 0;
-  while (len >= buffer_size) {
+  while (true) {
     ret = gw_ctx->sys_get_account_script((void *)gw_ctx,
                                          account_id,
                                          &len,
                                          offset,
-                                         buffer);
+                                         ptr);
     if (ret != 0) {
-      *code = buffer;
-      *code_size = total_size;
+      *data_buffer = buffer;
       return ret;
     }
     total_size += (size_t)len;
-    if (len == buffer_size) {
+    if (len == buffer_size || len == buffer_size / 2) {
       uint8_t *new_buffer = (uint8_t *)malloc(buffer_size * 2);
       memcpy(new_buffer, buffer, buffer_size);
-      len = (uint32_t) buffer_size;
-      offset = buffer_size;
-      buffer_size *= 2;
       free(buffer);
+      ptr = new_buffer + total_size;
+      buffer = new_buffer;
+      offset = buffer_size;
+      len = (uint32_t) buffer_size;
+      buffer_size *= 2;
+    } else {
+      break;
     }
   }
-  *code = buffer;
-  *code_size = total_size;
+
+  mol_seg_t script_seg;
+  script_seg.ptr = buffer;
+  script_seg.size = total_size;
+  if (MolReader_Script_verify(&script_seg, false) != MOL_OK) {
+    ckb_debug("verify script failed");
+    return -1;
+  }
+  mol_seg_t args_seg = MolReader_Script_get_args(&script_seg);
+  mol_seg_t args_bytes_seg = MolReader_Bytes_raw_bytes(&args_seg);
+  *code_size = *((uint32_t *)args_bytes_seg.ptr);
+  *code = args_bytes_seg.ptr + 4;
+  *data_buffer = buffer;
+  debug_print_int("loaded code size", *code_size);
+  debug_print_data("loaded code data", *code, *code_size);
+
   return 0;
 }
 
@@ -190,14 +213,20 @@ struct evmc_tx_context get_tx_context(struct evmc_host_context* context) {
 
 bool account_exists(struct evmc_host_context* context,
                     const evmc_address* address) {
+  ckb_debug("BEGIN account_exists");
   uint32_t account_id;
   int ret = get_account_id_by_address(context->gw_ctx, address, &account_id);
+  if (ret != 0) {
+    context->error_code = ret;
+  }
+  ckb_debug("END account_exists");
   return ret == 0;
 }
 
 evmc_bytes32 get_storage(struct evmc_host_context* context,
                          const evmc_address* address,
                          const evmc_bytes32* key) {
+  ckb_debug("BEGIN get_storage");
   evmc_bytes32 value{};
   int ret = context->gw_ctx->sys_load((void *)context->gw_ctx,
                                       key->bytes,
@@ -205,6 +234,7 @@ evmc_bytes32 get_storage(struct evmc_host_context* context,
   if (ret != 0) {
     context->error_code = ret;
   }
+  ckb_debug("END get_storage");
   return value;
 }
 
@@ -212,35 +242,41 @@ enum evmc_storage_status set_storage(struct evmc_host_context* context,
                                      const evmc_address* address,
                                      const evmc_bytes32* key,
                                      const evmc_bytes32* value) {
+  ckb_debug("BEGIN set_storage");
   int ret = context->gw_ctx->sys_store((void *)context->gw_ctx, key->bytes, value->bytes);
   if (ret != 0) {
     context->error_code = ret;
   }
   /* TODO: more rich evmc_storage_status */
+  ckb_debug("END set_storage");
   return EVMC_STORAGE_ADDED;
 }
 
 size_t get_code_size(struct evmc_host_context* context,
                      const evmc_address* address) {
+  ckb_debug("BEGIN get_code_size");
   uint32_t account_id = 0;
   int ret = get_account_id_by_address(context->gw_ctx, address, &account_id);
   if (ret != 0) {
     context->error_code = ret;
     return 0;
   }
+  uint8_t *buffer = NULL;
   uint8_t *code = NULL;
   size_t code_size;
-  ret = load_account_script(context->gw_ctx, account_id, &code, &code_size);
+  ret = load_account_code(context->gw_ctx, account_id, &buffer, &code, &code_size);
   if (ret != 0) {
     context->error_code = ret;
     return 0;
   }
-  free((void *)code);
+  free((void *)buffer);
+  ckb_debug("END get_code_size");
   return code_size;
 }
 
 evmc_bytes32 get_code_hash(struct evmc_host_context* context,
                            const evmc_address* address) {
+  ckb_debug("BEGIN get_code_hash");
   evmc_bytes32 hash{};
   uint32_t account_id = 0;
   int ret = get_account_id_by_address(context->gw_ctx, address, &account_id);
@@ -249,9 +285,10 @@ evmc_bytes32 get_code_hash(struct evmc_host_context* context,
     return hash;
   }
 
+  uint8_t *buffer = NULL;
   uint8_t *code = NULL;
   size_t code_size;
-  ret = load_account_script(context->gw_ctx, account_id, &code, &code_size);
+  ret = load_account_code(context->gw_ctx, account_id, &buffer, &code, &code_size);
   if (ret != 0) {
     context->error_code = ret;
     return hash;
@@ -259,7 +296,8 @@ evmc_bytes32 get_code_hash(struct evmc_host_context* context,
 
   union ethash_hash256 hash_result = ethash::keccak256(code, code_size);
   memcpy(hash.bytes, hash_result.bytes, 32);
-  free((void *)code);
+  free((void *)buffer);
+  ckb_debug("END get_code_hash");
   return hash;
 }
 
@@ -268,7 +306,7 @@ size_t copy_code(struct evmc_host_context* context,
                  size_t code_offset,
                  uint8_t* buffer_data,
                  size_t buffer_size) {
-
+  ckb_debug("BEGIN copy_code");
   uint32_t account_id = 0;
   int ret = get_account_id_by_address(context->gw_ctx, address, &account_id);
   if (ret != 0) {
@@ -284,11 +322,13 @@ size_t copy_code(struct evmc_host_context* context,
   if (ret != 0) {
     return ret;
   }
+  ckb_debug("END copy_code");
   return 0;
 }
 
 evmc_uint256be get_balance(struct evmc_host_context* context,
                            const evmc_address* address) {
+  ckb_debug("BEGIN copy_code");
   evmc_uint256be balance{};
   uint32_t account_id;
   int ret = get_account_id_by_address(context->gw_ctx, address, &account_id);
@@ -296,6 +336,7 @@ evmc_uint256be get_balance(struct evmc_host_context* context,
     return balance;
   }
 
+  ckb_debug("END copy_code");
   /* FIXME */
   return balance;
 }
@@ -309,6 +350,7 @@ void selfdestruct(struct evmc_host_context* context,
 
 struct evmc_result call(struct evmc_host_context* context,
                         const struct evmc_message* msg) {
+  ckb_debug("BEGIN call");
   int ret;
   struct evmc_result res;
   gw_context_t *gw_ctx = context->gw_ctx;
@@ -370,11 +412,13 @@ struct evmc_result call(struct evmc_host_context* context,
   */
 
   /* FIXME: handle transfer logic */
+  ckb_debug("END call");
 
   return res;
 }
 
 evmc_bytes32 get_block_hash(struct evmc_host_context* context, int64_t number) {
+  ckb_debug("BEGIN get_block_hash");
   evmc_bytes32 block_hash{};
   int ret = context->gw_ctx->sys_get_block_hash((void *)context->gw_ctx,
                                                 number,
@@ -383,6 +427,7 @@ evmc_bytes32 get_block_hash(struct evmc_host_context* context, int64_t number) {
     context->error_code = ret;
     return block_hash;
   }
+  ckb_debug("END get_block_hash");
   return block_hash;
 }
 
@@ -392,6 +437,7 @@ void emit_log(struct evmc_host_context* context,
               size_t data_size,
               const evmc_bytes32 topics[],
               size_t topics_count) {
+  ckb_debug("BEGIN emit_log");
   size_t output_size = 20 + (4 + data_size) + (4 + topics_count * 32);
   uint8_t *output = (uint8_t *)malloc(output_size);
   uint32_t data_size_u32 = (uint32_t)(data_size);
@@ -414,6 +460,7 @@ void emit_log(struct evmc_host_context* context,
     context->error_code = ret;
   }
   free(output);
+  ckb_debug("END emit_log");
   return;
 }
 
@@ -456,6 +503,26 @@ int gw_construct(gw_context_t * ctx) {
   }
   /* FIXME: handle created address */
 
+  /* Check res.output_data == code */
+  uint8_t *data_buffer = NULL;
+  uint8_t *loaded_code_data = NULL;
+  size_t loaded_code_size = 0;
+  ret = load_account_code(ctx, ctx->call_context.to_id, &data_buffer, &loaded_code_data, &loaded_code_size);
+  if (ret != 0) {
+    return ret;
+  }
+  if (loaded_code_size != res.output_size) {
+    /* ERROR: return data length not match the script args length */
+    return -1;
+  }
+  if (memcmp(loaded_code_data, res.output_data, loaded_code_size)) {
+    /* ERROR: return data not match the script data */
+    return -1;
+  }
+  ckb_debug("BEGIN: free loaded code data");
+  free((void *)data_buffer);
+  ckb_debug("END: free loaded code data");
+
   gw_call_receipt_t *receipt = (gw_call_receipt_t *)ctx->sys_context;
   debug_print_int("output size", res.output_size);
   receipt->return_data_len = (uint32_t)res.output_size;
@@ -467,9 +534,12 @@ int gw_construct(gw_context_t * ctx) {
 
 /* parse args then call contract */
 int gw_handle_message(gw_context_t* ctx) {
+  ckb_debug("BEGIN gw_handle_message");
   int ret;
   struct evmc_message msg;
+  ckb_debug("BEGIN init_message()");
   ret = init_message(&msg, ctx);
+  ckb_debug("END init_message()");
   if (ret != 0) {
     return ret;
   }
@@ -487,14 +557,15 @@ int gw_handle_message(gw_context_t* ctx) {
   }
   struct evmc_host_context context { ctx, tx_origin, 0 };
 
+  uint8_t *buffer = NULL;
   uint8_t *code_data = NULL;
   size_t code_size = 0;
-  ret = load_account_script(ctx, ctx->call_context.to_id, &code_data, &code_size);
+  ret = load_account_code(ctx, ctx->call_context.to_id, &buffer, &code_data, &code_size);
   if (ret != 0) {
     return ret;
   }
   struct evmc_result res = vm->execute(vm, &interface, &context, EVMC_MAX_REVISION, &msg, code_data, code_size);
-  free(code_data);
+  free((void *)buffer);
   if (context.error_code != 0)  {
     return context.error_code;
   }
@@ -504,6 +575,7 @@ int gw_handle_message(gw_context_t* ctx) {
   receipt->return_data_len = (uint32_t)res.output_size;
   memcpy(receipt->return_data, res.output_data, res.output_size);
   debug_print_int("status_code", res.status_code);
+  ckb_debug("END gw_handle_message");
   return (int)res.status_code;
 }
 

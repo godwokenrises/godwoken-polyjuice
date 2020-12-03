@@ -23,6 +23,7 @@
 #define GW_SYS_LOAD_BLOCKINFO 4052
 #define GW_SYS_LOAD_SCRIPT_HASH_BY_ACCOUNT_ID 4053
 #define GW_SYS_LOAD_ACCOUNT_ID_BY_SCRIPT_HASH 4054
+#define GW_SYS_LOAD_ACCOUNT_SCRIPT 4055
 #define GW_SYS_LOAD_PROGRAM_AS_DATA 4061
 #define GW_SYS_LOAD_PROGRAM_AS_CODE 4062
 
@@ -74,6 +75,11 @@ int sys_get_account_id_by_script_hash(void *ctx, uint8_t script_hash[32], uint32
 /* Get account script_hash by account id */
 int sys_get_script_hash_by_account_id(void *ctx, uint32_t account_id, uint8_t script_hash[32]) {
   return syscall(GW_SYS_LOAD_SCRIPT_HASH_BY_ACCOUNT_ID, account_id, script_hash, 0, 0, 0, 0);
+}
+
+/* Get account script by account id */
+int sys_get_account_script(void *ctx, uint32_t account_id, uint32_t * len, uint32_t offset, uint8_t * script) {
+  return syscall(GW_SYS_LOAD_ACCOUNT_SCRIPT, account_id, len, offset, script, 0, 0);
 }
 
 /* set program return data */
@@ -205,10 +211,10 @@ int main() {
   context.sys_store = sys_store;
   context.sys_set_program_return_data = sys_set_program_return_data;
   context.sys_call = sys_call;
-  /* TODO: sys_create */
+  /* FIXME: sys_create */
   context.sys_get_account_id_by_script_hash = sys_get_account_id_by_script_hash;
   context.sys_get_script_hash_by_account_id = sys_get_script_hash_by_account_id;
-  /* FIXME: get account script */
+  context.sys_get_account_script = sys_get_account_script;
 
   uint8_t call_context[CALL_CONTEXT_LEN];
   uint64_t len = CALL_CONTEXT_LEN;
