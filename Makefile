@@ -10,11 +10,9 @@ CFLAGS_CKB_STD = -Ideps/ckb-c-stdlib -Ideps/ckb-c-stdlib/molecule
 CFLAGS_INTX := -Ideps/intx/lib/intx -Ideps/intx/include
 CFLAGS_ETHASH := -Ideps/ethash/include -Ideps/ethash/lib/ethash -Ideps/ethash/lib/keccak -Ideps/ethash/lib/support
 CFLAGS_EVMONE := -Ideps/evmone/lib/evmone -Ideps/evmone/include -Ideps/evmone/evmc/include
-CFLAGS_SECP := -isystem deps/secp256k1/src -isystem deps/secp256k1
-CFLAGS := -O3 $(CFLAGS_CKB_STD) $(CFLAGS_EVMONE) $(CFLAGS_INTX) $(CFLAGS_ETHASH) $(CFLAGS_SECP) -Wall -g
+CFLAGS := -O3 -Ic $(CFLAGS_CKB_STD) $(CFLAGS_EVMONE) $(CFLAGS_INTX) $(CFLAGS_ETHASH) -Wall -g
 CXXFLAGS := $(CFLAGS) -std=c++1z
 LDFLAGS := -fdata-sections -ffunction-sections -Wl,--gc-sections
-SECP256K1_SRC := deps/secp256k1/src/ecmult_static_pre_context.h
 
 MOLC := moleculec
 MOLC_VERSION := 0.6.1
@@ -33,8 +31,8 @@ all-via-docker: generate-protocol
 	mkdir -p build
 	docker run --rm -v `pwd`:/code ${BUILDER_DOCKER} bash -c "cd /code && make"
 
-build/generator: generator.c polyjuice.h $(ALL_OBJS)
-	$(CXX) $(CFLAGS) $(LDFLAGS) -I. -Ibuild -o $@ generator.c $(ALL_OBJS)
+build/generator: c/generator.c c/polyjuice.h $(ALL_OBJS)
+	$(CXX) $(CFLAGS) $(LDFLAGS) -I. -Ibuild -o $@ c/generator.c $(ALL_OBJS)
 	$(OBJCOPY) --only-keep-debug $@ $@.debug
 	$(OBJCOPY) --strip-debug --strip-all $@
 
@@ -70,23 +68,5 @@ build/blockchain.h: ${PROTOCOL_SCHEMA_DIR}/blockchain.mol
 build/godwoken.h: ${PROTOCOL_SCHEMA_DIR}/godwoken.mol
 	${MOLC} --language c --schema-file $< > $@
 
-# secp256k1
-build/secp256k1_data_info.h: build/dump_secp256k1_data
-	$<
-
-build/dump_secp256k1_data: dump_secp256k1_data.c $(SECP256K1_SRC)
-	mkdir -p build
-	gcc $(CFLAGS_SECP) $(CFLAGS_CKB_STD) -o $@ $<
-
-$(SECP256K1_SRC):
-	cd deps/secp256k1 && \
-		./autogen.sh && \
-		CC=$(CC) LD=$(LD) ./configure --with-bignum=no --enable-ecmult-static-precomputation --enable-endomorphism --enable-module-recovery --host=$(TARGET) && \
-		make src/ecmult_static_pre_context.h src/ecmult_static_context.h
-
 clean:
 	rm -rf build/*
-	# cd deps/secp256k1 && [ -f "Makefile" ] && make clean
-
-clean-bin:
-	rm -rf build/generator.so
