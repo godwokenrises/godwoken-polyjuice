@@ -18,6 +18,7 @@
 #define GW_SYS_STORE 3051
 #define GW_SYS_LOAD 3052
 #define GW_SYS_SET_RETURN_DATA 3061
+#define GW_SYS_CREATE 3071
 /* internal syscall only for generator */
 #define GW_SYS_LOAD_CALLCONTEXT 4051
 #define GW_SYS_LOAD_BLOCKINFO 4052
@@ -196,6 +197,13 @@ int sys_call(void *ctx, uint32_t to_id, uint8_t *args, uint32_t args_len,
   }
 
   return 0;
+}
+
+int sys_create(void *ctx,
+               uint8_t *script,
+               uint32_t script_len,
+               uint32_t *account_id) {
+  return syscall(GW_SYS_CREATE, script, script_len, account_id, 0, 0, 0);
 }
 
 int main() {

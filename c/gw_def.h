@@ -26,28 +26,29 @@ typedef struct {
 /**
  * Load value by key from current contract account
  *
- * @param ctx    The godwoken context
- * @param account_id
- * @param args
- * @param args_len
- * @param receipt Receipt of this function call
- * @return       The status code, 0 is success
+ * @param ctx        The godwoken context
+ * @param account_id The account id to call
+ * @param args       The arguments data for the call
+ * @param args_len   The length of the arguments data
+ * @param receipt    Receipt of this function call
+ * @return           The status code, 0 is success
  */
-typedef int (*gw_call_fn)(void *ctx, uint32_t account_id, uint8_t *args,
-                          uint32_t args_len, gw_call_receipt_t *receipt);
+typedef int (*gw_call_fn)(void *ctx,
+                          uint32_t account_id,
+                          uint8_t *args,
+                          uint32_t args_len,
+                          gw_call_receipt_t *receipt);
 
 /**
  * Create a new account
  *
- * @param ctx    The godwoken context
- * @param script Contract's script
- * @param len    Length of script structure
- * @param receipt Receipt of this constructor call
- * @return       The status code, 0 is success
+ * @param ctx        The godwoken context
+ * @param script     Contract's script (MUST be valid molecule format CKB Script)
+ * @param script_len Length of script structure
+ * @param account_id The address of created account id
+ * @return           The status code, 0 is success
  */
-typedef int (*gw_create_fn)(void *ctx, uint8_t *script,
-                          uint32_t len, gw_call_receipt_t *receipt);
-
+typedef int (*gw_create_fn)(void *ctx, uint8_t *script, uint32_t script_len, uint32_t *account_id);
 
 /**
  * Load value by key from current contract account
@@ -113,7 +114,8 @@ typedef int (*gw_get_account_nonce_fn)(void *ctx, uint32_t account_id, uint32_t 
  *
  * @param ctx        The godwoken context
  * @param account_id The account id
- * @param len        The length of the script
+ * @param len        The length of the script data
+ * @param offset     The offset of the script data
  * @param script     The pointer of the script to save the result
  * @return           The status code, 0 is success
  */
