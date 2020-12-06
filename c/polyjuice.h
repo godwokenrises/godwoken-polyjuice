@@ -9,6 +9,8 @@
 #include "godwoken.h"
 #include "ckb_syscalls.h"
 
+#include <map>
+#include <iterator>
 #include <ethash/keccak.hpp>
 #include <evmc/evmc.h>
 #include <evmone/evmone.h>
@@ -40,6 +42,8 @@ struct evmc_host_context {
   gw_context_t* gw_ctx;
   evmc_address tx_origin;
   int error_code;
+  mol_seg_t script_seg;
+  void *mock_map;
 };
 
 /**
@@ -122,7 +126,13 @@ void release_result(const struct evmc_result* result) {
   return;
 }
 
-int get_account_id_by_address(gw_context_t *ctx, const evmc_address* address, uint32_t *account_id) {
+evmc_address account_id_to_address(uint32_t account_id) {
+  evmc_address addr;
+  memset(addr.bytes, 0, 20);
+  memcpy(addr.bytes, (uint8_t *)(&account_id), 4);
+  return addr;
+}
+int address_to_account_id(const evmc_address* address, uint32_t *account_id) {
   for (size_t i = 4; i < 20; i++) {
     if (address->bytes[i] != 0) {
       /* ERROR: invalid polyjuice address */
@@ -135,7 +145,7 @@ int get_account_id_by_address(gw_context_t *ctx, const evmc_address* address, ui
 
 int load_account_code(gw_context_t *gw_ctx,
                       uint32_t account_id,
-                      uint8_t **data_buffer,
+                      mol_seg_t *script_seg,
                       uint8_t **code,
                       size_t *code_size) {
   int ret;
@@ -152,7 +162,7 @@ int load_account_code(gw_context_t *gw_ctx,
                                          offset,
                                          ptr);
     if (ret != 0) {
-      *data_buffer = buffer;
+      free(buffer);
       return ret;
     }
     total_size += (size_t)len;
@@ -170,18 +180,16 @@ int load_account_code(gw_context_t *gw_ctx,
     }
   }
 
-  mol_seg_t script_seg;
-  script_seg.ptr = buffer;
-  script_seg.size = total_size;
-  if (MolReader_Script_verify(&script_seg, false) != MOL_OK) {
+  script_seg->ptr = buffer;
+  script_seg->size = total_size;
+  if (MolReader_Script_verify(script_seg, false) != MOL_OK) {
     ckb_debug("verify script failed");
     return -1;
   }
-  mol_seg_t args_seg = MolReader_Script_get_args(&script_seg);
+  mol_seg_t args_seg = MolReader_Script_get_args(script_seg);
   mol_seg_t args_bytes_seg = MolReader_Bytes_raw_bytes(&args_seg);
   *code_size = *((uint32_t *)args_bytes_seg.ptr);
   *code = args_bytes_seg.ptr + 4;
-  *data_buffer = buffer;
   debug_print_int("loaded code size", *code_size);
   debug_print_data("loaded code data", *code, *code_size);
 
@@ -215,7 +223,7 @@ bool account_exists(struct evmc_host_context* context,
                     const evmc_address* address) {
   ckb_debug("BEGIN account_exists");
   uint32_t account_id;
-  int ret = get_account_id_by_address(context->gw_ctx, address, &account_id);
+  int ret = address_to_account_id(address, &account_id);
   if (ret != 0) {
     context->error_code = ret;
   }
@@ -256,20 +264,20 @@ size_t get_code_size(struct evmc_host_context* context,
                      const evmc_address* address) {
   ckb_debug("BEGIN get_code_size");
   uint32_t account_id = 0;
-  int ret = get_account_id_by_address(context->gw_ctx, address, &account_id);
+  int ret = address_to_account_id(address, &account_id);
   if (ret != 0) {
     context->error_code = ret;
     return 0;
   }
-  uint8_t *buffer = NULL;
+  mol_seg_t script_seg;
   uint8_t *code = NULL;
   size_t code_size;
-  ret = load_account_code(context->gw_ctx, account_id, &buffer, &code, &code_size);
+  ret = load_account_code(context->gw_ctx, account_id, &script_seg, &code, &code_size);
   if (ret != 0) {
     context->error_code = ret;
     return 0;
   }
-  free((void *)buffer);
+  free((void *)script_seg.ptr);
   ckb_debug("END get_code_size");
   return code_size;
 }
@@ -279,16 +287,16 @@ evmc_bytes32 get_code_hash(struct evmc_host_context* context,
   ckb_debug("BEGIN get_code_hash");
   evmc_bytes32 hash{};
   uint32_t account_id = 0;
-  int ret = get_account_id_by_address(context->gw_ctx, address, &account_id);
+  int ret = address_to_account_id(address, &account_id);
   if (ret != 0) {
     context->error_code = ret;
     return hash;
   }
 
-  uint8_t *buffer = NULL;
+  mol_seg_t script_seg;
   uint8_t *code = NULL;
   size_t code_size;
-  ret = load_account_code(context->gw_ctx, account_id, &buffer, &code, &code_size);
+  ret = load_account_code(context->gw_ctx, account_id, &script_seg, &code, &code_size);
   if (ret != 0) {
     context->error_code = ret;
     return hash;
@@ -296,7 +304,7 @@ evmc_bytes32 get_code_hash(struct evmc_host_context* context,
 
   union ethash_hash256 hash_result = ethash::keccak256(code, code_size);
   memcpy(hash.bytes, hash_result.bytes, 32);
-  free((void *)buffer);
+  free((void *)script_seg.ptr);
   ckb_debug("END get_code_hash");
   return hash;
 }
@@ -308,7 +316,7 @@ size_t copy_code(struct evmc_host_context* context,
                  size_t buffer_size) {
   ckb_debug("BEGIN copy_code");
   uint32_t account_id = 0;
-  int ret = get_account_id_by_address(context->gw_ctx, address, &account_id);
+  int ret = address_to_account_id(address, &account_id);
   if (ret != 0) {
     return (size_t)ret;
   }
@@ -331,7 +339,7 @@ evmc_uint256be get_balance(struct evmc_host_context* context,
   ckb_debug("BEGIN copy_code");
   evmc_uint256be balance{};
   uint32_t account_id;
-  int ret = get_account_id_by_address(context->gw_ctx, address, &account_id);
+  int ret = address_to_account_id(address, &account_id);
   if (ret != 0) {
     return balance;
   }
@@ -356,7 +364,7 @@ struct evmc_result call(struct evmc_host_context* context,
   gw_context_t *gw_ctx = context->gw_ctx;
 
   uint32_t to_id;
-  ret = get_account_id_by_address(gw_ctx, &(msg->destination), &to_id);
+  ret = address_to_account_id(&(msg->destination), &to_id);
   if (ret != 0) {
     context->error_code = ret;
     res.status_code = EVMC_REVERT;
@@ -380,21 +388,40 @@ struct evmc_result call(struct evmc_host_context* context,
   gw_call_receipt_t receipt;
   gw_context_t sub_gw_ctx;
   receipt.return_data_len = 0;
-  sub_gw_ctx.sys_context = &receipt;
   ret = gw_create_sub_context(gw_ctx, &sub_gw_ctx, from_id, to_id, args, args_len);
+  sub_gw_ctx.sys_context = &receipt;
   if (ret != 0) {
     context->error_code = ret;
     res.status_code = EVMC_REVERT;
     return res;
   }
 
+  /* TODO: handle special kind (CREATE2/CALLCODE/DELEGATECALL)*/
   if (msg->kind == EVMC_CALL) {
     ret = gw_handle_message(&sub_gw_ctx);
+    memset(res.create_address.bytes, 0, 20);
   } else if (msg->kind == EVMC_CREATE) {
     ret = gw_construct(&sub_gw_ctx);
+    /*
+     * TODO Steps:
+     *  1. Build Script by receipt.return_data
+     *  2. Create account by Script
+     *  3. Get account id by script hash
+     *  4. Set account id to sub_gw_ctx.call_context.to_id
+     *  5. Set res.create_address by sub_gw_ctx.call_context.to_id
+     */
+    res.create_address = account_id_to_address(sub_gw_ctx.call_context.to_id);
+    std::map<std::string, int> *kv_map = (std::map<std::string, int>*)context->mock_map;
   } else {
-    ret = -1;
+    /* ERROR: Invalid call kind */
+    context->error_code = -1;
+    res.status_code = EVMC_REVERT;
+    return res;
   }
+  /* Free the buffer after use sub_gw_ctx.call_context.args */
+  free(sub_gw_ctx.call_context.args);
+  sub_gw_ctx.call_context.args = NULL;
+
   if (ret != 0) {
     context->error_code = ret;
     res.status_code = EVMC_REVERT;
@@ -406,10 +433,6 @@ struct evmc_result call(struct evmc_host_context* context,
   res.output_data = (uint8_t *)malloc(res.output_size);
   memcpy((void *)res.output_data, receipt.return_data, res.output_size);
   res.release = release_result;
-  /* FIXME: res.create_address:
-     How to handle create account action?
-     ==> Add a API: sys_create(ctx, args, args_len, receipt);
-  */
 
   /* FIXME: handle transfer logic */
   ckb_debug("END call");
@@ -482,45 +505,58 @@ int gw_construct(gw_context_t * ctx) {
   }
 
   struct evmc_vm *vm = evmc_create_evmone();
-  struct evmc_host_interface interface = { account_exists, get_storage, set_storage, get_balance, get_code_size, get_code_hash, copy_code, selfdestruct, call, get_tx_context, get_block_hash, emit_log};
-
+  struct evmc_host_interface interface = { account_exists,
+                                           get_storage, set_storage,
+                                           get_balance,
+                                           get_code_size, get_code_hash, copy_code,
+                                           selfdestruct, call,
+                                           get_tx_context,
+                                           get_block_hash,
+                                           emit_log };
   evmc_address tx_origin = msg.sender;
   if (msg.depth > 0 ) {
     memcpy(tx_origin.bytes, ctx->call_context.args + 1, 20);
   }
-  struct evmc_host_context context { ctx, tx_origin, 0 };
+  mol_seg_t script_seg;
+  uint8_t *code_data = NULL;
+  size_t code_size = 0;
+  ret = load_account_code(ctx, ctx->call_context.to_id, &script_seg, &code_data, &code_size);
+  if (ret != 0) {
+    return ret;
+  }
+  void *mock_map = NULL;
+  if (ctx->call_context.to_id == 0) {
+    std::map<std::string, int> kv_map;
+    mock_map = (void*)&kv_map;
+  }
+  struct evmc_host_context context { ctx, tx_origin, 0, script_seg, mock_map };
 
-  const uint8_t *code_data = msg.input_data;
-  size_t code_size = msg.input_size;
+  const uint8_t *current_code_data = msg.input_data;
+  size_t current_code_size = msg.input_size;
   msg.input_data = NULL;
   msg.input_size = 0;
 
   ckb_debug("BEGIN vm->execute()");
-  struct evmc_result res = vm->execute(vm, &interface, &context, EVMC_MAX_REVISION, &msg, code_data, code_size);
+  struct evmc_result res = vm->execute(vm, &interface, &context, EVMC_MAX_REVISION, &msg, current_code_data, current_code_size);
   ckb_debug("END vm->execute()");
   if (context.error_code != 0)  {
     return context.error_code;
   }
   /* FIXME: handle created address */
 
-  /* Check res.output_data == code */
-  uint8_t *data_buffer = NULL;
-  uint8_t *loaded_code_data = NULL;
-  size_t loaded_code_size = 0;
-  ret = load_account_code(ctx, ctx->call_context.to_id, &data_buffer, &loaded_code_data, &loaded_code_size);
-  if (ret != 0) {
-    return ret;
-  }
-  if (loaded_code_size != res.output_size) {
-    /* ERROR: return data length not match the script args length */
-    return -1;
-  }
-  if (memcmp(loaded_code_data, res.output_data, loaded_code_size)) {
-    /* ERROR: return data not match the script data */
-    return -1;
+  if (ctx->call_context.to_id != 0) {
+    /* Check res.output_data == code */
+    if (code_size != res.output_size) {
+      /* ERROR: return data length not match the script args length */
+      return -1;
+    }
+    if (memcmp(code_data, res.output_data, code_size)) {
+      /* ERROR: return data not match the script data */
+      return -1;
+    }
   }
   ckb_debug("BEGIN: free loaded code data");
-  free((void *)data_buffer);
+  free((void *)script_seg.ptr);
   ckb_debug("END: free loaded code data");
 
   gw_call_receipt_t *receipt = (gw_call_receipt_t *)ctx->sys_context;
@@ -549,23 +585,29 @@ int gw_handle_message(gw_context_t* ctx) {
   }
 
   struct evmc_vm *vm = evmc_create_evmone();
-  struct evmc_host_interface interface = { account_exists, get_storage, set_storage, get_balance, get_code_size, get_code_hash, copy_code, selfdestruct, call, get_tx_context, get_block_hash, emit_log};
-
+  struct evmc_host_interface interface = { account_exists,
+                                           get_storage, set_storage,
+                                           get_balance,
+                                           get_code_size, get_code_hash, copy_code,
+                                           selfdestruct, call,
+                                           get_tx_context,
+                                           get_block_hash,
+                                           emit_log };
   evmc_address tx_origin = msg.sender;
   if (msg.depth > 0 ) {
     memcpy(tx_origin.bytes, ctx->call_context.args + 1, 20);
   }
-  struct evmc_host_context context { ctx, tx_origin, 0 };
-
-  uint8_t *buffer = NULL;
+  mol_seg_t script_seg;
   uint8_t *code_data = NULL;
   size_t code_size = 0;
-  ret = load_account_code(ctx, ctx->call_context.to_id, &buffer, &code_data, &code_size);
+  ret = load_account_code(ctx, ctx->call_context.to_id, &script_seg, &code_data, &code_size);
   if (ret != 0) {
     return ret;
   }
+  struct evmc_host_context context { ctx, tx_origin, 0, script_seg, NULL };
+
   struct evmc_result res = vm->execute(vm, &interface, &context, EVMC_MAX_REVISION, &msg, code_data, code_size);
-  free((void *)buffer);
+  free((void *)script_seg.ptr);
   if (context.error_code != 0)  {
     return context.error_code;
   }

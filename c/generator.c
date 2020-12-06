@@ -202,8 +202,8 @@ int sys_call(void *ctx, uint32_t to_id, uint8_t *args, uint32_t args_len,
 int sys_create(void *ctx,
                uint8_t *script,
                uint32_t script_len,
-               uint32_t *account_id) {
-  return syscall(GW_SYS_CREATE, script, script_len, account_id, 0, 0, 0);
+               gw_call_receipt_t *receipt) {
+  return syscall(GW_SYS_CREATE, script, script_len, 0, 0, 0, 0);
 }
 
 int main() {
@@ -219,7 +219,7 @@ int main() {
   context.sys_store = sys_store;
   context.sys_set_program_return_data = sys_set_program_return_data;
   context.sys_call = sys_call;
-  /* FIXME: sys_create */
+  context.sys_create = sys_create;
   context.sys_get_account_id_by_script_hash = sys_get_account_id_by_script_hash;
   context.sys_get_script_hash_by_account_id = sys_get_script_hash_by_account_id;
   context.sys_get_account_script = sys_get_account_script;
