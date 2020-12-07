@@ -13,6 +13,7 @@
 #include <iterator>
 #include <ethash/keccak.hpp>
 #include <evmc/evmc.h>
+#include <evmc/evmc.hpp>
 #include <evmone/evmone.h>
 
 static char debug_buffer[64 * 1024];
@@ -236,6 +237,15 @@ evmc_bytes32 get_storage(struct evmc_host_context* context,
                          const evmc_bytes32* key) {
   ckb_debug("BEGIN get_storage");
   evmc_bytes32 value{};
+  if (context->mock_map != NULL) {
+    std::map<evmc::bytes32, evmc::bytes32> *mock_map = (std::map<evmc::bytes32, evmc::bytes32> *)context->mock_map;
+    auto it = mock_map->find((evmc::bytes32)(*key));
+    if (it != mock_map->end()) {
+      memcpy(value.bytes, it->second.bytes, 32);
+      return value;
+    }
+  }
+
   int ret = context->gw_ctx->sys_load((void *)context->gw_ctx,
                                       key->bytes,
                                       (uint8_t *)value.bytes);
@@ -251,9 +261,14 @@ enum evmc_storage_status set_storage(struct evmc_host_context* context,
                                      const evmc_bytes32* key,
                                      const evmc_bytes32* value) {
   ckb_debug("BEGIN set_storage");
-  int ret = context->gw_ctx->sys_store((void *)context->gw_ctx, key->bytes, value->bytes);
-  if (ret != 0) {
-    context->error_code = ret;
+  if (context->mock_map != NULL) {
+    std::map<evmc::bytes32, evmc::bytes32> *mock_map = (std::map<evmc::bytes32, evmc::bytes32> *)context->mock_map;
+    mock_map->insert(std::pair<evmc::bytes32, evmc::bytes32>((evmc::bytes32)(*key), (evmc::bytes32)(*value)));
+  } else {
+    int ret = context->gw_ctx->sys_store((void *)context->gw_ctx, key->bytes, value->bytes);
+    if (ret != 0) {
+      context->error_code = ret;
+    }
   }
   /* TODO: more rich evmc_storage_status */
   ckb_debug("END set_storage");
@@ -401,17 +416,72 @@ struct evmc_result call(struct evmc_host_context* context,
     ret = gw_handle_message(&sub_gw_ctx);
     memset(res.create_address.bytes, 0, 20);
   } else if (msg->kind == EVMC_CREATE) {
+    /* assert(to_id == 0) */
+    if (to_id != 0) {
+      context->error_code = ret;
+      res.status_code = EVMC_REVERT;
+      return res;
+    }
+
     ret = gw_construct(&sub_gw_ctx);
-    /*
-     * TODO Steps:
-     *  1. Build Script by receipt.return_data
-     *  2. Create account by Script
-     *  3. Get account id by script hash
-     *  4. Set account id to sub_gw_ctx.call_context.to_id
-     *  5. Set res.create_address by sub_gw_ctx.call_context.to_id
-     */
+    if (ret != 0) {
+      context->error_code = ret;
+      res.status_code = EVMC_REVERT;
+      return res;
+    }
+
+    /* 1. Build Script by receipt.return_data */
+    mol_seg_t code_hash_seg = MolReader_Script_get_code_hash(&context->script_seg);
+    mol_seg_t hash_type_seg = MolReader_Script_get_hash_type(&context->script_seg);
+    mol_seg_t args_seg;
+    args_seg.size = 4 + receipt.return_data_len;
+    args_seg.ptr = (uint8_t *)malloc(args_seg.size);
+    memcpy(args_seg.ptr, (uint8_t *)(&receipt.return_data_len), 4);
+    memcpy(args_seg.ptr + 4, receipt.return_data, receipt.return_data_len);
+
+    mol_builder_t script_builder;
+    MolBuilder_Script_init(&script_builder);
+    MolBuilder_Script_set_code_hash(&script_builder, code_hash_seg.ptr, code_hash_seg.size);
+    MolBuilder_Script_set_hash_type(&script_builder, *hash_type_seg.ptr);
+    MolBuilder_Script_set_args(&script_builder, args_seg.ptr, args_seg.size);
+    mol_seg_res_t script_res = MolBuilder_Script_build(script_builder);
+    // Because errno is keyword
+    uint8_t error_num = *(uint8_t *)(&script_res);
+    if (error_num != MOL_OK) {
+      /* ERROR: build script failed */
+      context->error_code = error_num;
+      res.status_code = EVMC_REVERT;
+      return res;
+    }
+    mol_seg_t new_script_seg = script_res.seg;
+
+    /* 2. Create account by Script */
+    ret = gw_ctx->sys_create((void *)gw_ctx, new_script_seg.ptr, new_script_seg.size, &receipt);
+    if (ret != 0) {
+      context->error_code = ret;
+      res.status_code = EVMC_REVERT;
+      return res;
+    }
+
+    /* 3. Get account id by script hash */
+    uint8_t new_script_hash[32];
+    blake2b_state blake2b_ctx;
+    blake2b_init(&blake2b_ctx, 32);
+    blake2b_update(&blake2b_ctx, new_script_seg.ptr, new_script_seg.size);
+    blake2b_final(&blake2b_ctx, new_script_hash, 32);
+    uint32_t new_account_id;
+    ret = gw_ctx->sys_get_account_id_by_script_hash((void *)gw_ctx, new_script_hash, &new_account_id);
+    if (ret != 0) {
+      context->error_code = ret;
+      res.status_code = EVMC_REVERT;
+      return res;
+    }
+
+    /* 4. Set account id to sub_gw_ctx.call_context.to_id */
+    sub_gw_ctx.call_context.to_id = new_account_id;
+
+    /* 5. Set res.create_address by sub_gw_ctx.call_context.to_id */
     res.create_address = account_id_to_address(sub_gw_ctx.call_context.to_id);
-    std::map<std::string, int> *kv_map = (std::map<std::string, int>*)context->mock_map;
   } else {
     /* ERROR: Invalid call kind */
     context->error_code = -1;
@@ -526,7 +596,7 @@ int gw_construct(gw_context_t * ctx) {
   }
   void *mock_map = NULL;
   if (ctx->call_context.to_id == 0) {
-    std::map<std::string, int> kv_map;
+    std::map<evmc::bytes32, evmc::bytes32> kv_map;
     mock_map = (void*)&kv_map;
   }
   struct evmc_host_context context { ctx, tx_origin, 0, script_seg, mock_map };
