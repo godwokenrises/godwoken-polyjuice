@@ -10,13 +10,14 @@ CFLAGS_CKB_STD = -Ideps/ckb-c-stdlib -Ideps/ckb-c-stdlib/molecule
 CFLAGS_INTX := -Ideps/intx/lib/intx -Ideps/intx/include
 CFLAGS_ETHASH := -Ideps/ethash/include -Ideps/ethash/lib/ethash -Ideps/ethash/lib/keccak -Ideps/ethash/lib/support
 CFLAGS_EVMONE := -Ideps/evmone/lib/evmone -Ideps/evmone/include -Ideps/evmone/evmc/include
-CFLAGS := -O3 -Ic $(CFLAGS_CKB_STD) $(CFLAGS_EVMONE) $(CFLAGS_INTX) $(CFLAGS_ETHASH) -Wall -g
+CFLAGS_GODWOKEN := -Ideps/godwoken/c
+CFLAGS := -O3 -Ic $(CFLAGS_CKB_STD) $(CFLAGS_EVMONE) $(CFLAGS_INTX) $(CFLAGS_ETHASH) $(CFLAGS_GODWOKEN) -Wall -g
 CXXFLAGS := $(CFLAGS) -std=c++1z
 LDFLAGS := -fdata-sections -ffunction-sections -Wl,--gc-sections
 
 MOLC := moleculec
 MOLC_VERSION := 0.6.1
-PROTOCOL_SCHEMA_DIR := ./schemas
+PROTOCOL_SCHEMA_DIR := ./deps/godwoken/crates/types/schemas
 
 ALL_OBJS := build/evmone.o build/analysis.o build/execution.o build/instructions.o build/instructions_calls.o build/div.o build/keccak.o build/keccakf800.o build/keccakf1600.o
 
