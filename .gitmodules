@@ -13,3 +13,6 @@
 [submodule "deps/godwoken"]
 	path = deps/godwoken
 	url = https://github.com/nervosnetwork/godwoken.git
+[submodule "deps/godwoken-fix"]
+	path = deps/godwoken-fix
+	url = https://github.com/TheWaWaR/godwoken.git
