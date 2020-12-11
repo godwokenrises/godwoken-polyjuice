@@ -34,14 +34,19 @@ static void debug_print_int(const char *prefix, int64_t ret) {
 /* account script buffer sisze: 32KB */
 #define ACCOUNT_SCRIPT_BUFSIZE 32768
 
+static bool script_loaded = false;
+static uint8_t script_code_hash[32];
+static uint8_t script_hash_type;
+
 int handle_message(gw_context_t* ctx);
+typedef int (*stream_data_loader_fn)(void *ctx, uint32_t account_id,
+                                     uint32_t *len, uint32_t offset,
+                                     uint8_t *data);
 
 struct evmc_host_context {
   gw_context_t* gw_ctx;
   evmc_address tx_origin;
   int error_code;
-  uint8_t *script_code_hash;
-  uint8_t script_hash_type;
 };
 
 evmc_address account_id_to_address(uint32_t account_id) {
@@ -90,7 +95,7 @@ int create_sub_context(const gw_context_t *ctx,
      input_data : [u8],
    ]
  */
-int init_message(struct evmc_message *msg, gw_context_t* ctx) {
+int parse_message(struct evmc_message *msg, gw_context_t* ctx) {
   debug_print_int("args_len", ctx->transaction_context.args_len);
   /* == Args decoder */
   size_t offset = 0;
@@ -143,17 +148,44 @@ int init_message(struct evmc_message *msg, gw_context_t* ctx) {
   return 0;
 }
 
+int build_script(uint8_t code_hash[32],
+                 uint8_t hash_type,
+                 uint8_t *args,
+                 uint32_t args_len,
+                 mol_seg_t *script_seg) {
+    /* 1. Build Script by receipt.return_data */
+    mol_seg_t args_seg;
+    args_seg.size = args_len;
+    args_seg.ptr = (uint8_t *)malloc(args_seg.size);
+    memcpy(args_seg.ptr, args, args_len);
+
+    mol_builder_t script_builder;
+    MolBuilder_Script_init(&script_builder);
+    MolBuilder_Script_set_code_hash(&script_builder, code_hash, 32);
+    MolBuilder_Script_set_hash_type(&script_builder, hash_type);
+    MolBuilder_Script_set_args(&script_builder, args_seg.ptr, args_seg.size);
+    mol_seg_res_t script_res = MolBuilder_Script_build(script_builder);
+    // Because errno is keyword
+    uint8_t error_num = *(uint8_t *)(&script_res);
+    if (error_num != MOL_OK) {
+      /* ERROR: build script failed */
+      return -1;
+    }
+    *script_seg = script_res.seg;
+    return 0;
+}
+
 void release_result(const struct evmc_result* result) {
   free((void *)result->output_data);
   return;
 }
 
 
-int load_account_code(gw_context_t *gw_ctx,
-                      uint32_t account_id,
-                      mol_seg_t *script_seg,
-                      uint8_t **code,
-                      size_t *code_size) {
+int load_all_data(gw_context_t *gw_ctx,
+                  uint32_t account_id,
+                  uint8_t **data,
+                  size_t *data_size,
+                  stream_data_loader_fn loader) {
   int ret;
   size_t total_size = 0;
   size_t buffer_size = ACCOUNT_SCRIPT_BUFSIZE;
@@ -162,13 +194,12 @@ int load_account_code(gw_context_t *gw_ctx,
   uint8_t *ptr = buffer;
   size_t offset = 0;
   while (true) {
-    ret = gw_ctx->sys_get_account_script((void *)gw_ctx,
-                                         account_id,
-                                         &len,
-                                         offset,
-                                         ptr);
+    ret = loader((void *)gw_ctx, account_id, &len, offset, ptr);
     if (ret != 0) {
+      /* ERROR: load account data failed */
       free(buffer);
+      *data = NULL;
+      *data_size = 0;
       return ret;
     }
     total_size += (size_t)len;
@@ -185,20 +216,35 @@ int load_account_code(gw_context_t *gw_ctx,
       break;
     }
   }
+  *data = buffer;
+  *data_size = total_size;
+  debug_print_int("loaded data size", *data_size);
+  debug_print_data("loaded data data", *data, *data_size);
 
-  script_seg->ptr = buffer;
-  script_seg->size = total_size;
+  return 0;
+}
+
+int load_account_code(gw_context_t *gw_ctx,
+                       uint32_t account_id,
+                       uint8_t **code,
+                       size_t *code_size) {
+  return load_all_data(gw_ctx, account_id, code, code_size, gw_ctx->sys_get_account_code);
+}
+
+int load_account_script(gw_context_t *gw_ctx, uint32_t account_id, mol_seg_t *script_seg) {
+  int ret;
+  uint8_t *script = NULL;
+  size_t script_size = 0;
+  ret = load_all_data(gw_ctx, account_id, &script, &script_size, gw_ctx->sys_get_account_script);
+  if (ret != 0) {
+    return ret;
+  }
+  script_seg->ptr = script;
+  script_seg->size = (uint32_t)script_size;
   if (MolReader_Script_verify(script_seg, false) != MOL_OK) {
-    ckb_debug("verify script failed");
+    /* ERROR invalid script */
     return -1;
   }
-  mol_seg_t args_seg = MolReader_Script_get_args(script_seg);
-  mol_seg_t args_bytes_seg = MolReader_Bytes_raw_bytes(&args_seg);
-  *code_size = *((uint32_t *)args_bytes_seg.ptr);
-  *code = args_bytes_seg.ptr + 4;
-  debug_print_int("loaded code size", *code_size);
-  debug_print_data("loaded code data", *code, *code_size);
-
   return 0;
 }
 
@@ -228,13 +274,13 @@ struct evmc_tx_context get_tx_context(struct evmc_host_context* context) {
 bool account_exists(struct evmc_host_context* context,
                     const evmc_address* address) {
   ckb_debug("BEGIN account_exists");
-  uint32_t account_id;
+  uint32_t account_id = 0;
   int ret = address_to_account_id(address, &account_id);
   if (ret != 0) {
     context->error_code = ret;
   }
   ckb_debug("END account_exists");
-  return ret == 0;
+  return account_id == 0;
 }
 
 evmc_bytes32 get_storage(struct evmc_host_context* context,
@@ -279,15 +325,14 @@ size_t get_code_size(struct evmc_host_context* context,
     context->error_code = ret;
     return 0;
   }
-  mol_seg_t script_seg;
   uint8_t *code = NULL;
   size_t code_size;
-  ret = load_account_code(context->gw_ctx, account_id, &script_seg, &code, &code_size);
+  ret = load_account_code(context->gw_ctx, account_id, &code, &code_size);
   if (ret != 0) {
     context->error_code = ret;
     return 0;
   }
-  free((void *)script_seg.ptr);
+  free(code);
   ckb_debug("END get_code_size");
   return code_size;
 }
@@ -303,10 +348,9 @@ evmc_bytes32 get_code_hash(struct evmc_host_context* context,
     return hash;
   }
 
-  mol_seg_t script_seg;
   uint8_t *code = NULL;
   size_t code_size;
-  ret = load_account_code(context->gw_ctx, account_id, &script_seg, &code, &code_size);
+  ret = load_account_code(context->gw_ctx, account_id, &code, &code_size);
   if (ret != 0) {
     context->error_code = ret;
     return hash;
@@ -314,7 +358,7 @@ evmc_bytes32 get_code_hash(struct evmc_host_context* context,
 
   union ethash_hash256 hash_result = ethash::keccak256(code, code_size);
   memcpy(hash.bytes, hash_result.bytes, 32);
-  free((void *)script_seg.ptr);
+  free(code);
   ckb_debug("END get_code_hash");
   return hash;
 }
@@ -373,6 +417,10 @@ struct evmc_result call(struct evmc_host_context* context,
   struct evmc_result res;
   gw_context_t *gw_ctx = context->gw_ctx;
 
+  /* FIXME: Handle pre-compiled contracts
+   *   - check msg->destination
+   */
+
   uint32_t to_id;
   ret = address_to_account_id(&(msg->destination), &to_id);
   if (ret != 0) {
@@ -421,69 +469,7 @@ struct evmc_result call(struct evmc_host_context* context,
   gw_call_receipt_t *receipt = &sub_gw_ctx.receipt;
 
   /* TODO: handle special kind (CREATE2/CALLCODE/DELEGATECALL)*/
-  if (msg->kind == EVMC_CALL) {
-    ret = handle_message(&sub_gw_ctx);
-    memset(res.create_address.bytes, 0, 20);
-  } else if (msg->kind == EVMC_CREATE) {
-    /* assert(to_id == 0) */
-    if (to_id != 0) {
-      context->error_code = ret;
-      res.status_code = EVMC_REVERT;
-      return res;
-    }
-
-    ret = handle_message(&sub_gw_ctx);
-    if (ret != 0) {
-      context->error_code = ret;
-      res.status_code = EVMC_REVERT;
-      return res;
-    }
-
-    /* 1. Build Script by receipt.return_data */
-    mol_seg_t args_seg;
-    args_seg.size = 4 + receipt->return_data_len;
-    args_seg.ptr = (uint8_t *)malloc(args_seg.size);
-    memcpy(args_seg.ptr, (uint8_t *)(&(receipt->return_data_len)), 4);
-    memcpy(args_seg.ptr + 4, receipt->return_data, receipt->return_data_len);
-
-    mol_builder_t script_builder;
-    MolBuilder_Script_init(&script_builder);
-    MolBuilder_Script_set_code_hash(&script_builder, context->script_code_hash, 32);
-    MolBuilder_Script_set_hash_type(&script_builder, context->script_hash_type);
-    MolBuilder_Script_set_args(&script_builder, args_seg.ptr, args_seg.size);
-    mol_seg_res_t script_res = MolBuilder_Script_build(script_builder);
-    // Because errno is keyword
-    uint8_t error_num = *(uint8_t *)(&script_res);
-    if (error_num != MOL_OK) {
-      /* ERROR: build script failed */
-      context->error_code = error_num;
-      res.status_code = EVMC_REVERT;
-      return res;
-    }
-    mol_seg_t new_script_seg = script_res.seg;
-
-    /* 2. Create account by Script */
-    /* 3. Get account id */
-    uint32_t new_account_id;
-    ret = gw_ctx->sys_create((void *)gw_ctx, new_script_seg.ptr, new_script_seg.size, &new_account_id);
-    if (ret != 0) {
-      context->error_code = ret;
-      res.status_code = EVMC_REVERT;
-      return res;
-    }
-
-    /* 4. Set account id to sub_gw_ctx.transaction_context.to_id */
-    sub_gw_ctx.transaction_context.to_id = new_account_id;
-
-    /* 5. Set res.create_address by sub_gw_ctx.transaction_context.to_id */
-    res.create_address = account_id_to_address(sub_gw_ctx.transaction_context.to_id);
-  } else {
-    /* ERROR: Invalid call kind */
-    context->error_code = -1;
-    res.status_code = EVMC_REVERT;
-    return res;
-  }
-
+  ret = handle_message(&sub_gw_ctx);
   if (ret != 0) {
     context->error_code = ret;
     res.status_code = EVMC_REVERT;
@@ -563,14 +549,83 @@ int handle_message(gw_context_t* ctx) {
 
   int ret;
 
+  /* Parse message */
   struct evmc_message msg;
-  ckb_debug("BEGIN init_message()");
-  ret = init_message(&msg, ctx);
-  ckb_debug("END init_message()");
+  ckb_debug("BEGIN parse_message()");
+  ret = parse_message(&msg, ctx);
+  ckb_debug("END parse_message()");
   if (ret != 0) {
     return ret;
   }
 
+  evmc_address tx_origin = msg.sender;
+  if (msg.depth > 0 ) {
+    memcpy(tx_origin.bytes, ctx->transaction_context.args + 1, 20);
+  }
+
+  /* Load account script */
+  if (!script_loaded) {
+    mol_seg_t script_seg;
+    ret = load_account_script(ctx, ctx->transaction_context.to_id, &script_seg);
+    if (ret != 0) {
+      return ret;
+    }
+    mol_seg_t code_hash_seg = MolReader_Script_get_code_hash(&script_seg);
+    mol_seg_t hash_type_seg = MolReader_Script_get_hash_type(&script_seg);
+    free((void *)script_seg.ptr);
+    script_loaded = true;
+    memcpy(script_code_hash, code_hash_seg.ptr, 32);
+    script_hash_type = *hash_type_seg.ptr;
+  }
+
+  struct evmc_host_context context { ctx, tx_origin, 0 };
+
+  uint8_t *code_data = NULL;
+  size_t code_size = 0;
+  if (msg.kind == EVMC_CREATE) {
+    /* use input as code */
+    code_data = (uint8_t *)msg.input_data;
+    code_size = msg.input_size;
+    msg.input_data = NULL;
+    msg.input_size = 0;
+    /* create account id */
+    /* Include:
+       - sender account id
+       - sender nonce
+    */
+    uint8_t args[36];
+    memcpy(args, (uint8_t *)(&ctx->transaction_context.from_id), 4);
+    // TODO: the nonce length can be optimized (change nonce data type, u32 is not enough)
+    ret = ctx->sys_load_nonce(ctx, ctx->transaction_context.from_id, args + 4);
+    if (ret != 0) {
+      return ret;
+    }
+    mol_seg_t new_script_seg;
+    uint32_t new_account_id;
+    ret = build_script(script_code_hash, script_hash_type, args, 36, &new_script_seg);
+    if (ret != 0) {
+      return ret;
+    }
+    ret = ctx->sys_create(ctx, new_script_seg.ptr, new_script_seg.size, &new_account_id);
+    if (ret != 0) {
+      return ret;
+    }
+    ctx->transaction_context.to_id = new_account_id;
+  } else if (msg.kind == EVMC_CALL) {
+    ret = load_account_code(ctx,
+                            ctx->transaction_context.to_id,
+                            &code_data,
+                            &code_size);
+    if (ret != 0) {
+      return ret;
+    }
+    // Do nothing
+  } else {
+    // FIXME: handle special call kind
+    return -1;
+  }
+
+  /* Execute the code in EVM */
   struct evmc_vm *vm = evmc_create_evmone();
   struct evmc_host_interface interface = { account_exists,
                                            get_storage, set_storage,
@@ -580,56 +635,27 @@ int handle_message(gw_context_t* ctx) {
                                            get_tx_context,
                                            get_block_hash,
                                            emit_log };
-  evmc_address tx_origin = msg.sender;
-  if (msg.depth > 0 ) {
-    memcpy(tx_origin.bytes, ctx->transaction_context.args + 1, 20);
-  }
-  mol_seg_t script_seg;
-  uint8_t *code_data = NULL;
-  size_t code_size = 0;
-  ret = load_account_code(ctx,
-                          ctx->transaction_context.to_id,
-                          &script_seg,
-                          &code_data,
-                          &code_size);
-  mol_seg_t code_hash_seg = MolReader_Script_get_code_hash(&script_seg);
-  mol_seg_t hash_type_seg = MolReader_Script_get_hash_type(&script_seg);
-  if (code_hash_seg.size != 32) {
-    // ERROR: invalid code hash length
-    return -1;
-  }
-  uint8_t script_code_hash[32];
-  uint8_t script_hash_type = *hash_type_seg.ptr;
-  memcpy(script_code_hash, code_hash_seg.ptr, code_hash_seg.size);
-  free((void *)script_seg.ptr);
-
-  if (ret != 0) {
-    return ret;
-  }
-  struct evmc_host_context context { ctx, tx_origin, 0, script_code_hash, script_hash_type };
-
-  const uint8_t *current_code_data = code_data;
-  size_t current_code_size = code_size;
-  if (msg.kind == EVMC_CREATE) {
-    current_code_data = msg.input_data;
-    current_code_size = msg.input_size;
-    msg.input_data = NULL;
-    msg.input_size = 0;
-  } else if (msg.kind == EVMC_CALL) {
-    // Do nothing
-  } else {
-    // FIXME: handle special call kind
-    return -1;
-  }
   struct evmc_result res = vm->execute(vm,
                                        &interface,
                                        &context,
                                        EVMC_MAX_REVISION,
                                        &msg,
-                                       current_code_data,
-                                       current_code_size);
+                                       code_data,
+                                       code_size);
   if (context.error_code != 0)  {
     return context.error_code;
+  }
+
+  /* Store code though syscall */
+  // TODO handle special create kind
+  if (msg.kind == EVMC_CREATE) {
+    ret = ctx->sys_set_account_code(ctx,
+                                    ctx->transaction_context.to_id,
+                                    res.output_size,
+                                    (uint8_t *)res.output_data);
+    if (ret != 0) {
+      return ret;
+    }
   }
 
   debug_print_int("output size", res.output_size);

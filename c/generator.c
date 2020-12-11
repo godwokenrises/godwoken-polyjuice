@@ -38,6 +38,7 @@ int main() {
   gw_context_t context;
   gw_context_init(&context);
 
+  uint32_t old_to_id = context.transaction_context.to_id;
   /* load layer2 contract */
   ret = handle_message(&context);
   if (ret != 0) {
@@ -48,10 +49,13 @@ int main() {
                    context.receipt.return_data,
                    context.receipt.return_data_len);
   debug_print_int("return data length", context.receipt.return_data_len);
-  /* Return data from receipt */
-  ret = context.sys_set_program_return_data((void *)(&context),
-                                             context.receipt.return_data,
-                                             context.receipt.return_data_len);
+  /* It's a call */
+  if (old_to_id == context.transaction_context.to_id) {
+    /* Return data from receipt */
+    ret = context.sys_set_program_return_data((void *)(&context),
+                                              context.receipt.return_data,
+                                              context.receipt.return_data_len);
+  }
   if (ret != 0) {
     return ret;
   }
