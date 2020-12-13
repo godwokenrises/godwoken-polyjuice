@@ -7,6 +7,7 @@
 #include "gw_def.h"
 #include "common.h"
 #include "godwoken.h"
+#include "sudt_utils.h"
 #include "ckb_syscalls.h"
 
 #include <ethash/keccak.hpp>
@@ -36,6 +37,7 @@ static void debug_print_int(const char *prefix, int64_t ret) {
 #define GW_ACCOUNT_CONTRACT_CODE 100
 
 static bool script_loaded = false;
+static uint32_t sudt_id = UINT32_MAX;
 static uint8_t script_code_hash[32];
 static uint8_t script_hash_type;
 
@@ -429,15 +431,28 @@ size_t copy_code(struct evmc_host_context* context,
 evmc_uint256be get_balance(struct evmc_host_context* context,
                            const evmc_address* address) {
   ckb_debug("BEGIN copy_code");
+  int ret;
   evmc_uint256be balance{};
   uint32_t account_id;
-  int ret = address_to_account_id(address, &account_id);
+  ret = address_to_account_id(address, &account_id);
   if (ret != 0) {
+    ckb_debug("address to account_id failed");
+    context->error_code = -1;
     return balance;
   }
 
   ckb_debug("END copy_code");
-  /* FIXME */
+  uint128_t value_u128 = 0;
+  ret = sudt_get_balance(context->gw_ctx, sudt_id, account_id, &value_u128);
+  if (ret != 0) {
+    ckb_debug("sudt_get_balance failed");
+    context->error_code = -1;
+    return balance;
+  }
+  uint8_t *value_ptr = (uint8_t *)(&value_u128);
+  for (int i = 0; i < 16; i++) {
+    balance.bytes[31-i] = *(value_ptr + i);
+  }
   return balance;
 }
 
@@ -462,6 +477,7 @@ struct evmc_result call(struct evmc_host_context* context,
   uint32_t to_id;
   ret = address_to_account_id(&(msg->destination), &to_id);
   if (ret != 0) {
+    ckb_debug("address to account id failed");
     context->error_code = ret;
     res.status_code = EVMC_REVERT;
     return res;
@@ -469,6 +485,7 @@ struct evmc_result call(struct evmc_host_context* context,
 
   if (msg->depth > (int32_t)UINT16_MAX) {
     // ERROR: depth too large
+    ckb_debug("depth too large");
     context->error_code = -1;
     res.status_code = EVMC_REVERT;
     return res;
@@ -500,6 +517,7 @@ struct evmc_result call(struct evmc_host_context* context,
   gw_context_t sub_gw_ctx;
   ret = create_sub_context(gw_ctx, &sub_gw_ctx, from_id, to_id, args, args_len);
   if (ret != 0) {
+    ckb_debug("create sub context failed");
     context->error_code = ret;
     res.status_code = EVMC_REVERT;
     return res;
@@ -509,6 +527,7 @@ struct evmc_result call(struct evmc_host_context* context,
   /* TODO: handle special kind (CREATE2/CALLCODE/DELEGATECALL)*/
   ret = handle_message(&sub_gw_ctx);
   if (ret != 0) {
+    ckb_debug("inner call failed (transfer/contract call contract)");
     context->error_code = ret;
     res.status_code = EVMC_REVERT;
     return res;
@@ -519,8 +538,10 @@ struct evmc_result call(struct evmc_host_context* context,
   res.output_data = (uint8_t *)malloc(res.output_size);
   memcpy((void *)res.output_data, receipt->return_data, res.output_size);
   res.release = release_result;
+  if (msg->kind == EVMC_CREATE) {
+    res.create_address = account_id_to_address(sub_gw_ctx.transaction_context.to_id);
+  }
 
-  /* FIXME: handle transfer logic */
   ckb_debug("END call");
 
   return res;
@@ -601,7 +622,7 @@ int handle_message(gw_context_t* ctx) {
     memcpy(tx_origin.bytes, ctx->transaction_context.args + 1, 20);
   }
 
-  /* Load account script */
+  /* Load account script (TODO: can be cached) */
   if (!script_loaded) {
     mol_seg_t script_seg;
     ret = load_account_script(ctx, ctx->transaction_context.to_id, &script_seg);
@@ -610,10 +631,13 @@ int handle_message(gw_context_t* ctx) {
     }
     mol_seg_t code_hash_seg = MolReader_Script_get_code_hash(&script_seg);
     mol_seg_t hash_type_seg = MolReader_Script_get_hash_type(&script_seg);
-    free((void *)script_seg.ptr);
+    mol_seg_t args_seg = MolReader_Script_get_args(&script_seg);
+    mol_seg_t raw_args_seg = MolReader_Bytes_raw_bytes(&args_seg);
     script_loaded = true;
     memcpy(script_code_hash, code_hash_seg.ptr, 32);
     script_hash_type = *hash_type_seg.ptr;
+    sudt_id = *(uint32_t *)(raw_args_seg.ptr);
+    free((void *)script_seg.ptr);
   }
 
   struct evmc_host_context context { ctx, tx_origin, 0 };
@@ -628,19 +652,21 @@ int handle_message(gw_context_t* ctx) {
     msg.input_size = 0;
     /* create account id */
     /* Include:
+       - sudt id
        - sender account id
        - sender nonce (NOTE: only first 4 bytes (u32))
     */
-    uint8_t args[36];
-    memcpy(args, (uint8_t *)(&ctx->transaction_context.from_id), 4);
+    uint8_t args[40];
+    memcpy(args, (uint8_t *)(&sudt_id), 4);
+    memcpy(args + 4, (uint8_t *)(&ctx->transaction_context.from_id), 4);
     // TODO: the nonce length can be optimized (change nonce data type, u32 is not enough)
-    ret = ctx->sys_load_nonce(ctx, ctx->transaction_context.from_id, args + 4);
+    ret = ctx->sys_load_nonce(ctx, ctx->transaction_context.from_id, args + 8);
     if (ret != 0) {
       return ret;
     }
     mol_seg_t new_script_seg;
     uint32_t new_account_id;
-    ret = build_script(script_code_hash, script_hash_type, args, 8, &new_script_seg);
+    ret = build_script(script_code_hash, script_hash_type, args, 12, &new_script_seg);
     if (ret != 0) {
       return ret;
     }
@@ -681,7 +707,36 @@ int handle_message(gw_context_t* ctx) {
                                        code_data,
                                        code_size);
   if (context.error_code != 0)  {
+    debug_print_int("context.error_code:", context.error_code);
     return context.error_code;
+  }
+
+  /* handle transfer logic */
+  bool is_zero_value = true;
+  for (int i = 0; i < 32; i++) {
+    if (msg.value.bytes[i] != 0) {
+      is_zero_value = false;
+      break;
+    }
+  }
+  if (!is_zero_value) {
+    uint8_t value_u128_bytes[16];
+    for (int i = 0; i < 16; i++) {
+      value_u128_bytes[i] = msg.value.bytes[31-i];
+    }
+    uint128_t value_u128 = *(uint128_t *)value_u128_bytes;
+    debug_print_int("from_id", ctx->transaction_context.from_id);
+    debug_print_int("to_id", ctx->transaction_context.to_id);
+    debug_print_int("transfer value", value_u128);
+    ret = sudt_transfer(ctx,
+                        sudt_id,
+                        ctx->transaction_context.from_id,
+                        ctx->transaction_context.to_id,
+                        value_u128);
+    if (ret != 0) {
+      ckb_debug("transfer failed");
+      return ret;
+    }
   }
 
   /* Store code though syscall */
