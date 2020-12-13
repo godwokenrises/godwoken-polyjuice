@@ -155,9 +155,13 @@ int build_script(uint8_t code_hash[32],
                  mol_seg_t *script_seg) {
     /* 1. Build Script by receipt.return_data */
     mol_seg_t args_seg;
-    args_seg.size = args_len;
-    args_seg.ptr = (uint8_t *)malloc(args_seg.size);
-    memcpy(args_seg.ptr, args, args_len);
+    args_seg.size = 4 + args_len;
+    args_seg.ptr = (uint8_t *)malloc(4 + args_seg.size);
+    memcpy(args_seg.ptr, (uint8_t *)(&args_len), 4);
+    memcpy(args_seg.ptr + 4, args, args_len);
+    debug_print_data("script.args", args_seg.ptr, args_seg.size);
+    debug_print_data("script.code_hash", code_hash, 32);
+    debug_print_int("script.hash_type", hash_type);
 
     mol_builder_t script_builder;
     MolBuilder_Script_init(&script_builder);
@@ -172,6 +176,12 @@ int build_script(uint8_t code_hash[32],
       return -1;
     }
     *script_seg = script_res.seg;
+
+    debug_print_data("script ", script_seg->ptr, script_seg->size);
+    if (MolReader_Script_verify(script_seg, false) != MOL_OK) {
+      ckb_debug("built an invalid script");
+      return -1;
+    }
     return 0;
 }
 
@@ -228,10 +238,12 @@ int load_account_code(gw_context_t *gw_ctx,
                        uint32_t account_id,
                        uint8_t **code,
                        size_t *code_size) {
+  debug_print_int("load_account_code, account_id:", account_id);
   return load_all_data(gw_ctx, account_id, code, code_size, gw_ctx->sys_get_account_code);
 }
 
 int load_account_script(gw_context_t *gw_ctx, uint32_t account_id, mol_seg_t *script_seg) {
+  debug_print_int("load_account_script, account_id:", account_id);
   int ret;
   uint8_t *script = NULL;
   size_t script_size = 0;
@@ -591,7 +603,7 @@ int handle_message(gw_context_t* ctx) {
     /* create account id */
     /* Include:
        - sender account id
-       - sender nonce
+       - sender nonce (NOTE: only first 4 bytes (u32))
     */
     uint8_t args[36];
     memcpy(args, (uint8_t *)(&ctx->transaction_context.from_id), 4);
@@ -602,7 +614,7 @@ int handle_message(gw_context_t* ctx) {
     }
     mol_seg_t new_script_seg;
     uint32_t new_account_id;
-    ret = build_script(script_code_hash, script_hash_type, args, 36, &new_script_seg);
+    ret = build_script(script_code_hash, script_hash_type, args, 8, &new_script_seg);
     if (ret != 0) {
       return ret;
     }
