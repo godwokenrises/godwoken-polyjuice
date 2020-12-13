@@ -14,7 +14,7 @@ const CKB_HASH_PERSONALIZATION: &[u8] = b"ckb-default-hash";
 
 const BINARIES: &[(&str, &str)] = &[(
     "generator",
-    "d4ab2670512772f966b0cdbd663fc65dfbf55aad323d62993d6cf17d49444e10",
+    "23c12ab00086ce7cc04230197adf526a307fc049574747045539bfacbec59461",
 )];
 
 fn main() {
