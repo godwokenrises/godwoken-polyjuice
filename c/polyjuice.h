@@ -33,13 +33,18 @@ static void debug_print_int(const char *prefix, int64_t ret) {
 
 /* account script buffer sisze: 32KB */
 #define ACCOUNT_SCRIPT_BUFSIZE 32768
+#define GW_ACCOUNT_CONTRACT_CODE 100
 
 static bool script_loaded = false;
 static uint8_t script_code_hash[32];
 static uint8_t script_hash_type;
 
+void gw_build_contract_code_key(uint32_t id, uint8_t key[GW_KEY_BYTES]) {
+  gw_build_account_field_key(id, GW_ACCOUNT_CONTRACT_CODE, key);
+}
+
 int handle_message(gw_context_t* ctx);
-typedef int (*stream_data_loader_fn)(void *ctx, uint32_t account_id,
+typedef int (*stream_data_loader_fn)(void *ctx, long data_id,
                                      uint32_t *len, uint32_t offset,
                                      uint8_t *data);
 
@@ -192,7 +197,7 @@ void release_result(const struct evmc_result* result) {
 
 
 int load_all_data(gw_context_t *gw_ctx,
-                  uint32_t account_id,
+                  long data_id,
                   uint8_t **data,
                   size_t *data_size,
                   stream_data_loader_fn loader) {
@@ -204,7 +209,7 @@ int load_all_data(gw_context_t *gw_ctx,
   uint8_t *ptr = buffer;
   size_t offset = 0;
   while (true) {
-    ret = loader((void *)gw_ctx, account_id, &len, offset, ptr);
+    ret = loader((void *)gw_ctx, data_id, &len, offset, ptr);
     if (ret != 0) {
       /* ERROR: load account data failed */
       free(buffer);
@@ -234,12 +239,33 @@ int load_all_data(gw_context_t *gw_ctx,
   return 0;
 }
 
+
+int data_loader(void *ctx, long data_id,
+                uint32_t *len, uint32_t offset,
+                uint8_t *data) {
+  gw_context_t *gw_ctx = (gw_context_t *)ctx;
+  return gw_ctx->sys_load_data(ctx, (uint8_t *)data_id, len, offset, data);
+}
 int load_account_code(gw_context_t *gw_ctx,
                        uint32_t account_id,
                        uint8_t **code,
                        size_t *code_size) {
   debug_print_int("load_account_code, account_id:", account_id);
-  return load_all_data(gw_ctx, account_id, code, code_size, gw_ctx->sys_get_account_code);
+  uint8_t key[32];
+  uint8_t data_hash[32];
+  gw_build_contract_code_key(account_id, key);
+  int ret = gw_ctx->sys_load((void *)gw_ctx, account_id, key, data_hash);
+  if (ret != 0) {
+    return ret;
+  }
+  return load_all_data(gw_ctx, (long)data_hash, code, code_size, data_loader);
+}
+
+int account_script_loader(void *ctx, long data_id,
+                          uint32_t *len, uint32_t offset,
+                          uint8_t *data) {
+  gw_context_t *gw_ctx = (gw_context_t *)ctx;
+  return gw_ctx->sys_get_account_script(ctx, (uint32_t)data_id, len, offset, data);
 }
 
 int load_account_script(gw_context_t *gw_ctx, uint32_t account_id, mol_seg_t *script_seg) {
@@ -247,7 +273,7 @@ int load_account_script(gw_context_t *gw_ctx, uint32_t account_id, mol_seg_t *sc
   int ret;
   uint8_t *script = NULL;
   size_t script_size = 0;
-  ret = load_all_data(gw_ctx, account_id, &script, &script_size, gw_ctx->sys_get_account_script);
+  ret = load_all_data(gw_ctx, (long)account_id, &script, &script_size, account_script_loader);
   if (ret != 0) {
     return ret;
   }
@@ -661,10 +687,19 @@ int handle_message(gw_context_t* ctx) {
   /* Store code though syscall */
   // TODO handle special create kind
   if (msg.kind == EVMC_CREATE) {
-    ret = ctx->sys_set_account_code(ctx,
-                                    ctx->transaction_context.to_id,
-                                    res.output_size,
-                                    (uint8_t *)res.output_data);
+    uint32_t new_account_id = ctx->transaction_context.to_id;
+    uint8_t key[32];
+    uint8_t data_hash[32];
+    blake2b_hash(data_hash, (uint8_t *)res.output_data, res.output_size);
+    gw_build_contract_code_key(new_account_id, key);
+    ckb_debug("BEGIN store data key");
+    ret = ctx->sys_store(ctx, new_account_id, key, data_hash);
+    if (ret != 0) {
+      return ret;
+    }
+    ckb_debug("BEGIN store data");
+    ret = ctx->sys_store_data(ctx, res.output_size, (uint8_t *)res.output_data);
+    ckb_debug("END store data");
     if (ret != 0) {
       return ret;
     }
