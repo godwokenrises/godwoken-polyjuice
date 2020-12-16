@@ -12,7 +12,7 @@
 #include "common.h"
 #include "gw_def.h"
 #include "generator.h"
-#include "polyjuice.h"
+#include "generator/polyjuice.h"
 
 /* syscalls */
 #define GW_SYS_STORE 3051

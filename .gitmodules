@@ -16,3 +16,9 @@
 [submodule "deps/godwoken-fix"]
 	path = deps/godwoken-fix
 	url = https://github.com/TheWaWaR/godwoken.git
+[submodule "deps/secp256k1"]
+	path = deps/secp256k1
+	url = https://github.com/nervosnetwork/secp256k1
+[submodule "deps/secp256k1-fix"]
+	path = deps/secp256k1-fix
+	url = https://github.com/TheWaWaR/secp256k1

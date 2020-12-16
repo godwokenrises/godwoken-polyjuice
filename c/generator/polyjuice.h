@@ -14,6 +14,7 @@
 #include <evmc/evmc.h>
 #include <evmc/evmc.hpp>
 #include <evmone/evmone.h>
+#include "generator/contracts.h"
 
 static char debug_buffer[64 * 1024];
 static void debug_print_data(const char *prefix,
@@ -40,6 +41,9 @@ static bool script_loaded = false;
 static uint32_t sudt_id = UINT32_MAX;
 static uint8_t script_code_hash[32];
 static uint8_t script_hash_type;
+
+/* FIXME: handle all gas cost */
+
 
 void gw_build_contract_code_key(uint32_t id, uint8_t key[GW_KEY_BYTES]) {
   gw_build_account_field_key(id, GW_ACCOUNT_CONTRACT_CODE, key);
@@ -473,6 +477,22 @@ struct evmc_result call(struct evmc_host_context* context,
   /* FIXME: Handle pre-compiled contracts
    *   - check msg->destination
    */
+  precompiled_contract_gas_fn contract_gas;
+  precompiled_contract_fn contract;
+  if (match_precompiled_address(&msg->destination, &contract_gas, &contract)) {
+    uint64_t _gas_cost = contract_gas(msg->input_data, msg->input_size);
+    ret = contract(gw_ctx,
+                   msg->input_data, msg->input_size,
+                   (uint8_t **)&res.output_data, &res.output_size);
+    if (ret != 0) {
+      ckb_debug("call pre-compiled contract failed");
+      context->error_code = ret;
+      res.status_code = EVMC_REVERT;
+      return res;
+    }
+    res.release = release_result;
+    return res;
+  }
 
   uint32_t to_id;
   ret = address_to_account_id(&(msg->destination), &to_id);
