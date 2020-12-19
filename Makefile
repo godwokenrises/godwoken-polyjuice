@@ -35,7 +35,7 @@ all-via-docker: generate-protocol
 	mkdir -p build
 	docker run --rm -v `pwd`:/code ${BUILDER_DOCKER} bash -c "cd /code && make"
 
-build/generator: c/generator.c c/generator/polyjuice.h build/secp256k1_data_info.h $(ALL_OBJS)
+build/generator: c/generator.c c/contracts.h c/generator/secp256k1_helper.h c/polyjuice.h build/secp256k1_data_info.h $(ALL_OBJS)
 	$(CXX) $(CFLAGS) $(LDFLAGS) -Ibuild -o $@ c/generator.c $(ALL_OBJS)
 	$(OBJCOPY) --only-keep-debug $@ $@.debug
 	$(OBJCOPY) --strip-debug --strip-all $@

@@ -12,7 +12,8 @@
 #include "common.h"
 #include "gw_def.h"
 #include "generator.h"
-#include "generator/polyjuice.h"
+#include "generator/secp256k1_helper.h"
+#include "polyjuice.h"
 
 /* syscalls */
 #define GW_SYS_STORE 3051

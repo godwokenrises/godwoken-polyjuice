@@ -1,7 +1,5 @@
 /* pre-compiled Ethereum contracts */
 
-#include "generator/secp256k1_helper.h"
-
 typedef uint64_t (*precompiled_contract_gas_fn)(const uint8_t *input_src, const size_t input_size);
 typedef int (*precompiled_contract_fn)(gw_context_t *ctx,
                                        const uint8_t *input_src, const size_t input_size,

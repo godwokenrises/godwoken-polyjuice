@@ -14,7 +14,7 @@
 #include <evmc/evmc.h>
 #include <evmc/evmc.hpp>
 #include <evmone/evmone.h>
-#include "generator/contracts.h"
+#include "contracts.h"
 
 static char debug_buffer[64 * 1024];
 static void debug_print_data(const char *prefix,
