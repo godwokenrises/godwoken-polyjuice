@@ -15,13 +15,13 @@ int main() {
   int ret;
 
   /* prepare context */
-  gw_validator_context_t context;
+  gw_verification_context_t context;
   gw_context_init(&context);
   gw_context_t *gw_ctx = &context.gw_ctx;
 
   uint32_t old_to_id = gw_ctx->transaction_context.to_id;
   /* load layer2 contract */
-  ret = handle_message(&context, sizeof(gw_validator_context_t));
+  ret = handle_message(&context, sizeof(gw_verification_context_t));
   if (ret != 0) {
     return ret;
   }

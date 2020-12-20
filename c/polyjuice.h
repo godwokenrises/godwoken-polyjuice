@@ -538,18 +538,20 @@ struct evmc_result call(struct evmc_host_context* context,
   uint32_t from_id = gw_ctx->transaction_context.to_id;
   void *sub_ctx = malloc(context->ctx_size);
   memcpy(sub_ctx, context->gw_ctx, context->ctx_size);
-  gw_context_t *sub_gw_ctx = (gw_context_t *)sub_ctx;
-  ret = create_sub_context(gw_ctx, sub_gw_ctx, from_id, to_id, args, args_len);
+  gw_context_t *sub_gw_ctx0 = (gw_context_t *)sub_ctx;
+  ret = create_sub_context(gw_ctx, sub_gw_ctx0, from_id, to_id, args, args_len);
   if (ret != 0) {
     ckb_debug("create sub context failed");
     context->error_code = ret;
     res.status_code = EVMC_REVERT;
     return res;
   }
-  gw_call_receipt_t *receipt = &sub_gw_ctx->receipt;
 
   /* TODO: handle special kind (CREATE2/CALLCODE/DELEGATECALL)*/
-  ret = handle_message(sub_gw_ctx, context->ctx_size);
+  ret = handle_message(sub_ctx, context->ctx_size);
+  gw_context_t sub_gw_ctx = *sub_gw_ctx0;
+  free(sub_ctx);
+  gw_call_receipt_t *receipt = &sub_gw_ctx.receipt;
   if (ret != 0) {
     ckb_debug("inner call failed (transfer/contract call contract)");
     context->error_code = ret;
@@ -563,7 +565,7 @@ struct evmc_result call(struct evmc_host_context* context,
   memcpy((void *)res.output_data, receipt->return_data, res.output_size);
   res.release = release_result;
   if (msg->kind == EVMC_CREATE) {
-    res.create_address = account_id_to_address(sub_gw_ctx->transaction_context.to_id);
+    res.create_address = account_id_to_address(sub_gw_ctx.transaction_context.to_id);
   }
 
   ckb_debug("END call");
