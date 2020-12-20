@@ -5,19 +5,22 @@
 #include "common.h"
 
 #define MAX_BUF_SIZE 65536
+/* 2048 * (32 + 32 + 8) = 147456 Byte (~144KB)*/
+#define KV_STATE_CAPACITY 2048
 
 typedef struct {
   gw_context_t gw_ctx;
   uint32_t account_count;
-  gw_state_t *kv_state;
+  gw_state_t kv_state;
   /* SMT proof */
   uint8_t *kv_state_proof;
   size_t kv_state_proof_size;
   /* To proof the block is in the chain */
   uint8_t *block_proof;
   size_t block_proof_size;
+  /* transaction proof */
   uint8_t *tx_proof;
-  size_t *tx_proof_size;
+  size_t tx_proof_size;
   /* The script of entrance account */
   uint8_t *entrance_account_script;
   size_t entrance_account_script_size;
@@ -32,7 +35,7 @@ int sys_load(void *ctx, uint32_t account_id, const uint8_t key[GW_KEY_BYTES],
   gw_verification_context_t *verify_ctx = (gw_verification_context_t *)ctx;
   uint8_t raw_key[GW_KEY_BYTES] = {0};
   gw_build_account_key(account_id, key, raw_key);
-  return gw_state_fetch(verify_ctx->kv_state, raw_key, value);
+  return gw_state_fetch(&verify_ctx->kv_state, raw_key, value);
 }
 int sys_store(void *ctx, uint32_t account_id, const uint8_t key[GW_KEY_BYTES],
               const uint8_t value[GW_VALUE_BYTES]) {
@@ -42,7 +45,7 @@ int sys_store(void *ctx, uint32_t account_id, const uint8_t key[GW_KEY_BYTES],
   gw_verification_context_t *verify_ctx = (gw_verification_context_t *)ctx;
   uint8_t raw_key[GW_KEY_BYTES];
   gw_build_account_key(account_id, key, raw_key);
-  return gw_state_insert(verify_ctx->kv_state, raw_key, value);
+  return gw_state_insert(&verify_ctx->kv_state, raw_key, value);
 }
 
 int sys_load_nonce(void *ctx, uint32_t account_id, uint8_t value[GW_VALUE_BYTES]) {
@@ -52,13 +55,13 @@ int sys_load_nonce(void *ctx, uint32_t account_id, uint8_t value[GW_VALUE_BYTES]
   gw_verification_context_t *verify_ctx = (gw_verification_context_t *)ctx;
   uint8_t key[32];
   gw_build_nonce_key(account_id, key);
-  return gw_state_fetch(verify_ctx->kv_state, key, value);
+  return gw_state_fetch(&verify_ctx->kv_state, key, value);
 }
 
 /* set call return data */
 int sys_set_program_return_data(void *ctx, uint8_t *data, uint32_t len) {
-  /* FIXME */
-  return -1;
+  /* TODO: Do nothing? */
+  return 0;
 }
 
 /* Get account id by account script_hash */
@@ -71,7 +74,7 @@ int sys_get_account_id_by_script_hash(void *ctx, uint8_t script_hash[32],
   uint8_t raw_key[32];
   uint8_t value[32];
   gw_build_script_hash_to_account_id_key(script_hash, raw_key);
-  int ret = gw_state_fetch(verify_ctx->kv_state, raw_key, value);
+  int ret = gw_state_fetch(&verify_ctx->kv_state, raw_key, value);
   if (ret != 0) {
     return ret;
   }
@@ -94,7 +97,7 @@ int sys_get_script_hash_by_account_id(void *ctx, uint32_t account_id,
   gw_verification_context_t *verify_ctx = (gw_verification_context_t *)ctx;
   uint8_t raw_key[32];
   gw_build_account_field_key(account_id, GW_ACCOUNT_SCRIPT_HASH, raw_key);
-  return gw_state_fetch(verify_ctx->kv_state, raw_key, script_hash);
+  return gw_state_fetch(&verify_ctx->kv_state, raw_key, script_hash);
 }
 
 /* Get account script by account id */
@@ -186,16 +189,6 @@ int sys_load_data(void *ctx, uint8_t data_hash[32],
   return -1;
 }
 
-int _sys_load_l2transaction(void *addr, uint64_t *len) {
-  /* FIXME */
-  return -1;
-}
-
-int _sys_load_block_info(void *addr, uint64_t *len) {
-  /* FIXME */
-  return -1;
-}
-
 int sys_create(void *ctx, uint8_t *script, uint32_t script_len,
                uint32_t *account_id) {
   if (ctx == NULL) {
@@ -209,7 +202,7 @@ int sys_create(void *ctx, uint8_t *script, uint32_t script_len,
   uint8_t nonce_value[32];
   gw_build_account_field_key(id, GW_ACCOUNT_NONCE, nonce_key);
   memset(nonce_value, 0, 32);
-  ret = gw_state_insert(verify_ctx->kv_state, nonce_key, nonce_value);
+  ret = gw_state_insert(&verify_ctx->kv_state, nonce_key, nonce_value);
   if (ret != 0) {
     return -1;
   }
@@ -221,7 +214,7 @@ int sys_create(void *ctx, uint8_t *script, uint32_t script_len,
   blake2b_update(&blake2b_ctx, script, script_len);
   blake2b_final(&blake2b_ctx, script_hash, 32);
   gw_build_account_field_key(id, GW_ACCOUNT_SCRIPT_HASH, script_hash_key);
-  ret = gw_state_insert(verify_ctx->kv_state, script_hash_key, script_hash);
+  ret = gw_state_insert(&verify_ctx->kv_state, script_hash_key, script_hash);
   if (ret != 0) {
     return -1;
   }
@@ -230,12 +223,12 @@ int sys_create(void *ctx, uint8_t *script, uint32_t script_len,
   uint8_t hash_to_id_value[32];
   gw_build_script_hash_to_account_id_key(script_hash, hash_to_id_key);
   memcpy(hash_to_id_value, (uint8_t *)(&id), 4);
-  ret = gw_state_insert(verify_ctx->kv_state, hash_to_id_key, hash_to_id_value);
+  ret = gw_state_insert(&verify_ctx->kv_state, hash_to_id_key, hash_to_id_value);
   if (ret != 0) {
     return -1;
   }
 
-  /* TODO: how to verify new_scripts */
+  /* TODO: how to verify new_scripts? */
 
   verify_ctx->account_count += 1;
 
@@ -246,6 +239,137 @@ int sys_log(void *ctx, uint32_t account_id, uint32_t data_length,
             const uint8_t *data) {
   /* do nothing */
   return 0;
+}
+
+/* FIXME: Load and verify rollup cell */
+int load_rollup_cell() {
+  return -1;
+}
+/* FIXME: Load and verify challenge cell */
+int load_challenge_cell() {
+  return -1;
+}
+
+/* Load and verify cancel challenge transaction witness
+ *
+ * NOTE: current script as challenge cell's lock script
+ */
+int load_cancel_challenge_witness(void *ctx) {
+  if (ctx == NULL) {
+    return GW_ERROR_INVALID_CONTEXT;
+  }
+  gw_verification_context_t *verify_ctx = (gw_verification_context_t *)ctx;
+
+  int ret;
+  uint8_t buf[MAX_BUF_SIZE];
+  uint64_t buf_len = MAX_BUF_SIZE;
+  ret = ckb_load_witness(buf, &buf_len, 0, 0, CKB_SOURCE_GROUP_INPUT);
+  if (ret != CKB_SUCCESS) {
+    ckb_debug("load witness failed");
+    return ret;
+  }
+  mol_seg_t witness_seg;
+  witness_seg.ptr = (uint8_t *)buf;
+  witness_seg.size = buf_len;
+  if (MolReader_WitnessArgs_verify(&witness_seg, false) != MOL_OK) {
+    ckb_debug("witness is not WitnessArgs format");
+    return -1;
+  }
+  mol_seg_t content_seg = MolReader_WitnessArgs_get_input_type(&witness_seg);
+  if (MolReader_BytesOpt_is_none(&content_seg)) {
+    ckb_debug("WitnessArgs has no input field");
+    return -1;
+  }
+  mol_seg_t cancel_challenge_seg = MolReader_Bytes_raw_bytes(&content_seg);
+  if (MolReader_CancelChallenge_verify(&cancel_challenge_seg, false) != MOL_OK) {
+    ckb_debug("input field is not CancelChallenge");
+    return -1;
+  }
+
+  mol_seg_t raw_l2block_seg = MolReader_CancelChallenge_get_raw_l2block(&cancel_challenge_seg);
+  mol_seg_t raw_l2tx_seg = MolReader_CancelChallenge_get_raw_l2tx(&cancel_challenge_seg);
+
+  /* load transaction context */
+  gw_transaction_context_t *tx_ctx = &(verify_ctx->gw_ctx.transaction_context);
+  ret = gw_parse_transaction_context(tx_ctx, &raw_l2tx_seg);
+  if (ret != 0) {
+    ckb_debug("parse l2 transaction failed");
+    return ret;
+  }
+
+  /* load block info */
+  gw_block_info_t *block_info = &(verify_ctx->gw_ctx.block_info);
+  mol_seg_t number_seg = MolReader_RawL2Block_get_number(&raw_l2block_seg);
+  mol_seg_t timestamp_seg = MolReader_RawL2Block_get_timestamp(&raw_l2block_seg);
+  mol_seg_t aggregator_id_seg = MolReader_RawL2Block_get_aggregator_id(&raw_l2block_seg);
+  block_info->number = *((uint32_t *)number_seg.ptr);
+  block_info->timestamp = *((uint32_t *)timestamp_seg.ptr);
+  block_info->aggregator_id = *((uint32_t *)aggregator_id_seg.ptr);
+
+  /* load tx_proof */
+  mol_seg_t tx_proof_seg = MolReader_CancelChallenge_get_tx_proof(&cancel_challenge_seg);
+  verify_ctx->tx_proof = (uint8_t *)malloc(tx_proof_seg.size);
+  memcpy(verify_ctx->tx_proof,
+         tx_proof_seg.ptr,
+         tx_proof_seg.size);
+  verify_ctx->tx_proof_size = (size_t)tx_proof_seg.size;
+
+  /* load block proof */
+  mol_seg_t block_proof_seg = MolReader_CancelChallenge_get_block_proof(&cancel_challenge_seg);
+  verify_ctx->block_proof = (uint8_t *)malloc(block_proof_seg.size);
+  memcpy(verify_ctx->block_proof,
+         block_proof_seg.ptr,
+         block_proof_seg.size);
+  verify_ctx->block_proof_size = (size_t)block_proof_seg.size;
+
+  /* load kv state */
+  mol_seg_t kv_state_seg = MolReader_CancelChallenge_get_kv_state(&cancel_challenge_seg);
+  uint32_t kv_length = MolReader_KVPairVec_length(&kv_state_seg);
+  if (kv_length > KV_STATE_CAPACITY) {
+    ckb_debug("too many key/value pair");
+    return -1;
+  }
+  gw_pair_t *kv_pairs = (gw_pair_t *)malloc(sizeof(gw_pair_t) * KV_STATE_CAPACITY);
+  gw_state_init(&verify_ctx->kv_state, kv_pairs, KV_STATE_CAPACITY);
+  for (uint32_t i = 0; i < kv_length; i ++) {
+    mol_seg_res_t seg_res = MolReader_KVPairVec_get(&kv_state_seg, i);
+    uint8_t error_num = *(uint8_t *)(&seg_res);
+    if (error_num != MOL_OK) {
+      return -1;
+    }
+    mol_seg_t kv_pair_seg = seg_res.seg;
+    mol_seg_t key_seg = MolReader_KVPair_get_k(&kv_pair_seg);
+    mol_seg_t value_seg = MolReader_KVPair_get_v(&kv_pair_seg);
+    gw_state_insert(&verify_ctx->kv_state, key_seg.ptr, value_seg.ptr);
+  }
+
+  mol_seg_t kv_state_proof_seg = MolReader_CancelChallenge_get_kv_state_proof(&cancel_challenge_seg);
+  verify_ctx->kv_state_proof = (uint8_t *)malloc(kv_state_proof_seg.size);
+  memcpy(verify_ctx->kv_state_proof,
+         kv_state_proof_seg.ptr,
+         kv_state_proof_seg.size);
+  verify_ctx->kv_state_proof_size = (size_t)kv_state_proof_seg.size;
+
+  /* load entrance account */
+  mol_seg_t entrance_account_script_seg = MolReader_CancelChallenge_get_entrance_account_script(&cancel_challenge_seg);
+  verify_ctx->entrance_account_script = (uint8_t *)malloc(entrance_account_script_seg.size);
+  memcpy(verify_ctx->entrance_account_script,
+         entrance_account_script_seg.ptr,
+         entrance_account_script_seg.size);
+  verify_ctx->entrance_account_script_size = (size_t)entrance_account_script_seg.size;
+  verify_ctx->entrance_account_id = tx_ctx->to_id;
+
+  return 0;
+}
+
+/* == Verify key value state == */
+/* Before execute handle_message verify read values and write old values */
+int verify_old_kv_state() {
+  return -1;
+}
+/* After execute handle_message verify read values and write new values */
+int verify_new_kv_state() {
+  return -1;
 }
 
 int gw_context_init(gw_verification_context_t *context) {
@@ -267,40 +391,7 @@ int gw_context_init(gw_verification_context_t *context) {
   gw_ctx->sys_log = sys_log;
 
   /* initialize context */
-  // 1. load transaction
-  uint8_t buf[MAX_BUF_SIZE] = {0};
-  uint64_t len = MAX_BUF_SIZE;
-  int ret = _sys_load_l2transaction(buf, &len);
-  if (ret != 0) {
-    return ret;
-  }
-  if (len > MAX_BUF_SIZE) {
-    return GW_ERROR_INVALID_DATA;
-  }
-
-  mol_seg_t l2transaction_seg;
-  l2transaction_seg.ptr = buf;
-  l2transaction_seg.size = len;
-  ret = gw_parse_transaction_context(&gw_ctx->transaction_context,
-                                     &l2transaction_seg);
-  if (ret != 0) {
-    return ret;
-  }
-
-  // 2. load block info
-  len = MAX_BUF_SIZE;
-  ret = _sys_load_block_info(buf, &len);
-  if (ret != 0) {
-    return ret;
-  }
-  if (len > MAX_BUF_SIZE) {
-    return GW_ERROR_INVALID_DATA;
-  }
-
-  mol_seg_t block_info_seg;
-  block_info_seg.ptr = buf;
-  block_info_seg.size = len;
-  ret = gw_parse_block_info(&gw_ctx->block_info, &block_info_seg);
+  int ret = load_cancel_challenge_witness(context);
   if (ret != 0) {
     return ret;
   }

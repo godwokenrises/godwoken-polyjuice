@@ -85,6 +85,7 @@ int create_sub_context(const gw_context_t *ctx,
                        uint32_t to_id,
                        uint8_t *args,
                        uint32_t args_len) {
+  /* FIXME: gw_transaction_context_t.args too large */
   *sub_ctx = *ctx;
   gw_call_receipt_t receipt;
   receipt.return_data_len = 0;

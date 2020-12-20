@@ -2,6 +2,15 @@
 
 #define VALIDATOR
 
+/* Layer 1 validator contract
+ *
+ * Verify:
+ *  1. The challenged layer 2 block is belong to the chain
+ *  2. The challenged layer 2 transaction is belong to the challenged layer 2 block
+ *  3. The kv state changes are valid
+ *  4. The entrance account script is valid (lazy verify)
+ */
+
 #include "ckb_syscalls.h"
 #include "common.h"
 #include "gw_def.h"
