@@ -43,7 +43,7 @@ int main() {
 
   uint32_t old_to_id = context.transaction_context.to_id;
   /* load layer2 contract */
-  ret = handle_message(&context);
+  ret = handle_message(&context, sizeof(gw_context_t));
   if (ret != 0) {
     return ret;
   }

@@ -15,26 +15,27 @@ int main() {
   int ret;
 
   /* prepare context */
-  gw_context_t context;
+  gw_validator_context_t context;
   gw_context_init(&context);
+  gw_context_t *gw_ctx = &context.gw_ctx;
 
-  uint32_t old_to_id = context.transaction_context.to_id;
+  uint32_t old_to_id = gw_ctx->transaction_context.to_id;
   /* load layer2 contract */
-  ret = handle_message(&context);
+  ret = handle_message(&context, sizeof(gw_validator_context_t));
   if (ret != 0) {
     return ret;
   }
 
   debug_print_data("return data",
-                   context.receipt.return_data,
-                   context.receipt.return_data_len);
-  debug_print_int("return data length", context.receipt.return_data_len);
+                   gw_ctx->receipt.return_data,
+                   gw_ctx->receipt.return_data_len);
+  debug_print_int("return data length", gw_ctx->receipt.return_data_len);
   /* It's a call */
-  if (old_to_id == context.transaction_context.to_id) {
+  if (old_to_id == gw_ctx->transaction_context.to_id) {
     /* Return data from receipt */
-    ret = context.sys_set_program_return_data((void *)(&context),
-                                              context.receipt.return_data,
-                                              context.receipt.return_data_len);
+    ret = gw_ctx->sys_set_program_return_data((void *)(&context),
+                                              gw_ctx->receipt.return_data,
+                                              gw_ctx->receipt.return_data_len);
   }
   if (ret != 0) {
     return ret;
