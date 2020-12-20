@@ -29,7 +29,7 @@ ALL_OBJS := build/evmone.o build/analysis.o build/execution.o build/instructions
 # docker pull nervos/ckb-riscv-gnu-toolchain:bionic-20190702
 BUILDER_DOCKER := nervos/ckb-riscv-gnu-toolchain@sha256:7b168b4b109a0f741078a71b7c4dddaf1d283a5244608f7851f5714fbad273ba
 
-all: build/generator build/blockchain.h build/godwoken.h build/secp256k1_data_info.h
+all: build/generator build/validator build/blockchain.h build/godwoken.h build/secp256k1_data_info.h
 
 all-via-docker: generate-protocol
 	mkdir -p build
@@ -37,6 +37,11 @@ all-via-docker: generate-protocol
 
 build/generator: c/generator.c c/contracts.h c/generator/secp256k1_helper.h c/polyjuice.h build/secp256k1_data_info.h $(ALL_OBJS)
 	$(CXX) $(CFLAGS) $(LDFLAGS) -Ibuild -o $@ c/generator.c $(ALL_OBJS)
+	$(OBJCOPY) --only-keep-debug $@ $@.debug
+	$(OBJCOPY) --strip-debug --strip-all $@
+
+build/validator: c/validator.c c/contracts.h c/validator/secp256k1_helper.h c/polyjuice.h build/secp256k1_data_info.h $(ALL_OBJS)
+	$(CXX) $(CFLAGS) $(LDFLAGS) -Ibuild -o $@ c/validator.c $(ALL_OBJS)
 	$(OBJCOPY) --only-keep-debug $@ $@.debug
 	$(OBJCOPY) --strip-debug --strip-all $@
 

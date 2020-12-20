@@ -1,5 +1,5 @@
-#ifndef GW_GENERATOR_H_
-#define GW_GENERATOR_H_
+#ifndef GW_VALIDATOR_H_
+#define GW_VALIDATOR_H_
 /* Layer2 contract generator
  *
  * The generator supposed to be run off-chain.

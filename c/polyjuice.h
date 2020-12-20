@@ -420,6 +420,7 @@ size_t copy_code(struct evmc_host_context* context,
   }
 
   uint32_t len = (uint32_t)buffer_size;
+  /* FIXME: change to load_account_code() */
   ret = context->gw_ctx->sys_get_account_script((void *)context->gw_ctx,
                                                     account_id,
                                                     &len,

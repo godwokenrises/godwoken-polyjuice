@@ -1,3 +1,6 @@
+#ifndef CONTRACTS_H_
+#define CONTRACTS_H_
+
 /* pre-compiled Ethereum contracts */
 
 typedef uint64_t (*precompiled_contract_gas_fn)(const uint8_t *input_src, const size_t input_size);
@@ -28,7 +31,11 @@ int ecrecover(gw_context_t *ctx,
   int ret;
   secp256k1_context context;
   uint8_t secp_data[CKB_SECP256K1_DATA_SIZE];
+#ifdef GENERATOR
   ret = ckb_secp256k1_custom_verify_only_initialize(ctx, &context, secp_data);
+#else
+  ret = ckb_secp256k1_custom_verify_only_initialize(&context, secp_data);
+#endif
   if (ret != 0) {
     return ret;
   }
@@ -103,3 +110,5 @@ bool match_precompiled_address(const evmc_address *destination,
   }
   return true;
 }
+
+#endif

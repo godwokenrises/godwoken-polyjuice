@@ -8,6 +8,8 @@
  * and should be able to use the states to construct a transaction that satifies
  * the validator.
  */
+#define GENERATOR
+
 #include "ckb_syscalls.h"
 #include "common.h"
 #include "gw_def.h"
