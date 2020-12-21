@@ -5,10 +5,10 @@
 /* Layer 1 validator contract
  *
  * Verify:
- *  1. The challenged layer 2 block is belong to the chain
- *  2. The challenged layer 2 transaction is belong to the challenged layer 2 block
+ *  1. [HOLD] The challenged layer 2 block is belong to the chain
+ *  2. [HOLD] The challenged layer 2 transaction is belong to the challenged layer 2 block
  *  3. The kv state changes are valid
- *  4. The entrance account script is valid (lazy verify)
+ *  4. The entrance account script is valid (lazy, verify when load account script)
  */
 
 #include "ckb_syscalls.h"
@@ -29,8 +29,16 @@ int main() {
   gw_context_t *gw_ctx = &context.gw_ctx;
 
   uint32_t old_to_id = gw_ctx->transaction_context.to_id;
+  ret = verify_old_kv_state(&context);
+  if (ret != 0) {
+    return ret;
+  }
   /* load layer2 contract */
   ret = handle_message(&context, sizeof(gw_verification_context_t));
+  if (ret != 0) {
+    return ret;
+  }
+  ret = verify_new_kv_state(&context);
   if (ret != 0) {
     return ret;
   }
