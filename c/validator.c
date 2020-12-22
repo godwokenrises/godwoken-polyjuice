@@ -1,6 +1,6 @@
 /* Polyjuice validator */
 
-#define VALIDATOR
+#define GW_VALIDATOR
 
 /* Layer 1 validator contract
  *
@@ -12,10 +12,8 @@
  */
 
 #include "ckb_syscalls.h"
-#include "common.h"
-#include "gw_def.h"
 #include "gw_smt.h"
-#include "validator_utils.h"
+#include "gw_syscalls.h"
 #include "validator/secp256k1_helper.h"
 #include "polyjuice.h"
 

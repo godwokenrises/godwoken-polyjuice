@@ -31,7 +31,7 @@ int ecrecover(gw_context_t *ctx,
   int ret;
   secp256k1_context context;
   uint8_t secp_data[CKB_SECP256K1_DATA_SIZE];
-#ifdef GENERATOR
+#ifdef GW_GENERATOR
   ret = ckb_secp256k1_custom_verify_only_initialize(ctx, &context, secp_data);
 #else
   ret = ckb_secp256k1_custom_verify_only_initialize(&context, secp_data);
