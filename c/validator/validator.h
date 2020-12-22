@@ -33,10 +33,16 @@ typedef struct {
   uint8_t *block_merkle_root;
   uint8_t *block_proof;
   size_t block_proof_size;
-  /* transaction proof */
+
+
+  /* merkle root of L2Transaction list */
+  uint8_t *tx_witness_root;
+  /* hash of L2Transaction */
   uint8_t *tx_hash;
+  /* transaction proof */
   uint8_t *tx_proof;
   size_t tx_proof_size;
+
   /* The script of entrance account */
   uint8_t *entrance_account_script;
   size_t entrance_account_script_size;
@@ -331,7 +337,8 @@ int load_cancel_challenge_witness(void *ctx) {
   }
 
   mol_seg_t raw_l2block_seg = MolReader_CancelChallenge_get_raw_l2block(&cancel_challenge_seg);
-  mol_seg_t raw_l2tx_seg = MolReader_CancelChallenge_get_raw_l2tx(&cancel_challenge_seg);
+  mol_seg_t l2tx_seg = MolReader_CancelChallenge_get_l2tx(&cancel_challenge_seg);
+  mol_seg_t raw_l2tx_seg = MolReader_L2Transaction_get_raw(&l2tx_seg);
 
   /* load transaction context */
   gw_transaction_context_t *tx_ctx = &(verify_ctx->gw_ctx.transaction_context);
@@ -343,8 +350,12 @@ int load_cancel_challenge_witness(void *ctx) {
   verify_ctx->tx_hash = (uint8_t *)malloc(32);
   blake2b_state blake2b_ctx;
   blake2b_init(&blake2b_ctx, 32);
-  blake2b_update(&blake2b_ctx, raw_l2tx_seg.ptr, raw_l2tx_seg.size);
+  blake2b_update(&blake2b_ctx, l2tx_seg.ptr, l2tx_seg.size);
   blake2b_final(&blake2b_ctx, verify_ctx->tx_hash, 32);
+  mol_seg_t submit_transactions_seg = MolReader_RawL2Block_get_submit_transactions(&raw_l2block_seg);
+  mol_seg_t tx_witness_root_seg = MolReader_SubmitTransactions_get_tx_witness_root(&submit_transactions_seg);
+  verify_ctx->tx_witness_root = (uint8_t *)malloc(32);
+  memcpy(verify_ctx->tx_witness_root, tx_witness_root_seg.ptr, 32);
 
   /* load block info */
   gw_block_info_t *block_info = &(verify_ctx->gw_ctx.block_info);
@@ -427,12 +438,30 @@ int load_cancel_challenge_witness(void *ctx) {
   return 0;
 }
 
-/* Verify challenged layer 2 block is belong to the chain */
-int verify_l2tx(void *ctx) {
-  /* FIXME: run in which script ? */
-  return 0;
-}
 /* Verify challenged layer 2 transaction is belong to the challenged layer 2 block */
+int verify_l2tx(void *ctx) {
+  if (ctx == NULL) {
+    return GW_ERROR_INVALID_CONTEXT;
+  }
+  gw_verification_context_t *verify_ctx = (gw_verification_context_t *)ctx;
+
+  int ret;
+  gw_state_t kv_state;
+  gw_pair_t pair;
+  gw_state_init(&kv_state, &pair, 1);
+  uint8_t key[32];
+  memcpy(key, (uint8_t *)(&verify_ctx->start_challenge->tx_index), 4);
+  memset(key + 4, 0, 32 - 4);
+  ret = gw_state_insert(&kv_state, key, verify_ctx->tx_hash);
+  if (ret != 0) {
+    return ret;
+  }
+  return gw_smt_verify(verify_ctx->tx_witness_root,
+                       &kv_state,
+                       verify_ctx->tx_proof,
+                       verify_ctx->tx_proof_size);
+}
+/* Verify challenged layer 2 block is belong to the chain */
 int verify_l2block(void *ctx) {
   /* FIXME: run in which script ? */
   return 0;
@@ -493,14 +522,14 @@ int gw_context_init(gw_verification_context_t *context) {
     return ret;
   }
 
-  /* ret = verify_l2block(context); */
-  /* if (ret != 0) { */
-  /*   return ret; */
-  /* } */
-  /* ret = verify_l2tx(context); */
-  /* if (ret != 0) { */
-  /*   return ret; */
-  /* } */
+  ret = verify_l2block(context);
+  if (ret != 0) {
+    return ret;
+  }
+  ret = verify_l2tx(context);
+  if (ret != 0) {
+    return ret;
+  }
 
   return 0;
 }
