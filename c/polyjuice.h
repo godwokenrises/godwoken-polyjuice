@@ -4,16 +4,22 @@
 #include <stdio.h>
 #include <string.h>
 
-#include "gw_def.h"
 #include "common.h"
 #include "godwoken.h"
-#include "sudt_utils.h"
 #include "ckb_syscalls.h"
+#include "gw_syscalls.h"
+#include "sudt_utils.h"
 
 #include <ethash/keccak.hpp>
 #include <evmc/evmc.h>
 #include <evmc/evmc.hpp>
 #include <evmone/evmone.h>
+
+#ifdef GW_GENERATOR
+#include "generator/secp256k1_helper.h"
+#else
+#include "validator/secp256k1_helper.h"
+#endif
 #include "contracts.h"
 
 static char debug_buffer[64 * 1024];
@@ -764,4 +770,36 @@ int handle_message(gw_context_t *ctx, gw_transaction_context_t *tx_ctx, gw_call_
   debug_print_int("status_code", res.status_code);
   ckb_debug("END handle_message");
   return (int)res.status_code;
+}
+
+int run() {
+  int ret;
+
+  /* prepare context */
+  gw_context_t context;
+  ret = gw_context_init(&context);
+  if (ret != 0) {
+    return ret;
+  }
+
+  gw_call_receipt_t receipt;
+  receipt.return_data_len = 0;
+  /* load layer2 contract */
+  ret = handle_message(&context, NULL, &receipt);
+  if (ret != 0) {
+    return ret;
+  }
+
+  ret = context.sys_set_program_return_data(&context,
+                                            receipt.return_data,
+                                            receipt.return_data_len);
+  if (ret != 0) {
+    return ret;
+  }
+
+  ret = gw_finalize(&context, &receipt);
+  if (ret != 0) {
+    return ret;
+  }
+  return 0;
 }
