@@ -15,7 +15,7 @@
 #include "common.h"
 #include "gw_def.h"
 #include "gw_smt.h"
-#include "validator/validator.h"
+#include "validator_utils.h"
 #include "validator/secp256k1_helper.h"
 #include "polyjuice.h"
 
@@ -24,17 +24,18 @@ int main() {
   int ret;
 
   /* prepare context */
-  gw_verification_context_t context;
+  gw_context_t context;
   gw_context_init(&context);
-  gw_context_t *gw_ctx = &context.gw_ctx;
 
-  uint32_t old_to_id = gw_ctx->transaction_context.to_id;
+  uint32_t old_to_id = context.transaction_context.to_id;
   ret = verify_old_kv_state(&context);
   if (ret != 0) {
     return ret;
   }
+  gw_call_receipt_t receipt;
+  receipt.return_data_len = 0;
   /* load layer2 contract */
-  ret = handle_message(&context, sizeof(gw_verification_context_t));
+  ret = handle_message(&context, NULL, &receipt);
   if (ret != 0) {
     return ret;
   }
@@ -44,15 +45,15 @@ int main() {
   }
 
   debug_print_data("return data",
-                   gw_ctx->receipt.return_data,
-                   gw_ctx->receipt.return_data_len);
-  debug_print_int("return data length", gw_ctx->receipt.return_data_len);
+                   receipt.return_data,
+                   receipt.return_data_len);
+  debug_print_int("return data length", receipt.return_data_len);
   /* It's a call */
-  if (old_to_id == gw_ctx->transaction_context.to_id) {
+  if (old_to_id == context.transaction_context.to_id) {
     /* Return data from receipt */
-    ret = gw_ctx->sys_set_program_return_data((void *)(&context),
-                                              gw_ctx->receipt.return_data,
-                                              gw_ctx->receipt.return_data_len);
+    ret = context.sys_set_program_return_data(&context,
+                                              receipt.return_data,
+                                              receipt.return_data_len);
   }
   if (ret != 0) {
     return ret;
