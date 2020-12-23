@@ -12,10 +12,16 @@ const PATH_PREFIX: &str = "build/";
 const BUF_SIZE: usize = 8 * 1024;
 const CKB_HASH_PERSONALIZATION: &[u8] = b"ckb-default-hash";
 
-const BINARIES: &[(&str, &str)] = &[(
-    "generator",
-    "23c12ab00086ce7cc04230197adf526a307fc049574747045539bfacbec59461",
-)];
+const BINARIES: &[(&str, &str)] = &[
+    (
+        "generator",
+        "a2b604e19c8f8213e93d2045a55db54af93af2b9ce36f7a67efb7bafc038af05",
+    ),
+    (
+        "validator",
+        "3635387fd76f10c733349f35af2da6873f7959f44e590d0758905c45e50cd48c",
+    )
+];
 
 fn main() {
     let mut bundled = includedir_codegen::start("BUNDLED_CELL");
