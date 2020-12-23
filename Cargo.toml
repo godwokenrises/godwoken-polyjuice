@@ -1,13 +1,13 @@
 [package]
 name = "godwoken-polyjuice"
-version = "0.0.4"
+version = "0.0.5"
 authors = ["Linfeng Qian <thewawar@gmail.com>"]
 edition = "2018"
 build = "build.rs"
 license = "MIT"
 description = "Polyjuice scripts for godwoken"
 repository = "https://github.com/thewawar/godwoken-polyjuice"
-include = ["src/**/*", "Cargo.toml", "build.rs", "build/generator"]
+include = ["src/**/*", "Cargo.toml", "build.rs", "build/generator", "build/validator"]
 
 [dependencies]
 includedir = "0.5.0"
