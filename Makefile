@@ -41,16 +41,18 @@ clean-via-docker: generate-protocol
 	docker run --rm -v `pwd`:/code ${BUILDER_DOCKER} bash -c "cd /code && make clean"
 
 build/generator: c/generator.c c/contracts.h c/generator/secp256k1_helper.h c/polyjuice.h build/secp256k1_data_info.h $(ALL_OBJS)
-	sed -i 's@\(#define USE_ECMULT_STATIC_PRECOMPUTATION 1\)@//\1@g' $(SECP_DIR)/src/libsecp256k1-config.h
+	cd $(SECP_DIR) && (git apply workaround-fix-g++-linking.patch || true) && cd - # apply patch
 	$(CXX) $(CFLAGS) $(LDFLAGS) -Ibuild -o $@ c/generator.c $(ALL_OBJS)
 	$(OBJCOPY) --only-keep-debug $@ $@.debug
 	$(OBJCOPY) --strip-debug --strip-all $@
+	cd $(SECP_DIR) && (git apply -R workaround-fix-g++-linking.patch || true) && cd - # revert patch
 
 build/validator: c/validator.c c/contracts.h c/validator/secp256k1_helper.h c/polyjuice.h build/secp256k1_data_info.h $(ALL_OBJS)
-	sed -i 's@\(#define USE_ECMULT_STATIC_PRECOMPUTATION 1\)@//\1@g' $(SECP_DIR)/src/libsecp256k1-config.h
+	cd $(SECP_DIR) && (git apply workaround-fix-g++-linking.patch || true) && cd - # apply patch
 	$(CXX) $(CFLAGS) $(LDFLAGS) -Ibuild -o $@ c/validator.c $(ALL_OBJS)
 	$(OBJCOPY) --only-keep-debug $@ $@.debug
 	$(OBJCOPY) --strip-debug --strip-all $@
+	cd $(SECP_DIR) && (git apply -R workaround-fix-g++-linking.patch || true) && cd - # revert patch
 
 build/evmone.o: deps/evmone/lib/evmone/evmone.cpp
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -c -o $@ $< -DPROJECT_VERSION=\"0.5.0-dev\"
@@ -80,9 +82,9 @@ build/dump_secp256k1_data: c/dump_secp256k1_data.c $(SECP256K1_SRC)
 	gcc $(CFLAGS) -o $@ $<
 $(SECP256K1_SRC):
 	cd $(SECP_DIR) && \
+    (git apply -R workaround-fix-g++-linking.patch || true) && \
 		./autogen.sh && \
 		CC=$(CC) LD=$(LD) ./configure --with-bignum=no --enable-ecmult-static-precomputation --enable-endomorphism --enable-module-recovery --host=$(TARGET) && \
-    sed -i 's@//\(#define USE_ECMULT_STATIC_PRECOMPUTATION 1\)@\1@g' src/libsecp256k1-config.h && \
     make src/ecmult_static_pre_context.h src/ecmult_static_context.h
 
 generate-protocol: check-moleculec-version build/blockchain.h build/godwoken.h
