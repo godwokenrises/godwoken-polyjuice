@@ -15,6 +15,8 @@
 int main() {
   int ret;
 
+
+
   /* prepare context */
   gw_context_t context;
   ret = gw_context_init(&context);
@@ -22,9 +24,21 @@ int main() {
     return ret;
   }
 
+  evmc_message msg;
+  uint128_t gas_price;
+  /* Parse message */
+  ckb_debug("BEGIN parse_message()");
+  ret = parse_args(&msg, &gas_price, context->transaction_context);
+  ckb_debug("END parse_message()");
+  if (ret != 0) {
+    return ret;
+  }
+
   context.receipt.return_data_len = 0;
   /* load layer2 contract */
-  ret = handle_message(&context, NULL, &context.receipt);
+  uint32_t from_id = context->transaction_context.from_id;
+  uint32_t to_id = context->transaction_context.to_id;
+  ret = handle_message(&context, &msg, from_id, &to_id, &context.receipt);
   if (ret != 0) {
     return ret;
   }
