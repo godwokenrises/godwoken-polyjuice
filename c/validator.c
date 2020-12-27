@@ -13,5 +13,32 @@
 #include "polyjuice.h"
 
 int main() {
-  return run();
+  int ret;
+
+  /* prepare context */
+  gw_context_t context;
+  ret = gw_context_init(&context);
+  if (ret != 0) {
+    return ret;
+  }
+
+  context.receipt.return_data_len = 0;
+  /* load layer2 contract */
+  ret = handle_message(&context, NULL, &context.receipt);
+  if (ret != 0) {
+    return ret;
+  }
+
+  ret = context.sys_set_program_return_data(&context,
+                                            context.receipt.return_data,
+                                            context.receipt.return_data_len);
+  if (ret != 0) {
+    return ret;
+  }
+
+  ret = gw_finalize(&context);
+  if (ret != 0) {
+    return ret;
+  }
+  return 0;
 }
