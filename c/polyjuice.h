@@ -57,9 +57,7 @@ void gw_build_contract_code_key(uint32_t id, uint8_t key[GW_KEY_BYTES]) {
 
 int handle_message(gw_context_t *ctx,
                    const evmc_message *msg,
-                   uint32_t from_id,
-                   uint32_t *to_id,
-                   gw_call_receipt_t *receipt);
+                   struct evmc_result *res);
 typedef int (*stream_data_loader_fn)(gw_context_t *ctx, long data_id,
                                      uint32_t *len, uint32_t offset,
                                      uint8_t *data);
@@ -107,33 +105,47 @@ int parse_args(struct evmc_message *msg,
   /* == Args decoder */
   size_t offset = 0;
   uint8_t *args = tx_ctx->args;
-  /* args[0] */
+
+  /* args[0] call kind */
   evmc_call_kind kind = (evmc_call_kind)*(args + offset);
   offset += 1;
-  /* args[1] */
+  debug_print_int("[kind]", kind);
+
+  /* args[1] flags */
   uint8_t flags = *(args + offset);
   offset += 1;
-  debug_print_int("flags", flags);
-  /* args[2..10] gas */
-  int64_t gas = (int64_t)*((uint64_t *)(args + offset));
+  debug_print_int("[flags]", flags);
+
+  /* args[2..10] gas limit */
+  int64_t gas_limit = (int64_t)*((uint64_t *)(args + offset));
   offset += 8;
+  debug_print_int("[gas_limit]", gas_limit);
+
   /* args[10..26] gas price */
   *gas_price = *((uint128_t *)(args + offset));
   offset += 16;
-  /* args[26..58] value */
+  debug_print_int("[gas_price]", (int64_t)gas_price);
+
+  /* args[26..58] transfer value */
   evmc_uint256be value = *((evmc_uint256be *)(args + offset));
   offset += 32;
-  debug_print_data("value", value.bytes, 32);
+  debug_print_data("[value]", value.bytes, 32);
+
   /* args[58..62] */
   uint32_t input_size = *((uint32_t *)(args + offset));
   offset += 4;
-  debug_print_int("input_size", input_size);
+  debug_print_int("[input_size]", input_size);
+
   /* args[62..62+input_size] */
   uint8_t *input_data = args + offset;
-  debug_print_data("input_data", input_data, input_size);
+  debug_print_data("[input_data]", input_data, input_size);
 
   if (tx_ctx->args_len != (input_size + offset)) {
-    /* ERROR: Invalid args_len */
+    ckb_debug("invalid polyjuice transaction");
+    return -1;
+  }
+  if (kind != EVMC_CALL || kind != EVMC_CREATE) {
+    ckb_debug("invalid call kind");
     return -1;
   }
 
@@ -147,7 +159,7 @@ int parse_args(struct evmc_message *msg,
   msg->value = value;
   msg->input_data = input_data;
   msg->input_size = input_size;
-  msg->gas = gas;
+  msg->gas = gas_limit;
   msg->sender = sender;
   msg->destination = destination;
   msg->create2_salt = evmc_bytes32{};
@@ -475,10 +487,13 @@ struct evmc_result call(struct evmc_host_context* context,
   precompiled_contract_gas_fn contract_gas;
   precompiled_contract_fn contract;
   if (match_precompiled_address(&msg->destination, &contract_gas, &contract)) {
-    uint64_t _gas_cost = contract_gas(msg->input_data, msg->input_size);
+    uint64_t gas_cost = contract_gas(msg->input_data, msg->input_size);
+    res.gas_left = msg->gas - (int64_t)gas_cost;
     ret = contract(gw_ctx,
-                   msg->input_data, msg->input_size,
-                   (uint8_t **)&res.output_data, &res.output_size);
+                   msg->input_data,
+                   msg->input_size,
+                   (uint8_t **)&res.output_data,
+                   &res.output_size);
     if (ret != 0) {
       ckb_debug("call pre-compiled contract failed");
       context->error_code = ret;
@@ -489,51 +504,20 @@ struct evmc_result call(struct evmc_host_context* context,
     return res;
   }
 
-  uint32_t from_id;
-  ret = address_to_account_id(&(msg->sender), &from_id);
-  if (ret != 0) {
-    ckb_debug("address to account id failed");
-    context->error_code = ret;
-    res.status_code = EVMC_REVERT;
-    return res;
-  }
-  uint32_t to_id;
-  ret = address_to_account_id(&(msg->destination), &to_id);
-  if (ret != 0) {
-    ckb_debug("address to account id failed");
-    context->error_code = ret;
-    res.status_code = EVMC_REVERT;
-    return res;
-  }
-
   if (msg->depth > (int32_t)UINT16_MAX) {
-    // ERROR: depth too large
     ckb_debug("depth too large");
     context->error_code = -1;
     res.status_code = EVMC_REVERT;
     return res;
   }
 
-  /* prepare context */
-  gw_call_receipt_t sub_receipt;
-  sub_receipt.return_data_len = 0;
-
   /* TODO: handle special kind (CREATE2/CALLCODE/DELEGATECALL)*/
-  ret = handle_message(gw_ctx, msg, from_id, &to_id, &sub_receipt);
+  ret = handle_message(gw_ctx, msg, &res);
   if (ret != 0) {
     ckb_debug("inner call failed (transfer/contract call contract)");
     context->error_code = ret;
     res.status_code = EVMC_REVERT;
     return res;
-  }
-
-  /* Fill evmc_result */
-  res.output_size = (size_t)sub_receipt.return_data_len;
-  res.output_data = (uint8_t *)malloc(res.output_size);
-  memcpy((void *)res.output_data, sub_receipt.return_data, res.output_size);
-  res.release = release_result;
-  if (msg->kind == EVMC_CREATE) {
-    res.create_address = account_id_to_address(to_id);
   }
 
   ckb_debug("END call");
@@ -599,17 +583,28 @@ void emit_log(struct evmc_host_context* context,
  */
 int handle_message(gw_context_t *ctx,
                    const evmc_message *msg,
-                   uint32_t from_id,
-                   uint32_t *to_id,
-                   gw_call_receipt_t *receipt) {
+                   struct evmc_result *res) {
   ckb_debug("BEGIN handle_message");
 
   int ret;
 
+  uint32_t to_id;
+  uint32_t from_id;
+  ret = address_to_account_id(&(msg->destination), &to_id);
+  if (ret != 0) {
+    ckb_debug("address to account id failed");
+    return -1;
+  }
+  ret = address_to_account_id(&(msg->sender), &from_id);
+  if (ret != 0) {
+    ckb_debug("address to account id failed");
+    return -1;
+  }
+
   if (!has_touched) {
     /* entrance message */
     mol_seg_t script_seg;
-    ret = load_account_script(ctx, *to_id, &script_seg);
+    ret = load_account_script(ctx, to_id, &script_seg);
     if (ret != 0) {
       return ret;
     }
@@ -634,8 +629,11 @@ int handle_message(gw_context_t *ctx,
     /* use input as code */
     code_data = (uint8_t *)msg->input_data;
     code_size = msg->input_size;
-    msg->input_data = NULL;
-    msg->input_size = 0;
+
+    /* FIXME:: how to handle code data */
+    /* msg->input_data = NULL; */
+    /* msg->input_size = 0; */
+
     /* create account id */
     /* Include:
        - sudt id
@@ -660,10 +658,10 @@ int handle_message(gw_context_t *ctx,
     if (ret != 0) {
       return ret;
     }
-    *to_id = new_account_id;
+    to_id = new_account_id;
   } else if (msg->kind == EVMC_CALL) {
     ret = load_account_code(ctx,
-                            *to_id,
+                            to_id,
                             &code_data,
                             &code_size);
     if (ret != 0) {
@@ -675,7 +673,7 @@ int handle_message(gw_context_t *ctx,
     return -1;
   }
 
-  struct evmc_host_context context { ctx, from_id, *to_id, tx_origin, 0 };
+  struct evmc_host_context context { ctx, from_id, to_id, tx_origin, 0 };
 
   /* Execute the code in EVM */
   struct evmc_vm *vm = evmc_create_evmone();
@@ -687,22 +685,21 @@ int handle_message(gw_context_t *ctx,
                                            get_tx_context,
                                            get_block_hash,
                                            emit_log };
-  struct evmc_result res = vm->execute(vm,
-                                       &interface,
-                                       &context,
-                                       EVMC_MAX_REVISION,
-                                       &msg,
-                                       code_data,
-                                       code_size);
+  *res = vm->execute(vm,
+                     &interface,
+                     &context,
+                     EVMC_MAX_REVISION,
+                     msg,
+                     code_data,
+                     code_size);
   if (context.error_code != 0)  {
     debug_print_int("context.error_code:", context.error_code);
     return context.error_code;
   }
-  if (res.gas_left < 0) {
+  if (res->gas_left < 0) {
     ckb_debug("gas not enough");
     return -1;
   }
-  msg->gas = res.gas_left;
 
   /* handle transfer logic */
   bool is_zero_value = true;
@@ -719,12 +716,12 @@ int handle_message(gw_context_t *ctx,
     }
     uint128_t value_u128 = *(uint128_t *)value_u128_bytes;
     debug_print_int("from_id", from_id);
-    debug_print_int("to_id", *to_id);
+    debug_print_int("to_id", to_id);
     debug_print_int("transfer value", value_u128);
     ret = sudt_transfer(ctx,
                         sudt_id,
                         from_id,
-                        *to_id,
+                        to_id,
                         value_u128);
     if (ret != 0) {
       ckb_debug("transfer failed");
@@ -737,25 +734,82 @@ int handle_message(gw_context_t *ctx,
   if (msg->kind == EVMC_CREATE) {
     uint8_t key[32];
     uint8_t data_hash[32];
-    blake2b_hash(data_hash, (uint8_t *)res.output_data, res.output_size);
-    gw_build_contract_code_key(*to_id, key);
+    blake2b_hash(data_hash, (uint8_t *)res->output_data, res->output_size);
+    gw_build_contract_code_key(to_id, key);
     ckb_debug("BEGIN store data key");
-    ret = ctx->sys_store(ctx, *to_id, key, data_hash);
+    ret = ctx->sys_store(ctx, to_id, key, data_hash);
     if (ret != 0) {
       return ret;
     }
     ckb_debug("BEGIN store data");
-    ret = ctx->sys_store_data(ctx, res.output_size, (uint8_t *)res.output_data);
+    ret = ctx->sys_store_data(ctx, res->output_size, (uint8_t *)res->output_data);
     ckb_debug("END store data");
     if (ret != 0) {
       return ret;
     }
+    res->create_address = account_id_to_address(to_id);
   }
 
-  debug_print_int("output size", res.output_size);
-  receipt->return_data_len = (uint32_t)res.output_size;
-  memcpy(receipt->return_data, res.output_data, res.output_size);
-  debug_print_int("status_code", res.status_code);
+  debug_print_int("output size", res->output_size);
+  debug_print_int("status_code", res->status_code);
   ckb_debug("END handle_message");
-  return (int)res.status_code;
+  return (int)res->status_code;
+}
+
+
+int run_polyjuice() {
+  int ret;
+
+  /* prepare context */
+  gw_context_t context;
+  ret = gw_context_init(&context);
+  if (ret != 0) {
+    return ret;
+  }
+
+  evmc_message msg;
+  uint128_t gas_price;
+  /* Parse message */
+  ckb_debug("BEGIN parse_message()");
+  ret = parse_args(&msg, &gas_price, &context.transaction_context);
+  ckb_debug("END parse_message()");
+  if (ret != 0) {
+    return ret;
+  }
+
+  struct evmc_result res;
+  ret = handle_message(&context, &msg, &res);
+  if (ret != 0) {
+    return ret;
+  }
+
+  ret = context.sys_set_program_return_data(&context,
+                                            (uint8_t *)res.output_data,
+                                            res.output_size);
+  if (ret != 0) {
+    ckb_debug("set return data failed");
+    return ret;
+  }
+
+  /* Handle transaction fee */
+  if (res.gas_left < 0) {
+    ckb_debug("gas not enough");
+    return -1;
+  }
+  if (msg.gas < res.gas_left) {
+    ckb_debug("unreachable!");
+    return -1;
+  }
+  uint128_t fee = gas_price * (uint128_t)(msg.gas - res.gas_left);
+  ret = sudt_transfer(&context,
+                      sudt_id,
+                      context.transaction_context.from_id,
+                      context.block_info.aggregator_id,
+                      fee);
+
+  ret = gw_finalize(&context);
+  if (ret != 0) {
+    return ret;
+  }
+  return 0;
 }
