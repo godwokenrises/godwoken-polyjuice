@@ -42,8 +42,10 @@ static void debug_print_int(const char *prefix, int64_t ret) {
   ckb_debug(debug_buffer);
 }
 
-/* account script buffer sisze: 32KB */
-#define ACCOUNT_SCRIPT_BUFSIZE 32768
+/* Max script buffer size: 1KB */
+#define MAX_SCRIPT_SIZE 1024
+/* Max data buffer size: 24KB */
+#define MAX_DATA_SIZE 24576
 #define GW_ACCOUNT_CONTRACT_CODE 100
 
 static bool has_touched = false;
@@ -212,61 +214,11 @@ void release_result(const struct evmc_result* result) {
   return;
 }
 
-
-int load_all_data(gw_context_t *gw_ctx,
-                  long data_id,
-                  uint8_t **data,
-                  size_t *data_size,
-                  stream_data_loader_fn loader) {
-  int ret;
-  size_t total_size = 0;
-  size_t buffer_size = ACCOUNT_SCRIPT_BUFSIZE;
-  uint32_t len = (uint32_t) buffer_size;
-  uint8_t *buffer = (uint8_t *)malloc(buffer_size);
-  uint8_t *ptr = buffer;
-  size_t offset = 0;
-  while (true) {
-    ret = loader(gw_ctx, data_id, &len, offset, ptr);
-    if (ret != 0) {
-      /* ERROR: load account data failed */
-      free(buffer);
-      *data = NULL;
-      *data_size = 0;
-      return ret;
-    }
-    total_size += (size_t)len;
-    if (len == buffer_size || len == buffer_size / 2) {
-      uint8_t *new_buffer = (uint8_t *)malloc(buffer_size * 2);
-      memcpy(new_buffer, buffer, buffer_size);
-      free(buffer);
-      ptr = new_buffer + total_size;
-      buffer = new_buffer;
-      offset = buffer_size;
-      len = (uint32_t) buffer_size;
-      buffer_size *= 2;
-    } else {
-      break;
-    }
-  }
-  *data = buffer;
-  *data_size = total_size;
-  debug_print_int("loaded data size", *data_size);
-  debug_print_data("loaded data data", *data, *data_size);
-
-  return 0;
-}
-
-
-int data_loader(gw_context_t *ctx, long data_id,
-                uint32_t *len, uint32_t offset,
-                uint8_t *data) {
-  gw_context_t *gw_ctx = (gw_context_t *)ctx;
-  return gw_ctx->sys_load_data(ctx, (uint8_t *)data_id, len, offset, data);
-}
 int load_account_code(gw_context_t *gw_ctx,
-                       uint32_t account_id,
-                       uint8_t **code,
-                       size_t *code_size) {
+                      uint32_t account_id,
+                      uint32_t *code_size,
+                      uint32_t offset,
+                      uint8_t *code) {
   debug_print_int("load_account_code, account_id:", account_id);
   uint8_t key[32];
   uint8_t data_hash[32];
@@ -275,28 +227,36 @@ int load_account_code(gw_context_t *gw_ctx,
   if (ret != 0) {
     return ret;
   }
-  return load_all_data(gw_ctx, (long)data_hash, code, code_size, data_loader);
-}
 
-int account_script_loader(gw_context_t *gw_ctx, long data_id,
-                          uint32_t *len, uint32_t offset,
-                          uint8_t *data) {
-  return gw_ctx->sys_get_account_script(gw_ctx, (uint32_t)data_id, len, offset, data);
-}
-
-int load_account_script(gw_context_t *gw_ctx, uint32_t account_id, mol_seg_t *script_seg) {
-  debug_print_int("load_account_script, account_id:", account_id);
-  int ret;
-  uint8_t *script = NULL;
-  size_t script_size = 0;
-  ret = load_all_data(gw_ctx, (long)account_id, &script, &script_size, account_script_loader);
+  uint32_t old_code_size = *code_size;
+  ret = gw_ctx->sys_load_data(gw_ctx, data_hash, code_size, offset, code);
   if (ret != 0) {
     return ret;
   }
-  script_seg->ptr = script;
-  script_seg->size = (uint32_t)script_size;
+  if (*code_size >= old_code_size) {
+    ckb_debug("code can't be larger than MAX_DATA_SIZE");
+    return -1;
+  }
+  return 0;
+}
+
+int load_account_script(gw_context_t *gw_ctx,
+                        uint32_t account_id,
+                        uint8_t *buffer,
+                        uint32_t buffer_size,
+                        mol_seg_t *script_seg) {
+  debug_print_int("load_account_script, account_id:", account_id);
+  int ret;
+  uint32_t len = buffer_size;
+  ret = gw_ctx->sys_get_account_script(gw_ctx, account_id, &len, 0, buffer);
+  if (ret != 0) {
+    ckb_debug("load account script failed");
+    return ret;
+  }
+  script_seg->ptr = buffer;
+  script_seg->size = len;
   if (MolReader_Script_verify(script_seg, false) != MOL_OK) {
-    /* ERROR invalid script */
+    ckb_debug("load account script: invalid script");
     return -1;
   }
   return 0;
@@ -379,14 +339,13 @@ size_t get_code_size(struct evmc_host_context* context,
     context->error_code = ret;
     return 0;
   }
-  uint8_t *code = NULL;
-  size_t code_size;
-  ret = load_account_code(context->gw_ctx, account_id, &code, &code_size);
+  uint8_t code[MAX_DATA_SIZE];
+  uint32_t code_size = MAX_DATA_SIZE;
+  ret = load_account_code(context->gw_ctx, account_id, &code_size, 0, code);
   if (ret != 0) {
     context->error_code = ret;
     return 0;
   }
-  free(code);
   ckb_debug("END get_code_size");
   return code_size;
 }
@@ -402,9 +361,9 @@ evmc_bytes32 get_code_hash(struct evmc_host_context* context,
     return hash;
   }
 
-  uint8_t *code = NULL;
-  size_t code_size;
-  ret = load_account_code(context->gw_ctx, account_id, &code, &code_size);
+  uint8_t code[MAX_DATA_SIZE];
+  uint32_t code_size = MAX_DATA_SIZE;
+  ret = load_account_code(context->gw_ctx, account_id, &code_size, 0, code);
   if (ret != 0) {
     context->error_code = ret;
     return hash;
@@ -412,7 +371,6 @@ evmc_bytes32 get_code_hash(struct evmc_host_context* context,
 
   union ethash_hash256 hash_result = ethash::keccak256(code, code_size);
   memcpy(hash.bytes, hash_result.bytes, 32);
-  free(code);
   ckb_debug("END get_code_hash");
   return hash;
 }
@@ -429,13 +387,12 @@ size_t copy_code(struct evmc_host_context* context,
     return (size_t)ret;
   }
 
-  uint32_t len = (uint32_t)buffer_size;
-  /* FIXME: change to load_account_code() */
-  ret = context->gw_ctx->sys_get_account_script(context->gw_ctx,
-                                                    account_id,
-                                                    &len,
-                                                    code_offset,
-                                                    buffer_data);
+  uint32_t code_size = (uint32_t) buffer_size;
+  ret = load_account_code(context->gw_ctx,
+                          account_id,
+                          &code_size,
+                          (uint32_t)code_offset,
+                          buffer_data);
   if (ret != 0) {
     return ret;
   }
@@ -615,8 +572,9 @@ int handle_message(gw_context_t *ctx,
   /* Load: validator_code_hash, hash_type, sudt_id */
   if (!has_touched) {
     /* entrance message */
+    uint8_t buffer[MAX_SCRIPT_SIZE];
     mol_seg_t script_seg;
-    ret = load_account_script(ctx, to_id, &script_seg);
+    ret = load_account_script(ctx, to_id, buffer, MAX_SCRIPT_SIZE, &script_seg);
     if (ret != 0) {
       return ret;
     }
@@ -641,7 +599,12 @@ int handle_message(gw_context_t *ctx,
     msg.input_data = NULL;
     msg.input_size = 0;
   } else {
-    ret = load_account_code(ctx, to_id, &code_data, &code_size);
+    /* call kind: CALL/CALLCODE/DELEGATECALL */
+    uint8_t code_data_buffer[MAX_DATA_SIZE];
+    uint32_t code_size_u32 = MAX_DATA_SIZE;
+    ret = load_account_code(ctx, to_id, &code_size_u32, 0, code_data_buffer);
+    code_data = code_data_buffer;
+    code_size = (size_t)code_size_u32;
     if (ret != 0) {
       return ret;
     }
