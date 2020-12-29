@@ -22,6 +22,9 @@
 #endif
 #include "contracts.h"
 
+#define is_create(kind) ((kind) == EVMC_CREATE || (kind) == EVMC_CREATE2)
+#define is_special_call(kind) ((kind) == EVMC_CALLCODE || (kind) == EVMC_DELEGATECALL)
+
 static char debug_buffer[64 * 1024];
 static void debug_print_data(const char *prefix,
                              const uint8_t *data,
@@ -50,14 +53,13 @@ static evmc_address tx_origin;
 static uint8_t script_code_hash[32];
 static uint8_t script_hash_type;
 
-/* FIXME: handle all gas cost */
-
 
 void gw_build_contract_code_key(uint32_t id, uint8_t key[GW_KEY_BYTES]) {
   gw_build_account_field_key(id, GW_ACCOUNT_CONTRACT_CODE, key);
 }
 
 int handle_message(gw_context_t *ctx,
+                   uint32_t parent_from_id,
                    const evmc_message *msg,
                    struct evmc_result *res);
 typedef int (*stream_data_loader_fn)(gw_context_t *ctx, long data_id,
@@ -150,7 +152,6 @@ int parse_args(struct evmc_message *msg,
     return -1;
   }
 
-  /* FIXME: Check from_id and to_id code hash, ONLY ALLOW: [polyjuice, sudt] */
   evmc_address sender = account_id_to_address(tx_ctx->from_id);
   evmc_address destination = account_id_to_address(tx_ctx->to_id);
   tx_origin_id = tx_ctx->from_id;
@@ -515,7 +516,7 @@ struct evmc_result call(struct evmc_host_context* context,
   }
 
   /* TODO: handle special kind (CREATE2/CALLCODE/DELEGATECALL)*/
-  ret = handle_message(gw_ctx, msg, &res);
+  ret = handle_message(gw_ctx, context->from_id, msg, &res);
   if (ret != 0) {
     ckb_debug("inner call failed (transfer/contract call contract)");
     context->error_code = ret;
@@ -585,25 +586,33 @@ void emit_log(struct evmc_host_context* context,
  * Must allocate an account id before create contract
  */
 int handle_message(gw_context_t *ctx,
-                   const evmc_message *msg,
+                   uint32_t parent_from_id,
+                   const evmc_message *msg_origin,
                    struct evmc_result *res) {
   ckb_debug("BEGIN handle_message");
+
+  evmc_message msg = *msg_origin;
 
   int ret;
 
   uint32_t to_id;
   uint32_t from_id;
-  ret = address_to_account_id(&(msg->destination), &to_id);
+  ret = address_to_account_id(&(msg.destination), &to_id);
   if (ret != 0) {
     ckb_debug("address to account id failed");
     return -1;
   }
-  ret = address_to_account_id(&(msg->sender), &from_id);
-  if (ret != 0) {
-    ckb_debug("address to account id failed");
-    return -1;
+  if (msg.kind == EVMC_DELEGATECALL) {
+    from_id = parent_from_id;
+  } else {
+    ret = address_to_account_id(&(msg.sender), &from_id);
+    if (ret != 0) {
+      ckb_debug("address to account id failed");
+      return -1;
+    }
   }
 
+  /* Load: validator_code_hash, hash_type, sudt_id */
   if (!has_touched) {
     /* entrance message */
     mol_seg_t script_seg;
@@ -622,34 +631,71 @@ int handle_message(gw_context_t *ctx,
     has_touched = true;
   }
 
+  /* Load contract code from evmc_message or by sys_load_data */
   uint8_t *code_data = NULL;
   size_t code_size = 0;
-  if (msg->kind == EVMC_CREATE) {
+  if (is_create(msg.kind)) {
     /* use input as code */
-    code_data = (uint8_t *)msg->input_data;
-    code_size = msg->input_size;
-
-    /* FIXME:: how to handle code data */
-    /* msg->input_data = NULL; */
-    /* msg->input_size = 0; */
-
-    /* create account id */
-    /* Include:
-       - sudt id
-       - sender account id
-       - sender nonce (NOTE: only first 4 bytes (u32))
-    */
-    uint8_t args[40];
-    memcpy(args, (uint8_t *)(&sudt_id), 4);
-    memcpy(args + 4, (uint8_t *)(&from_id), 4);
-    // TODO: the nonce length can be optimized (change nonce data type, u32 is not enough)
-    ret = ctx->sys_load_nonce(ctx, from_id, args + 8);
+    code_data = (uint8_t *)msg.input_data;
+    code_size = msg.input_size;
+    msg.input_data = NULL;
+    msg.input_size = 0;
+  } else {
+    ret = load_account_code(ctx, to_id, &code_data, &code_size);
     if (ret != 0) {
       return ret;
     }
+  }
+
+  /* Handle special call: CALLCODE/DELEGATECALL */
+  if (is_special_call(msg.kind)) {
+    /* This action must after load the contract code */
+    to_id = from_id;
+  }
+
+  /* Create new account by script */
+  uint8_t script_args[128];
+  uint32_t script_args_len = 0;
+  if (msg.kind == EVMC_CREATE) {
+    /* create account id
+       Include:
+       - [4 bytes] sudt id
+       - [4 bytes] sender account id
+       - [4 bytes] sender nonce (NOTE: only use first 4 bytes (u32))
+    */
+    memcpy(script_args, (uint8_t *)(&sudt_id), 4);
+    memcpy(script_args + 4, (uint8_t *)(&from_id), 4);
+    // TODO: the nonce length can be optimized (change nonce data type, u32 is not enough)
+    ret = ctx->sys_load_nonce(ctx, from_id, script_args + 8);
+    if (ret != 0) {
+      return ret;
+    }
+    script_args_len = 4 + 4 + 4;
+  } else if (msg.kind == EVMC_CREATE2) {
+    /* create account id
+       Include:
+       - [ 4 bytes] sudt id
+       - [ 1 byte ] 0xff (refer to ethereum)
+       - [ 4 bytes] sender account id
+       - [32 bytes] create2_salt
+       - [32 bytes] keccak256(init_code)
+    */
+    memcpy(script_args, (uint8_t *)(&sudt_id), 4);
+    script_args[4] = 0xff;
+    memcpy(script_args + (4+1), (uint8_t *)(&from_id), 4);
+    memcpy(script_args + (4+1+4), msg.create2_salt.bytes, 32);
+    union ethash_hash256 hash_result = ethash::keccak256(code_data, code_size);
+    memcpy(script_args + (4+1+4+32), hash_result.bytes, 32);
+    script_args_len = 4 + 1 + 4 + 32 + 32;
+  }
+  if (script_args_len > 0) {
     mol_seg_t new_script_seg;
     uint32_t new_account_id;
-    ret = build_script(script_code_hash, script_hash_type, args, 12, &new_script_seg);
+    ret = build_script(script_code_hash,
+                       script_hash_type,
+                       script_args,
+                       script_args_len,
+                       &new_script_seg);
     if (ret != 0) {
       return ret;
     }
@@ -658,23 +704,10 @@ int handle_message(gw_context_t *ctx,
       return ret;
     }
     to_id = new_account_id;
-  } else if (msg->kind == EVMC_CALL) {
-    ret = load_account_code(ctx,
-                            to_id,
-                            &code_data,
-                            &code_size);
-    if (ret != 0) {
-      return ret;
-    }
-    // Do nothing
-  } else {
-    // FIXME: handle special call kind
-    return -1;
   }
 
-  struct evmc_host_context context { ctx, from_id, to_id, 0 };
-
   /* Execute the code in EVM */
+  struct evmc_host_context context { ctx, from_id, to_id, 0 };
   struct evmc_vm *vm = evmc_create_evmone();
   struct evmc_host_interface interface = { account_exists,
                                            get_storage, set_storage,
@@ -688,7 +721,7 @@ int handle_message(gw_context_t *ctx,
                      &interface,
                      &context,
                      EVMC_MAX_REVISION,
-                     msg,
+                     &msg,
                      code_data,
                      code_size);
   if (context.error_code != 0)  {
@@ -700,10 +733,10 @@ int handle_message(gw_context_t *ctx,
     return -1;
   }
 
-  /* handle transfer logic */
+  /* Handle transfer logic */
   bool is_zero_value = true;
   for (int i = 0; i < 32; i++) {
-    if (msg->value.bytes[i] != 0) {
+    if (msg.value.bytes[i] != 0) {
       is_zero_value = false;
       break;
     }
@@ -711,7 +744,7 @@ int handle_message(gw_context_t *ctx,
   if (!is_zero_value) {
     uint8_t value_u128_bytes[16];
     for (int i = 0; i < 16; i++) {
-      value_u128_bytes[i] = msg->value.bytes[31-i];
+      value_u128_bytes[i] = msg.value.bytes[31-i];
     }
     uint128_t value_u128 = *(uint128_t *)value_u128_bytes;
     debug_print_int("from_id", from_id);
@@ -729,8 +762,7 @@ int handle_message(gw_context_t *ctx,
   }
 
   /* Store code though syscall */
-  // TODO handle special create kind
-  if (msg->kind == EVMC_CREATE) {
+  if (is_create(msg.kind)) {
     uint8_t key[32];
     uint8_t data_hash[32];
     blake2b_hash(data_hash, (uint8_t *)res->output_data, res->output_size);
@@ -777,7 +809,7 @@ int run_polyjuice() {
   }
 
   struct evmc_result res;
-  ret = handle_message(&context, &msg, &res);
+  ret = handle_message(&context, UINT32_MAX, &msg, &res);
   if (ret != 0) {
     return ret;
   }
