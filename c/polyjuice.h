@@ -45,6 +45,8 @@ static void debug_print_int(const char *prefix, int64_t ret) {
 
 static bool has_touched = false;
 static uint32_t sudt_id = UINT32_MAX;
+static uint32_t tx_origin_id = UINT32_MAX;
+static evmc_address tx_origin;
 static uint8_t script_code_hash[32];
 static uint8_t script_hash_type;
 
@@ -66,7 +68,6 @@ struct evmc_host_context {
   gw_context_t* gw_ctx;
   uint32_t from_id;
   uint32_t to_id;
-  evmc_address tx_origin;
   int error_code;
 };
 
@@ -152,6 +153,8 @@ int parse_args(struct evmc_message *msg,
   /* FIXME: Check from_id and to_id code hash, ONLY ALLOW: [polyjuice, sudt] */
   evmc_address sender = account_id_to_address(tx_ctx->from_id);
   evmc_address destination = account_id_to_address(tx_ctx->to_id);
+  tx_origin_id = tx_ctx->from_id;
+  memcpy(tx_origin.bytes, sender.bytes, 20);
 
   msg->kind = kind;
   msg->flags = flags;
@@ -305,7 +308,7 @@ struct evmc_tx_context get_tx_context(struct evmc_host_context* context) {
   struct evmc_tx_context ctx{};
   /* gas price = 1 */
   ctx.tx_gas_price.bytes[31] = 0x01;
-  ctx.tx_origin = context->tx_origin;
+  memcpy(ctx.tx_origin.bytes, tx_origin.bytes, 20);
   /* TODO: get coinbase by aggregator id */
   memset(ctx.block_coinbase.bytes, 0, 20);
   ctx.block_number = context->gw_ctx->block_info.number;
@@ -619,10 +622,6 @@ int handle_message(gw_context_t *ctx,
     has_touched = true;
   }
 
-  evmc_address tx_origin;
-  memcpy(tx_origin.bytes, ctx->transaction_context.args + 1, 20);
-
-
   uint8_t *code_data = NULL;
   size_t code_size = 0;
   if (msg->kind == EVMC_CREATE) {
@@ -673,7 +672,7 @@ int handle_message(gw_context_t *ctx,
     return -1;
   }
 
-  struct evmc_host_context context { ctx, from_id, to_id, tx_origin, 0 };
+  struct evmc_host_context context { ctx, from_id, to_id, 0 };
 
   /* Execute the code in EVM */
   struct evmc_vm *vm = evmc_create_evmone();
