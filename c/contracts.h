@@ -15,7 +15,12 @@
 #define IDENTITY_BASE_GAS     15  // Base price for a data copy operation
 #define IDENTITY_PERWORD_GAS  3   // Per-work price for a data copy operation
 
+#define BLAKE2F_INPUT_LENGTH          213
+#define BLAKE2F_FINAL_BLOCK_BYTES     0x1
+#define BLAKE2F_NON_FINAL_BLOCK_BYTES 0x0
+
 #define ERROR_MOD_EXP  -23
+#define ERROR_BLAKE2F  -24
 
 /* pre-compiled Ethereum contracts */
 
@@ -166,6 +171,7 @@ int data_copy(gw_context_t *ctx,
 }
 
 uint64_t big_mod_exp_required_gas(const uint8_t *input, const size_t input_size) {
+  /* FIXME: todo */
   return 0;
 }
 
@@ -261,6 +267,236 @@ int big_mod_exp(gw_context_t *ctx,
   return 0;
 }
 
+static uint8_t precomputed[10][16] = {{0, 2, 4, 6, 1, 3, 5, 7, 8, 10, 12, 14, 9, 11, 13, 15},
+                                      {14, 4, 9, 13, 10, 8, 15, 6, 1, 0, 11, 5, 12, 2, 7, 3},
+                                      {11, 12, 5, 15, 8, 0, 2, 13, 10, 3, 7, 9, 14, 6, 1, 4},
+                                      {7, 3, 13, 11, 9, 1, 12, 14, 2, 5, 4, 15, 6, 10, 0, 8},
+                                      {9, 5, 2, 10, 0, 7, 4, 15, 14, 11, 6, 3, 1, 12, 8, 13},
+                                      {2, 6, 0, 8, 12, 10, 11, 3, 4, 7, 15, 1, 13, 5, 14, 9},
+                                      {12, 1, 14, 4, 5, 15, 13, 10, 0, 6, 9, 8, 7, 3, 2, 11},
+                                      {13, 7, 12, 3, 11, 14, 1, 9, 5, 15, 8, 2, 0, 4, 6, 10},
+                                      {6, 14, 11, 0, 15, 9, 3, 8, 12, 13, 1, 10, 2, 7, 4, 5},
+                                      {10, 8, 7, 1, 2, 4, 6, 5, 15, 9, 3, 13, 11, 14, 12, 0},};
+static uint64_t iv[8] = { 0x6a09e667f3bcc908, 0xbb67ae8584caa73b,
+                          0x3c6ef372fe94f82b, 0xa54ff53a5f1d36f1,
+                          0x510e527fade682d1, 0x9b05688c2b3e6c1f,
+                          0x1f83d9abfb41bd6b, 0x5be0cd19137e2179,};
+
+uint64_t blake2f_required_gas(const uint8_t *input, const size_t input_size) {
+  if (input_size != BLAKE2F_INPUT_LENGTH) {
+    return 0;
+  }
+  uint32_t gas = ((uint32_t)input[0] << 24
+                  | (uint32_t)input[1] << 16
+                  | (uint32_t)input[2] << 8
+                  | (uint32_t)input[3] << 0);
+  return (uint64_t)gas;
+}
+
+uint64_t rotate_left64(uint64_t x, int k) {
+  size_t n = 64;
+  size_t s = (size_t)(k) & (n - 1);
+  return x<<s | x>>(n-s);
+}
+
+void f_generic(uint64_t h[8],
+               uint64_t m[16],
+               uint64_t c0,
+               uint64_t c1,
+               uint64_t flag,
+               uint64_t rounds) {
+  uint64_t v0 = h[0];
+  uint64_t v1 = h[1];
+  uint64_t v2 = h[2];
+  uint64_t v3 = h[3];
+  uint64_t v4 = h[4];
+  uint64_t v5 = h[5];
+  uint64_t v6 = h[6];
+  uint64_t v7 = h[7];
+  uint64_t v8 = iv[0];
+  uint64_t v9 = iv[1];
+  uint64_t v10 = iv[2];
+  uint64_t v11 = iv[3];
+  uint64_t v12 = iv[4];
+  uint64_t v13 = iv[5];
+  uint64_t v14 = iv[6];
+  uint64_t v15 = iv[7];
+	v12 ^= c0;
+  v13 ^= c1;
+  v14 ^= flag;
+
+	for (uint64_t i = 0; i < rounds; i++)  {
+		uint8_t *s = precomputed[i%10];
+
+		v0 += m[s[0]];
+		v0 += v4;
+		v12 ^= v0;
+		v12 = rotate_left64(v12, -32);
+		v8 += v12;
+		v4 ^= v8;
+		v4 = rotate_left64(v4, -24);
+		v1 += m[s[1]];
+		v1 += v5;
+		v13 ^= v1;
+		v13 = rotate_left64(v13, -32);
+		v9 += v13;
+		v5 ^= v9;
+		v5 = rotate_left64(v5, -24);
+		v2 += m[s[2]];
+		v2 += v6;
+		v14 ^= v2;
+		v14 = rotate_left64(v14, -32);
+		v10 += v14;
+		v6 ^= v10;
+		v6 = rotate_left64(v6, -24);
+		v3 += m[s[3]];
+		v3 += v7;
+		v15 ^= v3;
+		v15 = rotate_left64(v15, -32);
+		v11 += v15;
+		v7 ^= v11;
+		v7 = rotate_left64(v7, -24);
+
+		v0 += m[s[4]];
+		v0 += v4;
+		v12 ^= v0;
+		v12 = rotate_left64(v12, -16);
+		v8 += v12;
+		v4 ^= v8;
+		v4 = rotate_left64(v4, -63);
+		v1 += m[s[5]];
+		v1 += v5;
+		v13 ^= v1;
+		v13 = rotate_left64(v13, -16);
+    v9 += v13;
+    v5 ^= v9;
+    v5 = rotate_left64(v5, -63);
+		v2 += m[s[6]];
+		v2 += v6;
+		v14 ^= v2;
+		v14 = rotate_left64(v14, -16);
+		v10 += v14;
+		v6 ^= v10;
+		v6 = rotate_left64(v6, -63);
+		v3 += m[s[7]];
+		v3 += v7;
+		v15 ^= v3;
+		v15 = rotate_left64(v15, -16);
+		v11 += v15;
+		v7 ^= v11;
+		v7 = rotate_left64(v7, -63);
+
+		v0 += m[s[8]];
+		v0 += v5;
+		v15 ^= v0;
+		v15 = rotate_left64(v15, -32);
+		v10 += v15;
+		v5 ^= v10;
+		v5 = rotate_left64(v5, -24);
+		v1 += m[s[9]];
+		v1 += v6;
+		v12 ^= v1;
+		v12 = rotate_left64(v12, -32);
+		v11 += v12;
+		v6 ^= v11;
+		v6 = rotate_left64(v6, -24);
+		v2 += m[s[10]];
+		v2 += v7;
+		v13 ^= v2;
+		v13 = rotate_left64(v13, -32);
+		v8 += v13;
+		v7 ^= v8;
+		v7 = rotate_left64(v7, -24);
+		v3 += m[s[11]];
+		v3 += v4;
+		v14 ^= v3;
+		v14 = rotate_left64(v14, -32);
+		v9 += v14;
+		v4 ^= v9;
+		v4 = rotate_left64(v4, -24);
+
+		v0 += m[s[12]];
+		v0 += v5;
+		v15 ^= v0;
+		v15 = rotate_left64(v15, -16);
+		v10 += v15;
+		v5 ^= v10;
+		v5 = rotate_left64(v5, -63);
+		v1 += m[s[13]];
+		v1 += v6;
+		v12 ^= v1;
+		v12 = rotate_left64(v12, -16);
+		v11 += v12;
+		v6 ^= v11;
+		v6 = rotate_left64(v6, -63);
+		v2 += m[s[14]];
+		v2 += v7;
+		v13 ^= v2;
+		v13 = rotate_left64(v13, -16);
+		v8 += v13;
+		v7 ^= v8;
+		v7 = rotate_left64(v7, -63);
+		v3 += m[s[15]];
+		v3 += v4;
+		v14 ^= v3;
+		v14 = rotate_left64(v14, -16);
+		v9 += v14;
+		v4 ^= v9;
+		v4 = rotate_left64(v4, -63);
+	}
+	h[0] ^= v0 ^ v8;
+	h[1] ^= v1 ^ v9;
+	h[2] ^= v2 ^ v10;
+	h[3] ^= v3 ^ v11;
+	h[4] ^= v4 ^ v12;
+	h[5] ^= v5 ^ v13;
+	h[6] ^= v6 ^ v14;
+	h[7] ^= v7 ^ v15;
+}
+
+int blake2f(gw_context_t *ctx,
+              const uint8_t *input_src,
+              const size_t input_size,
+              uint8_t **output, size_t *output_size) {
+  if (input_size != BLAKE2F_INPUT_LENGTH) {
+    return ERROR_BLAKE2F;
+  }
+  if (input_src[212] != BLAKE2F_NON_FINAL_BLOCK_BYTES
+      && input_src[212] != BLAKE2F_FINAL_BLOCK_BYTES) {
+    return ERROR_BLAKE2F;
+  }
+
+  uint32_t rounds = ((uint32_t)input_src[0] << 24
+                     | (uint32_t)input_src[1] << 16
+                     | (uint32_t)input_src[2] << 8
+                     | (uint32_t)input_src[3] << 0);
+  bool final = input_src[212] == BLAKE2F_FINAL_BLOCK_BYTES;
+  uint64_t h[8];
+  uint64_t m[16];
+  uint64_t t[2];
+  for (size_t i = 0; i < 8; i++) {
+    size_t offset = 4 + i * 8;
+    h[i] = *(uint64_t *)(input_src + offset);
+  }
+  for (size_t i = 0; i < 16; i++) {
+    size_t offset = 68 + i * 8;
+    m[i] = *(uint64_t *)(input_src + offset);
+  }
+  t[0] = *(uint64_t *)(input_src + 196);
+  t[1] = *(uint64_t *)(input_src + 204);
+
+  uint64_t flag = final ? 0xFFFFFFFFFFFFFFFF : 0;
+  f_generic(h, m, t[0], t[1], flag, (uint64_t)rounds);
+
+  *output = (uint8_t *)malloc(64);
+  *output_size = 64;
+  for (size_t i = 0; i < 8; i++) {
+    size_t offset = i * 8;
+    memcpy(*output + offset, (uint8_t *)(&h[i]), 8);
+  }
+  return 0;
+}
+
 bool match_precompiled_address(const evmc_address *destination,
                             precompiled_contract_gas_fn *contract_gas,
                             precompiled_contract_fn *contract) {
@@ -290,6 +526,15 @@ bool match_precompiled_address(const evmc_address *destination,
   case 5:
     *contract_gas = big_mod_exp_required_gas;
     *contract = big_mod_exp;
+    break;
+    /* FIXME:
+       common.BytesToAddress([]byte{6}): &bn256AddIstanbul{},
+       common.BytesToAddress([]byte{7}): &bn256ScalarMulIstanbul{},
+       common.BytesToAddress([]byte{8}): &bn256PairingIstanbul{},
+     */
+  case 9:
+    *contract_gas = blake2f_required_gas;
+    *contract = blake2f;
     break;
   default:
     *contract_gas = NULL;
