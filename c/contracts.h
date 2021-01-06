@@ -3,6 +3,7 @@
 
 #include "sha256.h"
 #include "ripemd160.h"
+#include "mbedtls/bignum.h"
 
 /* Protocol Params:
    [Referenced]: https://github.com/ethereum/go-ethereum/blob/master/params/protocol_params.go
@@ -13,6 +14,8 @@
 #define RIPEMD160_PERWORD_GAS 120 // Per-word price for a RIPEMD160 operation
 #define IDENTITY_BASE_GAS     15  // Base price for a data copy operation
 #define IDENTITY_PERWORD_GAS  3   // Per-work price for a data copy operation
+
+#define ERROR_MOD_EXP  -23
 
 /* pre-compiled Ethereum contracts */
 
@@ -162,6 +165,102 @@ int data_copy(gw_context_t *ctx,
   return 0;
 }
 
+uint64_t big_mod_exp_required_gas(const uint8_t *input, const size_t input_size) {
+  return 0;
+}
+
+
+int big_mod_exp(gw_context_t *ctx,
+                const uint8_t *input_src,
+                const size_t input_size,
+                uint8_t **output, size_t *output_size) {
+  int ret;
+  mbedtls_mpi base_len;
+  mbedtls_mpi exp_len;
+  mbedtls_mpi mod_len;
+  mbedtls_mpi_init(&base_len);
+  mbedtls_mpi_init(&exp_len);
+  mbedtls_mpi_init(&mod_len);
+  ret = mbedtls_mpi_read_binary(&base_len, input_src, 32);
+  if (ret != 0) {
+    return ERROR_MOD_EXP;
+  }
+  ret = mbedtls_mpi_read_binary(&exp_len, input_src + 32, 32);
+  if (ret != 0) {
+    return ERROR_MOD_EXP;
+  }
+  ret = mbedtls_mpi_read_binary(&mod_len, input_src + 64, 32);
+  if (ret != 0) {
+    return ERROR_MOD_EXP;
+  }
+
+  if (mbedtls_mpi_cmp_int(&base_len, 0) == 0 && mbedtls_mpi_cmp_int(&mod_len, 0) == 0) {
+    *output = NULL;
+    *output_size = 0;
+    return 0;
+  }
+
+  size_t base_size;
+  size_t exp_size;
+  size_t mod_size;
+  ret = mbedtls_mpi_write_binary_le(&base_len, (unsigned char *)(&base_size), sizeof(base_size));
+  if (ret != 0) {
+    return ERROR_MOD_EXP;
+  }
+  ret = mbedtls_mpi_write_binary_le(&exp_len, (unsigned char *)(&exp_size), sizeof(exp_size));
+  if (ret != 0) {
+    return ERROR_MOD_EXP;
+  }
+  ret = mbedtls_mpi_write_binary_le(&mod_len, (unsigned char *)(&mod_size), sizeof(mod_size));
+  if (ret != 0) {
+    return ERROR_MOD_EXP;
+  }
+
+  const uint8_t *content = input_size > 96 ? input_src + 96 : NULL;
+  const size_t content_size = content != NULL ? input_size - 96 : 0;
+  if (content_size < (base_size + exp_size + mod_size)) {
+    return ERROR_MOD_EXP;
+  }
+
+  mbedtls_mpi base;
+  mbedtls_mpi exp;
+  mbedtls_mpi mod;
+  mbedtls_mpi result;
+  mbedtls_mpi_init(&base);
+  mbedtls_mpi_init(&exp);
+  mbedtls_mpi_init(&mod);
+  mbedtls_mpi_init(&result);
+  ret = mbedtls_mpi_read_binary(&base, content, base_size);
+  if (ret != 0) {
+    return ERROR_MOD_EXP;
+  }
+  ret = mbedtls_mpi_read_binary(&exp, content + base_size, exp_size);
+  if (ret != 0) {
+    return ERROR_MOD_EXP;
+  }
+  ret = mbedtls_mpi_read_binary(&mod, content + base_size + exp_size, mod_size);
+  if (ret != 0) {
+    return ERROR_MOD_EXP;
+  }
+
+  *output = (uint8_t*)malloc(mod_size);
+  *output_size = mod_size;
+  if (mbedtls_mpi_bitlen(&mod) == 0) {
+    memset(*output, 0, mod_size);
+    return 0;
+  }
+
+  ret = mbedtls_mpi_exp_mod(&result, &base, &exp, &mod, NULL);
+  if (ret != 0) {
+    return ERROR_MOD_EXP;
+  }
+  ret = mbedtls_mpi_write_binary(&result, *output, mod_size);
+  if (ret != 0) {
+    return ERROR_MOD_EXP;
+  }
+  return 0;
+}
+
 bool match_precompiled_address(const evmc_address *destination,
                             precompiled_contract_gas_fn *contract_gas,
                             precompiled_contract_fn *contract) {
@@ -187,6 +286,10 @@ bool match_precompiled_address(const evmc_address *destination,
   case 4:
     *contract_gas = data_copy_required_gas;
     *contract = data_copy;
+    break;
+  case 5:
+    *contract_gas = big_mod_exp_required_gas;
+    *contract = big_mod_exp;
     break;
   default:
     *contract_gas = NULL;

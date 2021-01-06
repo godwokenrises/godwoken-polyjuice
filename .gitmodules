@@ -25,3 +25,6 @@
 [submodule "deps/crypto-algorithms"]
 	path = deps/crypto-algorithms
 	url = https://github.com/B-Con/crypto-algorithms.git
+[submodule "deps/mbedtls"]
+	path = deps/mbedtls
+	url = https://github.com/nervosnetwork/mbedtls.git

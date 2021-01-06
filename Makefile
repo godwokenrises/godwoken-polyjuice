@@ -12,9 +12,10 @@ CFLAGS_SECP := -isystem $(SECP_DIR)/src -isystem $(SECP_DIR)
 CFLAGS_INTX := -Ideps/intx/lib/intx -Ideps/intx/include
 CFLAGS_ETHASH := -Ideps/ethash/include -Ideps/ethash/lib/ethash -Ideps/ethash/lib/keccak -Ideps/ethash/lib/support
 CFLAGS_CRYPTO_ALGORITHMS := -Ideps/crypto-algorithms
+CFLAGS_MBEDTLS := -Ideps/mbedtls/include
 CFLAGS_EVMONE := -Ideps/evmone/lib/evmone -Ideps/evmone/include -Ideps/evmone/evmc/include
 CFLAGS_GODWOKEN := -Ideps/godwoken/c
-CFLAGS := -O3  -Ic/ripemd160 $(CFLAGS_CKB_STD) $(CFLAGS_EVMONE) $(CFLAGS_INTX) $(CFLAGS_ETHASH) $(CFLAGS_CRYPTO_ALGORITHMS) $(CFLAGS_GODWOKEN) $(CFLAGS_SECP) -Wall -g
+CFLAGS := -O3  -Ic/ripemd160 $(CFLAGS_CKB_STD) $(CFLAGS_EVMONE) $(CFLAGS_INTX) $(CFLAGS_ETHASH) $(CFLAGS_CRYPTO_ALGORITHMS) $(CFLAGS_MBEDTLS) $(CFLAGS_GODWOKEN) $(CFLAGS_SECP) -Wall -g
 CXXFLAGS := $(CFLAGS) -std=c++1z
 LDFLAGS := -fdata-sections -ffunction-sections -Wl,--gc-sections
 
@@ -25,7 +26,7 @@ MOLC_VERSION := 0.6.1
 PROTOCOL_SCHEMA_DIR := ./deps/godwoken/crates/types/schemas
 
 ALL_OBJS := build/evmone.o build/analysis.o build/execution.o build/instructions.o build/instructions_calls.o build/div.o build/keccak.o build/keccakf800.o build/keccakf1600.o \
-  build/sha256.o build/memzero.o build/ripemd160.o
+  build/sha256.o build/memzero.o build/ripemd160.o build/bignum.o build/platform_util.o
 
 # docker pull nervos/ckb-riscv-gnu-toolchain:gnu-bionic-20191012
 # BUILDER_DOCKER := nervos/ckb-riscv-gnu-toolchain@sha256:aae8a3f79705f67d505d1f1d5ddc694a4fd537ed1c7e9622420a470d59ba2ec3
@@ -81,6 +82,11 @@ build/memzero.o: c/ripemd160/memzero.c
 	$(CXX) $(CFLAGS) $(LDFLAGS) -c -o $@ $<
 build/ripemd160.o: c/ripemd160/ripemd160.c
 	$(CXX) $(CFLAGS) $(LDFLAGS) -c -o $@ $<
+
+build/platform_util.o: deps/mbedtls/library/platform_util.c
+	$(CC) $(CFLAGS) $(LDFLAGS) -c -o $@ $<
+build/bignum.o: deps/mbedtls/library/bignum.c
+	$(CC) $(CFLAGS) $(LDFLAGS) -c -o $@ $<
 
 build/sha256.o: deps/crypto-algorithms/sha256.c
 	$(CXX) $(CFLAGS) $(LDFLAGS) -c -o $@ $<
