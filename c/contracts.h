@@ -1,6 +1,11 @@
 #ifndef CONTRACTS_H_
 #define CONTRACTS_H_
 
+#include "sha256.h"
+
+#define SHA256_BASE_GAS       60
+#define SHA256_PERWORD_GAS    12
+
 /* pre-compiled Ethereum contracts */
 
 typedef uint64_t (*precompiled_contract_gas_fn)(const uint8_t *input_src, const size_t input_size);
@@ -88,6 +93,23 @@ int ecrecover(gw_context_t *ctx,
   return 0;
 }
 
+uint64_t sha256hash_required_gas(const uint8_t *input, const size_t input_size) {
+  return (uint64_t)(input_size + 31) / 32 * SHA256_PERWORD_GAS + SHA256_BASE_GAS;
+}
+
+
+int sha256hash(gw_context_t *ctx,
+               const uint8_t *input_src,
+               const size_t input_size,
+               uint8_t **output, size_t *output_size) {
+  *output = (uint8_t *)malloc(32);
+  *output_size = 32;
+  SHA256_CTX sha256_ctx;
+  sha256_init(&sha256_ctx);
+  sha256_update(&sha256_ctx, input_src, input_size);
+  sha256_final(&sha256_ctx, *output);
+  return 0;
+}
 
 bool match_precompiled_address(const evmc_address *destination,
                             precompiled_contract_gas_fn *contract_gas,
@@ -102,6 +124,10 @@ bool match_precompiled_address(const evmc_address *destination,
   case 1:
     *contract_gas = ecrecover_required_gas;
     *contract = ecrecover;
+    break;
+  case 2:
+    *contract_gas = sha256hash_required_gas;
+    *contract = sha256hash;
     break;
   default:
     *contract_gas = NULL;

@@ -11,9 +11,10 @@ CFLAGS_CKB_STD = -Ideps/ckb-c-stdlib -Ideps/ckb-c-stdlib/molecule
 CFLAGS_SECP := -isystem $(SECP_DIR)/src -isystem $(SECP_DIR)
 CFLAGS_INTX := -Ideps/intx/lib/intx -Ideps/intx/include
 CFLAGS_ETHASH := -Ideps/ethash/include -Ideps/ethash/lib/ethash -Ideps/ethash/lib/keccak -Ideps/ethash/lib/support
+CFLAGS_CRYPTO_ALGORITHMS := -Ideps/crypto-algorithms
 CFLAGS_EVMONE := -Ideps/evmone/lib/evmone -Ideps/evmone/include -Ideps/evmone/evmc/include
 CFLAGS_GODWOKEN := -Ideps/godwoken/c
-CFLAGS := -O3  $(CFLAGS_CKB_STD) $(CFLAGS_EVMONE) $(CFLAGS_INTX) $(CFLAGS_ETHASH) $(CFLAGS_GODWOKEN) $(CFLAGS_SECP) -Wall -g
+CFLAGS := -O3  $(CFLAGS_CKB_STD) $(CFLAGS_EVMONE) $(CFLAGS_INTX) $(CFLAGS_ETHASH) $(CFLAGS_CRYPTO_ALGORITHMS) $(CFLAGS_GODWOKEN) $(CFLAGS_SECP) -Wall -g
 CXXFLAGS := $(CFLAGS) -std=c++1z
 LDFLAGS := -fdata-sections -ffunction-sections -Wl,--gc-sections
 
@@ -23,7 +24,7 @@ MOLC := moleculec
 MOLC_VERSION := 0.6.1
 PROTOCOL_SCHEMA_DIR := ./deps/godwoken/crates/types/schemas
 
-ALL_OBJS := build/evmone.o build/analysis.o build/execution.o build/instructions.o build/instructions_calls.o build/div.o build/keccak.o build/keccakf800.o build/keccakf1600.o
+ALL_OBJS := build/evmone.o build/analysis.o build/execution.o build/instructions.o build/instructions_calls.o build/div.o build/keccak.o build/keccakf800.o build/keccakf1600.o build/sha256.o
 
 # docker pull nervos/ckb-riscv-gnu-toolchain:gnu-bionic-20191012
 # BUILDER_DOCKER := nervos/ckb-riscv-gnu-toolchain@sha256:aae8a3f79705f67d505d1f1d5ddc694a4fd537ed1c7e9622420a470d59ba2ec3
@@ -73,6 +74,9 @@ build/keccakf800.o: deps/ethash/lib/keccak/keccakf800.c
 	$(CC) $(CFLAGS) $(LDFLAGS)  -c -o $@ $<
 
 build/div.o: deps/intx/lib/intx/div.cpp
+	$(CXX) $(CFLAGS) $(LDFLAGS) -c -o $@ $<
+
+build/sha256.o: deps/crypto-algorithms/sha256.c
 	$(CXX) $(CFLAGS) $(LDFLAGS) -c -o $@ $<
 
 build/secp256k1_data_info.h: build/dump_secp256k1_data
