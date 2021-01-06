@@ -46,7 +46,9 @@ static void debug_print_int(const char *prefix, int64_t ret) {
 #define MAX_SCRIPT_SIZE 1024
 /* Max data buffer size: 24KB */
 #define MAX_DATA_SIZE 24576
-#define GW_ACCOUNT_CONTRACT_CODE 100
+#define POLYJUICE_SYSTEM_PREFIX 0xFF
+#define POLYJUICE_CONTRACT_CODE 0x01
+#define POLYJUICE_DESTRUCTED 0x02
 
 static bool has_touched = false;
 static uint32_t sudt_id = UINT32_MAX;
@@ -55,9 +57,20 @@ static evmc_address tx_origin;
 static uint8_t script_code_hash[32];
 static uint8_t script_hash_type;
 
+void polyjuice_build_system_key(uint32_t id,
+                                uint8_t polyjuice_field_type,
+                                uint8_t key[GW_KEY_BYTES]) {
+  memset(key, 0, 32);
+  memcpy(key, (uint8_t *)(&id), sizeof(uint32_t));
+  key[4] = POLYJUICE_SYSTEM_PREFIX;
+  key[5] = polyjuice_field_type;
+}
 
-void gw_build_contract_code_key(uint32_t id, uint8_t key[GW_KEY_BYTES]) {
-  gw_build_account_field_key(id, GW_ACCOUNT_CONTRACT_CODE, key);
+void polyjuice_build_contract_code_key(uint32_t id, uint8_t key[GW_KEY_BYTES]) {
+  polyjuice_build_system_key(id, POLYJUICE_CONTRACT_CODE, key);
+}
+void polyjuice_build_destructed_key(uint32_t id, uint8_t key[GW_KEY_BYTES]) {
+  polyjuice_build_system_key(id, POLYJUICE_DESTRUCTED, key);
 }
 
 int handle_message(gw_context_t *ctx,
@@ -222,7 +235,7 @@ int load_account_code(gw_context_t *gw_ctx,
   debug_print_int("load_account_code, account_id:", account_id);
   uint8_t key[32];
   uint8_t data_hash[32];
-  gw_build_contract_code_key(account_id, key);
+  polyjuice_build_contract_code_key(account_id, key);
   int ret = gw_ctx->sys_load(gw_ctx, account_id, key, data_hash);
   if (ret != 0) {
     return ret;
@@ -333,9 +346,11 @@ enum evmc_storage_status set_storage(struct evmc_host_context* context,
 size_t get_code_size(struct evmc_host_context* context,
                      const evmc_address* address) {
   ckb_debug("BEGIN get_code_size");
+  int ret;
   uint32_t account_id = 0;
-  int ret = address_to_account_id(address, &account_id);
+  ret = address_to_account_id(address, &account_id);
   if (ret != 0) {
+    ckb_debug("address to account_id failed");
     context->error_code = ret;
     return 0;
   }
@@ -405,11 +420,11 @@ evmc_uint256be get_balance(struct evmc_host_context* context,
   ckb_debug("BEGIN copy_code");
   int ret;
   evmc_uint256be balance{};
-  uint32_t account_id;
+  uint32_t account_id = 0;
   ret = address_to_account_id(address, &account_id);
   if (ret != 0) {
     ckb_debug("address to account_id failed");
-    context->error_code = -1;
+    context->error_code = ret;
     return balance;
   }
 
@@ -431,7 +446,43 @@ evmc_uint256be get_balance(struct evmc_host_context* context,
 void selfdestruct(struct evmc_host_context* context,
                   const evmc_address* address,
                   const evmc_address* beneficiary) {
-  /* FIXME: NOT supported yet! */
+  int ret;
+  uint32_t beneficiary_account_id = 0;
+  ret = address_to_account_id(beneficiary, &beneficiary_account_id);
+  if (ret != 0) {
+    ckb_debug("address to account_id failed");
+    context->error_code = ret;
+    return;
+  }
+  uint128_t balance;
+  ret = sudt_get_balance(context->gw_ctx, sudt_id, beneficiary_account_id, &balance);
+  if (ret != 0) {
+    ckb_debug("get balance failed");
+    context->error_code = ret;
+    return;
+  }
+  if (balance > 0 && beneficiary_account_id != context->to_id) {
+    ret = sudt_transfer(context->gw_ctx, sudt_id, context->to_id, beneficiary_account_id, balance);
+    if (ret != 0) {
+      ckb_debug("transfer beneficiary failed");
+      context->error_code = ret;
+      return;
+    }
+  }
+
+  uint8_t raw_key[GW_KEY_BYTES];
+  uint8_t value[GW_VALUE_BYTES];
+  polyjuice_build_destructed_key(context->to_id, raw_key);
+  memset(value, 1, GW_VALUE_BYTES);
+  /* FIXME: it's a hack */
+#ifdef GW_VALIDATOR
+  ret = gw_state_insert(&context->gw_ctx->kv_state, raw_key, value);
+#else
+  ret = syscall(GW_SYS_STORE, raw_key, value, 0, 0, 0, 0);
+#endif
+  if (ret != 0) {
+    context->error_code = ret;
+  }
   return;
 }
 
@@ -565,6 +616,26 @@ int handle_message(gw_context_t *ctx,
     ret = address_to_account_id(&(msg.sender), &from_id);
     if (ret != 0) {
       ckb_debug("address to account id failed");
+      return -1;
+    }
+  }
+
+  /* Check if target contract is destructed */
+  if (!is_create(msg.kind)) {
+    uint8_t destructed_raw_key[GW_KEY_BYTES];
+    uint8_t destructed_raw_value[GW_VALUE_BYTES];
+    polyjuice_build_destructed_key(to_id, destructed_raw_key);
+#ifdef GW_VALIDATOR
+    ret = gw_state_fetch(&ctx->kv_state, destructed_raw_key, destructed_raw_key);
+#else
+    ret = syscall(GW_SYS_LOAD, destructed_raw_key, destructed_raw_value, 0, 0, 0, 0);
+#endif
+    if (ret != 0) {
+      ckb_debug("load destructed key failed");
+      return -1;
+    }
+    if (destructed_raw_value[0] != 0) {
+      ckb_debug("call a contract that was already destructed");
       return -1;
     }
   }
@@ -729,7 +800,7 @@ int handle_message(gw_context_t *ctx,
     uint8_t key[32];
     uint8_t data_hash[32];
     blake2b_hash(data_hash, (uint8_t *)res->output_data, res->output_size);
-    gw_build_contract_code_key(to_id, key);
+    polyjuice_build_contract_code_key(to_id, key);
     ckb_debug("BEGIN store data key");
     ret = ctx->sys_store(ctx, to_id, key, data_hash);
     if (ret != 0) {
