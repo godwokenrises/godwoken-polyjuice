@@ -7,10 +7,12 @@
 /* Protocol Params:
    [Referenced]: https://github.com/ethereum/go-ethereum/blob/master/params/protocol_params.go
 */
-#define SHA256_BASE_GAS       60 // Base price for a SHA256 operation
-#define SHA256_PERWORD_GAS    12 // Per-word price for a SHA256 operation
+#define SHA256_BASE_GAS       60  // Base price for a SHA256 operation
+#define SHA256_PERWORD_GAS    12  // Per-word price for a SHA256 operation
 #define RIPEMD160_BASE_GAS    600 // Base price for a RIPEMD160 operation
 #define RIPEMD160_PERWORD_GAS 120 // Per-word price for a RIPEMD160 operation
+#define IDENTITY_BASE_GAS     15  // Base price for a data copy operation
+#define IDENTITY_PERWORD_GAS  3   // Per-work price for a data copy operation
 
 /* pre-compiled Ethereum contracts */
 
@@ -93,6 +95,9 @@ int ecrecover(gw_context_t *ctx,
 
   union ethash_hash256 hash_result = ethash::keccak256(temp + 1, 64);
   *output = (uint8_t *)malloc(32);
+  if (*output == NULL) {
+    return -1;
+  }
   memset(output, 0, 12);
   memcpy(output + 12, hash_result.bytes + 12, 20);
   *output_size = 32;
@@ -109,6 +114,9 @@ int sha256hash(gw_context_t *ctx,
                const size_t input_size,
                uint8_t **output, size_t *output_size) {
   *output = (uint8_t *)malloc(32);
+  if (*output == NULL) {
+    return -1;
+  }
   *output_size = 32;
   SHA256_CTX hash_ctx;
   sha256_init(&hash_ctx);
@@ -128,8 +136,29 @@ int ripemd160hash(gw_context_t *ctx,
                const size_t input_size,
                uint8_t **output, size_t *output_size) {
   *output = (uint8_t *)malloc(20);
+  if (*output == NULL) {
+    return -1;
+  }
   *output_size = 20;
   ripemd160(input_src, input_size, *output);
+  return 0;
+}
+
+uint64_t data_copy_required_gas(const uint8_t *input, const size_t input_size) {
+  return (uint64_t)(input_size + 31) / 32 * IDENTITY_PERWORD_GAS + IDENTITY_BASE_GAS;
+}
+
+
+int data_copy(gw_context_t *ctx,
+                  const uint8_t *input_src,
+                  const size_t input_size,
+                  uint8_t **output, size_t *output_size) {
+  *output = (uint8_t *)malloc(input_size);
+  if (*output == NULL) {
+    return -1;
+  }
+  *output_size = input_size;
+  memcpy(*output, input_src, input_size);
   return 0;
 }
 
@@ -154,6 +183,10 @@ bool match_precompiled_address(const evmc_address *destination,
   case 3:
     *contract_gas = ripemd160hash_required_gas;
     *contract = ripemd160hash;
+    break;
+  case 4:
+    *contract_gas = data_copy_required_gas;
+    *contract = data_copy;
     break;
   default:
     *contract_gas = NULL;

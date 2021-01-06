@@ -194,6 +194,9 @@ int build_script(uint8_t code_hash[32],
     mol_seg_t args_seg;
     args_seg.size = 4 + args_len;
     args_seg.ptr = (uint8_t *)malloc(4 + args_seg.size);
+    if (args_seg.ptr == NULL) {
+      return -1;
+    }
     memcpy(args_seg.ptr, (uint8_t *)(&args_len), 4);
     memcpy(args_seg.ptr + 4, args, args_len);
     debug_print_data("script.args", args_seg.ptr, args_seg.size);
@@ -560,6 +563,10 @@ void emit_log(struct evmc_host_context* context,
   ckb_debug("BEGIN emit_log");
   size_t output_size = 20 + (4 + data_size) + (4 + topics_count * 32);
   uint8_t *output = (uint8_t *)malloc(output_size);
+  if (output == NULL) {
+    context->error_code = -1;
+    return;
+  }
   uint32_t data_size_u32 = (uint32_t)(data_size);
   uint32_t topics_count_u32 = (uint32_t)(topics_count);
   uint8_t *output_current = output;
