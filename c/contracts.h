@@ -170,9 +170,142 @@ int data_copy(gw_context_t *ctx,
   return 0;
 }
 
-uint64_t big_mod_exp_required_gas(const uint8_t *input, const size_t input_size) {
-  /* FIXME: todo */
+int read_lens(const uint8_t *input,
+              const size_t input_size,
+              mbedtls_mpi *base_len,
+              mbedtls_mpi *exp_len,
+              mbedtls_mpi *mod_len,
+              size_t *base_size,
+              size_t *exp_size,
+              size_t *mod_size) {
+  int ret;
+  mbedtls_mpi_init(base_len);
+  mbedtls_mpi_init(exp_len);
+  mbedtls_mpi_init(mod_len);
+  ret = mbedtls_mpi_read_binary(base_len, input, 32);
+  if (ret != 0) {
+    return ERROR_MOD_EXP;
+  }
+  ret = mbedtls_mpi_read_binary(exp_len, input + 32, 32);
+  if (ret != 0) {
+    return ERROR_MOD_EXP;
+  }
+  ret = mbedtls_mpi_read_binary(mod_len, input + 64, 32);
+  if (ret != 0) {
+    return ERROR_MOD_EXP;
+  }
+
+  ret = mbedtls_mpi_write_binary_le(base_len, (unsigned char *)(base_size), sizeof(size_t));
+  if (ret != 0) {
+    return ERROR_MOD_EXP;
+  }
+  ret = mbedtls_mpi_write_binary_le(exp_len, (unsigned char *)(exp_size), sizeof(size_t));
+  if (ret != 0) {
+    return ERROR_MOD_EXP;
+  }
+  ret = mbedtls_mpi_write_binary_le(mod_len, (unsigned char *)(mod_size), sizeof(size_t));
+  if (ret != 0) {
+    return ERROR_MOD_EXP;
+  }
   return 0;
+}
+
+// modexpMultComplexity implements bigModexp multComplexity formula, as defined in EIP-198
+//
+// def mult_complexity(x):
+//    if x <= 64: return x ** 2
+//    elif x <= 1024: return x ** 2 // 4 + 96 * x - 3072
+//    else: return x ** 2 // 16 + 480 * x - 199680
+//
+// where is x is max(length_of_MODULUS, length_of_BASE)
+uint128_t modexp_mult_complexity(uint128_t x) {
+  if (x <= 64) {
+    return x * x;
+  } else if (x <= 1024) {
+    return x * x / 4 + 96 * x - 3072;
+  } else {
+    return x * x / 16 + 480 * x - 199680;
+  }
+}
+
+uint64_t big_mod_exp_required_gas(const uint8_t *input, const size_t input_size) {
+  int ret;
+  mbedtls_mpi base_len;
+  mbedtls_mpi exp_len;
+  mbedtls_mpi mod_len;
+  size_t base_size;
+  size_t exp_size;
+  size_t mod_size;
+  ret = read_lens(input, input_size,
+                  &base_len, &exp_len, &mod_len,
+                  &base_size, &exp_size, &mod_size);
+  if (ret != 0) {
+    return ERROR_MOD_EXP;
+  }
+
+  const uint8_t *content = input_size > 96 ? input + 96 : NULL;
+  const size_t content_size = content != NULL ? input_size - 96 : 0;
+  if (content_size < (base_size + exp_size + mod_size)) {
+    return ERROR_MOD_EXP;
+  }
+
+	// Retrieve the head 32 bytes of exp for the adjusted exponent length
+  mbedtls_mpi exp_head;
+  mbedtls_mpi_init(&exp_head);
+  size_t exp_head_size = exp_size > 32 ? 32 : exp_size;
+  ret = mbedtls_mpi_read_binary(&exp_head, content + base_size, exp_head_size);
+  if (ret != 0) {
+    return ERROR_MOD_EXP;
+  }
+	// Calculate the adjusted exponent length
+  int msb = 0;
+  int exp_head_bitlen = mbedtls_mpi_bitlen(&exp_head);
+  if (exp_head_bitlen > 0) {
+    msb = exp_head_bitlen - 1;
+  }
+  mbedtls_mpi adj_exp_len;
+  mbedtls_mpi_init(&adj_exp_len);
+  if (exp_size > 32) {
+    ret = mbedtls_mpi_sub_int(&adj_exp_len, &exp_len, 32);
+    if (ret != 0) {
+      return ERROR_MOD_EXP;
+    }
+    ret = mbedtls_mpi_mul_int(&adj_exp_len, &adj_exp_len, 8);
+    if (ret != 0) {
+      return ERROR_MOD_EXP;
+    }
+  }
+  ret = mbedtls_mpi_add_int(&adj_exp_len, &adj_exp_len, msb);
+  if (ret != 0) {
+    return ERROR_MOD_EXP;
+  }
+	// Calculate the gas cost of the operation
+  size_t base_gas = mod_size > base_size ? mod_size : base_size;
+  uint128_t gas = modexp_mult_complexity((uint128_t)base_gas);
+  mbedtls_mpi gas_big;
+  mbedtls_mpi_init(&gas_big);
+  ret = mbedtls_mpi_read_binary_le(&gas_big, (unsigned char *)(&gas), 16);
+  if (ret != 0) {
+    return ERROR_MOD_EXP;
+  }
+  if (mbedtls_mpi_cmp_int(&adj_exp_len, 1) > 0) {
+    ret = mbedtls_mpi_mul_mpi(&gas_big, &gas_big, &adj_exp_len);
+    if (ret != 0) {
+      return ERROR_MOD_EXP;
+    }
+  }
+  ret = mbedtls_mpi_div_int(&gas_big, NULL, &gas_big, 20);
+  if (ret != 0) {
+    return ERROR_MOD_EXP;
+  }
+
+  if (mbedtls_mpi_bitlen(&gas_big) > 64) {
+    return UINT64_MAX;
+  } else {
+    uint64_t target_gas = 0;
+    ret = mbedtls_mpi_write_binary_le(&gas_big, (unsigned char *)(&target_gas), sizeof(target_gas));
+    return target_gas;
+  }
 }
 
 
@@ -184,40 +317,12 @@ int big_mod_exp(gw_context_t *ctx,
   mbedtls_mpi base_len;
   mbedtls_mpi exp_len;
   mbedtls_mpi mod_len;
-  mbedtls_mpi_init(&base_len);
-  mbedtls_mpi_init(&exp_len);
-  mbedtls_mpi_init(&mod_len);
-  ret = mbedtls_mpi_read_binary(&base_len, input_src, 32);
-  if (ret != 0) {
-    return ERROR_MOD_EXP;
-  }
-  ret = mbedtls_mpi_read_binary(&exp_len, input_src + 32, 32);
-  if (ret != 0) {
-    return ERROR_MOD_EXP;
-  }
-  ret = mbedtls_mpi_read_binary(&mod_len, input_src + 64, 32);
-  if (ret != 0) {
-    return ERROR_MOD_EXP;
-  }
-
-  if (mbedtls_mpi_cmp_int(&base_len, 0) == 0 && mbedtls_mpi_cmp_int(&mod_len, 0) == 0) {
-    *output = NULL;
-    *output_size = 0;
-    return 0;
-  }
-
   size_t base_size;
   size_t exp_size;
   size_t mod_size;
-  ret = mbedtls_mpi_write_binary_le(&base_len, (unsigned char *)(&base_size), sizeof(base_size));
-  if (ret != 0) {
-    return ERROR_MOD_EXP;
-  }
-  ret = mbedtls_mpi_write_binary_le(&exp_len, (unsigned char *)(&exp_size), sizeof(exp_size));
-  if (ret != 0) {
-    return ERROR_MOD_EXP;
-  }
-  ret = mbedtls_mpi_write_binary_le(&mod_len, (unsigned char *)(&mod_size), sizeof(mod_size));
+  ret = read_lens(input_src, input_size,
+                  &base_len, &exp_len, &mod_len,
+                  &base_size, &exp_size, &mod_size);
   if (ret != 0) {
     return ERROR_MOD_EXP;
   }
@@ -226,6 +331,12 @@ int big_mod_exp(gw_context_t *ctx,
   const size_t content_size = content != NULL ? input_size - 96 : 0;
   if (content_size < (base_size + exp_size + mod_size)) {
     return ERROR_MOD_EXP;
+  }
+
+  if (mbedtls_mpi_cmp_int(&base_len, 0) == 0 && mbedtls_mpi_cmp_int(&mod_len, 0) == 0) {
+    *output = NULL;
+    *output_size = 0;
+    return 0;
   }
 
   mbedtls_mpi base;
