@@ -502,7 +502,19 @@ struct evmc_result call(struct evmc_host_context* context,
   precompiled_contract_gas_fn contract_gas;
   precompiled_contract_fn contract;
   if (match_precompiled_address(&msg->destination, &contract_gas, &contract)) {
-    uint64_t gas_cost = contract_gas(msg->input_data, msg->input_size);
+    uint64_t gas_cost = 0;
+    ret = contract_gas(msg->input_data, msg->input_size, &gas_cost);
+    if (ret != 0) {
+      ckb_debug("call pre-compiled contract gas failed");
+      context->error_code = ret;
+      res.status_code = EVMC_REVERT;
+      return res;
+    }
+    if ((uint64_t)msg->gas < gas_cost) {
+      ckb_debug("call pre-compiled contract out of gas");
+      res.status_code = EVMC_OUT_OF_GAS;
+      return res;
+    }
     res.gas_left = msg->gas - (int64_t)gas_cost;
     ret = contract(gw_ctx,
                    msg->input_data,
@@ -771,7 +783,7 @@ int handle_message(gw_context_t *ctx,
   }
   if (res->gas_left < 0) {
     ckb_debug("gas not enough");
-    return -1;
+    return EVMC_OUT_OF_GAS;
   }
 
   /* Handle transfer logic */

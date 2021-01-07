@@ -24,14 +24,19 @@
 
 /* pre-compiled Ethereum contracts */
 
-typedef uint64_t (*precompiled_contract_gas_fn)(const uint8_t *input_src, const size_t input_size);
+typedef int (*precompiled_contract_gas_fn)(const uint8_t *input_src,
+                                           const size_t input_size,
+                                           uint64_t *gas);
 typedef int (*precompiled_contract_fn)(gw_context_t *ctx,
-                                       const uint8_t *input_src, const size_t input_size,
-                                       uint8_t **output, size_t *output_size);
+                                       const uint8_t *input_src,
+                                       const size_t input_size,
+                                       uint8_t **output,
+                                       size_t *output_size);
 
-uint64_t ecrecover_required_gas(const uint8_t *input, const size_t input_size) {
+int ecrecover_required_gas(const uint8_t *input, const size_t input_size, uint64_t *gas) {
   // Elliptic curve sender recovery gas price
-  return 3000;
+  *gas = 3000;
+  return 0;
 }
 
 /*
@@ -112,8 +117,9 @@ int ecrecover(gw_context_t *ctx,
   return 0;
 }
 
-uint64_t sha256hash_required_gas(const uint8_t *input, const size_t input_size) {
-  return (uint64_t)(input_size + 31) / 32 * SHA256_PERWORD_GAS + SHA256_BASE_GAS;
+int sha256hash_required_gas(const uint8_t *input, const size_t input_size, uint64_t *gas) {
+  *gas = (uint64_t)(input_size + 31) / 32 * SHA256_PERWORD_GAS + SHA256_BASE_GAS;
+  return 0;
 }
 
 
@@ -134,8 +140,9 @@ int sha256hash(gw_context_t *ctx,
 }
 
 
-uint64_t ripemd160hash_required_gas(const uint8_t *input, const size_t input_size) {
-  return (uint64_t)(input_size + 31) / 32 * RIPEMD160_PERWORD_GAS + RIPEMD160_BASE_GAS;
+int ripemd160hash_required_gas(const uint8_t *input, const size_t input_size, uint64_t *gas) {
+  *gas = (uint64_t)(input_size + 31) / 32 * RIPEMD160_PERWORD_GAS + RIPEMD160_BASE_GAS;
+  return 0;
 }
 
 
@@ -152,8 +159,9 @@ int ripemd160hash(gw_context_t *ctx,
   return 0;
 }
 
-uint64_t data_copy_required_gas(const uint8_t *input, const size_t input_size) {
-  return (uint64_t)(input_size + 31) / 32 * IDENTITY_PERWORD_GAS + IDENTITY_BASE_GAS;
+int data_copy_required_gas(const uint8_t *input, const size_t input_size, uint64_t *gas) {
+  *gas = (uint64_t)(input_size + 31) / 32 * IDENTITY_PERWORD_GAS + IDENTITY_BASE_GAS;
+  return 0;
 }
 
 
@@ -228,7 +236,7 @@ uint128_t modexp_mult_complexity(uint128_t x) {
   }
 }
 
-uint64_t big_mod_exp_required_gas(const uint8_t *input, const size_t input_size) {
+int big_mod_exp_required_gas(const uint8_t *input, const size_t input_size, uint64_t *target_gas) {
   int ret;
   mbedtls_mpi base_len;
   mbedtls_mpi exp_len;
@@ -300,12 +308,14 @@ uint64_t big_mod_exp_required_gas(const uint8_t *input, const size_t input_size)
   }
 
   if (mbedtls_mpi_bitlen(&gas_big) > 64) {
-    return UINT64_MAX;
+    *target_gas = UINT64_MAX;
   } else {
-    uint64_t target_gas = 0;
     ret = mbedtls_mpi_write_binary_le(&gas_big, (unsigned char *)(&target_gas), sizeof(target_gas));
-    return target_gas;
+    if (ret != 0) {
+      return ERROR_MOD_EXP;
+    }
   }
+  return 0;
 }
 
 
@@ -393,15 +403,17 @@ static uint64_t iv[8] = { 0x6a09e667f3bcc908, 0xbb67ae8584caa73b,
                           0x510e527fade682d1, 0x9b05688c2b3e6c1f,
                           0x1f83d9abfb41bd6b, 0x5be0cd19137e2179,};
 
-uint64_t blake2f_required_gas(const uint8_t *input, const size_t input_size) {
+int blake2f_required_gas(const uint8_t *input, const size_t input_size, uint64_t *target_gas) {
   if (input_size != BLAKE2F_INPUT_LENGTH) {
+    *target_gas = 0;
     return 0;
   }
   uint32_t gas = ((uint32_t)input[0] << 24
                   | (uint32_t)input[1] << 16
                   | (uint32_t)input[2] << 8
                   | (uint32_t)input[3] << 0);
-  return (uint64_t)gas;
+  *target_gas = (uint64_t)gas;
+  return 0;
 }
 
 uint64_t rotate_left64(uint64_t x, int k) {
