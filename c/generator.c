@@ -13,6 +13,4 @@
 
 #include "polyjuice.h"
 
-int main() {
-  return run_polyjuice();
-}
+int main() { return run_polyjuice(); }

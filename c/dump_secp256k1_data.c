@@ -1,4 +1,5 @@
 #include <stdio.h>
+
 #include "blake2b.h"
 
 /*

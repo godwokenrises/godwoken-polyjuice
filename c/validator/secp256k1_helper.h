@@ -75,7 +75,7 @@ int ckb_secp256k1_custom_verify_only_initialize(secp256k1_context* context,
   secp256k1_ecmult_gen_context_init(&context->ecmult_gen_ctx);
 
   /* Recasting data to (uint8_t*) for pointer math */
-  uint8_t* p = (uint8_t *)data;
+  uint8_t* p = (uint8_t*)data;
   secp256k1_ge_storage(*pre_g)[] = (secp256k1_ge_storage(*)[])p;
   secp256k1_ge_storage(*pre_g_128)[] =
       (secp256k1_ge_storage(*)[])(&p[CKB_SECP256K1_DATA_PRE_SIZE]);

@@ -115,6 +115,9 @@ build/godwoken.h: ${PROTOCOL_SCHEMA_DIR}/godwoken.mol
 	mkdir -p build
 	${MOLC} --language c --schema-file $< > $@
 
+fmt:
+	clang-format -i -style=Google c/**/*.*
+
 clean:
 	rm -rf build/*
 	cd $(SECP_DIR) && [ -f "Makefile" ] && make distclean && make clean

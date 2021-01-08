@@ -32,11 +32,12 @@ void secp256k1_default_error_callback_fn(const char* str, void* data) {
  * data should at least be CKB_SECP256K1_DATA_SIZE big
  * so as to hold all loaded data.
  */
-int ckb_secp256k1_custom_verify_only_initialize(gw_context_t *ctx,
+int ckb_secp256k1_custom_verify_only_initialize(gw_context_t* ctx,
                                                 secp256k1_context* context,
                                                 void* data) {
   uint32_t len = 0;
-  int ret = ctx->sys_load_data(ctx, ckb_secp256k1_data_hash, &len, 0, (uint8_t *)data);
+  int ret =
+      ctx->sys_load_data(ctx, ckb_secp256k1_data_hash, &len, 0, (uint8_t*)data);
   if (ret != 0 || len != CKB_SECP256K1_DATA_SIZE) {
     return CKB_SECP256K1_HELPER_ERROR_LOADING_DATA;
   }
@@ -48,7 +49,7 @@ int ckb_secp256k1_custom_verify_only_initialize(gw_context_t *ctx,
   secp256k1_ecmult_gen_context_init(&context->ecmult_gen_ctx);
 
   /* Recasting data to (uint8_t*) for pointer math */
-  uint8_t* p = (uint8_t *)data;
+  uint8_t* p = (uint8_t*)data;
   secp256k1_ge_storage(*pre_g)[] = (secp256k1_ge_storage(*)[])p;
   secp256k1_ge_storage(*pre_g_128)[] =
       (secp256k1_ge_storage(*)[])(&p[CKB_SECP256K1_DATA_PRE_SIZE]);
