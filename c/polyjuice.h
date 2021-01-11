@@ -1,17 +1,18 @@
-#include <evmc/evmc.h>
-#include <evmone/evmone.h>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 
-#include <ethash/keccak.hpp>
-#include <evmc/evmc.hpp>
-
 #include "ckb_syscalls.h"
-#include "common.h"
 #include "godwoken.h"
+
+#include <ethash/keccak.hpp>
+#include <evmc/evmc.h>
+#include <evmc/evmc.hpp>
+#include <evmone/evmone.h>
+
+#include "common.h"
 #include "gw_syscalls.h"
 #include "sudt_utils.h"
 
@@ -131,14 +132,14 @@ int parse_args(struct evmc_message* msg, uint128_t* gas_price,
   debug_print_int("[flags]", flags);
 
   /* args[2..10] gas limit */
-  int64_t gas_limit = (int64_t) * ((uint64_t*)(args + offset));
+  int64_t gas_limit = (int64_t) (*(uint64_t*)(args + offset));
   offset += 8;
   debug_print_int("[gas_limit]", gas_limit);
 
   /* args[10..26] gas price */
   *gas_price = *((uint128_t*)(args + offset));
   offset += 16;
-  debug_print_int("[gas_price]", (int64_t)gas_price);
+  debug_print_int("[gas_price]", (int64_t)(*gas_price));
 
   /* args[26..58] transfer value */
   evmc_uint256be value = *((evmc_uint256be*)(args + offset));
@@ -158,7 +159,7 @@ int parse_args(struct evmc_message* msg, uint128_t* gas_price,
     ckb_debug("invalid polyjuice transaction");
     return -1;
   }
-  if (kind != EVMC_CALL || kind != EVMC_CREATE) {
+  if (kind != EVMC_CALL && kind != EVMC_CREATE) {
     ckb_debug("invalid call kind");
     return -1;
   }
@@ -392,6 +393,7 @@ size_t copy_code(struct evmc_host_context* context, const evmc_address* address,
   if (ret != 0) {
     return ret;
   }
+  debug_print_data("code slice", buffer_data, buffer_size);
   ckb_debug("END copy_code");
   return 0;
 }
@@ -645,7 +647,7 @@ int handle_message(gw_context_t* ctx, uint32_t parent_from_id,
     memcpy(script_code_hash, code_hash_seg.ptr, 32);
     script_hash_type = *hash_type_seg.ptr;
     sudt_id = *(uint32_t*)(raw_args_seg.ptr);
-    free((void*)script_seg.ptr);
+    debug_print_int("sudt id", sudt_id);
     has_touched = true;
   }
 
@@ -842,8 +844,16 @@ int run_polyjuice() {
     return -1;
   }
   uint128_t fee = gas_price * (uint128_t)(msg.gas - res.gas_left);
+  debug_print_int("gas limit", msg.gas);
+  debug_print_int("gas left", res.gas_left);
+  debug_print_int("gas price", gas_price);
+  debug_print_int("fee", fee);
   ret = sudt_transfer(&context, sudt_id, context.transaction_context.from_id,
                       context.block_info.aggregator_id, fee);
+  if (ret != 0) {
+    debug_print_int("pay fee to aggregator failed", ret);
+    return ret;
+  }
 
   ret = gw_finalize(&context);
   if (ret != 0) {

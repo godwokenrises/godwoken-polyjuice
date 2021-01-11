@@ -1,0 +1,15 @@
+language: rust
+rust:
+  - stable
+before_script:
+  - rustup component add rustfmt
+  - rustup component add clippy
+  - cargo install moleculec
+stages:
+  - Test
+jobs:
+  include:
+    - stage: Test
+      name: Integration-Test
+      script:
+        - bash devtools/ci/integration-test.sh
