@@ -13,11 +13,15 @@ if [ -d "$GODWOKEN_DIR" ]
 then
     echo "godwoken project already exists"
 else
-    git clone -b polyjuice-ci https://github.com/TheWaWaR/godwoken.git $GODWOKEN_DIR
+    git clone https://github.com/nervosnetwork/godwoken.git $GODWOKEN_DIR
 fi
 
 mkdir -p $GODWOKEN_DIR/c/build
 cp $SCRIPT_DIR/*generator $SCRIPT_DIR/*validator $GODWOKEN_DIR/c/build
+
+cd $PROJECT_ROOT
+git submodule update --init --recursive
+make all-via-docker
 
 cd $TESTS_DIR
 export RUST_BACKTRACE=full

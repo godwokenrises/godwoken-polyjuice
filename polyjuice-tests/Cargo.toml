@@ -12,3 +12,7 @@ gw-common = { path = "../integration-test/godwoken/crates/common" }
 gw-generator = { path = "../integration-test/godwoken/crates/generator" }
 lazy_static = "1.4"
 blake2b-rs = "0.2"
+
+[dev-dependencies]
+hex = "0.4.2"
+rand = "0.7.3"
