@@ -437,15 +437,20 @@ void selfdestruct(struct evmc_host_context* context,
     context->error_code = ret;
     return;
   }
+  if (beneficiary_account_id == context->to_id) {
+    ckb_debug("invalid beneficiary account");
+    context->error_code = -1;
+    return;
+  }
+
   uint128_t balance;
-  ret = sudt_get_balance(context->gw_ctx, sudt_id, beneficiary_account_id,
-                         &balance);
+  ret = sudt_get_balance(context->gw_ctx, sudt_id, context->to_id, &balance);
   if (ret != 0) {
     ckb_debug("get balance failed");
     context->error_code = ret;
     return;
   }
-  if (balance > 0 && beneficiary_account_id != context->to_id) {
+  if (balance > 0) {
     ret = sudt_transfer(context->gw_ctx, sudt_id, context->to_id,
                         beneficiary_account_id, balance);
     if (ret != 0) {

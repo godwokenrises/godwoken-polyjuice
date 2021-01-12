@@ -58,28 +58,88 @@ pub fn new_block_info(aggregator_id: u32, number: u64, timestamp: u64) -> BlockI
         .build()
 }
 
-pub fn encode_polyjuice_args(
+pub fn account_id_to_eth_address(id: u32, ethabi: bool) -> Vec<u8> {
+    let offset = if ethabi { 12 } else { 0 };
+    let mut data = vec![0u8; offset + 20];
+    data[offset..offset+4].copy_from_slice(&id.to_le_bytes()[..]);
+    data
+}
+
+pub fn eth_address_to_account_id(data: &[u8]) -> Result<u32, String> {
+    if data.len() != 20 {
+        return Err(format!("Invalid eth address length: {}", data.len()));
+    }
+    if &data[4..20] != &[0u8; 16][..] {
+        return Err(format!("Invalid eth address data: {:?}", &data[4..20]));
+    }
+    let mut id_data = [0u8; 4];
+    id_data.copy_from_slice(&data[0..4]);
+    Ok(u32::from_le_bytes(id_data))
+}
+
+pub fn new_account_script(tree: &mut DummyState, from_id: u32) -> Script {
+    let from_nonce = tree.get_nonce(from_id).unwrap();
+    let mut new_account_args = [0u8; 12];
+    new_account_args[0..4].copy_from_slice(&CKB_SUDT_ACCOUNT_ID.to_le_bytes()[..]);
+    new_account_args[4..8].copy_from_slice(&from_id.to_le_bytes()[..]);
+    new_account_args[8..12].copy_from_slice(&from_nonce.to_le_bytes()[..]);
+    Script::new_builder()
+        .code_hash(PROGRAM_CODE_HASH.pack())
+        .args(Bytes::from(new_account_args.to_vec()).pack())
+        .build()
+}
+
+#[derive(Default, Debug)]
+pub struct PolyjuiceArgsBuilder {
     is_create: bool,
     is_static: bool,
     gas_limit: u64,
     gas_price: u128,
     value: u128,
-    input: &[u8],
-) -> Vec<u8> {
-    let mut output: Vec<u8> = vec![0u8; 62];
-    if is_create {
-        output[0] = 3;
+    input: Vec<u8>,
+}
+
+impl PolyjuiceArgsBuilder {
+    pub fn is_create(mut self, value: bool) -> Self {
+        self.is_create = value;
+        self
     }
-    if is_static {
-        output[1] = 1;
+    pub fn is_static(mut self, value: bool) -> Self {
+        self.is_static = value;
+        self
     }
-    output[2..10].copy_from_slice(&gas_limit.to_le_bytes()[..]);
-    output[10..26].copy_from_slice(&gas_price.to_le_bytes()[..]);
-    output[26..42].copy_from_slice(&[0u8; 16][..]);
-    output[42..58].copy_from_slice(&value.to_be_bytes()[..]);
-    output[58..62].copy_from_slice(&(input.len() as u32).to_le_bytes()[..]);
-    output.extend(input);
-    output
+    pub fn gas_limit(mut self, value: u64) -> Self {
+        self.gas_limit = value;
+        self
+    }
+    pub fn gas_price(mut self, value: u128) -> Self {
+        self.gas_price = value;
+        self
+    }
+    pub fn value(mut self, new_value: u128) -> Self {
+        self.value = new_value;
+        self
+    }
+    pub fn input(mut self, value: &[u8]) -> Self {
+        self.input = value.to_vec();
+        self
+    }
+    pub fn build(self) -> Vec<u8> {
+        let mut output: Vec<u8> = vec![0u8; 62];
+        if self.is_create {
+            output[0] = 3;
+        }
+        if self.is_static {
+            output[1] = 1;
+        }
+        output[2..10].copy_from_slice(&self.gas_limit.to_le_bytes()[..]);
+        output[10..26].copy_from_slice(&self.gas_price.to_le_bytes()[..]);
+        output[26..42].copy_from_slice(&[0u8; 16][..]);
+        output[42..58].copy_from_slice(&self.value.to_be_bytes()[..]);
+        output[58..62].copy_from_slice(&(self.input.len() as u32).to_le_bytes()[..]);
+        output.extend(self.input);
+        output
+    }
 }
 
 pub fn setup() -> (DummyState, Generator, u32) {
