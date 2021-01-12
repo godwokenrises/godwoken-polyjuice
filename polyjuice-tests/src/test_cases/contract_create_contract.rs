@@ -55,4 +55,30 @@ fn test_contract_create_contract() {
         .get_account_id_by_script_hash(&ss_account_script.hash().into())
         .unwrap()
         .unwrap();
+    assert_eq!(ss_account_id, 5);
+
+    {
+        // SimpleStorage.get();
+        let block_info = new_block_info(0, 2, 0);
+        let input = hex::decode("6d4ce63c").unwrap();
+        let args = PolyjuiceArgsBuilder::default()
+            .is_static(true)
+            .gas_limit(21000)
+            .gas_price(1)
+            .value(0)
+            .input(&input)
+            .build();
+        let raw_tx = RawL2Transaction::new_builder()
+            .from_id(from_id.pack())
+            .to_id(ss_account_id.pack())
+            .args(Bytes::from(args).pack())
+            .build();
+        let run_result = generator
+            .execute(&tree, &block_info, &raw_tx)
+            .expect("construct");
+        tree.apply_run_result(&run_result).expect("update state");
+        let mut expected_return_data = vec![0u8; 32];
+        expected_return_data[31] = 0xff;
+        assert_eq!(run_result.return_data, expected_return_data);
+    }
 }
