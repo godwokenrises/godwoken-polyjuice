@@ -10,8 +10,10 @@ edition = "2018"
 gw-types = { path = "../integration-test/godwoken/crates/types" }
 gw-common = { path = "../integration-test/godwoken/crates/common" }
 gw-generator = { path = "../integration-test/godwoken/crates/generator" }
+gw-jsonrpc-types = { path = "../integration-test/godwoken/crates/jsonrpc-types" }
 lazy_static = "1.4"
 blake2b-rs = "0.2"
+serde_json = "1.0"
 
 [dev-dependencies]
 hex = "0.4.2"

@@ -1,19 +1,19 @@
+pub use gw_common::{
+    blake2b::new_blake2b,
+    builtins::{CKB_SUDT_ACCOUNT_ID, RESERVED_ACCOUNT_ID},
+    state::State,
+    CKB_SUDT_SCRIPT_ARGS, CKB_SUDT_SCRIPT_HASH, H256,
+};
 pub use gw_generator::{
     account_lock_manage::{always_success::AlwaysSuccess, AccountLockManage},
     backend_manage::{Backend, BackendManage, META_CONTRACT_VALIDATOR_CODE_HASH},
     dummy_state::DummyState,
     traits::StateExt,
-    Generator,
-};
-pub use gw_common::{
-    state::State,
-    H256, blake2b::new_blake2b,
-    builtins::{CKB_SUDT_ACCOUNT_ID, RESERVED_ACCOUNT_ID},
-    CKB_SUDT_SCRIPT_ARGS, CKB_SUDT_SCRIPT_HASH,
+    Generator, RunResult,
 };
 use gw_types::{
     bytes::Bytes,
-    packed::{Script, BlockInfo},
+    packed::{BlockInfo, RawL2Transaction, Script},
     prelude::*,
 };
 use std::{fs, io::Read, path::PathBuf};
@@ -61,7 +61,7 @@ pub fn new_block_info(aggregator_id: u32, number: u64, timestamp: u64) -> BlockI
 pub fn account_id_to_eth_address(id: u32, ethabi: bool) -> Vec<u8> {
     let offset = if ethabi { 12 } else { 0 };
     let mut data = vec![0u8; offset + 20];
-    data[offset..offset+4].copy_from_slice(&id.to_le_bytes()[..]);
+    data[offset..offset + 4].copy_from_slice(&id.to_le_bytes()[..]);
     data
 }
 
@@ -144,14 +144,16 @@ impl PolyjuiceArgsBuilder {
 
 pub fn setup() -> (DummyState, Generator, u32) {
     let mut tree = DummyState::default();
-    let reserved_id = tree.create_account_from_script(
-        Script::new_builder()
-            .code_hash({
-                let code_hash: [u8; 32] = (*META_CONTRACT_VALIDATOR_CODE_HASH).into();
-                code_hash.pack()
-            })
-            .build(),
-    ).unwrap();
+    let reserved_id = tree
+        .create_account_from_script(
+            Script::new_builder()
+                .code_hash({
+                    let code_hash: [u8; 32] = (*META_CONTRACT_VALIDATOR_CODE_HASH).into();
+                    code_hash.pack()
+                })
+                .build(),
+        )
+        .unwrap();
     assert_eq!(
         reserved_id, RESERVED_ACCOUNT_ID,
         "reserved account id must be zero"
@@ -170,7 +172,7 @@ pub fn setup() -> (DummyState, Generator, u32) {
         "ckb simple UDT account id"
     );
 
-    let creator_contract_id = tree
+    let creator_account_id = tree
         .create_account_from_script(
             Script::new_builder()
                 .code_hash(PROGRAM_CODE_HASH.pack())
@@ -187,9 +189,39 @@ pub fn setup() -> (DummyState, Generator, u32) {
         GENERATOR_PROGRAM.clone(),
     ));
     let mut account_lock_manage = AccountLockManage::default();
-    account_lock_manage
-        .register_lock_algorithm(H256::zero(), Box::new(AlwaysSuccess::default()));
+    account_lock_manage.register_lock_algorithm(H256::zero(), Box::new(AlwaysSuccess::default()));
     let generator = Generator::new(backend_manage, account_lock_manage, Default::default());
 
-    (tree, generator, creator_contract_id)
+    (tree, generator, creator_account_id)
+}
+
+pub fn deploy(
+    generator: &Generator,
+    tree: &mut DummyState,
+    creator_account_id: u32,
+    from_id: u32,
+    init_code: &str,
+    gas_limit: u64,
+    value: u128,
+    block_number: u64,
+) -> RunResult {
+    let block_info = new_block_info(0, block_number, block_number);
+    let input = hex::decode(init_code).unwrap();
+    let args = PolyjuiceArgsBuilder::default()
+        .is_create(true)
+        .gas_limit(gas_limit)
+        .gas_price(1)
+        .value(value)
+        .input(&input)
+        .build();
+    let raw_tx = RawL2Transaction::new_builder()
+        .from_id(from_id.pack())
+        .to_id(creator_account_id.pack())
+        .args(Bytes::from(args).pack())
+        .build();
+    let run_result = generator
+        .execute(tree, &block_info, &raw_tx)
+        .expect("construct");
+    tree.apply_run_result(&run_result).expect("update state");
+    run_result
 }

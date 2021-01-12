@@ -232,12 +232,14 @@ int load_account_code(gw_context_t* gw_ctx, uint32_t account_id,
   polyjuice_build_contract_code_key(account_id, key);
   int ret = gw_ctx->sys_load(gw_ctx, account_id, key, data_hash);
   if (ret != 0) {
+    ckb_debug("sys_load failed");
     return ret;
   }
 
   uint32_t old_code_size = *code_size;
   ret = gw_ctx->sys_load_data(gw_ctx, data_hash, code_size, offset, code);
   if (ret != 0) {
+    ckb_debug("sys_load_data failed");
     return ret;
   }
   if (*code_size >= old_code_size) {
@@ -297,6 +299,7 @@ bool account_exists(struct evmc_host_context* context,
   uint32_t account_id = 0;
   int ret = address_to_account_id(address, &account_id);
   if (ret != 0) {
+    ckb_debug("address_to_account_id failed");
     context->error_code = ret;
   }
   ckb_debug("END account_exists");
@@ -310,6 +313,7 @@ evmc_bytes32 get_storage(struct evmc_host_context* context,
   int ret = context->gw_ctx->sys_load(context->gw_ctx, context->to_id,
                                       key->bytes, (uint8_t*)value.bytes);
   if (ret != 0) {
+    ckb_debug("sys_load failed");
     context->error_code = ret;
   }
   ckb_debug("END get_storage");
@@ -324,6 +328,7 @@ enum evmc_storage_status set_storage(struct evmc_host_context* context,
   int ret = context->gw_ctx->sys_store(context->gw_ctx, context->to_id,
                                        key->bytes, value->bytes);
   if (ret != 0) {
+    ckb_debug("sys_store failed");
     context->error_code = ret;
   }
   /* TODO: more rich evmc_storage_status */
@@ -346,6 +351,7 @@ size_t get_code_size(struct evmc_host_context* context,
   uint32_t code_size = MAX_DATA_SIZE;
   ret = load_account_code(context->gw_ctx, account_id, &code_size, 0, code);
   if (ret != 0) {
+    ckb_debug("load_account_code failed");
     context->error_code = ret;
     return 0;
   }
@@ -360,6 +366,7 @@ evmc_bytes32 get_code_hash(struct evmc_host_context* context,
   uint32_t account_id = 0;
   int ret = address_to_account_id(address, &account_id);
   if (ret != 0) {
+    ckb_debug("address_to_account_id failed");
     context->error_code = ret;
     return hash;
   }
@@ -368,6 +375,7 @@ evmc_bytes32 get_code_hash(struct evmc_host_context* context,
   uint32_t code_size = MAX_DATA_SIZE;
   ret = load_account_code(context->gw_ctx, account_id, &code_size, 0, code);
   if (ret != 0) {
+    ckb_debug("load_account_code failed");
     context->error_code = ret;
     return hash;
   }
@@ -471,6 +479,7 @@ void selfdestruct(struct evmc_host_context* context,
   ret = syscall(GW_SYS_STORE, raw_key, value, 0, 0, 0, 0);
 #endif
   if (ret != 0) {
+    ckb_debug("update selfdestruct special key failed");
     context->error_code = ret;
   }
   return;
@@ -542,6 +551,7 @@ evmc_bytes32 get_block_hash(struct evmc_host_context* context, int64_t number) {
   int ret = context->gw_ctx->sys_get_block_hash(context->gw_ctx, number,
                                                 (uint8_t*)block_hash.bytes);
   if (ret != 0) {
+    ckb_debug("sys_get_block_hash failed");
     context->error_code = ret;
     return block_hash;
   }
@@ -577,6 +587,7 @@ void emit_log(struct evmc_host_context* context, const evmc_address* address,
   int ret = context->gw_ctx->sys_log(context->gw_ctx, context->to_id,
                                      (uint32_t)output_size, output);
   if (ret != 0) {
+    ckb_debug("sys_log failed");
     context->error_code = ret;
   }
   free(output);
@@ -753,7 +764,7 @@ int handle_message(gw_context_t* ctx, uint32_t parent_from_id,
   *res = vm->execute(vm, &interface, &context, EVMC_MAX_REVISION, &msg,
                      code_data, code_size);
   if (context.error_code != 0) {
-    debug_print_int("context.error_code:", context.error_code);
+    debug_print_int("context.error_code", context.error_code);
     return context.error_code;
   }
   if (res->gas_left < 0) {

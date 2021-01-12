@@ -1,5 +1,4 @@
-pub(crate) mod test_cases;
 pub(crate) mod helper;
+pub(crate) mod test_cases;
 
-fn main() {
-}
+fn main() {}
