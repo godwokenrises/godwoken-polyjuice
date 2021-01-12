@@ -730,7 +730,13 @@ int handle_message(gw_context_t* ctx, uint32_t parent_from_id,
     ret = ctx->sys_create(ctx, new_script_seg.ptr, new_script_seg.size,
                           &new_account_id);
     if (ret != 0) {
-      return ret;
+      ckb_debug("create account failed assume account already created by meta_contract");
+      uint8_t script_hash[32];
+      blake2b_hash(script_hash, new_script_seg.ptr, new_script_seg.size);
+      ret = ctx->sys_get_account_id_by_script_hash(ctx, script_hash, &new_account_id);
+      if (ret != 0) {
+        return ret;
+      }
     }
     to_id = new_account_id;
   }
