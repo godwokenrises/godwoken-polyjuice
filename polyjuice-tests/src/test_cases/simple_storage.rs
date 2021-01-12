@@ -21,7 +21,6 @@ fn test_simple_storage() {
 
     let from_balance1 = tree.get_sudt_balance(CKB_SUDT_ACCOUNT_ID, from_id).unwrap();
     println!("balance of {} = {}", from_id, from_balance1);
-    let contract_account_script = new_account_script(&mut tree, from_id);
     {
         // Deploy SimpleStorage
         let block_info = new_block_info(0, 1, 0);
@@ -46,6 +45,7 @@ fn test_simple_storage() {
         println!("return_data: {}", hex::encode(&run_result.return_data[..]));
     }
 
+    let contract_account_script = new_account_script(&mut tree, from_id, false);
     let new_account_id = tree
         .get_account_id_by_script_hash(&contract_account_script.hash().into())
         .unwrap()

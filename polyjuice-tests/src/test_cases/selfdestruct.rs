@@ -28,7 +28,6 @@ fn test_selfdestruct() {
         0
     );
 
-    let contract_account_script = new_account_script(&mut tree, from_id);
     {
         // Deploy SelfDestruct
         let block_info = new_block_info(0, 1, 0);
@@ -53,6 +52,7 @@ fn test_selfdestruct() {
         // println!("result {:?}", run_result);
     }
 
+    let contract_account_script = new_account_script(&mut tree, from_id, false);
     let new_account_id = tree
         .get_account_id_by_script_hash(&contract_account_script.hash().into())
         .unwrap()

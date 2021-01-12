@@ -77,8 +77,7 @@ pub fn eth_address_to_account_id(data: &[u8]) -> Result<u32, String> {
     Ok(u32::from_le_bytes(id_data))
 }
 
-pub fn new_account_script(tree: &mut DummyState, from_id: u32) -> Script {
-    let from_nonce = tree.get_nonce(from_id).unwrap();
+pub fn new_account_script_with_nonce(tree: &mut DummyState, from_id: u32, from_nonce: u32) -> Script {
     let mut new_account_args = [0u8; 12];
     new_account_args[0..4].copy_from_slice(&CKB_SUDT_ACCOUNT_ID.to_le_bytes()[..]);
     new_account_args[4..8].copy_from_slice(&from_id.to_le_bytes()[..]);
@@ -87,6 +86,13 @@ pub fn new_account_script(tree: &mut DummyState, from_id: u32) -> Script {
         .code_hash(PROGRAM_CODE_HASH.pack())
         .args(Bytes::from(new_account_args.to_vec()).pack())
         .build()
+}
+pub fn new_account_script(tree: &mut DummyState, from_id: u32, current_nonce: bool) -> Script {
+    let mut from_nonce = tree.get_nonce(from_id).unwrap();
+    if !current_nonce {
+        from_nonce -= 1;
+    }
+    new_account_script_with_nonce(tree, from_id, from_nonce)
 }
 
 #[derive(Default, Debug)]

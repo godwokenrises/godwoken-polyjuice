@@ -488,9 +488,18 @@ void selfdestruct(struct evmc_host_context* context,
 struct evmc_result call(struct evmc_host_context* context,
                         const struct evmc_message* msg) {
   ckb_debug("BEGIN call");
+  debug_print_data("call.sender", msg->sender.bytes, 20);
+  debug_print_data("call.destination", msg->destination.bytes, 20);
   int ret;
   struct evmc_result res;
   gw_context_t* gw_ctx = context->gw_ctx;
+
+  if (msg->depth > (int32_t)UINT16_MAX) {
+    ckb_debug("depth too large");
+    context->error_code = -1;
+    res.status_code = EVMC_REVERT;
+    return res;
+  }
 
   /* FIXME: Handle pre-compiled contracts
    *   - check msg->destination
@@ -521,25 +530,25 @@ struct evmc_result call(struct evmc_host_context* context,
       return res;
     }
     res.release = release_result;
-    return res;
+  } else {
+    /* TODO: handle special kind (CREATE2/CALLCODE/DELEGATECALL)*/
+    ret = handle_message(gw_ctx, context->from_id, msg, &res);
+    if (ret != 0) {
+      ckb_debug("inner call failed (transfer/contract call contract)");
+      context->error_code = ret;
+      res.status_code = EVMC_REVERT;
+      return res;
+    }
   }
 
-  if (msg->depth > (int32_t)UINT16_MAX) {
-    ckb_debug("depth too large");
-    context->error_code = -1;
-    res.status_code = EVMC_REVERT;
-    return res;
-  }
-
-  /* TODO: handle special kind (CREATE2/CALLCODE/DELEGATECALL)*/
-  ret = handle_message(gw_ctx, context->from_id, msg, &res);
+  /* Increase context->to_id's nonce */
+  ret = context->gw_ctx->sys_increase_nonce(context->gw_ctx, context->to_id, NULL);
   if (ret != 0) {
-    ckb_debug("inner call failed (transfer/contract call contract)");
+    ckb_debug("increase nonce failed");
     context->error_code = ret;
     res.status_code = EVMC_REVERT;
     return res;
   }
-
   ckb_debug("END call");
 
   return res;
@@ -665,6 +674,9 @@ int handle_message(gw_context_t* ctx, uint32_t parent_from_id,
     sudt_id = *(uint32_t*)(raw_args_seg.ptr);
     debug_print_int("sudt id", sudt_id);
     has_touched = true;
+    if (msg.kind == EVMC_CREATE) {
+      to_id = 0;
+    }
   }
 
   /* Load contract code from evmc_message or by sys_load_data */
@@ -699,11 +711,13 @@ int handle_message(gw_context_t* ctx, uint32_t parent_from_id,
   uint32_t script_args_len = 0;
   if (msg.kind == EVMC_CREATE) {
     /* create account id
-   Include:
-   - [4 bytes] sudt id
-   - [4 bytes] sender account id
-   - [4 bytes] sender nonce (NOTE: only use first 4 bytes (u32))
-*/
+       Include:
+       - [4 bytes] sudt id
+       - [4 bytes] sender account id
+       - [4 bytes] sender nonce (NOTE: only use first 4 bytes (u32))
+    */
+    debug_print_int("from_id", from_id);
+    debug_print_int("to_id", to_id);
     memcpy(script_args, (uint8_t*)(&sudt_id), 4);
     memcpy(script_args + 4, (uint8_t*)(&from_id), 4);
     // TODO: the nonce length can be optimized (change nonce data type, u32 is
@@ -715,13 +729,13 @@ int handle_message(gw_context_t* ctx, uint32_t parent_from_id,
     script_args_len = 4 + 4 + 4;
   } else if (msg.kind == EVMC_CREATE2) {
     /* create account id
-   Include:
-   - [ 4 bytes] sudt id
-   - [ 1 byte ] 0xff (refer to ethereum)
-   - [ 4 bytes] sender account id
-   - [32 bytes] create2_salt
-   - [32 bytes] keccak256(init_code)
-*/
+       Include:
+       - [ 4 bytes] sudt id
+       - [ 1 byte ] 0xff (refer to ethereum)
+       - [ 4 bytes] sender account id
+       - [32 bytes] create2_salt
+       - [32 bytes] keccak256(init_code)
+    */
     memcpy(script_args, (uint8_t*)(&sudt_id), 4);
     script_args[4] = 0xff;
     memcpy(script_args + (4 + 1), (uint8_t*)(&from_id), 4);
@@ -750,6 +764,7 @@ int handle_message(gw_context_t* ctx, uint32_t parent_from_id,
       }
     }
     to_id = new_account_id;
+    debug_print_int(">> new to id", to_id);
   }
 
   /* Execute the code in EVM */
@@ -761,6 +776,8 @@ int handle_message(gw_context_t* ctx, uint32_t parent_from_id,
       account_exists, get_storage,    set_storage,    get_balance,
       get_code_size,  get_code_hash,  copy_code,      selfdestruct,
       call,           get_tx_context, get_block_hash, emit_log};
+  msg.sender = account_id_to_address(from_id);
+  msg.destination = account_id_to_address(to_id);
   *res = vm->execute(vm, &interface, &context, EVMC_MAX_REVISION, &msg,
                      code_data, code_size);
   if (context.error_code != 0) {

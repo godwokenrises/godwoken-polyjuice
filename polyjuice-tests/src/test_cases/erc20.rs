@@ -26,7 +26,6 @@ fn test_erc20() {
     tree.mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id3, 80000)
         .unwrap();
 
-    let contract_account_script = new_account_script(&mut tree, from_id1);
     // Deploy ERC20
     let _run_result = deploy(
         &generator,
@@ -39,6 +38,7 @@ fn test_erc20() {
         1,
     );
 
+    let contract_account_script = new_account_script(&mut tree, from_id1, false);
     let new_account_id = tree
         .get_account_id_by_script_hash(&contract_account_script.hash().into())
         .unwrap()
