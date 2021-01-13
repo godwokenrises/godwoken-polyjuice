@@ -2,9 +2,8 @@
 //!   See ./evm-contracts/CallContract.sol
 
 use crate::helper::{
-    simple_storage_get,
     account_id_to_eth_address, deploy, new_account_script, new_account_script_with_nonce,
-    new_block_info, setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
+    new_block_info, setup, simple_storage_get, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
@@ -70,7 +69,10 @@ fn test_contract_call_contract() {
         .unwrap();
 
     let run_result = simple_storage_get(&tree, &generator, block_number, from_id, ss_account_id);
-    assert_eq!(run_result.return_data, hex::decode("000000000000000000000000000000000000000000000000000000000000007b").unwrap());
+    assert_eq!(
+        run_result.return_data,
+        hex::decode("000000000000000000000000000000000000000000000000000000000000007b").unwrap()
+    );
 
     {
         // CallContract.proxySet(222); => SimpleStorage.set(x+3)
@@ -96,7 +98,10 @@ fn test_contract_call_contract() {
     }
 
     let run_result = simple_storage_get(&tree, &generator, block_number, from_id, ss_account_id);
-    assert_eq!(run_result.return_data, hex::decode("00000000000000000000000000000000000000000000000000000000000000e1").unwrap());
+    assert_eq!(
+        run_result.return_data,
+        hex::decode("00000000000000000000000000000000000000000000000000000000000000e1").unwrap()
+    );
 
     assert_eq!(tree.get_nonce(from_id).unwrap(), 3);
     assert_eq!(tree.get_nonce(ss_account_id).unwrap(), 0);

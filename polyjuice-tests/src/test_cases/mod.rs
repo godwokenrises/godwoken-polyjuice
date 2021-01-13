@@ -1,9 +1,9 @@
+pub(crate) mod call_multiple_times;
 pub(crate) mod contract_call_contract;
 pub(crate) mod contract_create_contract;
 pub(crate) mod erc20;
 pub(crate) mod selfdestruct;
 pub(crate) mod simple_storage;
-pub(crate) mod call_multiple_times;
 
 pub(crate) mod call_selfdestruct;
 pub(crate) mod delegatecall;
