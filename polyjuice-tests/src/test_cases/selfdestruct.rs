@@ -98,4 +98,24 @@ fn test_selfdestruct() {
             .unwrap(),
         200
     );
+
+    {
+        // call SelfDestruct.done();
+        let block_info = new_block_info(0, 2, 0);
+        let input = hex::decode("ae8421e1").unwrap();
+        let args = PolyjuiceArgsBuilder::default()
+            .gas_limit(31000)
+            .gas_price(1)
+            .value(0)
+            .input(&input)
+            .build();
+        let raw_tx = RawL2Transaction::new_builder()
+            .from_id(from_id.pack())
+            .to_id(new_account_id.pack())
+            .args(Bytes::from(args).pack())
+            .build();
+        let result = generator.execute(&tree, &block_info, &raw_tx);
+        println!("result {:?}", result);
+        assert!(result.is_err());
+    }
 }
