@@ -2,10 +2,8 @@
 //!   See ./evm-contracts/CreateContract.sol
 
 use crate::helper::{
-    deploy,
-    new_account_script_with_nonce,
-    account_id_to_eth_address, new_account_script, new_block_info, setup, PolyjuiceArgsBuilder,
-    CKB_SUDT_ACCOUNT_ID,
+    account_id_to_eth_address, deploy, new_account_script, new_account_script_with_nonce,
+    new_block_info, setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
