@@ -2,6 +2,7 @@
 //!   See ./evm-contracts/CallContract.sol
 
 use crate::helper::{
+    simple_storage_get,
     account_id_to_eth_address, deploy, new_account_script, new_account_script_with_nonce,
     new_block_info, setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
 };
@@ -68,29 +69,8 @@ fn test_contract_call_contract() {
         .unwrap()
         .unwrap();
 
-    {
-        // SimpleStorage.get();
-        let block_info = new_block_info(0, block_number, block_number);
-        let input = hex::decode("6d4ce63c").unwrap();
-        let args = PolyjuiceArgsBuilder::default()
-            .is_static(true)
-            .gas_limit(21000)
-            .gas_price(1)
-            .value(0)
-            .input(&input)
-            .build();
-        let raw_tx = RawL2Transaction::new_builder()
-            .from_id(from_id.pack())
-            .to_id(ss_account_id.pack())
-            .args(Bytes::from(args).pack())
-            .build();
-        let run_result = generator
-            .execute(&tree, &block_info, &raw_tx)
-            .expect("construct");
-        let mut expected_return_data = vec![0u8; 32];
-        expected_return_data[31] = 123;
-        assert_eq!(run_result.return_data, expected_return_data);
-    }
+    let run_result = simple_storage_get(&tree, &generator, block_number, from_id, ss_account_id);
+    assert_eq!(run_result.return_data, hex::decode("000000000000000000000000000000000000000000000000000000000000007b").unwrap());
 
     {
         // CallContract.proxySet(222); => SimpleStorage.set(x+3)
@@ -115,29 +95,8 @@ fn test_contract_call_contract() {
         tree.apply_run_result(&run_result).expect("update state");
     }
 
-    {
-        // SimpleStorage.get();
-        let block_info = new_block_info(0, block_number, block_number);
-        let input = hex::decode("6d4ce63c").unwrap();
-        let args = PolyjuiceArgsBuilder::default()
-            .is_static(true)
-            .gas_limit(21000)
-            .gas_price(1)
-            .value(0)
-            .input(&input)
-            .build();
-        let raw_tx = RawL2Transaction::new_builder()
-            .from_id(from_id.pack())
-            .to_id(ss_account_id.pack())
-            .args(Bytes::from(args).pack())
-            .build();
-        let run_result = generator
-            .execute(&tree, &block_info, &raw_tx)
-            .expect("construct");
-        let mut expected_return_data = vec![0u8; 32];
-        expected_return_data[31] = 225;
-        assert_eq!(run_result.return_data, expected_return_data);
-    }
+    let run_result = simple_storage_get(&tree, &generator, block_number, from_id, ss_account_id);
+    assert_eq!(run_result.return_data, hex::decode("00000000000000000000000000000000000000000000000000000000000000e1").unwrap());
 
     assert_eq!(tree.get_nonce(from_id).unwrap(), 3);
     assert_eq!(tree.get_nonce(ss_account_id).unwrap(), 0);

@@ -48,7 +48,7 @@ fn test_contract_create_contract() {
     // 2 => ss.get()
     // 3 => ss.set(value + 132)
     assert_eq!(contract_account_nonce, 3);
-    let ss_account_script = new_account_script_with_nonce(&mut tree, new_account_id, 0);
+    let ss_account_script = new_account_script_with_nonce(new_account_id, 0);
     let ss_account_id = tree
         .get_account_id_by_script_hash(&ss_account_script.hash().into())
         .unwrap()

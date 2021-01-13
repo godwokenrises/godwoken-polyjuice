@@ -78,7 +78,6 @@ pub fn eth_address_to_account_id(data: &[u8]) -> Result<u32, String> {
 }
 
 pub fn new_account_script_with_nonce(
-    tree: &mut DummyState,
     from_id: u32,
     from_nonce: u32,
 ) -> Script {
@@ -96,7 +95,7 @@ pub fn new_account_script(tree: &mut DummyState, from_id: u32, current_nonce: bo
     if !current_nonce {
         from_nonce -= 1;
     }
-    new_account_script_with_nonce(tree, from_id, from_nonce)
+    new_account_script_with_nonce(from_id, from_nonce)
 }
 
 #[derive(Default, Debug)]
@@ -234,4 +233,30 @@ pub fn deploy(
         .expect("construct");
     tree.apply_run_result(&run_result).expect("update state");
     run_result
+}
+
+pub fn simple_storage_get(
+    tree: &DummyState,
+    generator: &Generator,
+    block_number: u64,
+    from_id: u32,
+    ss_account_id: u32,
+) -> RunResult {
+    let block_info = new_block_info(0, block_number, block_number);
+    let input = hex::decode("6d4ce63c").unwrap();
+    let args = PolyjuiceArgsBuilder::default()
+        .is_static(true)
+        .gas_limit(21000)
+        .gas_price(1)
+        .value(0)
+        .input(&input)
+        .build();
+    let raw_tx = RawL2Transaction::new_builder()
+        .from_id(from_id.pack())
+        .to_id(ss_account_id.pack())
+        .args(Bytes::from(args).pack())
+        .build();
+    generator
+        .execute(tree, &block_info, &raw_tx)
+        .expect("construct")
 }
