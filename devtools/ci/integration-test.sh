@@ -18,6 +18,7 @@ fi
 
 mkdir -p $GODWOKEN_DIR/c/build
 cp $SCRIPT_DIR/*generator $SCRIPT_DIR/*validator $GODWOKEN_DIR/c/build
+touch $GODWOKEN_DIR/c/build/account_locks/eth-account-lock
 
 cd $PROJECT_ROOT
 git submodule update --init --recursive

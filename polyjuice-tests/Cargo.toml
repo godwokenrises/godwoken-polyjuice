@@ -9,6 +9,8 @@ edition = "2018"
 [dependencies]
 gw-types = { path = "../integration-test/godwoken/crates/types" }
 gw-common = { path = "../integration-test/godwoken/crates/common" }
+gw-db = { path = "../integration-test/godwoken/crates/db" }
+gw-store = { path = "../integration-test/godwoken/crates/store" }
 gw-generator = { path = "../integration-test/godwoken/crates/generator" }
 gw-jsonrpc-types = { path = "../integration-test/godwoken/crates/jsonrpc-types" }
 lazy_static = "1.4"

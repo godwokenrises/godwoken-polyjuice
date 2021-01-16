@@ -1,4 +1,4 @@
-pragma solidity >=0.4.0 <0.7.0;
+pragma solidity >=0.4.0 <=0.8.0;
 
 contract BlockInfo {
   bytes32 blockHash;
@@ -15,9 +15,9 @@ contract BlockInfo {
     number = block.number;
     timestamp = block.timestamp;
     coinbase = block.coinbase;
-    require(coinbase == 0xc8328aabcD9B9E8e64fBC566c4385c3bDeb219d7);
-    require(blockHash == 0x823b2ff5785b12da8b1363cac9a5cbe566d8b715a4311441b119c39a0367488c);
-    require(gasLimit == 9223372036854775807);
+    require(coinbase == 0xF300000000000000000000000000000000000000);
+    require(blockHash == 0x0707070707070707070707070707070707070707070707070707070707070707);
+    require(gasLimit == 12500000);
   }
 
   function getGenesisHash() public view returns (bytes32) {

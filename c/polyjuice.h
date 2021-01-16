@@ -277,11 +277,11 @@ struct evmc_tx_context get_tx_context(struct evmc_host_context* context) {
   /* gas price = 1 */
   ctx.tx_gas_price.bytes[31] = 0x01;
   memcpy(ctx.tx_origin.bytes, tx_origin.bytes, 20);
-  /* TODO: get coinbase by aggregator id */
-  memset(ctx.block_coinbase.bytes, 0, 20);
+  ctx.block_coinbase = account_id_to_address(context->gw_ctx->block_info.aggregator_id);
   ctx.block_number = context->gw_ctx->block_info.number;
   ctx.block_timestamp = context->gw_ctx->block_info.timestamp;
-  ctx.block_gas_limit = 10000000000;
+  /* Ethereum block gas limit */
+  ctx.block_gas_limit = 12500000;
   /* 2500000000000000, TODO: read from aggregator */
   ctx.block_difficulty = {
       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,

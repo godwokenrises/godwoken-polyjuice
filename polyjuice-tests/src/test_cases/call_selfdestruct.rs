@@ -6,7 +6,7 @@ use crate::helper::{
     new_block_info, setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
-use gw_generator::traits::StateExt;
+use gw_common::traits::StateExt;
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
 
 const SD_INIT_CODE: &str = include_str!("./evm-contracts/SelfDestruct.bin");
@@ -14,15 +14,15 @@ const INIT_CODE: &str = include_str!("./evm-contracts/CallSelfDestruct.bin");
 
 #[test]
 fn test_selfdestruct() {
-    let (mut tree, generator, creator_account_id) = setup();
+    let (store, mut tree, generator, creator_account_id) = setup();
 
-    let from_script = gw_generator::sudt::build_l2_sudt_script([1u8; 32].into());
+    let from_script = gw_common::sudt::build_l2_sudt_script([1u8; 32].into());
     let from_id = tree.create_account_from_script(from_script).unwrap();
     tree.mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, 400000)
         .unwrap();
     let mut block_number = 1;
 
-    let beneficiary_script = gw_generator::sudt::build_l2_sudt_script([2u8; 32].into());
+    let beneficiary_script = gw_common::sudt::build_l2_sudt_script([2u8; 32].into());
     let beneficiary_id = tree.create_account_from_script(beneficiary_script).unwrap();
     assert_eq!(
         tree.get_sudt_balance(CKB_SUDT_ACCOUNT_ID, beneficiary_id)
@@ -37,6 +37,7 @@ fn test_selfdestruct() {
     );
     let run_result = deploy(
         &generator,
+        &store,
         &mut tree,
         creator_account_id,
         from_id,
@@ -64,6 +65,7 @@ fn test_selfdestruct() {
 
     let run_result = deploy(
         &generator,
+        &store,
         &mut tree,
         creator_account_id,
         from_id,
@@ -103,7 +105,7 @@ fn test_selfdestruct() {
             .args(Bytes::from(args).pack())
             .build();
         let run_result = generator
-            .execute(&tree, &block_info, &raw_tx)
+            .execute(&store, &tree, &block_info, &raw_tx)
             .expect("construct");
         tree.apply_run_result(&run_result).expect("update state");
     }
@@ -139,7 +141,7 @@ fn test_selfdestruct() {
             .to_id(sd_account_id.pack())
             .args(Bytes::from(args).pack())
             .build();
-        let result = generator.execute(&tree, &block_info, &raw_tx);
+        let result = generator.execute(&store, &tree, &block_info, &raw_tx);
         println!("result {:?}", result);
         assert!(result.is_err());
     }
@@ -163,7 +165,7 @@ fn test_selfdestruct() {
             .to_id(new_account_id.pack())
             .args(Bytes::from(args).pack())
             .build();
-        let result = generator.execute(&tree, &block_info, &raw_tx);
+        let result = generator.execute(&store, &tree, &block_info, &raw_tx);
         println!("result {:?}", result);
         assert!(result.is_err());
     }
