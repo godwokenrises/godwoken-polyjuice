@@ -267,9 +267,24 @@ int load_account_code(gw_context_t* gw_ctx, uint32_t account_id,
     ckb_debug("sys_load failed");
     return ret;
   }
+  debug_print_data("data_hash", data_hash, 32);
+
+  bool is_data_hash_zero = true;
+  for (size_t i = 0; i < 32; i++) {
+    if (data_hash[i] != 0) {
+      is_data_hash_zero = false;
+      break;
+    }
+  }
+  if (is_data_hash_zero) {
+    ckb_debug("data hash all zero");
+    *code_size = 0;
+    return 0;
+  }
 
   uint32_t old_code_size = *code_size;
   ret = gw_ctx->sys_load_data(gw_ctx, data_hash, code_size, offset, code);
+  debug_print_data("code data", code, *code_size);
   if (ret != 0) {
     ckb_debug("sys_load_data failed");
     return ret;
@@ -674,11 +689,9 @@ int handle_message(gw_context_t* ctx, uint32_t parent_from_id,
     uint8_t destructed_raw_value[GW_VALUE_BYTES];
     polyjuice_build_destructed_key(to_id, destructed_raw_key);
 #ifdef GW_VALIDATOR
-    ret =
-        gw_state_fetch(&ctx->kv_state, destructed_raw_key, destructed_raw_key);
+    ret = gw_state_fetch(&ctx->kv_state, destructed_raw_key, destructed_raw_key);
 #else
-    ret = syscall(GW_SYS_LOAD, destructed_raw_key, destructed_raw_value, 0, 0,
-                  0, 0);
+    ret = syscall(GW_SYS_LOAD, destructed_raw_key, destructed_raw_value, 0, 0, 0, 0);
 #endif
     if (ret != 0) {
       ckb_debug("load destructed key failed");
@@ -716,6 +729,9 @@ int handle_message(gw_context_t* ctx, uint32_t parent_from_id,
   /* Load contract code from evmc_message or by sys_load_data */
   uint8_t* code_data = NULL;
   size_t code_size = 0;
+  bool to_id_is_eoa = false;
+  uint8_t code_data_buffer[MAX_DATA_SIZE];
+  uint32_t code_size_u32 = MAX_DATA_SIZE;
   if (is_create(msg.kind)) {
     /* use input as code */
     code_data = (uint8_t*)msg.input_data;
@@ -724,13 +740,16 @@ int handle_message(gw_context_t* ctx, uint32_t parent_from_id,
     msg.input_size = 0;
   } else {
     /* call kind: CALL/CALLCODE/DELEGATECALL */
-    uint8_t code_data_buffer[MAX_DATA_SIZE];
-    uint32_t code_size_u32 = MAX_DATA_SIZE;
     ret = load_account_code(ctx, to_id, &code_size_u32, 0, code_data_buffer);
-    code_data = code_data_buffer;
-    code_size = (size_t)code_size_u32;
     if (ret != 0) {
       return ret;
+    }
+    if (code_size_u32 > 0) {
+      code_data = code_data_buffer;
+      code_size = (size_t)code_size_u32;
+    } else {
+      /* call EoA account */
+      to_id_is_eoa = true;
     }
   }
 
@@ -801,29 +820,8 @@ int handle_message(gw_context_t* ctx, uint32_t parent_from_id,
     debug_print_int(">> new to id", to_id);
   }
 
-  /* Execute the code in EVM */
-  struct evmc_host_context context {
-    ctx, from_id, to_id, 0
-  };
-  struct evmc_vm* vm = evmc_create_evmone();
-  struct evmc_host_interface interface = {
-      account_exists, get_storage,    set_storage,    get_balance,
-      get_code_size,  get_code_hash,  copy_code,      selfdestruct,
-      call,           get_tx_context, get_block_hash, emit_log};
-  msg.sender = account_id_to_address(from_id);
-  msg.destination = account_id_to_address(to_id);
-  *res = vm->execute(vm, &interface, &context, EVMC_MAX_REVISION, &msg,
-                     code_data, code_size);
-  if (context.error_code != 0) {
-    debug_print_int("context.error_code", context.error_code);
-    return context.error_code;
-  }
-  if (res->gas_left < 0) {
-    ckb_debug("gas not enough");
-    return EVMC_OUT_OF_GAS;
-  }
-
-  /* Handle transfer logic */
+  /* Handle transfer logic.
+     NOTE: MUST do this before vm.execute and after to_id finalized */
   bool is_zero_value = true;
   for (int i = 0; i < 32; i++) {
     if (msg.value.bytes[i] != 0) {
@@ -847,6 +845,44 @@ int handle_message(gw_context_t* ctx, uint32_t parent_from_id,
     }
   }
 
+  /* TODO: transfer value from EoA to EoA is not allowed? */
+  if (msg.kind == EVMC_CALL && from_id == tx_origin_id && to_id_is_eoa) {
+    ckb_debug("transfer value from eoa to eoa");
+    /* TODO: return -1; */
+  }
+
+  bool transfer_only = !is_create(msg.kind) && msg.input_size == 0;
+  debug_print_int("to_id_is_eoa", to_id_is_eoa);
+  debug_print_int("transfer_only", transfer_only);
+  struct evmc_host_context context {ctx, from_id, to_id, 0};
+  struct evmc_vm* vm = evmc_create_evmone();
+  struct evmc_host_interface interface = {account_exists, get_storage,    set_storage,    get_balance,
+                                          get_code_size,  get_code_hash,  copy_code,      selfdestruct,
+                                          call,           get_tx_context, get_block_hash, emit_log};
+  if (!to_id_is_eoa && !transfer_only) {
+    /* Execute the code in EVM */
+    msg.sender = account_id_to_address(from_id);
+    msg.destination = account_id_to_address(to_id);
+
+    debug_print_int("code size", code_size);
+    debug_print_data("msg.input_data", msg.input_data, msg.input_size);
+    *res = vm->execute(vm, &interface, &context, EVMC_MAX_REVISION, &msg,
+                       code_data, code_size);
+    if (context.error_code != 0) {
+      debug_print_int("context.error_code", context.error_code);
+      return context.error_code;
+    }
+    if (res->gas_left < 0) {
+      ckb_debug("gas not enough");
+      return EVMC_OUT_OF_GAS;
+    }
+  } else {
+    res->output_data = NULL;
+    res->release = NULL;
+    res->output_size = 0;
+    res->status_code = EVMC_SUCCESS;
+  }
+
   /* Store code though syscall */
   if (is_create(msg.kind)) {
     uint8_t key[32];
@@ -854,6 +890,7 @@ int handle_message(gw_context_t* ctx, uint32_t parent_from_id,
     blake2b_hash(data_hash, (uint8_t*)res->output_data, res->output_size);
     polyjuice_build_contract_code_key(to_id, key);
     ckb_debug("BEGIN store data key");
+    debug_print_data("data_hash", data_hash, 32);
     ret = ctx->sys_store(ctx, to_id, key, data_hash);
     if (ret != 0) {
       return ret;
@@ -868,6 +905,7 @@ int handle_message(gw_context_t* ctx, uint32_t parent_from_id,
     res->create_address = account_id_to_address(to_id);
   }
 
+  debug_print_data("output data", res->output_data, res->output_size);
   debug_print_int("output size", res->output_size);
   debug_print_int("status_code", res->status_code);
   ckb_debug("END handle_message");
