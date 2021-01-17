@@ -119,7 +119,7 @@ fn test_delegatecall() {
 
     assert_eq!(tree.get_nonce(from_id).unwrap(), 5);
     assert_eq!(tree.get_nonce(ss_account_id).unwrap(), 0);
-    assert_eq!(tree.get_nonce(new_account_id).unwrap(), 4);
+    assert_eq!(tree.get_nonce(new_account_id).unwrap(), 0);
 
     let run_result = simple_storage_get(
         &store,

@@ -141,7 +141,7 @@ fn test_call_multiple_times() {
     assert_eq!(tree.get_nonce(from_id).unwrap(), 4);
     assert_eq!(tree.get_nonce(ss1_account_id).unwrap(), 0);
     assert_eq!(tree.get_nonce(ss2_account_id).unwrap(), 0);
-    assert_eq!(tree.get_nonce(new_account_id).unwrap(), 6);
+    assert_eq!(tree.get_nonce(new_account_id).unwrap(), 0);
 
     let run_result = simple_storage_get(
         &store,

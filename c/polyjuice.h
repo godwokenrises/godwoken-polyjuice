@@ -73,6 +73,38 @@ void polyjuice_build_destructed_key(uint32_t id, uint8_t key[GW_KEY_BYTES]) {
   polyjuice_build_system_key(id, POLYJUICE_DESTRUCTED, key);
 }
 
+int gw_increase_nonce(gw_context_t *ctx, uint32_t account_id, uint32_t *new_nonce) {
+  uint8_t old_nonce_value[GW_VALUE_BYTES];
+  int ret = ctx->sys_load_nonce(ctx, account_id, old_nonce_value);
+  if (ret != 0) {
+    return ret;
+  }
+  for (size_t i = 4; i < GW_VALUE_BYTES; i++) {
+    if(old_nonce_value[i] != 0){
+      return GW_ERROR_INVALID_DATA;
+    }
+  }
+  uint32_t next_nonce = *((uint32_t *)old_nonce_value) + 1;
+
+  uint8_t nonce_key[GW_KEY_BYTES];
+  uint8_t nonce_value[GW_VALUE_BYTES];
+  memset(nonce_value, 0, GW_VALUE_BYTES);
+  gw_build_nonce_key(account_id, nonce_key);
+  memcpy(nonce_value, (uint8_t *)(&next_nonce), 4);
+#ifdef GW_GENERATOR
+  ret = syscall(GW_SYS_STORE, nonce_key, nonce_value, 0, 0, 0, 0);
+#else
+  ret = gw_state_insert(&ctx->kv_state, nonce_key, nonce_value);
+#endif
+  if (ret != 0) {
+    return ret;
+  }
+  if (new_nonce != NULL) {
+    *new_nonce = next_nonce;
+  }
+  return 0;
+}
+
 int handle_message(gw_context_t* ctx, uint32_t parent_from_id,
                    const evmc_message* msg, struct evmc_result* res);
 typedef int (*stream_data_loader_fn)(gw_context_t* ctx, long data_id,
@@ -542,12 +574,14 @@ struct evmc_result call(struct evmc_host_context* context,
   }
 
   /* Increase context->to_id's nonce */
-  ret = context->gw_ctx->sys_increase_nonce(context->gw_ctx, context->to_id, NULL);
-  if (ret != 0) {
-    ckb_debug("increase nonce failed");
-    context->error_code = ret;
-    res.status_code = EVMC_REVERT;
-    return res;
+  if (is_create(msg->kind)) {
+    ret = gw_increase_nonce(context->gw_ctx, context->to_id, NULL);
+    if (ret != 0) {
+      ckb_debug("increase nonce failed");
+      context->error_code = ret;
+      res.status_code = EVMC_REVERT;
+      return res;
+    }
   }
   ckb_debug("END call");
 

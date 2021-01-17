@@ -46,9 +46,7 @@ fn test_contract_create_contract() {
     assert_eq!(new_account_id, 4);
     let contract_account_nonce = tree.get_nonce(new_account_id).unwrap();
     // 1 => new SimpleStorage()
-    // 2 => ss.get()
-    // 3 => ss.set(value + 132)
-    assert_eq!(contract_account_nonce, 3);
+    assert_eq!(contract_account_nonce, 1);
     let ss_account_script = new_account_script_with_nonce(new_account_id, 0);
     let ss_account_id = tree
         .get_account_id_by_script_hash(&ss_account_script.hash().into())

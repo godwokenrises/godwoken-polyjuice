@@ -112,7 +112,7 @@ fn test_selfdestruct() {
 
     assert_eq!(tree.get_nonce(from_id).unwrap(), 3);
     assert_eq!(tree.get_nonce(sd_account_id).unwrap(), 0);
-    assert_eq!(tree.get_nonce(new_account_id).unwrap(), 1);
+    assert_eq!(tree.get_nonce(new_account_id).unwrap(), 0);
     assert_eq!(
         tree.get_sudt_balance(CKB_SUDT_ACCOUNT_ID, sd_account_id)
             .unwrap(),
