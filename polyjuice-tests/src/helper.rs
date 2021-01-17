@@ -52,6 +52,13 @@ lazy_static::lazy_static! {
     };
 }
 
+#[derive(Default, Clone, Debug)]
+pub struct PolyjuiceLog {
+    pub address: [u8; 20],
+    pub data: Vec<u8>,
+    pub topics: Vec<H256>,
+}
+
 pub fn new_block_info(aggregator_id: u32, number: u64, timestamp: u64) -> BlockInfo {
     BlockInfo::new_builder()
         .aggregator_id(aggregator_id.pack())
@@ -234,6 +241,46 @@ pub fn deploy(
         .expect("construct");
     tree.apply_run_result(&run_result).expect("update state");
     run_result
+}
+
+pub fn parse_log(data: &[u8]) -> PolyjuiceLog {
+    let mut offset: usize = 0;
+    let mut address = [0u8; 20];
+    address.copy_from_slice(&data[offset..offset + 20]);
+    offset += 20;
+    let mut data_size_bytes = [0u8; 4];
+    data_size_bytes.copy_from_slice(&data[offset..offset + 4]);
+    offset += 4;
+    let data_size: u32 = u32::from_le_bytes(data_size_bytes);
+    let mut log_data = vec![0u8; data_size as usize];
+    log_data.copy_from_slice(&data[offset..offset + (data_size as usize)]);
+    offset += data_size as usize;
+    println!("data_size: {}", data_size);
+
+    let mut topics_count_bytes = [0u8; 4];
+    topics_count_bytes.copy_from_slice(&data[offset..offset + 4]);
+    offset += 4;
+    let topics_count: u32 = u32::from_le_bytes(topics_count_bytes);
+    let mut topics = Vec::new();
+    println!("topics_count: {}", topics_count);
+    for _ in 0..topics_count {
+        let mut topic = [0u8; 32];
+        topic.copy_from_slice(&data[offset..offset + 32]);
+        offset += 32;
+        topics.push(topic.into());
+    }
+    if offset != data.len() {
+        panic!(
+            "Too many bytes for polyjuice log data: offset={}, data.len()={}",
+            offset,
+            data.len()
+        );
+    }
+    PolyjuiceLog {
+        address,
+        data: log_data,
+        topics,
+    }
 }
 
 pub fn simple_storage_get(

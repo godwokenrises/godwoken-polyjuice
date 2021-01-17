@@ -4,11 +4,11 @@ pub(crate) mod contract_call_contract;
 pub(crate) mod contract_create_contract;
 pub(crate) mod delegatecall;
 pub(crate) mod erc20;
+pub(crate) mod get_block_info;
+pub(crate) mod parse_log_event;
 pub(crate) mod selfdestruct;
 pub(crate) mod simple_storage;
 
-pub(crate) mod get_block_info;
-pub(crate) mod parse_log_event;
 pub(crate) mod pre_compiled_contracts;
 pub(crate) mod simple_transfer;
 //  Special pre-compiled contract to support transfer to any sudt
