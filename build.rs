@@ -20,7 +20,7 @@ const BINARIES: &[(&str, &str)] = &[
     (
         "validator",
         "35e6589415d11e031a3a252b160ea48b1a10126d654164549e8df16ea81f8eb1",
-    )
+    ),
 ];
 
 fn main() {

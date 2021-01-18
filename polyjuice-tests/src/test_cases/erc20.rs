@@ -6,7 +6,7 @@ use crate::helper::{
     PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
-use gw_common::traits::StateExt;
+use gw_generator::traits::StateExt;
 use gw_jsonrpc_types::parameter::RunResult;
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
 
@@ -15,11 +15,11 @@ const INIT_CODE: &str = include_str!("./evm-contracts/ERC20.bin");
 #[test]
 fn test_erc20() {
     let (store, mut tree, generator, creator_account_id) = setup();
-    let from_script1 = gw_common::sudt::build_l2_sudt_script([1u8; 32].into());
+    let from_script1 = gw_generator::sudt::build_l2_sudt_script([1u8; 32].into());
     let from_id1 = tree.create_account_from_script(from_script1).unwrap();
-    let from_script2 = gw_common::sudt::build_l2_sudt_script([2u8; 32].into());
+    let from_script2 = gw_generator::sudt::build_l2_sudt_script([2u8; 32].into());
     let from_id2 = tree.create_account_from_script(from_script2).unwrap();
-    let from_script3 = gw_common::sudt::build_l2_sudt_script([3u8; 32].into());
+    let from_script3 = gw_generator::sudt::build_l2_sudt_script([3u8; 32].into());
     let from_id3 = tree.create_account_from_script(from_script3).unwrap();
     tree.mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id1, 2000000)
         .unwrap();
@@ -152,7 +152,7 @@ fn test_erc20() {
             .args(Bytes::from(args).pack())
             .build();
         let run_result = generator
-            .execute(&store, &tree, &block_info, &raw_tx)
+            .execute(&store.begin_transaction(), &tree, &block_info, &raw_tx)
             .expect("construct");
         tree.apply_run_result(&run_result).expect("update state");
         assert_eq!(

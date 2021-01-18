@@ -534,8 +534,6 @@ version = "0.1.0"
 dependencies = [
  "cfg-if 0.1.10",
  "gw-hash",
- "gw-types",
- "lazy_static",
  "sparse-merkle-tree",
  "thiserror",
 ]
@@ -566,9 +564,9 @@ dependencies = [
  "blake2b-rs 0.2.0",
  "ckb-vm",
  "gw-common",
+ "gw-config",
  "gw-store",
  "gw-types",
- "hex",
  "lazy_static",
  "secp256k1",
  "sha3",

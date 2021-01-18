@@ -7,7 +7,7 @@ use crate::helper::{
     CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
-use gw_common::traits::StateExt;
+use gw_generator::traits::StateExt;
 use gw_jsonrpc_types::parameter::RunResult;
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
 
@@ -17,7 +17,7 @@ const SS_INIT_CODE: &str = include_str!("./evm-contracts/SimpleStorage.bin");
 fn test_account_already_exists() {
     let (store, mut tree, generator, creator_account_id) = setup();
 
-    let from_script = gw_common::sudt::build_l2_sudt_script([1u8; 32].into());
+    let from_script = gw_generator::sudt::build_l2_sudt_script([1u8; 32].into());
     let from_id = tree.create_account_from_script(from_script).unwrap();
     let mint_balance: u128 = 400000;
     tree.mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, mint_balance)
