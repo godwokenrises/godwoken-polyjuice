@@ -5,6 +5,8 @@
 #include "ripemd160.h"
 #include "sha256.h"
 
+#include "polyjuice_utils.h"
+
 /* Protocol Params:
    [Referenced]:
    https://github.com/ethereum/go-ethereum/blob/master/params/protocol_params.go
@@ -22,6 +24,7 @@
 
 #define ERROR_MOD_EXP -23
 #define ERROR_BLAKE2F -24
+#define ERROR_TRANSFER_TO_ANY_SUDT -25
 
 /* pre-compiled Ethereum contracts */
 
@@ -29,6 +32,7 @@ typedef int (*precompiled_contract_gas_fn)(const uint8_t* input_src,
                                            const size_t input_size,
                                            uint64_t* gas);
 typedef int (*precompiled_contract_fn)(gw_context_t* ctx,
+                                       uint32_t from_id,
                                        const uint8_t* input_src,
                                        const size_t input_size,
                                        uint8_t** output, size_t* output_size);
@@ -50,7 +54,9 @@ int ecrecover_required_gas(const uint8_t* input, const size_t input_size,
          [64..96 ] => r (u256)
          [96..128] => s (u256)
 */
-int ecrecover(gw_context_t* ctx, const uint8_t* input_src,
+int ecrecover(gw_context_t* ctx,
+              uint32_t from_id,
+              const uint8_t* input_src,
               const size_t input_size, uint8_t** output, size_t* output_size) {
   int ret;
   secp256k1_context context;
@@ -122,7 +128,9 @@ int sha256hash_required_gas(const uint8_t* input, const size_t input_size,
   return 0;
 }
 
-int sha256hash(gw_context_t* ctx, const uint8_t* input_src,
+int sha256hash(gw_context_t* ctx,
+               uint32_t from_id,
+               const uint8_t* input_src,
                const size_t input_size, uint8_t** output, size_t* output_size) {
   *output = (uint8_t*)malloc(32);
   if (*output == NULL) {
@@ -143,7 +151,9 @@ int ripemd160hash_required_gas(const uint8_t* input, const size_t input_size,
   return 0;
 }
 
-int ripemd160hash(gw_context_t* ctx, const uint8_t* input_src,
+int ripemd160hash(gw_context_t* ctx,
+                  uint32_t from_id,
+                  const uint8_t* input_src,
                   const size_t input_size, uint8_t** output,
                   size_t* output_size) {
   *output = (uint8_t*)malloc(20);
@@ -162,7 +172,9 @@ int data_copy_required_gas(const uint8_t* input, const size_t input_size,
   return 0;
 }
 
-int data_copy(gw_context_t* ctx, const uint8_t* input_src,
+int data_copy(gw_context_t* ctx,
+              uint32_t from_id,
+              const uint8_t* input_src,
               const size_t input_size, uint8_t** output, size_t* output_size) {
   *output = (uint8_t*)malloc(input_size);
   if (*output == NULL) {
@@ -313,7 +325,9 @@ int big_mod_exp_required_gas(const uint8_t* input, const size_t input_size,
   return 0;
 }
 
-int big_mod_exp(gw_context_t* ctx, const uint8_t* input_src,
+int big_mod_exp(gw_context_t* ctx,
+                uint32_t from_id,
+                const uint8_t* input_src,
                 const size_t input_size, uint8_t** output,
                 size_t* output_size) {
   int ret;
@@ -568,7 +582,9 @@ void f_generic(uint64_t h[8], uint64_t m[16], uint64_t c0, uint64_t c1,
   h[7] ^= v7 ^ v15;
 }
 
-int blake2f(gw_context_t* ctx, const uint8_t* input_src,
+int blake2f(gw_context_t* ctx,
+            uint32_t from_id,
+            const uint8_t* input_src,
             const size_t input_size, uint8_t** output, size_t* output_size) {
   if (input_size != BLAKE2F_INPUT_LENGTH) {
     return ERROR_BLAKE2F;
@@ -597,6 +613,7 @@ int blake2f(gw_context_t* ctx, const uint8_t* input_src,
   t[1] = *(uint64_t*)(input_src + 204);
 
   uint64_t flag = final ? 0xFFFFFFFFFFFFFFFF : 0;
+  /* TODO: improve performance */
   f_generic(h, m, t[0], t[1], flag, (uint64_t)rounds);
 
   *output = (uint8_t*)malloc(64);
@@ -604,6 +621,75 @@ int blake2f(gw_context_t* ctx, const uint8_t* input_src,
   for (size_t i = 0; i < 8; i++) {
     size_t offset = i * 8;
     memcpy(*output + offset, (uint8_t*)(&h[i]), 8);
+  }
+  return 0;
+}
+
+int transfer_to_any_sudt_gas(const uint8_t* input_src,
+                             const size_t input_size,
+                             uint64_t* gas) {
+  *gas = 300;
+  return 0;
+}
+
+int transfer_to_any_sudt(gw_context_t* ctx,
+                         uint32_t from_id,
+                         const uint8_t* input_src,
+                         const size_t input_size,
+                         uint8_t** output, size_t* output_size) {
+  if (input_size != (32 + 20 + 32)) {
+    return ERROR_TRANSFER_TO_ANY_SUDT;
+  }
+  uint8_t sudt_id_be[32];
+  memcpy(sudt_id_be, input_src, 32);
+  evmc_address to_address = *((evmc_address *)input_src + 32);
+  uint8_t amount_be[32];
+  memcpy(amount_be, input_src + 52, 32);
+
+  /* Check leading zeros */
+  for (size_t i = 0; i < 28; i++) {
+    if (sudt_id_be[i] != 0) {
+      return ERROR_TRANSFER_TO_ANY_SUDT;
+    }
+  }
+  for (size_t i = 0; i < 16; i++) {
+    if (amount_be[i] != 0) {
+      return ERROR_TRANSFER_TO_ANY_SUDT;
+    }
+  }
+  /* Swap bytes */
+  for (size_t i = 28; i < (28 + 32) / 2; i++) {
+    uint8_t tmp = sudt_id_be[i];
+    sudt_id_be[i] = sudt_id_be[28 + 31 - i];
+    sudt_id_be[28 + 31 - i] = tmp;
+  }
+  for (size_t i = 16; i < (16 + 32) / 2; i++) {
+    uint8_t tmp = amount_be[i];
+    amount_be[i] = amount_be[16 + 31 - i];
+    amount_be[16 + 31 - i] = tmp;
+  }
+  uint32_t sudt_id = *((uint32_t *)(sudt_id_be + 28));
+  uint128_t amount = *((uint128_t *)(amount_be + 16));
+
+  int ret;
+  uint32_t to_id;
+  ret = address_to_account_id(&to_address, &to_id);
+  if (ret != 0) {
+    ckb_debug("invalid to_address");
+    return ERROR_TRANSFER_TO_ANY_SUDT;
+  }
+  if (from_id == to_id) {
+    ckb_debug("from_id can't equals to to_id");
+    return ERROR_TRANSFER_TO_ANY_SUDT;
+  }
+  if (amount == 0) {
+    ckb_debug("amount can't be zero");
+    return ERROR_TRANSFER_TO_ANY_SUDT;
+  }
+  ret = sudt_transfer(ctx, sudt_id, from_id, to_id, amount);
+  if (ret != 0) {
+    ckb_debug("transfer failed");
+    return ret;
   }
   return 0;
 }
@@ -618,39 +704,43 @@ bool match_precompiled_address(const evmc_address* destination,
   }
 
   switch (destination->bytes[19]) {
-    case 1:
-      *contract_gas = ecrecover_required_gas;
-      *contract = ecrecover;
-      break;
-    case 2:
-      *contract_gas = sha256hash_required_gas;
-      *contract = sha256hash;
-      break;
-    case 3:
-      *contract_gas = ripemd160hash_required_gas;
-      *contract = ripemd160hash;
-      break;
-    case 4:
-      *contract_gas = data_copy_required_gas;
-      *contract = data_copy;
-      break;
-    case 5:
-      *contract_gas = big_mod_exp_required_gas;
-      *contract = big_mod_exp;
-      break;
-      /* FIXME:
-     common.BytesToAddress([]byte{6}): &bn256AddIstanbul{},
-     common.BytesToAddress([]byte{7}): &bn256ScalarMulIstanbul{},
-     common.BytesToAddress([]byte{8}): &bn256PairingIstanbul{},
-   */
-    case 9:
-      *contract_gas = blake2f_required_gas;
-      *contract = blake2f;
-      break;
-    default:
-      *contract_gas = NULL;
-      *contract = NULL;
-      return false;
+  case 1:
+    *contract_gas = ecrecover_required_gas;
+    *contract = ecrecover;
+    break;
+  case 2:
+    *contract_gas = sha256hash_required_gas;
+    *contract = sha256hash;
+    break;
+  case 3:
+    *contract_gas = ripemd160hash_required_gas;
+    *contract = ripemd160hash;
+    break;
+  case 4:
+    *contract_gas = data_copy_required_gas;
+    *contract = data_copy;
+    break;
+  case 5:
+    *contract_gas = big_mod_exp_required_gas;
+    *contract = big_mod_exp;
+    break;
+    /* FIXME:
+       common.BytesToAddress([]byte{6}): &bn256AddIstanbul{},
+       common.BytesToAddress([]byte{7}): &bn256ScalarMulIstanbul{},
+       common.BytesToAddress([]byte{8}): &bn256PairingIstanbul{},
+    */
+  case 9:
+    *contract_gas = blake2f_required_gas;
+    *contract = blake2f;
+    break;
+  case 0xf0:
+    *contract_gas = transfer_to_any_sudt_gas;
+    *contract = transfer_to_any_sudt;
+    break;
+  default:
+    *contract_gas = NULL;
+    *contract = NULL;
+    return false;
   }
   return true;
 }

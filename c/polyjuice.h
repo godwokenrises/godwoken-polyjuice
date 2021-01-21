@@ -16,12 +16,15 @@
 #include "gw_syscalls.h"
 #include "sudt_utils.h"
 
+#include "polyjuice_utils.h"
+
 #ifdef GW_GENERATOR
 #include "generator/secp256k1_helper.h"
 #else
 #include "validator/secp256k1_helper.h"
 #endif
 #include "contracts.h"
+
 
 #define is_create(kind) ((kind) == EVMC_CREATE || (kind) == EVMC_CREATE2)
 #define is_special_call(kind) \
@@ -118,22 +121,6 @@ struct evmc_host_context {
   int error_code;
 };
 
-evmc_address account_id_to_address(uint32_t account_id) {
-  evmc_address addr;
-  memset(addr.bytes, 0, 20);
-  memcpy(addr.bytes, (uint8_t*)(&account_id), 4);
-  return addr;
-}
-int address_to_account_id(const evmc_address* address, uint32_t* account_id) {
-  for (size_t i = 4; i < 20; i++) {
-    if (address->bytes[i] != 0) {
-      /* ERROR: invalid polyjuice address */
-      return -1;
-    }
-  }
-  *account_id = *((uint32_t*)(address->bytes));
-  return 0;
-}
 
 /**
    Message = [
@@ -568,7 +555,7 @@ struct evmc_result call(struct evmc_host_context* context,
       return res;
     }
     res.gas_left = msg->gas - (int64_t)gas_cost;
-    ret = contract(gw_ctx, msg->input_data, msg->input_size,
+    ret = contract(gw_ctx, context->to_id, msg->input_data, msg->input_size,
                    (uint8_t**)&res.output_data, &res.output_size);
     if (ret != 0) {
       ckb_debug("call pre-compiled contract failed");
