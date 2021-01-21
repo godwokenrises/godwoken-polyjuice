@@ -6,7 +6,7 @@ edition = "2018"
 build = "build.rs"
 license = "MIT"
 description = "Polyjuice scripts for godwoken"
-repository = "https://github.com/thewawar/godwoken-polyjuice"
+repository = "https://github.com/nervosnetwork/godwoken-polyjuice"
 include = ["src/**/*", "Cargo.toml", "build.rs", "build/generator", "build/validator"]
 
 [dependencies]
