@@ -4,6 +4,8 @@
 #include "mbedtls/bignum.h"
 #include "ripemd160.h"
 #include "sha256.h"
+#include <intx/intx.hpp>
+#include <bn128.hpp>
 
 #include "polyjuice_utils.h"
 
@@ -18,6 +20,15 @@
 #define IDENTITY_BASE_GAS 15       // Base price for a data copy operation
 #define IDENTITY_PERWORD_GAS 3     // Per-work price for a data copy operation
 
+#define BN256_ADD_GAS_BYZANTIUM              500    // Byzantium gas needed for an elliptic curve addition
+#define BN256_ADD_GAS_ISTANBUL               150    // Gas needed for an elliptic curve addition
+#define BN256_SCALAR_MUL_GAS_BYZANTIUM       40000  // Byzantium gas needed for an elliptic curve scalar multiplication
+#define BN256_SCALAR_MUL_GAS_ISTANBUL        6000   // Gas needed for an elliptic curve scalar multiplication
+#define BN256_PAIRING_BASE_GAS_BYZANTIUM     100000 // Byzantium base price for an elliptic curve pairing check
+#define BN256_PAIRING_BASE_GAS_ISTANBUL      45000  // Base price for an elliptic curve pairing check
+#define BN256_PAIRING_PERPOINT_GAS_BYZANTIUM 80000  // Byzantium per-point price for an elliptic curve pairing check
+#define BN256_PAIRING_PERPOINT_GAS_ISTANBUL  34000  // Per-point price for an elliptic curve pairing check
+
 #define BLAKE2F_INPUT_LENGTH 213
 #define BLAKE2F_FINAL_BLOCK_BYTES 0x1
 #define BLAKE2F_NON_FINAL_BLOCK_BYTES 0x0
@@ -25,6 +36,10 @@
 #define ERROR_MOD_EXP -23
 #define ERROR_BLAKE2F -24
 #define ERROR_TRANSFER_TO_ANY_SUDT -25
+#define ERROR_BN256_ADD -26
+#define ERROR_BN256_SCALAR_MUL -27
+#define ERROR_BN256_PAIRING -28
+#define ERROR_BN256_INVALID_POINT -29
 
 /* pre-compiled Ethereum contracts */
 
@@ -694,6 +709,146 @@ int transfer_to_any_sudt(gw_context_t* ctx,
   return 0;
 }
 
+
+int parse_curve_point(void *target, uint8_t *bytes) {
+  intx::uint256 *p = (intx::uint256 *)target;
+  p[0] = intx::be::unsafe::load<intx::uint256>(bytes);
+  p[1] = intx::be::unsafe::load<intx::uint256>(bytes + 32);
+  /* TODO: future version should mont x */
+  /* TODO: future version should mont y */
+  if (p[0] == 0 && p[1] == 0) {
+    p[1] = 1;
+    p[2] = 0;
+  } else {
+    p[2] = 1;
+    if (!bn128::g1::is_on_curve(p)) {
+      ckb_debug("bn256: malformed point");
+      return ERROR_BN256_INVALID_POINT;
+    }
+  }
+  return 0;
+}
+
+int parse_twist_point(void *target, uint8_t *bytes) {
+  /* FIXME: TODO */
+  return 0;
+}
+
+/* bn256AddIstanbul */
+int bn256_add_istanbul_gas(const uint8_t* input_src,
+                           const size_t input_size,
+                           uint64_t* gas) {
+  *gas = BN256_ADD_GAS_ISTANBUL;
+  return 0;
+}
+
+int bn256_add_istanbul(gw_context_t* ctx,
+                       uint32_t from_id,
+                       const uint8_t* input_src,
+                       const size_t input_size,
+                       uint8_t** output, size_t* output_size) {
+  int ret;
+  /* If the input is shorter than expected, it is assumed to be virtually padded
+     with zeros at the end (i.e. compatible with the semantics of the
+     CALLDATALOAD opcode). If the input is longer than expected, surplus bytes
+     at the end are ignored. */
+  uint8_t real_input[128] = {0};
+  /* point[3] = point[2]² */
+  intx::uint256 x[3];
+  intx::uint256 y[3];
+  intx::uint256 res[3];
+
+  memcpy(real_input, input_src, input_size);
+  ret = parse_curve_point((void *)x, real_input);
+  if (ret != 0) {
+    return ret;
+  }
+  ret = parse_curve_point((void *)y, real_input + 64);
+  if (ret != 0) {
+    return ret;
+  }
+  bn128::alt_bn128_add(x, y, res);
+
+  *output = (uint8_t *)malloc(64);
+  *output_size = 64;
+  intx::be::unsafe::store(*output, res[0]);
+  intx::be::unsafe::store(*output + 32, res[1]);
+  return 0;
+}
+
+/* bn256ScalarMulIstanbul */
+int bn256_scalar_mul_istanbul_gas(const uint8_t* input_src,
+                                  const size_t input_size,
+                                  uint64_t* gas) {
+  *gas = BN256_SCALAR_MUL_GAS_ISTANBUL;
+  return 0;
+}
+
+int bn256_scalar_mul_istanbul(gw_context_t* ctx,
+                              uint32_t from_id,
+                              const uint8_t* input_src,
+                              const size_t input_size,
+                              uint8_t** output, size_t* output_size) {
+  int ret;
+  uint8_t real_input[96] = {0};
+  intx::uint256 x[3];
+  intx::uint256 res[3];
+
+  memcpy(real_input, input_src, input_size);
+  ret = parse_curve_point((void *)x, real_input);
+  if (ret != 0) {
+    return ret;
+  }
+  intx::uint256 n = intx::be::unsafe::load<intx::uint256>(real_input + 64);
+  bn128::alt_bn128_mul(x, n, res);
+
+  *output = (uint8_t *)malloc(64);
+  *output_size = 64;
+  intx::be::unsafe::store(*output, res[0]);
+  intx::be::unsafe::store(*output + 32, res[1]);
+  return 0;
+}
+
+/* bn256PairingIstanbul */
+int bn256_pairing_istanbul_gas(const uint8_t* input_src,
+                               const size_t input_size,
+                               uint64_t* gas) {
+  *gas = BN256_PAIRING_BASE_GAS_ISTANBUL
+    + ((uint64_t)input_size / 192 * BN256_PAIRING_PERPOINT_GAS_ISTANBUL);
+  return 0;
+}
+
+int bn256_pairing_istanbul(gw_context_t* ctx,
+                           uint32_t from_id,
+                           const uint8_t* input_src,
+                           const size_t input_size,
+                           uint8_t** output, size_t* output_size) {
+  /* static uint8_t true_byte32[32] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}; */
+  /* static uint8_t false_byte32[32] = {0}; */
+  if (input_size % 192 > 0) {
+    return ERROR_BN256_PAIRING;
+  }
+
+  int ret;
+  size_t length = input_size / 192;
+  /* G1[] */
+  intx::uint256 *cs = (intx::uint256 *)malloc(length * 4 * sizeof(intx::uint256));
+  /* G2[] */
+  intx::uint256 *ts = (intx::uint256 *)malloc(length * 4 * sizeof(intx::uint256));
+  for (size_t i = 0; i < input_size; i += 192) {
+    ret = parse_curve_point((void *)(cs + i / 192 * 4), (uint8_t *)input_src + i);
+    if (ret != 0) {
+      return ret;
+    }
+    ret = parse_twist_point((void *)(ts + i / 192 * 4), (uint8_t *)input_src + i + 64);
+    if (ret != 0) {
+      return ret;
+    }
+  }
+  ckb_debug("pairing is unsupported yet!");
+  return ERROR_BN256_PAIRING;
+}
+
 bool match_precompiled_address(const evmc_address* destination,
                                precompiled_contract_gas_fn* contract_gas,
                                precompiled_contract_fn* contract) {
@@ -724,11 +879,18 @@ bool match_precompiled_address(const evmc_address* destination,
     *contract_gas = big_mod_exp_required_gas;
     *contract = big_mod_exp;
     break;
-    /* FIXME:
-       common.BytesToAddress([]byte{6}): &bn256AddIstanbul{},
-       common.BytesToAddress([]byte{7}): &bn256ScalarMulIstanbul{},
-       common.BytesToAddress([]byte{8}): &bn256PairingIstanbul{},
-    */
+  case 6:
+    *contract_gas = bn256_add_istanbul_gas;
+    *contract = bn256_add_istanbul;
+    break;
+  case 7:
+    *contract_gas = bn256_scalar_mul_istanbul_gas;
+    *contract = bn256_scalar_mul_istanbul;
+    break;
+  case 8:
+    *contract_gas = bn256_pairing_istanbul_gas;
+    *contract = bn256_pairing_istanbul;
+    break;
   case 9:
     *contract_gas = blake2f_required_gas;
     *contract = blake2f;
