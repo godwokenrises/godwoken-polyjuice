@@ -717,7 +717,7 @@ int parse_curve_point(void *target, uint8_t *bytes) {
   /* TODO: future version should mont x */
   /* TODO: future version should mont y */
   if (p[0] == 0 && p[1] == 0) {
-    p[1] = 1;
+    /* p[1] = 1; */
     p[2] = 0;
   } else {
     p[2] = 1;
@@ -753,12 +753,14 @@ int bn256_add_istanbul(gw_context_t* ctx,
      CALLDATALOAD opcode). If the input is longer than expected, surplus bytes
      at the end are ignored. */
   uint8_t real_input[128] = {0};
+  size_t real_size = input_size > 128 ? 128 : input_size;
   /* point[3] = point[2]² */
   intx::uint256 x[3];
   intx::uint256 y[3];
   intx::uint256 res[3];
 
-  memcpy(real_input, input_src, input_size);
+  memcpy(real_input, input_src, real_size);
+  debug_print_data("add input", real_input, 128);
   ret = parse_curve_point((void *)x, real_input);
   if (ret != 0) {
     return ret;
@@ -773,6 +775,7 @@ int bn256_add_istanbul(gw_context_t* ctx,
   *output_size = 64;
   intx::be::unsafe::store(*output, res[0]);
   intx::be::unsafe::store(*output + 32, res[1]);
+  debug_print_data("add output", *output, *output_size);
   return 0;
 }
 

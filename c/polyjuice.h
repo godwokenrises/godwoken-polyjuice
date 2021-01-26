@@ -30,22 +30,6 @@
 #define is_special_call(kind) \
   ((kind) == EVMC_CALLCODE || (kind) == EVMC_DELEGATECALL)
 
-static char debug_buffer[64 * 1024];
-static void debug_print_data(const char* prefix, const uint8_t* data,
-                             uint32_t data_len) {
-  int offset = 0;
-  offset += sprintf(debug_buffer, "%s 0x", prefix);
-  for (size_t i = 0; i < data_len; i++) {
-    offset += sprintf(debug_buffer + offset, "%02x", data[i]);
-  }
-  debug_buffer[offset] = '\0';
-  ckb_debug(debug_buffer);
-}
-static void debug_print_int(const char* prefix, int64_t ret) {
-  sprintf(debug_buffer, "%s => %ld", prefix, ret);
-  ckb_debug(debug_buffer);
-}
-
 /* Max script buffer size: 1KB */
 #define MAX_SCRIPT_SIZE 1024
 /* Max data buffer size: 24KB */

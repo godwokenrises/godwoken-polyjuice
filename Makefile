@@ -34,7 +34,7 @@ ALL_OBJS := build/evmone.o build/analysis.o build/execution.o build/instructions
 # docker pull nervos/ckb-riscv-gnu-toolchain:bionic-20190702
 BUILDER_DOCKER := nervos/ckb-riscv-gnu-toolchain@sha256:7b168b4b109a0f741078a71b7c4dddaf1d283a5244608f7851f5714fbad273ba
 
-all: build/generator build/validator build/blockchain.h build/godwoken.h
+all: build/generator build/validator build/test_contracts build/blockchain.h build/godwoken.h
 
 all-via-docker: generate-protocol
 	mkdir -p build
@@ -54,6 +54,13 @@ build/generator: c/generator.c c/contracts.h c/generator/secp256k1_helper.h c/po
 build/validator: c/validator.c c/contracts.h c/validator/secp256k1_helper.h c/polyjuice.h build/secp256k1_data_info.h $(ALL_OBJS)
 	cd $(SECP_DIR) && (git apply workaround-fix-g++-linking.patch || true) && cd - # apply patch
 	$(CXX) $(CFLAGS) $(LDFLAGS) -Ibuild -o $@ c/validator.c $(ALL_OBJS)
+	$(OBJCOPY) --only-keep-debug $@ $@.debug
+	$(OBJCOPY) --strip-debug --strip-all $@
+	cd $(SECP_DIR) && (git apply -R workaround-fix-g++-linking.patch || true) && cd - # revert patch
+
+build/test_contracts: c/tests/test_contracts.c c/contracts.h c/validator/secp256k1_helper.h build/secp256k1_data_info.h $(ALL_OBJS)
+	cd $(SECP_DIR) && (git apply workaround-fix-g++-linking.patch || true) && cd - # apply patch
+	$(CXX) $(CFLAGS) $(LDFLAGS) -Ibuild -o $@ c/tests/test_contracts.c $(ALL_OBJS)
 	$(OBJCOPY) --only-keep-debug $@ $@.debug
 	$(OBJCOPY) --strip-debug --strip-all $@
 	cd $(SECP_DIR) && (git apply -R workaround-fix-g++-linking.patch || true) && cd - # revert patch

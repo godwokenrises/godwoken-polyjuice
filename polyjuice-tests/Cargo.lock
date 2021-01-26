@@ -868,6 +868,7 @@ name = "polyjuice-tests"
 version = "0.1.0"
 dependencies = [
  "blake2b-rs 0.2.0",
+ "ckb-vm",
  "gw-common",
  "gw-db",
  "gw-generator",
