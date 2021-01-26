@@ -794,10 +794,11 @@ int bn256_scalar_mul_istanbul(gw_context_t* ctx,
                               uint8_t** output, size_t* output_size) {
   int ret;
   uint8_t real_input[96] = {0};
+  size_t real_size = input_size > 96 ? 96 : input_size;
   intx::uint256 x[3];
   intx::uint256 res[3];
 
-  memcpy(real_input, input_src, input_size);
+  memcpy(real_input, input_src, real_size);
   ret = parse_curve_point((void *)x, real_input);
   if (ret != 0) {
     return ret;
