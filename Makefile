@@ -10,12 +10,13 @@ CFLAGS_CKB_STD = -Ideps/ckb-c-stdlib -Ideps/ckb-c-stdlib/molecule
 # CFLAGS_CBMT := -isystem deps/merkle-tree
 CFLAGS_SECP := -isystem $(SECP_DIR)/src -isystem $(SECP_DIR)
 CFLAGS_INTX := -Ideps/intx/lib/intx -Ideps/intx/include
+CFLAGS_BN128 := -Ideps/bn128/include
 CFLAGS_ETHASH := -Ideps/ethash/include -Ideps/ethash/lib/ethash -Ideps/ethash/lib/keccak -Ideps/ethash/lib/support
 CFLAGS_CRYPTO_ALGORITHMS := -Ideps/crypto-algorithms
 CFLAGS_MBEDTLS := -Ideps/mbedtls/include
 CFLAGS_EVMONE := -Ideps/evmone/lib/evmone -Ideps/evmone/include -Ideps/evmone/evmc/include
-CFLAGS_GODWOKEN := -Ideps/godwoken-fix/c
-CFLAGS := -O3  -Ic/ripemd160 $(CFLAGS_CKB_STD) $(CFLAGS_EVMONE) $(CFLAGS_INTX) $(CFLAGS_ETHASH) $(CFLAGS_CRYPTO_ALGORITHMS) $(CFLAGS_MBEDTLS) $(CFLAGS_GODWOKEN) $(CFLAGS_SECP) -Wall -g
+CFLAGS_GODWOKEN := -Ideps/godwoken/c
+CFLAGS := -O3  -Ic/ripemd160 $(CFLAGS_CKB_STD) $(CFLAGS_EVMONE) $(CFLAGS_INTX) $(CFLAGS_BN128) $(CFLAGS_ETHASH) $(CFLAGS_CRYPTO_ALGORITHMS) $(CFLAGS_MBEDTLS) $(CFLAGS_GODWOKEN) $(CFLAGS_SECP) -Wall -g
 CXXFLAGS := $(CFLAGS) -std=c++1z
 LDFLAGS := -fdata-sections -ffunction-sections -Wl,--gc-sections
 
@@ -23,7 +24,7 @@ SECP256K1_SRC := $(SECP_DIR)/src/ecmult_static_pre_context.h
 
 MOLC := moleculec
 MOLC_VERSION := 0.6.1
-PROTOCOL_SCHEMA_DIR := ./deps/godwoken-fix/crates/types/schemas
+PROTOCOL_SCHEMA_DIR := ./deps/godwoken/crates/types/schemas
 
 ALL_OBJS := build/evmone.o build/analysis.o build/execution.o build/instructions.o build/instructions_calls.o build/div.o build/keccak.o build/keccakf800.o build/keccakf1600.o \
   build/sha256.o build/memzero.o build/ripemd160.o build/bignum.o build/platform_util.o
@@ -33,7 +34,7 @@ ALL_OBJS := build/evmone.o build/analysis.o build/execution.o build/instructions
 # docker pull nervos/ckb-riscv-gnu-toolchain:bionic-20190702
 BUILDER_DOCKER := nervos/ckb-riscv-gnu-toolchain@sha256:7b168b4b109a0f741078a71b7c4dddaf1d283a5244608f7851f5714fbad273ba
 
-all: build/generator build/validator build/blockchain.h build/godwoken.h
+all: build/generator build/validator build/test_contracts build/blockchain.h build/godwoken.h
 
 all-via-docker: generate-protocol
 	mkdir -p build
@@ -53,6 +54,13 @@ build/generator: c/generator.c c/contracts.h c/generator/secp256k1_helper.h c/po
 build/validator: c/validator.c c/contracts.h c/validator/secp256k1_helper.h c/polyjuice.h build/secp256k1_data_info.h $(ALL_OBJS)
 	cd $(SECP_DIR) && (git apply workaround-fix-g++-linking.patch || true) && cd - # apply patch
 	$(CXX) $(CFLAGS) $(LDFLAGS) -Ibuild -o $@ c/validator.c $(ALL_OBJS)
+	$(OBJCOPY) --only-keep-debug $@ $@.debug
+	$(OBJCOPY) --strip-debug --strip-all $@
+	cd $(SECP_DIR) && (git apply -R workaround-fix-g++-linking.patch || true) && cd - # revert patch
+
+build/test_contracts: c/tests/test_contracts.c c/contracts.h c/validator/secp256k1_helper.h build/secp256k1_data_info.h $(ALL_OBJS)
+	cd $(SECP_DIR) && (git apply workaround-fix-g++-linking.patch || true) && cd - # apply patch
+	$(CXX) $(CFLAGS) $(LDFLAGS) -Ibuild -o $@ c/tests/test_contracts.c $(ALL_OBJS)
 	$(OBJCOPY) --only-keep-debug $@ $@.debug
 	$(OBJCOPY) --strip-debug --strip-all $@
 	cd $(SECP_DIR) && (git apply -R workaround-fix-g++-linking.patch || true) && cd - # revert patch

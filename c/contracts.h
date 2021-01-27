@@ -4,6 +4,10 @@
 #include "mbedtls/bignum.h"
 #include "ripemd160.h"
 #include "sha256.h"
+#include <intx/intx.hpp>
+#include <bn128.hpp>
+
+#include "polyjuice_utils.h"
 
 /* Protocol Params:
    [Referenced]:
@@ -16,12 +20,26 @@
 #define IDENTITY_BASE_GAS 15       // Base price for a data copy operation
 #define IDENTITY_PERWORD_GAS 3     // Per-work price for a data copy operation
 
+#define BN256_ADD_GAS_BYZANTIUM              500    // Byzantium gas needed for an elliptic curve addition
+#define BN256_ADD_GAS_ISTANBUL               150    // Gas needed for an elliptic curve addition
+#define BN256_SCALAR_MUL_GAS_BYZANTIUM       40000  // Byzantium gas needed for an elliptic curve scalar multiplication
+#define BN256_SCALAR_MUL_GAS_ISTANBUL        6000   // Gas needed for an elliptic curve scalar multiplication
+#define BN256_PAIRING_BASE_GAS_BYZANTIUM     100000 // Byzantium base price for an elliptic curve pairing check
+#define BN256_PAIRING_BASE_GAS_ISTANBUL      45000  // Base price for an elliptic curve pairing check
+#define BN256_PAIRING_PERPOINT_GAS_BYZANTIUM 80000  // Byzantium per-point price for an elliptic curve pairing check
+#define BN256_PAIRING_PERPOINT_GAS_ISTANBUL  34000  // Per-point price for an elliptic curve pairing check
+
 #define BLAKE2F_INPUT_LENGTH 213
 #define BLAKE2F_FINAL_BLOCK_BYTES 0x1
 #define BLAKE2F_NON_FINAL_BLOCK_BYTES 0x0
 
 #define ERROR_MOD_EXP -23
 #define ERROR_BLAKE2F -24
+#define ERROR_TRANSFER_TO_ANY_SUDT -25
+#define ERROR_BN256_ADD -26
+#define ERROR_BN256_SCALAR_MUL -27
+#define ERROR_BN256_PAIRING -28
+#define ERROR_BN256_INVALID_POINT -29
 
 /* pre-compiled Ethereum contracts */
 
@@ -29,6 +47,7 @@ typedef int (*precompiled_contract_gas_fn)(const uint8_t* input_src,
                                            const size_t input_size,
                                            uint64_t* gas);
 typedef int (*precompiled_contract_fn)(gw_context_t* ctx,
+                                       uint32_t from_id,
                                        const uint8_t* input_src,
                                        const size_t input_size,
                                        uint8_t** output, size_t* output_size);
@@ -50,7 +69,9 @@ int ecrecover_required_gas(const uint8_t* input, const size_t input_size,
          [64..96 ] => r (u256)
          [96..128] => s (u256)
 */
-int ecrecover(gw_context_t* ctx, const uint8_t* input_src,
+int ecrecover(gw_context_t* ctx,
+              uint32_t from_id,
+              const uint8_t* input_src,
               const size_t input_size, uint8_t** output, size_t* output_size) {
   int ret;
   secp256k1_context context;
@@ -122,7 +143,9 @@ int sha256hash_required_gas(const uint8_t* input, const size_t input_size,
   return 0;
 }
 
-int sha256hash(gw_context_t* ctx, const uint8_t* input_src,
+int sha256hash(gw_context_t* ctx,
+               uint32_t from_id,
+               const uint8_t* input_src,
                const size_t input_size, uint8_t** output, size_t* output_size) {
   *output = (uint8_t*)malloc(32);
   if (*output == NULL) {
@@ -143,7 +166,9 @@ int ripemd160hash_required_gas(const uint8_t* input, const size_t input_size,
   return 0;
 }
 
-int ripemd160hash(gw_context_t* ctx, const uint8_t* input_src,
+int ripemd160hash(gw_context_t* ctx,
+                  uint32_t from_id,
+                  const uint8_t* input_src,
                   const size_t input_size, uint8_t** output,
                   size_t* output_size) {
   *output = (uint8_t*)malloc(20);
@@ -162,7 +187,9 @@ int data_copy_required_gas(const uint8_t* input, const size_t input_size,
   return 0;
 }
 
-int data_copy(gw_context_t* ctx, const uint8_t* input_src,
+int data_copy(gw_context_t* ctx,
+              uint32_t from_id,
+              const uint8_t* input_src,
               const size_t input_size, uint8_t** output, size_t* output_size) {
   *output = (uint8_t*)malloc(input_size);
   if (*output == NULL) {
@@ -313,7 +340,9 @@ int big_mod_exp_required_gas(const uint8_t* input, const size_t input_size,
   return 0;
 }
 
-int big_mod_exp(gw_context_t* ctx, const uint8_t* input_src,
+int big_mod_exp(gw_context_t* ctx,
+                uint32_t from_id,
+                const uint8_t* input_src,
                 const size_t input_size, uint8_t** output,
                 size_t* output_size) {
   int ret;
@@ -568,7 +597,9 @@ void f_generic(uint64_t h[8], uint64_t m[16], uint64_t c0, uint64_t c1,
   h[7] ^= v7 ^ v15;
 }
 
-int blake2f(gw_context_t* ctx, const uint8_t* input_src,
+int blake2f(gw_context_t* ctx,
+            uint32_t from_id,
+            const uint8_t* input_src,
             const size_t input_size, uint8_t** output, size_t* output_size) {
   if (input_size != BLAKE2F_INPUT_LENGTH) {
     return ERROR_BLAKE2F;
@@ -597,6 +628,7 @@ int blake2f(gw_context_t* ctx, const uint8_t* input_src,
   t[1] = *(uint64_t*)(input_src + 204);
 
   uint64_t flag = final ? 0xFFFFFFFFFFFFFFFF : 0;
+  /* TODO: improve performance */
   f_generic(h, m, t[0], t[1], flag, (uint64_t)rounds);
 
   *output = (uint8_t*)malloc(64);
@@ -606,6 +638,219 @@ int blake2f(gw_context_t* ctx, const uint8_t* input_src,
     memcpy(*output + offset, (uint8_t*)(&h[i]), 8);
   }
   return 0;
+}
+
+int transfer_to_any_sudt_gas(const uint8_t* input_src,
+                             const size_t input_size,
+                             uint64_t* gas) {
+  *gas = 300;
+  return 0;
+}
+
+int transfer_to_any_sudt(gw_context_t* ctx,
+                         uint32_t from_id,
+                         const uint8_t* input_src,
+                         const size_t input_size,
+                         uint8_t** output, size_t* output_size) {
+  if (input_size != (32 + 20 + 32)) {
+    return ERROR_TRANSFER_TO_ANY_SUDT;
+  }
+  uint8_t sudt_id_be[32];
+  memcpy(sudt_id_be, input_src, 32);
+  evmc_address to_address = *((evmc_address *)input_src + 32);
+  uint8_t amount_be[32];
+  memcpy(amount_be, input_src + 52, 32);
+
+  /* Check leading zeros */
+  for (size_t i = 0; i < 28; i++) {
+    if (sudt_id_be[i] != 0) {
+      return ERROR_TRANSFER_TO_ANY_SUDT;
+    }
+  }
+  for (size_t i = 0; i < 16; i++) {
+    if (amount_be[i] != 0) {
+      return ERROR_TRANSFER_TO_ANY_SUDT;
+    }
+  }
+  /* Swap bytes */
+  for (size_t i = 28; i < (28 + 32) / 2; i++) {
+    uint8_t tmp = sudt_id_be[i];
+    sudt_id_be[i] = sudt_id_be[28 + 31 - i];
+    sudt_id_be[28 + 31 - i] = tmp;
+  }
+  for (size_t i = 16; i < (16 + 32) / 2; i++) {
+    uint8_t tmp = amount_be[i];
+    amount_be[i] = amount_be[16 + 31 - i];
+    amount_be[16 + 31 - i] = tmp;
+  }
+  uint32_t sudt_id = *((uint32_t *)(sudt_id_be + 28));
+  uint128_t amount = *((uint128_t *)(amount_be + 16));
+
+  int ret;
+  uint32_t to_id;
+  ret = address_to_account_id(&to_address, &to_id);
+  if (ret != 0) {
+    ckb_debug("invalid to_address");
+    return ERROR_TRANSFER_TO_ANY_SUDT;
+  }
+  if (from_id == to_id) {
+    ckb_debug("from_id can't equals to to_id");
+    return ERROR_TRANSFER_TO_ANY_SUDT;
+  }
+  if (amount == 0) {
+    ckb_debug("amount can't be zero");
+    return ERROR_TRANSFER_TO_ANY_SUDT;
+  }
+  ret = sudt_transfer(ctx, sudt_id, from_id, to_id, amount);
+  if (ret != 0) {
+    ckb_debug("transfer failed");
+    return ret;
+  }
+  return 0;
+}
+
+
+int parse_curve_point(void *target, uint8_t *bytes) {
+  intx::uint256 *p = (intx::uint256 *)target;
+  p[0] = intx::be::unsafe::load<intx::uint256>(bytes);
+  p[1] = intx::be::unsafe::load<intx::uint256>(bytes + 32);
+  /* TODO: future version should mont x */
+  /* TODO: future version should mont y */
+  if (p[0] == 0 && p[1] == 0) {
+    /* p[1] = 1; */
+    p[2] = 0;
+  } else {
+    p[2] = 1;
+    if (!bn128::g1::is_on_curve(p)) {
+      ckb_debug("bn256: malformed point");
+      return ERROR_BN256_INVALID_POINT;
+    }
+  }
+  return 0;
+}
+
+int parse_twist_point(void *target, uint8_t *bytes) {
+  /* FIXME: TODO */
+  return 0;
+}
+
+/* bn256AddIstanbul */
+int bn256_add_istanbul_gas(const uint8_t* input_src,
+                           const size_t input_size,
+                           uint64_t* gas) {
+  *gas = BN256_ADD_GAS_ISTANBUL;
+  return 0;
+}
+
+int bn256_add_istanbul(gw_context_t* ctx,
+                       uint32_t from_id,
+                       const uint8_t* input_src,
+                       const size_t input_size,
+                       uint8_t** output, size_t* output_size) {
+  int ret;
+  /* If the input is shorter than expected, it is assumed to be virtually padded
+     with zeros at the end (i.e. compatible with the semantics of the
+     CALLDATALOAD opcode). If the input is longer than expected, surplus bytes
+     at the end are ignored. */
+  uint8_t real_input[128] = {0};
+  size_t real_size = input_size > 128 ? 128 : input_size;
+  /* point[3] = point[2]² */
+  intx::uint256 x[3];
+  intx::uint256 y[3];
+  intx::uint256 res[3];
+
+  memcpy(real_input, input_src, real_size);
+  debug_print_data("add input", real_input, 128);
+  ret = parse_curve_point((void *)x, real_input);
+  if (ret != 0) {
+    return ret;
+  }
+  ret = parse_curve_point((void *)y, real_input + 64);
+  if (ret != 0) {
+    return ret;
+  }
+  bn128::alt_bn128_add(x, y, res);
+
+  *output = (uint8_t *)malloc(64);
+  *output_size = 64;
+  intx::be::unsafe::store(*output, res[0]);
+  intx::be::unsafe::store(*output + 32, res[1]);
+  debug_print_data("add output", *output, *output_size);
+  return 0;
+}
+
+/* bn256ScalarMulIstanbul */
+int bn256_scalar_mul_istanbul_gas(const uint8_t* input_src,
+                                  const size_t input_size,
+                                  uint64_t* gas) {
+  *gas = BN256_SCALAR_MUL_GAS_ISTANBUL;
+  return 0;
+}
+
+int bn256_scalar_mul_istanbul(gw_context_t* ctx,
+                              uint32_t from_id,
+                              const uint8_t* input_src,
+                              const size_t input_size,
+                              uint8_t** output, size_t* output_size) {
+  int ret;
+  uint8_t real_input[96] = {0};
+  size_t real_size = input_size > 96 ? 96 : input_size;
+  intx::uint256 x[3];
+  intx::uint256 res[3];
+
+  memcpy(real_input, input_src, real_size);
+  ret = parse_curve_point((void *)x, real_input);
+  if (ret != 0) {
+    return ret;
+  }
+  intx::uint256 n = intx::be::unsafe::load<intx::uint256>(real_input + 64);
+  bn128::alt_bn128_mul(x, n, res);
+
+  *output = (uint8_t *)malloc(64);
+  *output_size = 64;
+  intx::be::unsafe::store(*output, res[0]);
+  intx::be::unsafe::store(*output + 32, res[1]);
+  return 0;
+}
+
+/* bn256PairingIstanbul */
+int bn256_pairing_istanbul_gas(const uint8_t* input_src,
+                               const size_t input_size,
+                               uint64_t* gas) {
+  *gas = BN256_PAIRING_BASE_GAS_ISTANBUL
+    + ((uint64_t)input_size / 192 * BN256_PAIRING_PERPOINT_GAS_ISTANBUL);
+  return 0;
+}
+
+int bn256_pairing_istanbul(gw_context_t* ctx,
+                           uint32_t from_id,
+                           const uint8_t* input_src,
+                           const size_t input_size,
+                           uint8_t** output, size_t* output_size) {
+  /* static uint8_t true_byte32[32] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}; */
+  /* static uint8_t false_byte32[32] = {0}; */
+  if (input_size % 192 > 0) {
+    return ERROR_BN256_PAIRING;
+  }
+
+  int ret;
+  size_t length = input_size / 192;
+  /* G1[] */
+  intx::uint256 *cs = (intx::uint256 *)malloc(length * 4 * sizeof(intx::uint256));
+  /* G2[] */
+  intx::uint256 *ts = (intx::uint256 *)malloc(length * 4 * sizeof(intx::uint256));
+  for (size_t i = 0; i < input_size; i += 192) {
+    ret = parse_curve_point((void *)(cs + i / 192 * 4), (uint8_t *)input_src + i);
+    if (ret != 0) {
+      return ret;
+    }
+    ret = parse_twist_point((void *)(ts + i / 192 * 4), (uint8_t *)input_src + i + 64);
+    if (ret != 0) {
+      return ret;
+    }
+  }
+  ckb_debug("pairing is unsupported yet!");
+  return ERROR_BN256_PAIRING;
 }
 
 bool match_precompiled_address(const evmc_address* destination,
@@ -618,39 +863,50 @@ bool match_precompiled_address(const evmc_address* destination,
   }
 
   switch (destination->bytes[19]) {
-    case 1:
-      *contract_gas = ecrecover_required_gas;
-      *contract = ecrecover;
-      break;
-    case 2:
-      *contract_gas = sha256hash_required_gas;
-      *contract = sha256hash;
-      break;
-    case 3:
-      *contract_gas = ripemd160hash_required_gas;
-      *contract = ripemd160hash;
-      break;
-    case 4:
-      *contract_gas = data_copy_required_gas;
-      *contract = data_copy;
-      break;
-    case 5:
-      *contract_gas = big_mod_exp_required_gas;
-      *contract = big_mod_exp;
-      break;
-      /* FIXME:
-     common.BytesToAddress([]byte{6}): &bn256AddIstanbul{},
-     common.BytesToAddress([]byte{7}): &bn256ScalarMulIstanbul{},
-     common.BytesToAddress([]byte{8}): &bn256PairingIstanbul{},
-   */
-    case 9:
-      *contract_gas = blake2f_required_gas;
-      *contract = blake2f;
-      break;
-    default:
-      *contract_gas = NULL;
-      *contract = NULL;
-      return false;
+  case 1:
+    *contract_gas = ecrecover_required_gas;
+    *contract = ecrecover;
+    break;
+  case 2:
+    *contract_gas = sha256hash_required_gas;
+    *contract = sha256hash;
+    break;
+  case 3:
+    *contract_gas = ripemd160hash_required_gas;
+    *contract = ripemd160hash;
+    break;
+  case 4:
+    *contract_gas = data_copy_required_gas;
+    *contract = data_copy;
+    break;
+  case 5:
+    *contract_gas = big_mod_exp_required_gas;
+    *contract = big_mod_exp;
+    break;
+  case 6:
+    *contract_gas = bn256_add_istanbul_gas;
+    *contract = bn256_add_istanbul;
+    break;
+  case 7:
+    *contract_gas = bn256_scalar_mul_istanbul_gas;
+    *contract = bn256_scalar_mul_istanbul;
+    break;
+  case 8:
+    *contract_gas = bn256_pairing_istanbul_gas;
+    *contract = bn256_pairing_istanbul;
+    break;
+  case 9:
+    *contract_gas = blake2f_required_gas;
+    *contract = blake2f;
+    break;
+  case 0xf0:
+    *contract_gas = transfer_to_any_sudt_gas;
+    *contract = transfer_to_any_sudt;
+    break;
+  default:
+    *contract_gas = NULL;
+    *contract = NULL;
+    return false;
   }
   return true;
 }

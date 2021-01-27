@@ -521,6 +521,7 @@ dependencies = [
  "gw-config",
  "gw-generator",
  "gw-store",
+ "gw-traits",
  "gw-types",
  "lazy_static",
  "parking_lot",
@@ -566,6 +567,7 @@ dependencies = [
  "gw-common",
  "gw-config",
  "gw-store",
+ "gw-traits",
  "gw-types",
  "lazy_static",
  "secp256k1",
@@ -605,9 +607,19 @@ dependencies = [
  "gw-common",
  "gw-config",
  "gw-db",
+ "gw-traits",
  "gw-types",
  "parking_lot",
  "thiserror",
+]
+
+[[package]]
+name = "gw-traits"
+version = "0.1.0"
+dependencies = [
+ "gw-common",
+ "gw-db",
+ "gw-types",
 ]
 
 [[package]]
@@ -868,11 +880,13 @@ name = "polyjuice-tests"
 version = "0.1.0"
 dependencies = [
  "blake2b-rs 0.2.0",
+ "ckb-vm",
  "gw-common",
  "gw-db",
  "gw-generator",
  "gw-jsonrpc-types",
  "gw-store",
+ "gw-traits",
  "gw-types",
  "hex",
  "lazy_static",

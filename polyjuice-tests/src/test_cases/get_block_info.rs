@@ -7,6 +7,7 @@ use crate::helper::{
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
+use gw_traits::ChainStore;
 use gw_db::schema::COLUMN_INDEX;
 use gw_jsonrpc_types::parameter::RunResult;
 use gw_types::{

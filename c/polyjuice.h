@@ -16,6 +16,8 @@
 #include "gw_syscalls.h"
 #include "sudt_utils.h"
 
+#include "polyjuice_utils.h"
+
 #ifdef GW_GENERATOR
 #include "generator/secp256k1_helper.h"
 #else
@@ -23,25 +25,10 @@
 #endif
 #include "contracts.h"
 
+
 #define is_create(kind) ((kind) == EVMC_CREATE || (kind) == EVMC_CREATE2)
 #define is_special_call(kind) \
   ((kind) == EVMC_CALLCODE || (kind) == EVMC_DELEGATECALL)
-
-static char debug_buffer[64 * 1024];
-static void debug_print_data(const char* prefix, const uint8_t* data,
-                             uint32_t data_len) {
-  int offset = 0;
-  offset += sprintf(debug_buffer, "%s 0x", prefix);
-  for (size_t i = 0; i < data_len; i++) {
-    offset += sprintf(debug_buffer + offset, "%02x", data[i]);
-  }
-  debug_buffer[offset] = '\0';
-  ckb_debug(debug_buffer);
-}
-static void debug_print_int(const char* prefix, int64_t ret) {
-  sprintf(debug_buffer, "%s => %ld", prefix, ret);
-  ckb_debug(debug_buffer);
-}
 
 /* Max script buffer size: 1KB */
 #define MAX_SCRIPT_SIZE 1024
@@ -118,22 +105,6 @@ struct evmc_host_context {
   int error_code;
 };
 
-evmc_address account_id_to_address(uint32_t account_id) {
-  evmc_address addr;
-  memset(addr.bytes, 0, 20);
-  memcpy(addr.bytes, (uint8_t*)(&account_id), 4);
-  return addr;
-}
-int address_to_account_id(const evmc_address* address, uint32_t* account_id) {
-  for (size_t i = 4; i < 20; i++) {
-    if (address->bytes[i] != 0) {
-      /* ERROR: invalid polyjuice address */
-      return -1;
-    }
-  }
-  *account_id = *((uint32_t*)(address->bytes));
-  return 0;
-}
 
 /**
    Message = [
@@ -324,12 +295,12 @@ struct evmc_tx_context get_tx_context(struct evmc_host_context* context) {
   /* gas price = 1 */
   ctx.tx_gas_price.bytes[31] = 0x01;
   memcpy(ctx.tx_origin.bytes, tx_origin.bytes, 20);
-  ctx.block_coinbase = account_id_to_address(context->gw_ctx->block_info.aggregator_id);
+  ctx.block_coinbase = account_id_to_address(context->gw_ctx->block_info.block_producer_id);
   ctx.block_number = context->gw_ctx->block_info.number;
   ctx.block_timestamp = context->gw_ctx->block_info.timestamp;
   /* Ethereum block gas limit */
   ctx.block_gas_limit = 12500000;
-  /* 2500000000000000, TODO: read from aggregator */
+  /* 2500000000000000, TODO: read from block_producer */
   ctx.block_difficulty = {
       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -568,7 +539,7 @@ struct evmc_result call(struct evmc_host_context* context,
       return res;
     }
     res.gas_left = msg->gas - (int64_t)gas_cost;
-    ret = contract(gw_ctx, msg->input_data, msg->input_size,
+    ret = contract(gw_ctx, context->to_id, msg->input_data, msg->input_size,
                    (uint8_t**)&res.output_data, &res.output_size);
     if (ret != 0) {
       ckb_debug("call pre-compiled contract failed");
@@ -960,9 +931,9 @@ int run_polyjuice() {
   debug_print_int("gas price", gas_price);
   debug_print_int("fee", fee);
   ret = sudt_transfer(&context, sudt_id, context.transaction_context.from_id,
-                      context.block_info.aggregator_id, fee);
+                      context.block_info.block_producer_id, fee);
   if (ret != 0) {
-    debug_print_int("pay fee to aggregator failed", ret);
+    debug_print_int("pay fee to block_producer failed", ret);
     return ret;
   }
 
