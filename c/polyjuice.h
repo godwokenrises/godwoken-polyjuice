@@ -295,12 +295,12 @@ struct evmc_tx_context get_tx_context(struct evmc_host_context* context) {
   /* gas price = 1 */
   ctx.tx_gas_price.bytes[31] = 0x01;
   memcpy(ctx.tx_origin.bytes, tx_origin.bytes, 20);
-  ctx.block_coinbase = account_id_to_address(context->gw_ctx->block_info.aggregator_id);
+  ctx.block_coinbase = account_id_to_address(context->gw_ctx->block_info.block_producer_id);
   ctx.block_number = context->gw_ctx->block_info.number;
   ctx.block_timestamp = context->gw_ctx->block_info.timestamp;
   /* Ethereum block gas limit */
   ctx.block_gas_limit = 12500000;
-  /* 2500000000000000, TODO: read from aggregator */
+  /* 2500000000000000, TODO: read from block_producer */
   ctx.block_difficulty = {
       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -931,9 +931,9 @@ int run_polyjuice() {
   debug_print_int("gas price", gas_price);
   debug_print_int("fee", fee);
   ret = sudt_transfer(&context, sudt_id, context.transaction_context.from_id,
-                      context.block_info.aggregator_id, fee);
+                      context.block_info.block_producer_id, fee);
   if (ret != 0) {
-    debug_print_int("pay fee to aggregator failed", ret);
+    debug_print_int("pay fee to block_producer failed", ret);
     return ret;
   }
 
