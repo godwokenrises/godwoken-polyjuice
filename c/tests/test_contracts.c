@@ -26,8 +26,6 @@ evmc_address build_pre_compiled_contract_address(uint8_t n) {
 
 void hex2bin(const char *hex, uint8_t **out, size_t *out_len) {
   size_t hex_length = strlen(hex);
-  ckb_debug(hex);
-  debug_print_int("hex length", hex_length);
   *out_len = hex_length / 2;
   *out = (uint8_t *)malloc(*out_len);
   char part1;
@@ -47,6 +45,7 @@ int test_contract(const uint8_t n,
                   const uint64_t expected_gas,
                   const char *success_message) {
   debug_print_int("pre-compiled contract address", n);
+  int ret;
   evmc_address addr = build_pre_compiled_contract_address(n);
   precompiled_contract_gas_fn contract_gas = NULL;
   precompiled_contract_fn contract = NULL;
@@ -59,19 +58,25 @@ int test_contract(const uint8_t n,
 
   uint64_t gas = 0;
   if (contract_gas(input_src, input_size, &gas) != 0) {
+    ckb_debug("calculate gas failed");
     return -1;
   }
   if (gas != expected_gas) {
+    ckb_debug("gas not matched");
+    debug_print_int("got gas", gas);
     return -1;
   }
   ckb_debug("gas matched");
 
-  gw_context_t* ctx = NULL;
+  gw_context_t ctx;
+  ctx.sys_load_data = sys_load_data;
   uint32_t from_id = 0xff;
   uint8_t *output = NULL;
   size_t output_size = 0;
-  if (contract(ctx, from_id, input_src, input_size, &output, &output_size) != 0) {
-    return -1;
+  ret = contract(&ctx, from_id, input_src, input_size, &output, &output_size);
+  if (ret != 0) {
+    debug_print_int("run contract failed", ret);
+    return ret;
   }
   ckb_debug("run contract success");
   uint8_t *expected_output = NULL;
@@ -92,6 +97,96 @@ int test_contract(const uint8_t n,
   free(output);
   ckb_debug(success_message);
   ckb_debug("===============================================");
+  return 0;
+}
+
+int test_ecrecover() {
+  if (test_contract(1,
+                    "a8b53bdf3306a35a7103ab5504a0c9b492295564b6202b1942a84ef300107281000000000000000000000000000000000000000000000000000000000000001b307835653165303366353363653138623737326363623030393366663731663366353366356337356237346463623331613835616138623838393262346538621122334455667788991011121314151617181920212223242526272829303132",
+                    "",
+                    3000,
+                    "ecrecover CallEcrecoverUnrecoverableKey ok") != -77) {
+    return -1;
+  }
+  if (test_contract(1,
+                    "18c547e4f7b0f325ad1e56f57e26c745b09a3e503d86e00e5255ff7f715d3d1c000000000000000000000000000000000000000000000000000000000000001c73b1693892219d736caba55bdb67216e485557ea6b6af75f37096c9aa6a5a75feeb940b1d03b21e36b0e47e79769f095fe2ab855bd91e3a38756b7d75a9c4549",
+                    "000000000000000000000000a94f5374fce5edbc8e2a8697c15331677e6ebf0b",
+                    3000,
+                    "ecrecover ValidKey ok") != 0) {
+    return -1;
+  }
+  if (test_contract(1,
+                    "18c547e4f7b0f325ad1e56f57e26c745b09a3e503d86e00e5255ff7f715d3d1c100000000000000000000000000000000000000000000000000000000000001c73b1693892219d736caba55bdb67216e485557ea6b6af75f37096c9aa6a5a75feeb940b1d03b21e36b0e47e79769f095fe2ab855bd91e3a38756b7d75a9c4549",
+                    "",
+                    3000,
+                    "ecrecover InvalidHighV-bits-1 ok") != -75) {
+    return -1;
+  }
+  if (test_contract(1,
+                    "18c547e4f7b0f325ad1e56f57e26c745b09a3e503d86e00e5255ff7f715d3d1c000000000000000000000000000000000000001000000000000000000000001c73b1693892219d736caba55bdb67216e485557ea6b6af75f37096c9aa6a5a75feeb940b1d03b21e36b0e47e79769f095fe2ab855bd91e3a38756b7d75a9c4549",
+                    "",
+                    3000,
+                    "ecrecover InvalidHighV-bits-2 ok") != -75) {
+    return -1;
+  }
+  if (test_contract(1,
+                    "18c547e4f7b0f325ad1e56f57e26c745b09a3e503d86e00e5255ff7f715d3d1c000000000000000000000000000000000000001000000000000000000000011c73b1693892219d736caba55bdb67216e485557ea6b6af75f37096c9aa6a5a75feeb940b1d03b21e36b0e47e79769f095fe2ab855bd91e3a38756b7d75a9c4549",
+                    "",
+                    3000,
+                    "ecrecover InvalidHighV-bits-3 ok") != -75) {
+    return -1;
+  }
+  return 0;
+}
+
+int test_sha256hash() {
+  if (test_contract(2,
+                    "38d18acb67d25c8bb9942764b62f18e17054f66a817bd4295423adf9ed98873e000000000000000000000000000000000000000000000000000000000000001b38d18acb67d25c8bb9942764b62f18e17054f66a817bd4295423adf9ed98873e789d1dd423d25f0772d2748d60f7e4b81bb14d086eba8e8e8efb6dcff8a4ae02",
+                    "811c7003375852fabd0d362e40e68607a12bdabae61a7d068fe5fdd1dbbf2a5d",
+                    108,
+                    "sha256hash ok") != 0) {
+    return -1;
+  }
+  return 0;
+}
+
+int test_ripemd160hash() {
+  if (test_contract(3,
+                    "38d18acb67d25c8bb9942764b62f18e17054f66a817bd4295423adf9ed98873e000000000000000000000000000000000000000000000000000000000000001b38d18acb67d25c8bb9942764b62f18e17054f66a817bd4295423adf9ed98873e789d1dd423d25f0772d2748d60f7e4b81bb14d086eba8e8e8efb6dcff8a4ae02",
+                    "0000000000000000000000009215b8d9882ff46f0dfde6684d78e831467f65e6",
+                    1080,
+                    "ripemd160hash ok") != 0) {
+    return -1;
+  }
+  return 0;
+}
+
+int test_data_copy() {
+  if (test_contract(4,
+                    "38d18acb67d25c8bb9942764b62f18e17054f66a817bd4295423adf9ed98873e000000000000000000000000000000000000000000000000000000000000001b38d18acb67d25c8bb9942764b62f18e17054f66a817bd4295423adf9ed98873e789d1dd423d25f0772d2748d60f7e4b81bb14d086eba8e8e8efb6dcff8a4ae02",
+                    "38d18acb67d25c8bb9942764b62f18e17054f66a817bd4295423adf9ed98873e000000000000000000000000000000000000000000000000000000000000001b38d18acb67d25c8bb9942764b62f18e17054f66a817bd4295423adf9ed98873e789d1dd423d25f0772d2748d60f7e4b81bb14d086eba8e8e8efb6dcff8a4ae02",
+                    27,
+                    "dataCopy ok") != 0) {
+    return -1;
+  }
+  return 0;
+}
+
+int test_big_mod_exp() {
+  if (test_contract(5,
+                    "00000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000002003fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2efffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f",
+                    "0000000000000000000000000000000000000000000000000000000000000001",
+                    13056,
+                    "bigModExp eip_example1 ok") != 0) {
+    return -1;
+  }
+  if (test_contract(5,
+                    "000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000200000000000000000000000000000000000000000000000000000000000000020fffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2efffffffffffffffffffffffffffffffffffffffffffffffffffffffefffffc2f",
+                    "0000000000000000000000000000000000000000000000000000000000000000",
+                    13056,
+                    "bigModExp eip_example2 ok") != 0) {
+    return -1;
+  }
   return 0;
 }
 
@@ -343,6 +438,21 @@ int test_bn256_scalar_mul_istanbul() {
 }
 
 int main() {
+  if (test_ecrecover() != 0) {
+    return -1;
+  }
+  if (test_sha256hash() != 0) {
+    return -2;
+  }
+  if (test_ripemd160hash() != 0) {
+    return -3;
+  }
+  if (test_data_copy() != 0) {
+    return -4;
+  }
+  if (test_big_mod_exp() != 0) {
+    return -5;
+  }
   if (test_bn256_add_istanbul() != 0) {
     return -6;
   }

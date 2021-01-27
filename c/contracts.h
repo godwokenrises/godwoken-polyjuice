@@ -94,7 +94,7 @@ int ecrecover(gw_context_t* ctx,
   for (int i = 32; i < 63; i++) {
     if (input[i] != 0) {
       ckb_debug("input[32:63] not all zero!");
-      return -1;
+      return -75;
     }
   }
   /* FIXME: crypto.ValidateSignatureValues(v, r, s, false) */
@@ -113,14 +113,14 @@ int ecrecover(gw_context_t* ctx,
   secp256k1_pubkey pubkey;
   if (secp256k1_ecdsa_recover(&context, &pubkey, &signature, input) != 1) {
     ckb_debug("recover public key failed");
-    return -1;
+    return -77;
   }
 
   /* Check pubkey hash */
   uint8_t temp[65];
-  size_t pubkey_size = 33;
+  size_t pubkey_size = 65;
   if (secp256k1_ec_pubkey_serialize(&context, temp, &pubkey_size, &pubkey,
-                                    SECP256K1_EC_COMPRESSED) != 1) {
+                                    SECP256K1_EC_UNCOMPRESSED) != 1) {
     ckb_debug("public key serialize failed");
     return -1;
   }
@@ -130,8 +130,8 @@ int ecrecover(gw_context_t* ctx,
   if (*output == NULL) {
     return -1;
   }
-  memset(output, 0, 12);
-  memcpy(output + 12, hash_result.bytes + 12, 20);
+  memset(*output, 0, 12);
+  memcpy(*output + 12, hash_result.bytes + 12, 20);
   *output_size = 32;
   return 0;
 }
@@ -171,12 +171,13 @@ int ripemd160hash(gw_context_t* ctx,
                   const uint8_t* input_src,
                   const size_t input_size, uint8_t** output,
                   size_t* output_size) {
-  *output = (uint8_t*)malloc(20);
+  *output = (uint8_t*)malloc(32);
   if (*output == NULL) {
     return -1;
   }
-  *output_size = 20;
-  ripemd160(input_src, input_size, *output);
+  memset(*output, 0, 12);
+  ripemd160(input_src, input_size, *output + 12);
+  *output_size = 32;
   return 0;
 }
 
@@ -331,8 +332,7 @@ int big_mod_exp_required_gas(const uint8_t* input, const size_t input_size,
   if (mbedtls_mpi_bitlen(&gas_big) > 64) {
     *target_gas = UINT64_MAX;
   } else {
-    ret = mbedtls_mpi_write_binary_le(&gas_big, (unsigned char*)(&target_gas),
-                                      sizeof(target_gas));
+    ret = mbedtls_mpi_write_binary_le(&gas_big, (unsigned char*)(target_gas), sizeof(uint64_t));
     if (ret != 0) {
       return ERROR_MOD_EXP;
     }
@@ -760,7 +760,6 @@ int bn256_add_istanbul(gw_context_t* ctx,
   intx::uint256 res[3];
 
   memcpy(real_input, input_src, real_size);
-  debug_print_data("add input", real_input, 128);
   ret = parse_curve_point((void *)x, real_input);
   if (ret != 0) {
     return ret;
@@ -775,7 +774,6 @@ int bn256_add_istanbul(gw_context_t* ctx,
   *output_size = 64;
   intx::be::unsafe::store(*output, res[0]);
   intx::be::unsafe::store(*output + 32, res[1]);
-  debug_print_data("add output", *output, *output_size);
   return 0;
 }
 

@@ -1,6 +1,7 @@
 #ifndef CKB_SECP256K1_HELPER_H_
 #define CKB_SECP256K1_HELPER_H_
 
+#include "../polyjuice_utils.h"
 #include "secp256k1_data_info.h"
 
 #define CKB_SECP256K1_HELPER_ERROR_LOADING_DATA -101
@@ -35,7 +36,7 @@ void secp256k1_default_error_callback_fn(const char* str, void* data) {
 int ckb_secp256k1_custom_verify_only_initialize(gw_context_t* ctx,
                                                 secp256k1_context* context,
                                                 void* data) {
-  uint32_t len = 0;
+  uint32_t len = CKB_SECP256K1_DATA_SIZE;
   int ret =
       ctx->sys_load_data(ctx, ckb_secp256k1_data_hash, &len, 0, (uint8_t*)data);
   if (ret != 0 || len != CKB_SECP256K1_DATA_SIZE) {
