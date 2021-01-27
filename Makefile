@@ -26,7 +26,8 @@ MOLC := moleculec
 MOLC_VERSION := 0.6.1
 PROTOCOL_SCHEMA_DIR := ./deps/godwoken/crates/types/schemas
 
-ALL_OBJS := build/evmone.o build/analysis.o build/execution.o build/instructions.o build/instructions_calls.o build/div.o build/keccak.o build/keccakf800.o build/keccakf1600.o \
+ALL_OBJS := build/evmone.o build/baseline.o build/analysis.o build/instruction_metrics.o build/instruction_names.o build/execution.o build/instructions.o build/instructions_calls.o \
+  build/keccak.o build/keccakf800.o \
   build/sha256.o build/memzero.o build/ripemd160.o build/bignum.o build/platform_util.o
 
 # docker pull nervos/ckb-riscv-gnu-toolchain:gnu-bionic-20191012
@@ -67,24 +68,30 @@ build/test_contracts: c/tests/test_contracts.c c/contracts.h c/validator/secp256
 
 build/evmone.o: deps/evmone/lib/evmone/evmone.cpp
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -c -o $@ $< -DPROJECT_VERSION=\"0.5.0-dev\"
+build/baseline.o: deps/evmone/lib/evmone/baseline.cpp
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -c -o $@ $<
 build/analysis.o: deps/evmone/lib/evmone/analysis.cpp
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -c -o $@ $<
 build/execution.o: deps/evmone/lib/evmone/execution.cpp
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -c -o $@ $<
 build/instructions.o: deps/evmone/lib/evmone/instructions.cpp
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -c -o $@ $<
+build/instruction_metrics.o: deps/evmone/evmc/lib/instructions/instruction_metrics.c
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -c -o $@ $<
+build/instruction_names.o: deps/evmone/evmc/lib/instructions/instruction_names.c
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -c -o $@ $<
 build/instructions_calls.o: deps/evmone/lib/evmone/instructions_calls.cpp
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -c -o $@ $<
 
-build/keccak.o: deps/ethash/lib/keccak/keccak.c build/keccakf800.o build/keccakf1600.o
+build/keccak.o: deps/ethash/lib/keccak/keccak.c build/keccakf800.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -c -o $@ $<
-build/keccakf1600.o: deps/ethash/lib/keccak/keccakf1600.c
-	$(CC) $(CFLAGS) $(LDFLAGS) -c -o $@ $<
+# build/keccakf1600.o: deps/ethash/lib/keccak/keccakf1600.c
+# 	$(CC) $(CFLAGS) $(LDFLAGS) -c -o $@ $<
 build/keccakf800.o: deps/ethash/lib/keccak/keccakf800.c
 	$(CC) $(CFLAGS) $(LDFLAGS)  -c -o $@ $<
 
-build/div.o: deps/intx/lib/intx/div.cpp
-	$(CXX) $(CFLAGS) $(LDFLAGS) -c -o $@ $<
+# build/div.o: deps/intx/lib/intx/div.cpp
+# 	$(CXX) $(CFLAGS) $(LDFLAGS) -c -o $@ $<
 
 build/memzero.o: c/ripemd160/memzero.c
 	$(CXX) $(CFLAGS) $(LDFLAGS) -c -o $@ $<
