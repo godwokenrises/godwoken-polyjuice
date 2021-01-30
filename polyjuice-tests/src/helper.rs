@@ -2,7 +2,7 @@ pub use gw_common::{
     blake2b::new_blake2b,
     builtins::{CKB_SUDT_ACCOUNT_ID, RESERVED_ACCOUNT_ID},
     state::State,
-    CKB_SUDT_SCRIPT_ARGS, CKB_SUDT_SCRIPT_HASH, H256,
+    CKB_SUDT_SCRIPT_ARGS, H256,
 };
 pub use gw_generator::{
     RunResult,
