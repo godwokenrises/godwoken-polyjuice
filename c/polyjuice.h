@@ -13,7 +13,13 @@
 #include <evmone/evmone.h>
 
 #include "common.h"
+
+/* https://stackoverflow.com/a/1545079 */
+#pragma push_macro("errno")
+#undef errno
 #include "gw_syscalls.h"
+#pragma pop_macro("errno")
+
 #include "sudt_utils.h"
 
 #include "polyjuice_utils.h"
