@@ -306,7 +306,7 @@ struct evmc_tx_context get_tx_context(struct evmc_host_context* context) {
   ctx.block_timestamp = context->gw_ctx->block_info.timestamp;
   /* Ethereum block gas limit */
   ctx.block_gas_limit = 12500000;
-  /* 2500000000000000, TODO: read from block_producer */
+  /* 2500000000000000 */
   ctx.block_difficulty = {
       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
@@ -496,7 +496,6 @@ void selfdestruct(struct evmc_host_context* context,
   uint8_t value[GW_VALUE_BYTES];
   polyjuice_build_destructed_key(context->to_id, raw_key);
   memset(value, 1, GW_VALUE_BYTES);
-  /* FIXME: it's a hack */
 #ifdef GW_VALIDATOR
   ret = gw_state_insert(&context->gw_ctx->kv_state, raw_key, value);
 #else
@@ -525,9 +524,6 @@ struct evmc_result call(struct evmc_host_context* context,
     return res;
   }
 
-  /* FIXME: Handle pre-compiled contracts
-   *   - check msg->destination
-   */
   precompiled_contract_gas_fn contract_gas;
   precompiled_contract_fn contract;
   if (match_precompiled_address(&msg->destination, &contract_gas, &contract)) {
@@ -555,7 +551,6 @@ struct evmc_result call(struct evmc_host_context* context,
     }
     res.release = release_result;
   } else {
-    /* TODO: handle special kind (CREATE2/CALLCODE/DELEGATECALL)*/
     ret = handle_message(gw_ctx, context->from_id, msg, &res);
     if (ret != 0) {
       ckb_debug("inner call failed (transfer/contract call contract)");
@@ -750,8 +745,6 @@ int handle_message(gw_context_t* ctx, uint32_t parent_from_id,
     debug_print_int("to_id", to_id);
     memcpy(script_args, (uint8_t*)(&sudt_id), 4);
     memcpy(script_args + 4, (uint8_t*)(&from_id), 4);
-    // TODO: the nonce length can be optimized (change nonce data type, u32 is
-    // not enough)
     ret = ctx->sys_load_nonce(ctx, from_id, script_args + 8);
     if (ret != 0) {
       return ret;
@@ -822,10 +815,9 @@ int handle_message(gw_context_t* ctx, uint32_t parent_from_id,
     }
   }
 
-  /* TODO: transfer value from EoA to EoA is not allowed? */
   if (msg.kind == EVMC_CALL && from_id == tx_origin_id && to_id_is_eoa) {
     ckb_debug("transfer value from eoa to eoa");
-    /* TODO: return -1; */
+    return -1;
   }
 
   bool transfer_only = !is_create(msg.kind) && msg.input_size == 0;
