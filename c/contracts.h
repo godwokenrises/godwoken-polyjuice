@@ -628,7 +628,7 @@ int blake2f(gw_context_t* ctx,
   t[1] = *(uint64_t*)(input_src + 204);
 
   uint64_t flag = final ? 0xFFFFFFFFFFFFFFFF : 0;
-  /* TODO: improve performance */
+  /* TODO: maybe improve performance */
   f_generic(h, m, t[0], t[1], flag, (uint64_t)rounds);
 
   *output = (uint8_t*)malloc(64);
@@ -714,10 +714,7 @@ int parse_curve_point(void *target, uint8_t *bytes) {
   intx::uint256 *p = (intx::uint256 *)target;
   p[0] = intx::be::unsafe::load<intx::uint256>(bytes);
   p[1] = intx::be::unsafe::load<intx::uint256>(bytes + 32);
-  /* TODO: future version should mont x */
-  /* TODO: future version should mont y */
   if (p[0] == 0 && p[1] == 0) {
-    /* p[1] = 1; */
     p[2] = 0;
   } else {
     p[2] = 1;
@@ -730,7 +727,7 @@ int parse_curve_point(void *target, uint8_t *bytes) {
 }
 
 int parse_twist_point(void *target, uint8_t *bytes) {
-  /* FIXME: TODO */
+  /* FIXME: wait for pairing implementation ready */
   return 0;
 }
 
@@ -820,6 +817,7 @@ int bn256_pairing_istanbul_gas(const uint8_t* input_src,
   return 0;
 }
 
+/* FIXME: Pairing is not supported due to it's high cycle cost. */
 int bn256_pairing_istanbul(gw_context_t* ctx,
                            uint32_t from_id,
                            const uint8_t* input_src,
@@ -847,7 +845,7 @@ int bn256_pairing_istanbul(gw_context_t* ctx,
       return ret;
     }
   }
-  ckb_debug("pairing is unsupported yet!");
+  ckb_debug("pairing is unsupported yet due to very high cycle cost!");
   return ERROR_BN256_PAIRING;
 }
 
