@@ -22,8 +22,8 @@ use gw_types::{
 use std::{fs, io::Read, path::PathBuf};
 
 pub const BIN_DIR: &'static str = "../build";
-pub const GENERATOR_NAME: &'static str = "generator";
-pub const VALIDATOR_NAME: &'static str = "validator";
+pub const GENERATOR_NAME: &'static str = "generator_log";
+pub const VALIDATOR_NAME: &'static str = "validator_log";
 
 lazy_static::lazy_static! {
     pub static ref GENERATOR_PROGRAM: Bytes = {

@@ -6,7 +6,15 @@
 #include <stdint.h>
 
 #include <evmc/evmc.h>
+#include "ckb_syscalls.h"
 
+#ifdef NO_DEBUG_LOG
+#undef ckb_debug
+#define ckb_debug(s) {}
+#define debug_print(s) {}
+#define debug_print_int(prefix, value) {}
+#define debug_print_data(prefix, data, data_len) {}
+#else  /* #ifdef NO_DEBUG_LOG */
 static char debug_buffer[64 * 1024];
 void debug_print_data(const char* prefix, const uint8_t* data,
                              uint32_t data_len) {
@@ -22,6 +30,7 @@ void debug_print_int(const char* prefix, int64_t ret) {
   sprintf(debug_buffer, "%s => %ld", prefix, ret);
   ckb_debug(debug_buffer);
 }
+#endif  /* #ifdef NO_DEBUG_LOG */
 
 evmc_address account_id_to_address(uint32_t account_id) {
   evmc_address addr{0};
