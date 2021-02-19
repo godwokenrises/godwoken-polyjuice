@@ -66,8 +66,8 @@ int ecrecover_required_gas(const uint8_t* input, const size_t input_size,
     input[32..64]  => v (padded)
          [64]      => v
     input[64..128] => signature[0..64]
-         [64..96 ] => r (u256)
-         [96..128] => s (u256)
+         [64..96 ] => r
+         [96..128] => s
 */
 int ecrecover(gw_context_t* ctx,
               uint32_t from_id,
@@ -94,9 +94,15 @@ int ecrecover(gw_context_t* ctx,
       return -75;
     }
   }
-  /* FIXME: crypto.ValidateSignatureValues(v, r, s, false) */
-
   int recid = input[63] - 27;
+
+  /* crypto.ValidateSignatureValues(v, r, s, false) */
+  /* NOTE: r,s overflow will be checked in secp256k1 library code */
+  if (recid != 0 && recid != 1) {
+    ckb_debug("v value is not in {27,28}");
+    return -1;
+  }
+
   uint8_t signature_data[64];
   memcpy(signature_data, input + 64, 32);
   memcpy(signature_data + 32, input + 96, 32);
@@ -443,6 +449,7 @@ uint64_t rotate_left64(uint64_t x, int k) {
   return x << s | x >> (n - s);
 }
 
+/* function f_generic is translated from https://github.com/ethereum/go-ethereum/blob/8647233a8ec2a2410a078013ca12c38fdc229866/crypto/blake2b/blake2b_generic.go#L46-L180 */
 void f_generic(uint64_t h[8], uint64_t m[16], uint64_t c0, uint64_t c1,
                uint64_t flag, uint64_t rounds) {
   uint64_t v0 = h[0];
@@ -822,8 +829,6 @@ int bn256_pairing_istanbul(gw_context_t* ctx,
                            const uint8_t* input_src,
                            const size_t input_size,
                            uint8_t** output, size_t* output_size) {
-  /* static uint8_t true_byte32[32] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1}; */
-  /* static uint8_t false_byte32[32] = {0}; */
   if (input_size % 192 > 0) {
     return ERROR_BN256_PAIRING;
   }
