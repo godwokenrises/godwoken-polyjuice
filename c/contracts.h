@@ -85,12 +85,9 @@ int ecrecover(gw_context_t* ctx,
     return ret;
   }
 
-  uint8_t input[128];
-  memcpy(input, input_src, input_size);
-  /* RightPadBytes */
-  for (size_t i = input_size; i < 128; i++) {
-    input[i] = 0;
-  }
+  uint8_t input[128] = {0};
+  size_t real_size = input_size > 128 ? 128 : input_size;
+  memcpy(input, input_src, real_size);
   for (int i = 32; i < 63; i++) {
     if (input[i] != 0) {
       ckb_debug("input[32:63] not all zero!");
