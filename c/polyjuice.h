@@ -496,7 +496,6 @@ void selfdestruct(struct evmc_host_context* context,
   uint8_t value[GW_VALUE_BYTES];
   polyjuice_build_destructed_key(context->to_id, raw_key);
   memset(value, 1, GW_VALUE_BYTES);
-  /* FIXME: it's a hack */
 #ifdef GW_VALIDATOR
   ret = gw_state_insert(&context->gw_ctx->kv_state, raw_key, value);
 #else
@@ -663,10 +662,10 @@ int handle_message(gw_context_t* ctx, uint32_t parent_from_id,
   /* Check if target contract is destructed */
   if (!is_create(msg.kind)) {
     uint8_t destructed_raw_key[GW_KEY_BYTES];
-    uint8_t destructed_raw_value[GW_VALUE_BYTES];
+    uint8_t destructed_raw_value[GW_VALUE_BYTES] = {0};
     polyjuice_build_destructed_key(to_id, destructed_raw_key);
 #ifdef GW_VALIDATOR
-    ret = gw_state_fetch(&ctx->kv_state, destructed_raw_key, destructed_raw_key);
+    ret = gw_state_fetch(&ctx->kv_state, destructed_raw_key, destructed_raw_value);
 #else
     ret = syscall(GW_SYS_LOAD, destructed_raw_key, destructed_raw_value, 0, 0, 0, 0);
 #endif
@@ -674,7 +673,14 @@ int handle_message(gw_context_t* ctx, uint32_t parent_from_id,
       ckb_debug("load destructed key failed");
       return -1;
     }
-    if (destructed_raw_value[0] != 0) {
+    bool destructed = true;
+    for (int i = 0; i < GW_VALUE_BYTES; i++) {
+      if (destructed_raw_value[0] == 0) {
+        destructed = false;
+        break;
+      }
+    }
+    if (destructed) {
       ckb_debug("call a contract that was already destructed");
       return -1;
     }
