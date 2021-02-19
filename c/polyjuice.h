@@ -160,14 +160,15 @@ int parse_args(struct evmc_message* msg, uint128_t* gas_price,
   offset += 4;
   debug_print_int("[input_size]", input_size);
 
-  /* args[62..62+input_size] */
-  uint8_t* input_data = args + offset;
-  debug_print_data("[input_data]", input_data, input_size);
-
   if (tx_ctx->args_len != (input_size + offset)) {
     ckb_debug("invalid polyjuice transaction");
     return -1;
   }
+
+  /* args[62..62+input_size] */
+  uint8_t* input_data = args + offset;
+  debug_print_data("[input_data]", input_data, input_size);
+
   if (kind != EVMC_CALL && kind != EVMC_CREATE) {
     ckb_debug("invalid call kind");
     return -1;
