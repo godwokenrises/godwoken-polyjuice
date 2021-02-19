@@ -23,6 +23,7 @@ touch $GODWOKEN_DIR/c/build/account_locks/eth-account-lock
 cd $PROJECT_ROOT
 git submodule update --init --recursive
 make all-via-docker
+cargo build
 
 cd $TESTS_DIR
 export RUST_BACKTRACE=full
