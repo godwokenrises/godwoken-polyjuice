@@ -6,11 +6,14 @@
 #include <stdint.h>
 
 #include <evmc/evmc.h>
+#include "ckb_syscalls.h"
 
 #ifdef NO_DEBUG_LOG
-#define debug_print(s)
-#define debug_print_int(prefix, value)
-#define debug_print_data(prefix, data, data_len)
+#undef ckb_debug
+#define ckb_debug(s) {}
+#define debug_print(s) {}
+#define debug_print_int(prefix, value) {}
+#define debug_print_data(prefix, data, data_len) {}
 #else  /* #ifdef NO_DEBUG_LOG */
 static char debug_buffer[64 * 1024];
 void debug_print_data(const char* prefix, const uint8_t* data,
