@@ -98,7 +98,9 @@ int gw_increase_nonce(gw_context_t *ctx, uint32_t account_id, uint32_t *new_nonc
   return 0;
 }
 
-int handle_message(gw_context_t* ctx, uint32_t parent_from_id,
+int handle_message(gw_context_t* ctx,
+                   uint32_t parent_from_id,
+                   uint32_t parent_to_id,
                    const evmc_message* msg, struct evmc_result* res);
 typedef int (*stream_data_loader_fn)(gw_context_t* ctx, long data_id,
                                      uint32_t* len, uint32_t offset,
@@ -571,7 +573,7 @@ struct evmc_result call(struct evmc_host_context* context,
     }
     res.release = release_result;
   } else {
-    ret = handle_message(gw_ctx, context->from_id, msg, &res);
+    ret = handle_message(gw_ctx, context->from_id, context->to_id, msg, &res);
     if (ret != 0) {
       ckb_debug("inner call failed (transfer/contract call contract)");
       context->error_code = ret;
@@ -867,7 +869,9 @@ int store_contract_code(gw_context_t* ctx,
  *
  * Must allocate an account id before create contract
  */
-int handle_message(gw_context_t* ctx, uint32_t parent_from_id,
+int handle_message(gw_context_t* ctx,
+                   uint32_t parent_from_id,
+                   uint32_t parent_to_id,
                    const evmc_message* msg_origin, struct evmc_result* res) {
   ckb_debug("BEGIN handle_message");
 
@@ -944,7 +948,7 @@ int handle_message(gw_context_t* ctx, uint32_t parent_from_id,
   /* Handle special call: CALLCODE/DELEGATECALL */
   if (is_special_call(msg.kind)) {
     /* This action must after load the contract code */
-    to_id = from_id;
+    to_id = parent_to_id;
   }
 
   /* Create new account by script */
@@ -1005,7 +1009,7 @@ int run_polyjuice() {
   }
 
   struct evmc_result res;
-  ret = handle_message(&context, UINT32_MAX, &msg, &res);
+  ret = handle_message(&context, UINT32_MAX, UINT32_MAX, &msg, &res);
   if (ret != 0) {
     return ret;
   }
