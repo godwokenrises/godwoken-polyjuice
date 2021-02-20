@@ -330,9 +330,24 @@ bool account_exists(struct evmc_host_context* context,
   if (ret != 0) {
     ckb_debug("address_to_account_id failed");
     context->error_code = ret;
+    return false;
+  }
+  uint8_t script_hash[32];
+  ret = context->gw_ctx->sys_get_script_hash_by_account_id(context->gw_ctx, account_id, script_hash);
+  if (ret != 0) {
+    context->error_code = ret;
+    return false;
+  }
+  bool exists = false;
+  for (int i = 0; i < 32; i++) {
+    /* if account not exists script_hash will be zero */
+    if (script_hash[i] != 0) {
+      exists = true;
+      break;
+    }
   }
   ckb_debug("END account_exists");
-  return account_id == 0;
+  return exists;
 }
 
 evmc_bytes32 get_storage(struct evmc_host_context* context,
