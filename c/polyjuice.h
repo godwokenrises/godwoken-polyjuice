@@ -197,7 +197,7 @@ int build_script(uint8_t code_hash[32], uint8_t hash_type, uint8_t* args,
   /* 1. Build Script by receipt.return_data */
   mol_seg_t args_seg;
   args_seg.size = 4 + args_len;
-  args_seg.ptr = (uint8_t*)malloc(4 + args_seg.size);
+  args_seg.ptr = (uint8_t*)malloc(args_seg.size);
   if (args_seg.ptr == NULL) {
     return -1;
   }
@@ -213,12 +213,16 @@ int build_script(uint8_t code_hash[32], uint8_t hash_type, uint8_t* args,
   MolBuilder_Script_set_hash_type(&script_builder, hash_type);
   MolBuilder_Script_set_args(&script_builder, args_seg.ptr, args_seg.size);
   mol_seg_res_t script_res = MolBuilder_Script_build(script_builder);
-  // Because errno is keyword
-  uint8_t error_num = *(uint8_t*)(&script_res);
-  if (error_num != MOL_OK) {
-    /* ERROR: build script failed */
+
+  /* https://stackoverflow.com/a/1545079 */
+#pragma push_macro("errno")
+#undef errno
+  if (script_res.errno != MOL_OK) {
+    ckb_debug("molecule build script failed");
     return -1;
   }
+#pragma pop_macro("errno")
+
   *script_seg = script_res.seg;
 
   debug_print_data("script ", script_seg->ptr, script_seg->size);
