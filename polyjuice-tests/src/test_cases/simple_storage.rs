@@ -14,7 +14,7 @@ const INIT_CODE: &str = include_str!("./evm-contracts/SimpleStorage.bin");
 fn test_simple_storage() {
     let (store, mut tree, generator, creator_account_id) = setup();
 
-    let from_script = gw_generator::sudt::build_l2_sudt_script([1u8; 32].into());
+    let from_script = gw_generator::sudt::build_l2_sudt_script([1u8; 32]);
     let from_id = tree.create_account_from_script(from_script).unwrap();
     tree.mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, 200000)
         .unwrap();
@@ -26,7 +26,7 @@ fn test_simple_storage() {
         let block_info = new_block_info(0, 1, 0);
         let input = hex::decode(INIT_CODE).unwrap();
         let args = PolyjuiceArgsBuilder::default()
-            .is_create(true)
+            .do_create(true)
             .gas_limit(22000)
             .gas_price(1)
             .value(0)
@@ -81,7 +81,7 @@ fn test_simple_storage() {
         let block_info = new_block_info(0, 3, 0);
         let input = hex::decode("6d4ce63c").unwrap();
         let args = PolyjuiceArgsBuilder::default()
-            .is_static(true)
+            .static_call(true)
             .gas_limit(21000)
             .gas_price(1)
             .value(0)

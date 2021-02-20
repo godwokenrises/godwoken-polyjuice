@@ -15,11 +15,11 @@ const INIT_CODE: &str = include_str!("./evm-contracts/ERC20.bin");
 #[test]
 fn test_erc20() {
     let (store, mut tree, generator, creator_account_id) = setup();
-    let from_script1 = gw_generator::sudt::build_l2_sudt_script([1u8; 32].into());
+    let from_script1 = gw_generator::sudt::build_l2_sudt_script([1u8; 32]);
     let from_id1 = tree.create_account_from_script(from_script1).unwrap();
-    let from_script2 = gw_generator::sudt::build_l2_sudt_script([2u8; 32].into());
+    let from_script2 = gw_generator::sudt::build_l2_sudt_script([2u8; 32]);
     let from_id2 = tree.create_account_from_script(from_script2).unwrap();
-    let from_script3 = gw_generator::sudt::build_l2_sudt_script([3u8; 32].into());
+    let from_script3 = gw_generator::sudt::build_l2_sudt_script([3u8; 32]);
     let from_id3 = tree.create_account_from_script(from_script3).unwrap();
     tree.mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id1, 2000000)
         .unwrap();
@@ -140,7 +140,7 @@ fn test_erc20() {
         println!(">> [input]: {}", args_str);
         let input = hex::decode(args_str).unwrap();
         let args = PolyjuiceArgsBuilder::default()
-            .is_static(*is_static)
+            .static_call(*is_static)
             .gas_limit(80000)
             .gas_price(1)
             .value(0)

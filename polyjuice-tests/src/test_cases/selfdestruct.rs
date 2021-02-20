@@ -15,12 +15,12 @@ const INIT_CODE: &str = include_str!("./evm-contracts/SelfDestruct.bin");
 fn test_selfdestruct() {
     let (store, mut tree, generator, creator_account_id) = setup();
 
-    let from_script = gw_generator::sudt::build_l2_sudt_script([1u8; 32].into());
+    let from_script = gw_generator::sudt::build_l2_sudt_script([1u8; 32]);
     let from_id = tree.create_account_from_script(from_script).unwrap();
     tree.mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, 200000)
         .unwrap();
 
-    let beneficiary_script = gw_generator::sudt::build_l2_sudt_script([2u8; 32].into());
+    let beneficiary_script = gw_generator::sudt::build_l2_sudt_script([2u8; 32]);
     let beneficiary_id = tree.create_account_from_script(beneficiary_script).unwrap();
     assert_eq!(
         tree.get_sudt_balance(CKB_SUDT_ACCOUNT_ID, beneficiary_id)
@@ -34,7 +34,7 @@ fn test_selfdestruct() {
         let mut input = hex::decode(INIT_CODE).unwrap();
         input.extend(account_id_to_eth_address(beneficiary_id, true));
         let args = PolyjuiceArgsBuilder::default()
-            .is_create(true)
+            .do_create(true)
             .gas_limit(22000)
             .gas_price(1)
             .value(200)

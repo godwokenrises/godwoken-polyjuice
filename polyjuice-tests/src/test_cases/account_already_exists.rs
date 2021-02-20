@@ -2,14 +2,10 @@
 //!   See ./evm-contracts/SimpleTransfer.sol
 
 use crate::helper::{
-    account_id_to_eth_address, deploy, new_account_script, new_account_script_with_nonce,
-    new_block_info, parse_log, setup, simple_storage_get, PolyjuiceArgsBuilder,
-    CKB_SUDT_ACCOUNT_ID,
+    deploy, new_account_script, new_account_script_with_nonce, setup, CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
-use gw_jsonrpc_types::parameter::RunResult;
-use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
 
 const SS_INIT_CODE: &str = include_str!("./evm-contracts/SimpleStorage.bin");
 
@@ -17,7 +13,7 @@ const SS_INIT_CODE: &str = include_str!("./evm-contracts/SimpleStorage.bin");
 fn test_account_already_exists() {
     let (store, mut tree, generator, creator_account_id) = setup();
 
-    let from_script = gw_generator::sudt::build_l2_sudt_script([1u8; 32].into());
+    let from_script = gw_generator::sudt::build_l2_sudt_script([1u8; 32]);
     let from_id = tree.create_account_from_script(from_script).unwrap();
     let mint_balance: u128 = 400000;
     tree.mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, mint_balance)
@@ -29,7 +25,7 @@ fn test_account_already_exists() {
         .unwrap();
 
     // Deploy SimpleStorage
-    let run_result = deploy(
+    let _run_result = deploy(
         &generator,
         &store,
         &mut tree,

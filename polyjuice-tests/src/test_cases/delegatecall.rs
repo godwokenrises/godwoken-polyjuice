@@ -17,14 +17,14 @@ const INIT_CODE: &str = include_str!("./evm-contracts/DelegateCall.bin");
 fn test_delegatecall() {
     let (store, mut tree, generator, creator_account_id) = setup();
 
-    let from_script = gw_generator::sudt::build_l2_sudt_script([1u8; 32].into());
+    let from_script = gw_generator::sudt::build_l2_sudt_script([1u8; 32]);
     let from_id = tree.create_account_from_script(from_script).unwrap();
     tree.mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, 280000)
         .unwrap();
     let mut block_number = 1;
 
     // Deploy SimpleStorage
-    let run_result = deploy(
+    let _run_result = deploy(
         &generator,
         &store,
         &mut tree,
@@ -114,6 +114,18 @@ fn test_delegatecall() {
         println!(
             "result {}",
             serde_json::to_string_pretty(&RunResult::from(run_result)).unwrap()
+        );
+        let run_result = simple_storage_get(
+            &store,
+            &tree,
+            &generator,
+            block_number,
+            from_id,
+            new_account_id,
+        );
+        assert_eq!(
+            run_result.return_data,
+            hex::decode(expected_return_value).unwrap()
         );
     }
 

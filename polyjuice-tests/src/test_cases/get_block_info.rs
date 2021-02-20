@@ -2,14 +2,13 @@
 //!   See ./evm-contracts/BlockInfo.sol
 
 use crate::helper::{
-    account_id_to_eth_address, deploy, new_account_script, new_account_script_with_nonce,
-    new_block_info, setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
+    new_account_script, new_block_info, setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
-use gw_generator::traits::StateExt;
-use gw_traits::ChainStore;
 use gw_db::schema::COLUMN_INDEX;
+use gw_generator::traits::StateExt;
 use gw_jsonrpc_types::parameter::RunResult;
+use gw_traits::ChainStore;
 use gw_types::{
     bytes::Bytes,
     packed::{RawL2Transaction, Uint64},
@@ -32,7 +31,7 @@ fn test_get_block_info() {
         println!("block_hash(0): {:?}", tx.get_block_hash_by_number(0));
     }
 
-    let from_script = gw_generator::sudt::build_l2_sudt_script([1u8; 32].into());
+    let from_script = gw_generator::sudt::build_l2_sudt_script([1u8; 32]);
     let from_id = tree.create_account_from_script(from_script).unwrap();
     tree.mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, 400000)
         .unwrap();
@@ -44,7 +43,7 @@ fn test_get_block_info() {
     let block_info = new_block_info(aggregator_id, block_number, timestamp);
     let input = hex::decode(INIT_CODE).unwrap();
     let args = PolyjuiceArgsBuilder::default()
-        .is_create(true)
+        .do_create(true)
         .gas_limit(160000)
         .gas_price(1)
         .value(0)
@@ -109,7 +108,7 @@ fn test_get_block_info() {
         let block_info = new_block_info(aggregator_id + 1, block_number + 1, timestamp + 1);
         let input = hex::decode(fn_sighash).unwrap();
         let args = PolyjuiceArgsBuilder::default()
-            .is_static(true)
+            .static_call(true)
             .gas_limit(21000)
             .gas_price(1)
             .value(0)
