@@ -1,12 +1,11 @@
 use ckb_vm::{
-    memory::Memory,
-    DefaultMachineBuilder,
     machine::asm::{AsmCoreMachine, AsmMachine},
+    memory::Memory,
     registers::{A0, A1, A2, A3, A7},
-    Error as VMError, Register, SupportMachine, Syscalls,
+    DefaultMachineBuilder, Error as VMError, Register, SupportMachine, Syscalls,
 };
-use gw_common::{H256, blake2b::new_blake2b};
-use gw_types::{bytes::Bytes, prelude::*};
+use gw_common::{blake2b::new_blake2b, H256};
+use gw_types::bytes::Bytes;
 use std::collections::HashMap;
 
 const BINARY: &[u8] = include_bytes!("../../../build/test_contracts");
@@ -60,7 +59,10 @@ impl<Mac: SupportMachine> Syscalls<Mac> for L2Syscalls {
 
                 let data_hash = load_data_h256(machine, data_hash_addr)?;
                 let len = load_data_u32(machine, len_addr)? as usize;
-                println!("data_hash: {:?}, len: {}, offset: {}", data_hash, len, offset);
+                println!(
+                    "data_hash: {:?}, len: {}, offset: {}",
+                    data_hash, len, offset
+                );
                 let data = self.data.get(&data_hash).unwrap();
                 let data_ref = data.as_ref();
                 let new_len = if offset >= data_ref.len() {
@@ -123,12 +125,17 @@ fn test_contracts() {
         hasher.finalize(&mut buf);
         buf.into()
     };
-    println!("secp_data_hash: {:?}, data.len(): {}", secp_data_hash, SECP_DATA.len());
+    println!(
+        "secp_data_hash: {:?}, data.len(): {}",
+        secp_data_hash,
+        SECP_DATA.len()
+    );
     let mut data = HashMap::default();
     data.insert(secp_data_hash, Bytes::from(SECP_DATA.to_vec()));
 
     let core_machine = Box::<AsmCoreMachine>::default();
-    let machine_builder = DefaultMachineBuilder::new(core_machine).syscall(Box::new(L2Syscalls { data }));
+    let machine_builder =
+        DefaultMachineBuilder::new(core_machine).syscall(Box::new(L2Syscalls { data }));
     let mut machine = AsmMachine::new(machine_builder.build(), None);
     machine.load_program(&binary, &[]).unwrap();
     let code = machine.run().unwrap();

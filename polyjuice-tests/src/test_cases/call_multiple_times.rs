@@ -17,7 +17,7 @@ const INIT_CODE: &str = include_str!("./evm-contracts/CallMultipleTimes.bin");
 fn test_call_multiple_times() {
     let (store, mut tree, generator, creator_account_id) = setup();
 
-    let from_script = gw_generator::sudt::build_l2_sudt_script([1u8; 32].into());
+    let from_script = gw_generator::sudt::build_l2_sudt_script([1u8; 32]);
     let from_id = tree.create_account_from_script(from_script).unwrap();
     tree.mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, 280000)
         .unwrap();
@@ -25,7 +25,7 @@ fn test_call_multiple_times() {
 
     // Deploy two SimpleStorage
     for _ in 0..2 {
-        let run_result = deploy(
+        let _run_result = deploy(
             &generator,
             &store,
             &mut tree,

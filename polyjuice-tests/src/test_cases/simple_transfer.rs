@@ -2,7 +2,7 @@
 //!   See ./evm-contracts/SimpleTransfer.sol
 
 use crate::helper::{
-    account_id_to_eth_address, deploy, new_account_script, new_block_info, parse_log, setup,
+    account_id_to_eth_address, deploy, new_account_script, new_block_info, setup,
     simple_storage_get, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
@@ -17,12 +17,12 @@ const INIT_CODE: &str = include_str!("./evm-contracts/SimpleTransfer.bin");
 fn test_simple_transfer() {
     let (store, mut tree, generator, creator_account_id) = setup();
 
-    let from_script = gw_generator::sudt::build_l2_sudt_script([1u8; 32].into());
+    let from_script = gw_generator::sudt::build_l2_sudt_script([1u8; 32]);
     let from_id = tree.create_account_from_script(from_script).unwrap();
     let mint_balance: u128 = 400000;
     tree.mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, mint_balance)
         .unwrap();
-    let target_script = gw_generator::sudt::build_l2_sudt_script([2u8; 32].into());
+    let target_script = gw_generator::sudt::build_l2_sudt_script([2u8; 32]);
     let target_id = tree.create_account_from_script(target_script).unwrap();
 
     let from_balance = tree.get_sudt_balance(CKB_SUDT_ACCOUNT_ID, from_id).unwrap();
@@ -78,7 +78,7 @@ fn test_simple_transfer() {
     println!("================");
     // Deploy SimpleTransfer
     let deploy_value = 200;
-    let run_result = deploy(
+    let _run_result = deploy(
         &generator,
         &store,
         &mut tree,

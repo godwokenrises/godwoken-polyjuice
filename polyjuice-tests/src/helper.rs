@@ -5,13 +5,12 @@ pub use gw_common::{
     CKB_SUDT_SCRIPT_ARGS, H256,
 };
 pub use gw_generator::{
-    RunResult,
-    builtin_scripts::META_CONTRACT_VALIDATOR_CODE_HASH,
-    traits::StateExt,
     account_lock_manage::{always_success::AlwaysSuccess, AccountLockManage},
     backend_manage::{Backend, BackendManage},
+    builtin_scripts::META_CONTRACT_VALIDATOR_CODE_HASH,
     dummy_state::DummyState,
-    Generator,
+    traits::StateExt,
+    Generator, RunResult,
 };
 pub use gw_store::Store;
 use gw_types::{
@@ -21,9 +20,9 @@ use gw_types::{
 };
 use std::{fs, io::Read, path::PathBuf};
 
-pub const BIN_DIR: &'static str = "../build";
-pub const GENERATOR_NAME: &'static str = "generator_log";
-pub const VALIDATOR_NAME: &'static str = "validator_log";
+pub const BIN_DIR: &str = "../build";
+pub const GENERATOR_NAME: &str = "generator_log";
+pub const VALIDATOR_NAME: &str = "validator_log";
 
 lazy_static::lazy_static! {
     pub static ref GENERATOR_PROGRAM: Bytes = {
@@ -75,11 +74,12 @@ pub fn account_id_to_eth_address(id: u32, ethabi: bool) -> Vec<u8> {
     data
 }
 
+#[allow(dead_code)]
 pub fn eth_address_to_account_id(data: &[u8]) -> Result<u32, String> {
     if data.len() != 20 {
         return Err(format!("Invalid eth address length: {}", data.len()));
     }
-    if &data[4..20] != &[0u8; 16][..] {
+    if data[4..20] != [0u8; 16][..] {
         return Err(format!("Invalid eth address data: {:?}", &data[4..20]));
     }
     let mut id_data = [0u8; 4];
@@ -116,11 +116,11 @@ pub struct PolyjuiceArgsBuilder {
 }
 
 impl PolyjuiceArgsBuilder {
-    pub fn is_create(mut self, value: bool) -> Self {
+    pub fn do_create(mut self, value: bool) -> Self {
         self.is_create = value;
         self
     }
-    pub fn is_static(mut self, value: bool) -> Self {
+    pub fn static_call(mut self, value: bool) -> Self {
         self.is_static = value;
         self
     }
@@ -177,7 +177,7 @@ pub fn setup() -> (Store, DummyState, Generator, u32) {
     );
 
     // setup CKB simple UDT contract
-    let ckb_sudt_script = gw_generator::sudt::build_l2_sudt_script(CKB_SUDT_SCRIPT_ARGS.into());
+    let ckb_sudt_script = gw_generator::sudt::build_l2_sudt_script(CKB_SUDT_SCRIPT_ARGS);
     // assert_eq!(
     //     ckb_sudt_script.hash(),
     //     CKB_SUDT_SCRIPT_HASH,
@@ -226,7 +226,7 @@ pub fn deploy(
     let block_info = new_block_info(0, block_number, block_number);
     let input = hex::decode(init_code).unwrap();
     let args = PolyjuiceArgsBuilder::default()
-        .is_create(true)
+        .do_create(true)
         .gas_limit(gas_limit)
         .gas_price(1)
         .value(value)
@@ -295,7 +295,7 @@ pub fn simple_storage_get(
     let block_info = new_block_info(0, block_number, block_number);
     let input = hex::decode("6d4ce63c").unwrap();
     let args = PolyjuiceArgsBuilder::default()
-        .is_static(true)
+        .static_call(true)
         .gas_limit(21000)
         .gas_price(1)
         .value(0)
