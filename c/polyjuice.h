@@ -53,7 +53,7 @@ static uint8_t script_hash_type;
 
 void polyjuice_build_system_key(uint32_t id, uint8_t polyjuice_field_type,
                                 uint8_t key[GW_KEY_BYTES]) {
-  memset(key, 0, 32);
+  memset(key, 0, GW_KEY_BYTES);
   memcpy(key, (uint8_t*)(&id), sizeof(uint32_t));
   key[4] = POLYJUICE_SYSTEM_PREFIX;
   key[5] = polyjuice_field_type;
