@@ -15,7 +15,7 @@ contract BlockInfo {
     number = block.number;
     timestamp = block.timestamp;
     coinbase = block.coinbase;
-    require(coinbase == 0xF300000000000000000000000000000000000000);
+    require(coinbase == 0x0400000000000000000000000000000000000000);
     require(blockHash == 0x0707070707070707070707070707070707070707070707070707070707070707);
     require(gasLimit == 12500000);
   }

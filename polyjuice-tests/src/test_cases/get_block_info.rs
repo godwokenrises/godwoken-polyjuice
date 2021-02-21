@@ -35,9 +35,11 @@ fn test_get_block_info() {
     let from_id = tree.create_account_from_script(from_script).unwrap();
     tree.mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, 400000)
         .unwrap();
+    let aggregator_script = gw_generator::sudt::build_l2_sudt_script([2u8; 32]);
+    let aggregator_id = tree.create_account_from_script(aggregator_script).unwrap();
+    assert_eq!(aggregator_id, 4);
 
     // Deploy BlockInfo
-    let aggregator_id: u32 = 0xf3;
     let mut block_number = 0x05;
     let timestamp: u64 = 0xff33;
     let block_info = new_block_info(aggregator_id, block_number, timestamp);
@@ -69,7 +71,7 @@ fn test_get_block_info() {
         .get_account_id_by_script_hash(&contract_account_script.hash().into())
         .unwrap()
         .unwrap();
-    assert_eq!(new_account_id, 4);
+    assert_eq!(new_account_id, 5);
 
     for (fn_sighash, expected_return_data) in [
         // getGenesisHash()
@@ -100,12 +102,12 @@ fn test_get_block_info() {
         // getCoinbase()
         (
             "d1a82a9d",
-            "000000000000000000000000f300000000000000000000000000000000000000",
+            "0000000000000000000000000400000000000000000000000000000000000000",
         ),
     ]
     .iter()
     {
-        let block_info = new_block_info(aggregator_id + 1, block_number + 1, timestamp + 1);
+        let block_info = new_block_info(aggregator_id, block_number + 1, timestamp + 1);
         let input = hex::decode(fn_sighash).unwrap();
         let args = PolyjuiceArgsBuilder::default()
             .static_call(true)
