@@ -174,6 +174,10 @@ int ripemd160hash(gw_context_t* ctx,
                   const uint8_t* input_src,
                   const size_t input_size, uint8_t** output,
                   size_t* output_size) {
+  if (input_size > (size_t)UINT32_MAX) {
+    /* input_size overflow */
+    return -1;
+  }
   *output = (uint8_t*)malloc(32);
   if (*output == NULL) {
     return -1;
