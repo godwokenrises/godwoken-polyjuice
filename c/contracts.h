@@ -34,12 +34,13 @@
 #define BLAKE2F_NON_FINAL_BLOCK_BYTES 0x0
 
 #define ERROR_MOD_EXP -23
-#define ERROR_BLAKE2F -24
-#define ERROR_TRANSFER_TO_ANY_SUDT -25
-#define ERROR_BN256_ADD -26
-#define ERROR_BN256_SCALAR_MUL -27
-#define ERROR_BN256_PAIRING -28
-#define ERROR_BN256_INVALID_POINT -29
+#define ERROR_BLAKE2F_INVALID_INPUT_LENGTH -24
+#define ERROR_BLAKE2F_INVALID_FINAL_FLAG -25
+#define ERROR_TRANSFER_TO_ANY_SUDT -26
+#define ERROR_BN256_ADD -27
+#define ERROR_BN256_SCALAR_MUL -28
+#define ERROR_BN256_PAIRING -29
+#define ERROR_BN256_INVALID_POINT -30
 
 /* pre-compiled Ethereum contracts */
 
@@ -610,11 +611,11 @@ int blake2f(gw_context_t* ctx,
             const uint8_t* input_src,
             const size_t input_size, uint8_t** output, size_t* output_size) {
   if (input_size != BLAKE2F_INPUT_LENGTH) {
-    return ERROR_BLAKE2F;
+    return ERROR_BLAKE2F_INVALID_INPUT_LENGTH;
   }
   if (input_src[212] != BLAKE2F_NON_FINAL_BLOCK_BYTES &&
       input_src[212] != BLAKE2F_FINAL_BLOCK_BYTES) {
-    return ERROR_BLAKE2F;
+    return ERROR_BLAKE2F_INVALID_FINAL_FLAG;
   }
 
   uint32_t rounds =
