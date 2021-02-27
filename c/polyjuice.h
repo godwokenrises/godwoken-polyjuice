@@ -563,7 +563,7 @@ struct evmc_result call(struct evmc_host_context* context,
       return res;
     }
     res.gas_left = msg->gas - (int64_t)gas_cost;
-    ret = contract(gw_ctx, context->to_id, msg->input_data, msg->input_size,
+    ret = contract(gw_ctx, context->from_id, msg->input_data, msg->input_size,
                    (uint8_t**)&res.output_data, &res.output_size);
     if (ret != 0) {
       ckb_debug("call pre-compiled contract failed");
