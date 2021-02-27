@@ -296,14 +296,6 @@ int big_mod_exp_required_gas(const uint8_t* input, const size_t input_size,
     return ERROR_MOD_EXP;
   }
 
-  const size_t content_size = base_size + exp_size + mod_size;
-  const size_t copy_size = input_size > content_size + 96
-    ? content_size
-    : (input_size > 96 ? input_size - 96 : 0);
-  uint8_t *content = (uint8_t*)malloc(content_size);
-  memset(content, 0, content_size);
-  memcpy(content, input + 96, copy_size);
-
   // Retrieve the head 32 bytes of exp for the adjusted exponent length
   int return_value = 0;
   mbedtls_mpi exp_head;
@@ -318,6 +310,18 @@ int big_mod_exp_required_gas(const uint8_t* input, const size_t input_size,
   int exp_head_bitlen = 0;
   size_t base_gas = 0;
   uint128_t gas = 0;
+
+  const size_t content_size = base_size + exp_size + mod_size;
+  const size_t copy_size = input_size > content_size + 96
+    ? content_size
+    : (input_size > 96 ? input_size - 96 : 0);
+  uint8_t *content = (uint8_t*)malloc(content_size);
+  if (content == NULL) {
+    return_value = ERROR_MOD_EXP;
+    goto mod_exp_gas_cleanup;
+  }
+  memset(content, 0, content_size);
+  memcpy(content, input + 96, copy_size);
 
   ret = mbedtls_mpi_read_binary(&exp_head, content + base_size, exp_head_size);
   if (ret != 0) {
@@ -418,14 +422,7 @@ int big_mod_exp(gw_context_t* ctx,
     return 0;
   }
 
-  const size_t content_size = base_size + exp_size + mod_size;
-  const size_t copy_size = input_size > content_size + 96
-    ? content_size
-    : (input_size > 96 ? input_size - 96 : 0);
-  uint8_t *content = (uint8_t*)malloc(content_size);
-  memset(content, 0, content_size);
-  memcpy(content, input_src + 96, copy_size);
-
+  int return_value = 0;
   mbedtls_mpi base;
   mbedtls_mpi exp;
   mbedtls_mpi mod;
@@ -434,7 +431,19 @@ int big_mod_exp(gw_context_t* ctx,
   mbedtls_mpi_init(&exp);
   mbedtls_mpi_init(&mod);
   mbedtls_mpi_init(&result);
-  int return_value = 0;
+
+  const size_t content_size = base_size + exp_size + mod_size;
+  const size_t copy_size = input_size > content_size + 96
+    ? content_size
+    : (input_size > 96 ? input_size - 96 : 0);
+  uint8_t *content = (uint8_t*)malloc(content_size);
+  if (content == NULL) {
+    return_value = ERROR_MOD_EXP;
+    goto mod_exp_cleanup;
+  }
+  memset(content, 0, content_size);
+  memcpy(content, input_src + 96, copy_size);
+
 
   ret = mbedtls_mpi_read_binary(&base, content, base_size);
   if (ret != 0) {
@@ -453,6 +462,10 @@ int big_mod_exp(gw_context_t* ctx,
   }
 
   *output = (uint8_t*)malloc(mod_size);
+  if (*output == NULL) {
+    return_value = ERROR_MOD_EXP;
+    goto mod_exp_cleanup;
+  }
   *output_size = mod_size;
   if (mbedtls_mpi_bitlen(&mod) == 0) {
     memset(*output, 0, mod_size);
@@ -706,6 +719,9 @@ int blake2f(gw_context_t* ctx,
   f_generic(h, m, t[0], t[1], flag, (uint64_t)rounds);
 
   *output = (uint8_t*)malloc(64);
+  if (*output == NULL) {
+    return -1;
+  }
   *output_size = 64;
   for (size_t i = 0; i < 8; i++) {
     size_t offset = i * 8;
@@ -842,6 +858,9 @@ int bn256_add_istanbul(gw_context_t* ctx,
   bn128::alt_bn128_add(x, y, res);
 
   *output = (uint8_t *)malloc(64);
+  if (*output == NULL) {
+    return -1;
+  }
   *output_size = 64;
   intx::be::unsafe::store(*output, res[0]);
   intx::be::unsafe::store(*output + 32, res[1]);
@@ -876,6 +895,9 @@ int bn256_scalar_mul_istanbul(gw_context_t* ctx,
   bn128::alt_bn128_mul(x, n, res);
 
   *output = (uint8_t *)malloc(64);
+  if (*output == NULL) {
+    return -1;
+  }
   *output_size = 64;
   intx::be::unsafe::store(*output, res[0]);
   intx::be::unsafe::store(*output + 32, res[1]);
@@ -905,8 +927,14 @@ int bn256_pairing_istanbul(gw_context_t* ctx,
   size_t length = input_size / 192;
   /* G1[] */
   intx::uint256 *cs = (intx::uint256 *)malloc(length * 4 * sizeof(intx::uint256));
+  if (cs == NULL) {
+    return -1;
+  }
   /* G2[] */
   intx::uint256 *ts = (intx::uint256 *)malloc(length * 4 * sizeof(intx::uint256));
+  if (ts == NULL) {
+    return -1;
+  }
   for (size_t i = 0; i < input_size; i += 192) {
     ret = parse_curve_point((void *)(cs + i / 192 * 4), (uint8_t *)input_src + i);
     if (ret != 0) {
