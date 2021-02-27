@@ -35,7 +35,7 @@ ALL_OBJS := build/evmone.o build/baseline.o build/analysis.o build/instruction_m
 # docker pull nervos/ckb-riscv-gnu-toolchain:bionic-20190702
 BUILDER_DOCKER := nervos/ckb-riscv-gnu-toolchain@sha256:7b168b4b109a0f741078a71b7c4dddaf1d283a5244608f7851f5714fbad273ba
 
-all: build/generator build/validator build/generator_log build/validator_log build/test_contracts build/blockchain.h build/godwoken.h
+all: build/generator build/validator build/generator_log build/validator_log build/test_contracts build/test_ripemd160 build/blockchain.h build/godwoken.h
 
 all-via-docker: generate-protocol
 	mkdir -p build
@@ -79,6 +79,10 @@ build/test_contracts: c/tests/test_contracts.c c/contracts.h c/validator/secp256
 	$(OBJCOPY) --only-keep-debug $@ $@.debug
 	$(OBJCOPY) --strip-debug --strip-all $@
 	cd $(SECP_DIR) && (git apply -R workaround-fix-g++-linking.patch || true) && cd - # revert patch
+
+build/test_ripemd160: c/ripemd160/test_ripemd160.c c/ripemd160/ripemd160.h c/ripemd160/memzero.h $(ALL_OBJS)
+	$(CXX) $(CFLAGS) $(LDFLAGS) -Ibuild -o $@ c/ripemd160/test_ripemd160.c $(ALL_OBJS)
+	riscv64-unknown-elf-run build/test_ripemd160
 
 build/evmone.o: deps/evmone/lib/evmone/evmone.cpp
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -c -o $@ $< -DPROJECT_VERSION=\"0.5.0-dev\"
