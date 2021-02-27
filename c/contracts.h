@@ -213,18 +213,23 @@ int read_lens(const uint8_t* input, const size_t input_size,
               mbedtls_mpi* base_len, mbedtls_mpi* exp_len, mbedtls_mpi* mod_len,
               size_t* base_size, size_t* exp_size, size_t* mod_size) {
   int ret;
+
+  uint8_t padded_input[96] = {0};
+  size_t real_size = input_size > 96 ? 96 : input_size;
+  memcpy(padded_input, input, real_size);
+
   mbedtls_mpi_init(base_len);
   mbedtls_mpi_init(exp_len);
   mbedtls_mpi_init(mod_len);
-  ret = mbedtls_mpi_read_binary(base_len, input, 32);
+  ret = mbedtls_mpi_read_binary(base_len, padded_input, 32);
   if (ret != 0) {
     return ERROR_MOD_EXP;
   }
-  ret = mbedtls_mpi_read_binary(exp_len, input + 32, 32);
+  ret = mbedtls_mpi_read_binary(exp_len, padded_input + 32, 32);
   if (ret != 0) {
     return ERROR_MOD_EXP;
   }
-  ret = mbedtls_mpi_read_binary(mod_len, input + 64, 32);
+  ret = mbedtls_mpi_read_binary(mod_len, padded_input + 64, 32);
   if (ret != 0) {
     return ERROR_MOD_EXP;
   }
@@ -266,6 +271,7 @@ uint128_t modexp_mult_complexity(uint128_t x) {
   }
 }
 
+/* eip2565: false */
 int big_mod_exp_required_gas(const uint8_t* input, const size_t input_size,
                              uint64_t* target_gas) {
   int ret;
@@ -281,11 +287,13 @@ int big_mod_exp_required_gas(const uint8_t* input, const size_t input_size,
     return ERROR_MOD_EXP;
   }
 
-  const uint8_t* content = input_size > 96 ? input + 96 : NULL;
-  const size_t content_size = content != NULL ? input_size - 96 : 0;
-  if (content_size < (base_size + exp_size + mod_size)) {
-    return ERROR_MOD_EXP;
-  }
+  const size_t content_size = base_size + exp_size + mod_size;
+  const size_t copy_size = input_size > content_size + 96
+    ? content_size
+    : (input_size > 96 ? input_size - 96 : 0);
+  uint8_t *content = (uint8_t*)malloc(content_size);
+  memset(content, 0, content_size);
+  memcpy(content, input + 96, copy_size);
 
   // Retrieve the head 32 bytes of exp for the adjusted exponent length
   mbedtls_mpi exp_head;
@@ -348,6 +356,7 @@ int big_mod_exp_required_gas(const uint8_t* input, const size_t input_size,
   return 0;
 }
 
+/* eip2565: false */
 int big_mod_exp(gw_context_t* ctx,
                 uint32_t from_id,
                 const uint8_t* input_src,
@@ -366,18 +375,20 @@ int big_mod_exp(gw_context_t* ctx,
     return ERROR_MOD_EXP;
   }
 
-  const uint8_t* content = input_size > 96 ? input_src + 96 : NULL;
-  const size_t content_size = content != NULL ? input_size - 96 : 0;
-  if (content_size < (base_size + exp_size + mod_size)) {
-    return ERROR_MOD_EXP;
-  }
-
   if (mbedtls_mpi_cmp_int(&base_len, 0) == 0 &&
       mbedtls_mpi_cmp_int(&mod_len, 0) == 0) {
     *output = NULL;
     *output_size = 0;
     return 0;
   }
+
+  const size_t content_size = base_size + exp_size + mod_size;
+  const size_t copy_size = input_size > content_size + 96
+    ? content_size
+    : (input_size > 96 ? input_size - 96 : 0);
+  uint8_t *content = (uint8_t*)malloc(content_size);
+  memset(content, 0, content_size);
+  memcpy(content, input_src + 96, copy_size);
 
   mbedtls_mpi base;
   mbedtls_mpi exp;
