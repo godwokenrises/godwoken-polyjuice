@@ -35,7 +35,7 @@ ALL_OBJS := build/evmone.o build/baseline.o build/analysis.o build/instruction_m
 # docker pull nervos/ckb-riscv-gnu-toolchain:bionic-20190702
 BUILDER_DOCKER := nervos/ckb-riscv-gnu-toolchain@sha256:7b168b4b109a0f741078a71b7c4dddaf1d283a5244608f7851f5714fbad273ba
 
-all: build/generator build/validator build/generator_log build/validator_log build/test_contracts build/test_ripemd160 build/blockchain.h build/godwoken.h
+all: build/test_contracts build/generator build/validator build/generator_log build/validator_log build/test_ripemd160 build/blockchain.h build/godwoken.h
 
 all-via-docker: generate-protocol
 	mkdir -p build
