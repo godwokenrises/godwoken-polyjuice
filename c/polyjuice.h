@@ -237,7 +237,9 @@ int build_script(uint8_t code_hash[32], uint8_t hash_type, uint8_t* args,
 }
 
 void release_result(const struct evmc_result* result) {
-  free((void*)result->output_data);
+  if (result->output_data != NULL) {
+    free((void*)result->output_data);
+  }
   return;
 }
 
