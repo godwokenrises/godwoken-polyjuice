@@ -48,7 +48,7 @@ typedef int (*precompiled_contract_gas_fn)(const uint8_t* input_src,
                                            const size_t input_size,
                                            uint64_t* gas);
 typedef int (*precompiled_contract_fn)(gw_context_t* ctx,
-                                       uint32_t from_id,
+                                       uint32_t parent_from_id,
                                        const uint8_t* input_src,
                                        const size_t input_size,
                                        uint8_t** output, size_t* output_size);
@@ -71,7 +71,7 @@ int ecrecover_required_gas(const uint8_t* input, const size_t input_size,
          [96..128] => s
 */
 int ecrecover(gw_context_t* ctx,
-              uint32_t from_id,
+              uint32_t parent_from_id,
               const uint8_t* input_src,
               const size_t input_size, uint8_t** output, size_t* output_size) {
   int ret;
@@ -148,7 +148,7 @@ int sha256hash_required_gas(const uint8_t* input, const size_t input_size,
 }
 
 int sha256hash(gw_context_t* ctx,
-               uint32_t from_id,
+               uint32_t parent_from_id,
                const uint8_t* input_src,
                const size_t input_size, uint8_t** output, size_t* output_size) {
   *output = (uint8_t*)malloc(32);
@@ -171,7 +171,7 @@ int ripemd160hash_required_gas(const uint8_t* input, const size_t input_size,
 }
 
 int ripemd160hash(gw_context_t* ctx,
-                  uint32_t from_id,
+                  uint32_t parent_from_id,
                   const uint8_t* input_src,
                   const size_t input_size, uint8_t** output,
                   size_t* output_size) {
@@ -197,7 +197,7 @@ int data_copy_required_gas(const uint8_t* input, const size_t input_size,
 }
 
 int data_copy(gw_context_t* ctx,
-              uint32_t from_id,
+              uint32_t parent_from_id,
               const uint8_t* input_src,
               const size_t input_size, uint8_t** output, size_t* output_size) {
   *output = (uint8_t*)malloc(input_size);
@@ -394,7 +394,7 @@ int big_mod_exp_required_gas(const uint8_t* input, const size_t input_size,
 
 /* eip2565: false */
 int big_mod_exp(gw_context_t* ctx,
-                uint32_t from_id,
+                uint32_t parent_from_id,
                 const uint8_t* input_src,
                 const size_t input_size, uint8_t** output,
                 size_t* output_size) {
@@ -685,7 +685,7 @@ void f_generic(uint64_t h[8], uint64_t m[16], uint64_t c0, uint64_t c1,
 }
 
 int blake2f(gw_context_t* ctx,
-            uint32_t from_id,
+            uint32_t parent_from_id,
             const uint8_t* input_src,
             const size_t input_size, uint8_t** output, size_t* output_size) {
   if (input_size != BLAKE2F_INPUT_LENGTH) {
@@ -738,7 +738,7 @@ int transfer_to_any_sudt_gas(const uint8_t* input_src,
 }
 
 int transfer_to_any_sudt(gw_context_t* ctx,
-                         uint32_t from_id,
+                         uint32_t parent_from_id,
                          const uint8_t* input_src,
                          const size_t input_size,
                          uint8_t** output, size_t* output_size) {
@@ -783,15 +783,15 @@ int transfer_to_any_sudt(gw_context_t* ctx,
     ckb_debug("invalid to_address");
     return ERROR_TRANSFER_TO_ANY_SUDT;
   }
-  if (from_id == to_id) {
-    ckb_debug("from_id can't equals to to_id");
+  if (parent_from_id == to_id) {
+    ckb_debug("parent_from_id can't equals to to_id");
     return ERROR_TRANSFER_TO_ANY_SUDT;
   }
   if (amount == 0) {
     ckb_debug("amount can't be zero");
     return ERROR_TRANSFER_TO_ANY_SUDT;
   }
-  ret = sudt_transfer(ctx, sudt_id, from_id, to_id, amount);
+  ret = sudt_transfer(ctx, sudt_id, parent_from_id, to_id, amount);
   if (ret != 0) {
     ckb_debug("transfer failed");
     return ret;
@@ -830,7 +830,7 @@ int bn256_add_istanbul_gas(const uint8_t* input_src,
 }
 
 int bn256_add_istanbul(gw_context_t* ctx,
-                       uint32_t from_id,
+                       uint32_t parent_from_id,
                        const uint8_t* input_src,
                        const size_t input_size,
                        uint8_t** output, size_t* output_size) {
@@ -876,7 +876,7 @@ int bn256_scalar_mul_istanbul_gas(const uint8_t* input_src,
 }
 
 int bn256_scalar_mul_istanbul(gw_context_t* ctx,
-                              uint32_t from_id,
+                              uint32_t parent_from_id,
                               const uint8_t* input_src,
                               const size_t input_size,
                               uint8_t** output, size_t* output_size) {
@@ -915,7 +915,7 @@ int bn256_pairing_istanbul_gas(const uint8_t* input_src,
 
 /* FIXME: Pairing is not supported due to it's high cycle cost. */
 int bn256_pairing_istanbul(gw_context_t* ctx,
-                           uint32_t from_id,
+                           uint32_t parent_from_id,
                            const uint8_t* input_src,
                            const size_t input_size,
                            uint8_t** output, size_t* output_size) {
