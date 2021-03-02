@@ -8,6 +8,7 @@
 #include <bn128.hpp>
 
 #include "polyjuice_utils.h"
+#include "sudt_contracts.h"
 
 /* Protocol Params:
    [Referenced]:
@@ -19,10 +20,6 @@
 #define RIPEMD160_PERWORD_GAS 120  // Per-word price for a RIPEMD160 operation
 #define IDENTITY_BASE_GAS 15       // Base price for a data copy operation
 #define IDENTITY_PERWORD_GAS 3     // Per-work price for a data copy operation
-#define TRANSFER_TO_ANY_SUDT_GAS 300
-#define BALANCE_OF_ANY_SUDT_GAS 150
-#define SET_ALLOWANCE_GAS 150
-#define GET_ALLOWANCE_GAS 150
 
 #define BN256_ADD_GAS_BYZANTIUM              500    // Byzantium gas needed for an elliptic curve addition
 #define BN256_ADD_GAS_ISTANBUL               150    // Gas needed for an elliptic curve addition
@@ -45,10 +42,6 @@
 #define ERROR_BN256_PAIRING -28
 #define ERROR_BN256_INVALID_POINT -29
 
-#define ERROR_BALANCE_OF_ANY_SUDT -30
-#define ERROR_TRANSFER_TO_ANY_SUDT -31
-#define ERROR_SET_ALLOWANCE -32
-#define ERROR_GET_ALLOWANCE -33
 
 /* pre-compiled Ethereum contracts */
 
@@ -888,193 +881,6 @@ int bn256_pairing_istanbul(gw_context_t* ctx,
   return ERROR_BN256_PAIRING;
 }
 
-int balance_of_any_sudt_gas(const uint8_t* input_src,
-                             const size_t input_size,
-                             uint64_t* gas) {
-  *gas = BALANCE_OF_ANY_SUDT_GAS;
-  return 0;
-}
-
-/* input:
-   ======
-     input[ 0..32] => sudt_id (big endian)
-     input[32..52] => account_id
-
-   output:
-   =======
-     output[0..32] => amount
- */
-int balance_of_any_sudt(gw_context_t* ctx,
-                         uint32_t parent_from_id,
-                         const uint8_t* input_src,
-                         const size_t input_size,
-                         uint8_t** output, size_t* output_size) {
-  int ret;
-  if (input_size != (32 + 20)) {
-    return ERROR_BALANCE_OF_ANY_SUDT;
-  }
-  uint8_t sudt_id_be[32];
-  memcpy(sudt_id_be, input_src, 32);
-  evmc_address address = *((evmc_address *)input_src + 32);
-
-  /* Check leading zeros */
-  for (size_t i = 0; i < 28; i++) {
-    if (sudt_id_be[i] != 0) {
-      return ERROR_BALANCE_OF_ANY_SUDT;
-    }
-  }
-  /* Swap bytes */
-  uint8_t sudt_id_le[4];
-  for (size_t i = 0; i < 4; i++) {
-    sudt_id_le[i] = sudt_id_be[31 - i];
-  }
-  uint32_t sudt_id = *((uint32_t *)sudt_id_le);
-
-  uint32_t account_id;
-  ret = address_to_account_id(&address, &account_id);
-  if (ret != 0) {
-    ckb_debug("invalid address");
-    return ERROR_BALANCE_OF_ANY_SUDT;
-  }
-
-  uint128_t balance;
-  ret = sudt_get_balance(ctx, sudt_id, account_id, &balance);
-  if (ret != 0) {
-    ckb_debug("sudt_get_balance failed");
-    return ERROR_BALANCE_OF_ANY_SUDT;
-  }
-  *output = (uint8_t *)malloc(32);
-  if (*output == NULL) {
-    ckb_debug("malloc failed");
-    return -1;
-  }
-  *output_size = 32;
-  memset(*output, 0, 32);
-  uint8_t *balance_le = (uint8_t *)(&balance);
-  for (size_t i = 0; i < 8; i++) {
-    *(*output + 31 - i) = *(balance_le + i);
-  }
-  return 0;
-}
-
-int transfer_to_any_sudt_gas(const uint8_t* input_src,
-                             const size_t input_size,
-                             uint64_t* gas) {
-  *gas = TRANSFER_TO_ANY_SUDT_GAS;
-  return 0;
-}
-
-/* input:
-   ======
-     input[ 0..32] => sudt_id (big endian)
-     input[32..52] => to_address
-     input[52..84] => amount (big endian)
-
-   output:
-   =======
-     output = NULL
- */
-int transfer_to_any_sudt(gw_context_t* ctx,
-                         uint32_t parent_from_id,
-                         const uint8_t* input_src,
-                         const size_t input_size,
-                         uint8_t** output, size_t* output_size) {
-  int ret;
-  if (input_size != (32 + 20 + 32)) {
-    return ERROR_TRANSFER_TO_ANY_SUDT;
-  }
-  uint8_t sudt_id_be[32];
-  memcpy(sudt_id_be, input_src, 32);
-  evmc_address to_address = *((evmc_address *)input_src + 32);
-  uint8_t amount_be[32];
-  memcpy(amount_be, input_src + 52, 32);
-
-  /* Check leading zeros */
-  for (size_t i = 0; i < 28; i++) {
-    if (sudt_id_be[i] != 0) {
-      return ERROR_TRANSFER_TO_ANY_SUDT;
-    }
-  }
-  for (size_t i = 0; i < 16; i++) {
-    if (amount_be[i] != 0) {
-      return ERROR_TRANSFER_TO_ANY_SUDT;
-    }
-  }
-  /* Swap bytes */
-  uint8_t sudt_id_le[4];
-  uint8_t amount_le[8];
-  for (size_t i = 0; i < 4; i++) {
-    sudt_id_le[i] = sudt_id_be[31 - i];
-  }
-  for (size_t i = 0; i < 8; i++) {
-    amount_le[i] = amount_be[31 - i];
-  }
-  uint32_t sudt_id = *((uint32_t *)sudt_id_le);
-  uint128_t amount = *((uint128_t *)amount_le);
-
-  uint32_t to_id;
-  ret = address_to_account_id(&to_address, &to_id);
-  if (ret != 0) {
-    ckb_debug("invalid to_address");
-    return ERROR_TRANSFER_TO_ANY_SUDT;
-  }
-  if (parent_from_id == to_id) {
-    ckb_debug("parent_from_id can't equals to to_id");
-    return ERROR_TRANSFER_TO_ANY_SUDT;
-  }
-  if (amount == 0) {
-    ckb_debug("amount can't be zero");
-    return ERROR_TRANSFER_TO_ANY_SUDT;
-  }
-  ret = sudt_transfer(ctx, sudt_id, parent_from_id, to_id, amount);
-  if (ret != 0) {
-    ckb_debug("transfer failed");
-    return ret;
-  }
-  *output = NULL;
-  *output_size = 0;
-  return 0;
-}
-
-int set_allowance_gas(const uint8_t* input_src,
-                      const size_t input_size,
-                      uint64_t* gas) {
-  *gas = SET_ALLOWANCE_GAS;
-  return 0;
-}
-
-/* input:
-   ======
-   input[ 0..32] => sudt_id (big endian)
-   input[32..52] => account_id
-*/
-int set_allowance(gw_context_t* ctx,
-                  uint32_t parent_from_id,
-                  const uint8_t* input_src,
-                  const size_t input_size,
-                  uint8_t** output, size_t* output_size) {
-  return 0;
-}
-
-int get_allowance_gas(const uint8_t* input_src,
-                      const size_t input_size,
-                      uint64_t* gas) {
-  *gas = GET_ALLOWANCE_GAS;
-  return 0;
-}
-
-/* input:
-   ======
-   input[ 0..32] => sudt_id (big endian)
-   input[32..52] => account_id
-*/
-int get_allowance(gw_context_t* ctx,
-                  uint32_t parent_from_id,
-                  const uint8_t* input_src,
-                  const size_t input_size,
-                  uint8_t** output, size_t* output_size) {
-  return 0;
-}
 
 bool match_precompiled_address(const evmc_address* destination,
                                precompiled_contract_gas_fn* contract_gas,
