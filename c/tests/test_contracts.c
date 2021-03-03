@@ -67,7 +67,7 @@ int test_contract(const uint8_t n,
   uint32_t from_id = 0xff;
   uint8_t *output = NULL;
   size_t output_size = 0;
-  ret = contract(&ctx, from_id, input_src, input_size, &output, &output_size);
+  ret = contract(&ctx, from_id, true, input_src, input_size, &output, &output_size);
   if (ret != 0) {
     debug_print_int("run contract failed", ret);
     return ret;

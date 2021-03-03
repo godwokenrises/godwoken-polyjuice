@@ -50,6 +50,7 @@ typedef int (*precompiled_contract_gas_fn)(const uint8_t* input_src,
                                            uint64_t* gas);
 typedef int (*precompiled_contract_fn)(gw_context_t* ctx,
                                        uint32_t parent_from_id,
+                                       bool is_static_call,
                                        const uint8_t* input_src,
                                        const size_t input_size,
                                        uint8_t** output, size_t* output_size);
@@ -73,6 +74,7 @@ int ecrecover_required_gas(const uint8_t* input, const size_t input_size,
 */
 int ecrecover(gw_context_t* ctx,
               uint32_t parent_from_id,
+              bool is_static_call,
               const uint8_t* input_src,
               const size_t input_size, uint8_t** output, size_t* output_size) {
   int ret;
@@ -150,6 +152,7 @@ int sha256hash_required_gas(const uint8_t* input, const size_t input_size,
 
 int sha256hash(gw_context_t* ctx,
                uint32_t parent_from_id,
+               bool is_static_call,
                const uint8_t* input_src,
                const size_t input_size, uint8_t** output, size_t* output_size) {
   *output = (uint8_t*)malloc(32);
@@ -173,6 +176,7 @@ int ripemd160hash_required_gas(const uint8_t* input, const size_t input_size,
 
 int ripemd160hash(gw_context_t* ctx,
                   uint32_t parent_from_id,
+                  bool is_static_call,
                   const uint8_t* input_src,
                   const size_t input_size, uint8_t** output,
                   size_t* output_size) {
@@ -199,6 +203,7 @@ int data_copy_required_gas(const uint8_t* input, const size_t input_size,
 
 int data_copy(gw_context_t* ctx,
               uint32_t parent_from_id,
+              bool is_static_call,
               const uint8_t* input_src,
               const size_t input_size, uint8_t** output, size_t* output_size) {
   *output = (uint8_t*)malloc(input_size);
@@ -396,6 +401,7 @@ int big_mod_exp_required_gas(const uint8_t* input, const size_t input_size,
 /* eip2565: false */
 int big_mod_exp(gw_context_t* ctx,
                 uint32_t parent_from_id,
+                bool is_static_call,
                 const uint8_t* input_src,
                 const size_t input_size, uint8_t** output,
                 size_t* output_size) {
@@ -687,6 +693,7 @@ void f_generic(uint64_t h[8], uint64_t m[16], uint64_t c0, uint64_t c1,
 
 int blake2f(gw_context_t* ctx,
             uint32_t parent_from_id,
+            bool is_static_call,
             const uint8_t* input_src,
             const size_t input_size, uint8_t** output, size_t* output_size) {
   if (input_size != BLAKE2F_INPUT_LENGTH) {
@@ -763,6 +770,7 @@ int bn256_add_istanbul_gas(const uint8_t* input_src,
 
 int bn256_add_istanbul(gw_context_t* ctx,
                        uint32_t parent_from_id,
+                       bool is_static_call,
                        const uint8_t* input_src,
                        const size_t input_size,
                        uint8_t** output, size_t* output_size) {
@@ -809,6 +817,7 @@ int bn256_scalar_mul_istanbul_gas(const uint8_t* input_src,
 
 int bn256_scalar_mul_istanbul(gw_context_t* ctx,
                               uint32_t parent_from_id,
+                              bool is_static_call,
                               const uint8_t* input_src,
                               const size_t input_size,
                               uint8_t** output, size_t* output_size) {
@@ -848,6 +857,7 @@ int bn256_pairing_istanbul_gas(const uint8_t* input_src,
 /* FIXME: Pairing is not supported due to it's high cycle cost. */
 int bn256_pairing_istanbul(gw_context_t* ctx,
                            uint32_t parent_from_id,
+                           bool is_static_call,
                            const uint8_t* input_src,
                            const size_t input_size,
                            uint8_t** output, size_t* output_size) {
@@ -943,6 +953,10 @@ bool match_precompiled_address(const evmc_address* destination,
   case 0xf3:
     *contract_gas = get_allowance_gas;
     *contract = get_allowance;
+    break;
+  case 0xf4:
+    *contract_gas = transfer_from_any_sudt_gas;
+    *contract = transfer_from_any_sudt;
     break;
   default:
     *contract_gas = NULL;
