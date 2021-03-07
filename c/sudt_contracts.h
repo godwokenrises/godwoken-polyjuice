@@ -82,7 +82,7 @@ int balance_of_any_sudt(gw_context_t* ctx,
     return ERROR_BALANCE_OF_ANY_SUDT;
   }
 
-  evmc_address address = *((evmc_address *)input_src + 32 + 12);
+  evmc_address address = *((evmc_address *)(input_src + 32 + 12));
   uint32_t account_id;
   ret = address_to_account_id(&address, &account_id);
   if (ret != 0) {
@@ -149,7 +149,7 @@ int transfer_to_any_sudt(gw_context_t* ctx,
   }
 
   uint32_t to_id = 0;
-  evmc_address to_address = *((evmc_address *)input_src + 32 + 12);
+  evmc_address to_address = *((evmc_address *)(input_src + 32 + 12));
   ret = address_to_account_id(&to_address, &to_id);
   if (ret != 0) {
     ckb_debug("invalid to_address");
@@ -215,7 +215,7 @@ int set_allowance(gw_context_t* ctx,
   }
 
   uint32_t spender_id = 0;
-  evmc_address spender_address = *((evmc_address *)input_src + 32 + 12);
+  evmc_address spender_address = *((evmc_address *)(input_src + 32 + 12));
   ret = address_to_account_id(&spender_address, &spender_id);
   if (ret != 0) {
     ckb_debug("invalid spender address");
@@ -269,8 +269,8 @@ int get_allowance(gw_context_t* ctx,
 
   uint32_t owner_id = 0;
   uint32_t spender_id = 0;
-  evmc_address owner_address = *((evmc_address *)input_src + 32 + 12);
-  evmc_address spender_address = *((evmc_address *)input_src + 64 + 12);
+  evmc_address owner_address = *((evmc_address *)(input_src + 32 + 12));
+  evmc_address spender_address = *((evmc_address *)(input_src + 64 + 12));
   ret = address_to_account_id(&owner_address, &owner_id);
   if (ret != 0) {
     ckb_debug("invalid owner address");
@@ -344,8 +344,8 @@ int transfer_from_any_sudt(gw_context_t* ctx,
 
   uint32_t sender_id = 0;
   uint32_t recipient_id = 0;
-  evmc_address sender_address = *((evmc_address *)input_src + 32 + 12);
-  evmc_address recipient_address = *((evmc_address *)input_src + 64 + 12);
+  evmc_address sender_address = *((evmc_address *)(input_src + 32 + 12));
+  evmc_address recipient_address = *((evmc_address *)(input_src + 64 + 12));
   ret = address_to_account_id(&sender_address, &sender_id);
   if (ret != 0) {
     ckb_debug("invalid sender address");

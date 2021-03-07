@@ -196,14 +196,14 @@ contract ERC20 is Context, IERC20 {
         uint256[2] memory input;
         input[0] = _sudtId;
         input[1] = uint256(uint160(address(account)));
-        uint256 amount = 0;
+        uint256[1] memory output;
         /* balance_of_any_sudt */
         assembly {
-            if iszero(call(not(0), 0xf0, 0x0, input, 0x40, amount, 0x20)) {
+            if iszero(call(not(0), 0xf0, 0x0, input, 0x40, output, 0x20)) {
                 revert(0x0, 0x0)
             }
         }
-        return amount;
+        return output[0];
     }
 
     /**
@@ -227,14 +227,14 @@ contract ERC20 is Context, IERC20 {
         input[0] = _sudtId;
         input[1] = uint256(uint160(address(owner)));
         input[2] = uint256(uint160(address(spender)));
-        uint256 amount = 0;
+        uint256[1] memory output;
         /* get_allowance */
         assembly {
-            if iszero(call(not(0), 0xf3, 0x0, input, 0x60, amount, 0x20)) {
+            if iszero(call(not(0), 0xf3, 0x0, input, 0x60, output, 0x20)) {
                 revert(0x0, 0x0)
             }
         }
-        return amount;
+        return output[0];
     }
 
     /**
@@ -270,10 +270,10 @@ contract ERC20 is Context, IERC20 {
         input[1] = uint256(uint160(address(sender)));
         input[2] = uint256(uint160(address(recipient)));
         input[3] = amount;
-        uint256 placeholder = 0;
+        uint256[1] memory output;
         /* transfer_from_any_sudt */
         assembly {
-            if iszero(call(not(0), 0xf4, 0x0, input, 0x80, placeholder, 0x20)) {
+            if iszero(call(not(0), 0xf4, 0x0, input, 0x80, output, 0x20)) {
                 revert(0x0, 0x0)
             }
         }
@@ -344,10 +344,10 @@ contract ERC20 is Context, IERC20 {
         input[0] = _sudtId;
         input[1] = uint256(uint160(address(recipient)));
         input[2] = amount;
-        uint256 placeholder = 0;
+        uint256[1] memory output;
         /* transfer_to_any_sudt */
         assembly {
-            if iszero(call(not(0), 0xf1, 0x0, input, 0x60, placeholder, 0x20)) {
+            if iszero(call(not(0), 0xf1, 0x0, input, 0x60, output, 0x20)) {
                 revert(0x0, 0x0)
             }
         }
@@ -376,10 +376,10 @@ contract ERC20 is Context, IERC20 {
         input[0] = _sudtId;
         input[1] = uint256(uint160(address(spender)));
         input[2] = amount;
-        uint256 placeholder = 0;
+        uint256[1] memory output;
         /* set_allowance */
         assembly {
-            if iszero(call(not(0), 0xf2, 0x0, input, 0x60, placeholder, 0x20)) {
+            if iszero(call(not(0), 0xf2, 0x0, input, 0x60, output, 0x20)) {
                 revert(0x0, 0x0)
             }
         }

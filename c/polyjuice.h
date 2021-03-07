@@ -540,6 +540,7 @@ struct evmc_result call(struct evmc_host_context* context,
   debug_print_data("call.destination", msg->destination.bytes, 20);
   int ret;
   struct evmc_result res;
+  res.release = release_result;
   gw_context_t* gw_ctx = context->gw_ctx;
 
   if (msg->depth > (int32_t)UINT16_MAX) {
@@ -566,7 +567,7 @@ struct evmc_result call(struct evmc_host_context* context,
       return res;
     }
     res.gas_left = msg->gas - (int64_t)gas_cost;
-    ret = contract(gw_ctx, context->parent_from_id, msg->flags == EVMC_STATIC,
+    ret = contract(gw_ctx, context->from_id, msg->flags == EVMC_STATIC,
                    msg->input_data, msg->input_size,
                    (uint8_t**)&res.output_data, &res.output_size);
     if (ret != 0) {
@@ -575,7 +576,7 @@ struct evmc_result call(struct evmc_host_context* context,
       res.status_code = EVMC_REVERT;
       return res;
     }
-    res.release = release_result;
+    debug_print_data("output data", res.output_data, res.output_size);
   } else {
     ret = handle_message(gw_ctx, context->from_id, context->to_id, msg, &res);
     if (ret != 0) {
