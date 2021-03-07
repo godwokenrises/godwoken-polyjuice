@@ -2,7 +2,8 @@
 //!   See ./evm-contracts/SimpleStorage.sol
 
 use crate::helper::{
-    new_account_script, new_block_info, setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
+    get_chain_view, new_account_script, new_block_info, setup, PolyjuiceArgsBuilder,
+    CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
@@ -38,7 +39,7 @@ fn test_simple_storage() {
             .args(Bytes::from(args).pack())
             .build();
         let run_result = generator
-            .execute(&store.begin_transaction(), &tree, &block_info, &raw_tx)
+            .execute_transaction(&get_chain_view(&store), &tree, &block_info, &raw_tx)
             .expect("construct");
         tree.apply_run_result(&run_result).expect("update state");
         // println!("result {:?}", run_result);
@@ -70,7 +71,7 @@ fn test_simple_storage() {
             .args(Bytes::from(args).pack())
             .build();
         let run_result = generator
-            .execute(&store.begin_transaction(), &tree, &block_info, &raw_tx)
+            .execute_transaction(&get_chain_view(&store), &tree, &block_info, &raw_tx)
             .expect("construct");
         tree.apply_run_result(&run_result).expect("update state");
         // println!("result {:?}", run_result);
@@ -93,7 +94,7 @@ fn test_simple_storage() {
             .args(Bytes::from(args).pack())
             .build();
         let run_result = generator
-            .execute(&store.begin_transaction(), &tree, &block_info, &raw_tx)
+            .execute_transaction(&get_chain_view(&store), &tree, &block_info, &raw_tx)
             .expect("construct");
         tree.apply_run_result(&run_result).expect("update state");
         let mut expected_return_data = vec![0u8; 32];

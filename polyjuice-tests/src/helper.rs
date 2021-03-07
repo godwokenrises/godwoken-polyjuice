@@ -4,6 +4,7 @@ pub use gw_common::{
     state::State,
     CKB_SUDT_SCRIPT_ARGS, H256,
 };
+use gw_db::schema::{COLUMN_INDEX, COLUMN_META, META_TIP_BLOCK_HASH_KEY};
 pub use gw_generator::{
     account_lock_manage::{always_success::AlwaysSuccess, AccountLockManage},
     backend_manage::{Backend, BackendManage},
@@ -12,10 +13,11 @@ pub use gw_generator::{
     traits::StateExt,
     Generator, RunResult,
 };
-pub use gw_store::Store;
+use gw_store::traits::KVStore;
+pub use gw_store::{chain_view::ChainView, Store};
 use gw_types::{
     bytes::Bytes,
-    packed::{BlockInfo, RawL2Transaction, Script},
+    packed::{BlockInfo, RawL2Transaction, Script, Uint64},
     prelude::*,
 };
 use std::{fs, io::Read, path::PathBuf};
@@ -85,6 +87,12 @@ pub fn eth_address_to_account_id(data: &[u8]) -> Result<u32, String> {
     let mut id_data = [0u8; 4];
     id_data.copy_from_slice(&data[0..4]);
     Ok(u32::from_le_bytes(id_data))
+}
+
+pub fn get_chain_view(store: &Store) -> ChainView {
+    let db = store.begin_transaction();
+    let tip_block_hash = store.get_tip_block_hash().unwrap();
+    ChainView::new(db, tip_block_hash)
 }
 
 pub fn new_account_script_with_nonce(from_id: u32, from_nonce: u32) -> Script {
@@ -209,6 +217,24 @@ pub fn setup() -> (Store, DummyState, Generator, u32) {
     account_lock_manage.register_lock_algorithm(H256::zero(), Box::new(AlwaysSuccess::default()));
     let generator = Generator::new(backend_manage, account_lock_manage, Default::default());
 
+    let tx = store.begin_transaction();
+    let tip_block_number: Uint64 = 8.pack();
+    let tip_block_hash = [8u8; 32];
+    tx.insert_raw(COLUMN_META, META_TIP_BLOCK_HASH_KEY, &tip_block_hash[..])
+        .unwrap();
+    tx.insert_raw(
+        COLUMN_INDEX,
+        tip_block_number.as_slice(),
+        &tip_block_hash[..],
+    )
+    .unwrap();
+    tx.insert_raw(
+        COLUMN_INDEX,
+        &tip_block_hash[..],
+        tip_block_number.as_slice(),
+    )
+    .unwrap();
+    tx.commit().unwrap();
     (store, tree, generator, creator_account_id)
 }
 
@@ -238,7 +264,7 @@ pub fn deploy(
         .args(Bytes::from(args).pack())
         .build();
     let run_result = generator
-        .execute(&store.begin_transaction(), tree, &block_info, &raw_tx)
+        .execute_transaction(&get_chain_view(&store), tree, &block_info, &raw_tx)
         .expect("construct");
     tree.apply_run_result(&run_result).expect("update state");
     run_result
@@ -307,6 +333,6 @@ pub fn simple_storage_get(
         .args(Bytes::from(args).pack())
         .build();
     generator
-        .execute(&store.begin_transaction(), tree, &block_info, &raw_tx)
+        .execute_transaction(&get_chain_view(&store), tree, &block_info, &raw_tx)
         .expect("construct")
 }

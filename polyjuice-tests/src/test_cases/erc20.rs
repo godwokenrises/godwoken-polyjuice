@@ -2,12 +2,12 @@
 //!   See ./evm-contracts/ERC20.bin
 
 use crate::helper::{
-    account_id_to_eth_address, deploy, new_account_script, new_block_info, setup,
+    account_id_to_eth_address, deploy, get_chain_view, new_account_script, new_block_info, setup,
     PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
-use gw_jsonrpc_types::parameter::RunResult;
+// use gw_jsonrpc_types::parameter::RunResult;
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
 
 const INIT_CODE: &str = include_str!("./evm-contracts/ERC20.bin");
@@ -152,16 +152,16 @@ fn test_erc20() {
             .args(Bytes::from(args).pack())
             .build();
         let run_result = generator
-            .execute(&store.begin_transaction(), &tree, &block_info, &raw_tx)
+            .execute_transaction(&get_chain_view(&store), &tree, &block_info, &raw_tx)
             .expect("construct");
         tree.apply_run_result(&run_result).expect("update state");
         assert_eq!(
             run_result.return_data,
             hex::decode(return_data_str).unwrap()
         );
-        println!(
-            "result {}",
-            serde_json::to_string_pretty(&RunResult::from(run_result)).unwrap()
-        );
+        // println!(
+        //     "result {}",
+        //     serde_json::to_string_pretty(&RunResult::from(run_result)).unwrap()
+        // );
     }
 }

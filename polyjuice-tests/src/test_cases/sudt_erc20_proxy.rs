@@ -2,12 +2,12 @@
 //!   See ./evm-contracts/ERC20.bin
 
 use crate::helper::{
-    account_id_to_eth_address, deploy, new_account_script, new_block_info, setup,
+    account_id_to_eth_address, deploy, get_chain_view, new_account_script, new_block_info, setup,
     PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
-use gw_jsonrpc_types::parameter::RunResult;
+// use gw_jsonrpc_types::parameter::RunResult;
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
 
 const INIT_CODE: &str = include_str!("../../../solidity/erc20/SudtERC20Proxy.bin");
@@ -24,9 +24,12 @@ fn test_sudt_erc20_proxy() {
     let from_id2 = tree.create_account_from_script(from_script2).unwrap();
     let from_script3 = gw_generator::sudt::build_l2_sudt_script([3u8; 32]);
     let from_id3 = tree.create_account_from_script(from_script3).unwrap();
-    tree.mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id1, 2000000).unwrap();
-    tree.mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id2, 2000000).unwrap();
-    tree.mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id3, 2000000).unwrap();
+    tree.mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id1, 2000000)
+        .unwrap();
+    tree.mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id2, 2000000)
+        .unwrap();
+    tree.mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id3, 2000000)
+        .unwrap();
 
     assert_eq!(CKB_SUDT_ACCOUNT_ID, 1);
     // Deploy ERC20
@@ -57,9 +60,13 @@ fn test_sudt_erc20_proxy() {
     println!("eoa1_hex: {}", eoa1_hex);
     println!("eoa2_hex: {}", eoa2_hex);
     println!("eoa3_hex: {}", eoa3_hex);
-    tree.mint_sudt(new_sudt_id, from_id1, 160000000000000000000000000000u128).unwrap();
+    tree.mint_sudt(new_sudt_id, from_id1, 160000000000000000000000000000u128)
+        .unwrap();
 
-    assert_eq!(tree.get_sudt_balance(new_sudt_id, from_id1).unwrap(), 160000000000000000000000000000u128);
+    assert_eq!(
+        tree.get_sudt_balance(new_sudt_id, from_id1).unwrap(),
+        160000000000000000000000000000u128
+    );
     assert_eq!(tree.get_sudt_balance(new_sudt_id, from_id2).unwrap(), 0);
     assert_eq!(tree.get_sudt_balance(new_sudt_id, from_id3).unwrap(), 0);
     for (idx, (from_id, args_str, is_static, return_data_str)) in [
@@ -173,16 +180,16 @@ fn test_sudt_erc20_proxy() {
             .args(Bytes::from(args).pack())
             .build();
         let run_result = generator
-            .execute(&store.begin_transaction(), &tree, &block_info, &raw_tx)
+            .execute_transaction(&get_chain_view(&store), &tree, &block_info, &raw_tx)
             .expect("construct");
         tree.apply_run_result(&run_result).expect("update state");
         assert_eq!(
             run_result.return_data,
             hex::decode(return_data_str).unwrap()
         );
-        println!(
-            "result {}",
-            serde_json::to_string_pretty(&RunResult::from(run_result)).unwrap()
-        );
+        // println!(
+        //     "result {}",
+        //     serde_json::to_string_pretty(&RunResult::from(run_result)).unwrap()
+        // );
     }
 }

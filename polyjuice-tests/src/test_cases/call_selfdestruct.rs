@@ -2,8 +2,8 @@
 //!   See ./evm-contracts/SelfDestruct.sol
 
 use crate::helper::{
-    account_id_to_eth_address, deploy, new_account_script_with_nonce, new_block_info, setup,
-    PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
+    account_id_to_eth_address, deploy, get_chain_view, new_account_script_with_nonce,
+    new_block_info, setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
@@ -105,7 +105,7 @@ fn test_selfdestruct() {
             .args(Bytes::from(args).pack())
             .build();
         let run_result = generator
-            .execute(&store.begin_transaction(), &tree, &block_info, &raw_tx)
+            .execute_transaction(&get_chain_view(&store), &tree, &block_info, &raw_tx)
             .expect("construct");
         tree.apply_run_result(&run_result).expect("update state");
     }
@@ -141,7 +141,8 @@ fn test_selfdestruct() {
             .to_id(sd_account_id.pack())
             .args(Bytes::from(args).pack())
             .build();
-        let result = generator.execute(&store.begin_transaction(), &tree, &block_info, &raw_tx);
+        let result =
+            generator.execute_transaction(&get_chain_view(&store), &tree, &block_info, &raw_tx);
         println!("result {:?}", result);
         assert!(result.is_err());
     }
@@ -165,7 +166,8 @@ fn test_selfdestruct() {
             .to_id(new_account_id.pack())
             .args(Bytes::from(args).pack())
             .build();
-        let result = generator.execute(&store.begin_transaction(), &tree, &block_info, &raw_tx);
+        let result =
+            generator.execute_transaction(&get_chain_view(&store), &tree, &block_info, &raw_tx);
         println!("result {:?}", result);
         assert!(result.is_err());
     }

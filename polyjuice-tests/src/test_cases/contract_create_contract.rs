@@ -2,12 +2,12 @@
 //!   See ./evm-contracts/CreateContract.sol
 
 use crate::helper::{
-    deploy, new_account_script, new_account_script_with_nonce, new_block_info, setup,
-    PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
+    deploy, get_chain_view, new_account_script, new_account_script_with_nonce, new_block_info,
+    setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
-use gw_jsonrpc_types::parameter::RunResult;
+// use gw_jsonrpc_types::parameter::RunResult;
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
 
 const INIT_CODE: &str = include_str!("./evm-contracts/CreateContract.bin");
@@ -22,7 +22,7 @@ fn test_contract_create_contract() {
         .unwrap();
 
     // Deploy CreateContract
-    let run_result = deploy(
+    let _run_result = deploy(
         &generator,
         &store,
         &mut tree,
@@ -33,10 +33,10 @@ fn test_contract_create_contract() {
         0,
         1,
     );
-    println!(
-        "result {}",
-        serde_json::to_string_pretty(&RunResult::from(run_result)).unwrap()
-    );
+    // println!(
+    //     "result {}",
+    //     serde_json::to_string_pretty(&RunResult::from(run_result)).unwrap()
+    // );
 
     let contract_account_script = new_account_script(&mut tree, from_id, false);
     let new_account_id = tree
@@ -71,7 +71,7 @@ fn test_contract_create_contract() {
             .args(Bytes::from(args).pack())
             .build();
         let run_result = generator
-            .execute(&store.begin_transaction(), &tree, &block_info, &raw_tx)
+            .execute_transaction(&get_chain_view(&store), &tree, &block_info, &raw_tx)
             .expect("construct");
         tree.apply_run_result(&run_result).expect("update state");
         let mut expected_return_data = vec![0u8; 32];

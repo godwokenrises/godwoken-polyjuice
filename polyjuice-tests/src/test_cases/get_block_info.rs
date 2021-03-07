@@ -2,13 +2,14 @@
 //!   See ./evm-contracts/BlockInfo.sol
 
 use crate::helper::{
-    new_account_script, new_block_info, setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
+    get_chain_view, new_account_script, new_block_info, setup, PolyjuiceArgsBuilder,
+    CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
 use gw_db::schema::COLUMN_INDEX;
 use gw_generator::traits::StateExt;
-use gw_jsonrpc_types::parameter::RunResult;
-use gw_traits::ChainStore;
+// use gw_jsonrpc_types::parameter::RunResult;
+use gw_store::traits::KVStore;
 use gw_types::{
     bytes::Bytes,
     packed::{RawL2Transaction, Uint64},
@@ -23,6 +24,7 @@ fn test_get_block_info() {
 
     {
         let genesis_number: Uint64 = 0.pack();
+        // See: BlockInfo.sol
         let block_hash = [7u8; 32];
         let tx = store.begin_transaction();
         tx.insert_raw(COLUMN_INDEX, genesis_number.as_slice(), &block_hash[..])
@@ -57,14 +59,14 @@ fn test_get_block_info() {
         .args(Bytes::from(args).pack())
         .build();
     let run_result = generator
-        .execute(&store.begin_transaction(), &tree, &block_info, &raw_tx)
+        .execute_transaction(&get_chain_view(&store), &tree, &block_info, &raw_tx)
         .expect("construct");
     tree.apply_run_result(&run_result).expect("update state");
     block_number += 1;
-    println!(
-        "result {}",
-        serde_json::to_string_pretty(&RunResult::from(run_result)).unwrap()
-    );
+    // println!(
+    //     "result {}",
+    //     serde_json::to_string_pretty(&RunResult::from(run_result)).unwrap()
+    // );
 
     let contract_account_script = new_account_script(&mut tree, from_id, false);
     let new_account_id = tree
@@ -122,7 +124,7 @@ fn test_get_block_info() {
             .args(Bytes::from(args).pack())
             .build();
         let run_result = generator
-            .execute(&store.begin_transaction(), &tree, &block_info, &raw_tx)
+            .execute_transaction(&get_chain_view(&store), &tree, &block_info, &raw_tx)
             .expect("construct");
         assert_eq!(
             run_result.return_data,
