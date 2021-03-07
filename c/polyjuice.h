@@ -45,6 +45,7 @@
 #define POLYJUICE_DESTRUCTED 0x02
 
 static bool has_touched = false;
+static uint8_t rollup_script_hash[32] = {0};
 static uint32_t sudt_id = UINT32_MAX;
 static uint32_t tx_origin_id = UINT32_MAX;
 static evmc_address tx_origin;
@@ -691,9 +692,16 @@ int load_globals(gw_context_t* ctx, uint32_t to_id) {
   mol_seg_t hash_type_seg = MolReader_Script_get_hash_type(&script_seg);
   mol_seg_t args_seg = MolReader_Script_get_args(&script_seg);
   mol_seg_t raw_args_seg = MolReader_Bytes_raw_bytes(&args_seg);
+
   memcpy(script_code_hash, code_hash_seg.ptr, 32);
   script_hash_type = *hash_type_seg.ptr;
-  sudt_id = *(uint32_t*)(raw_args_seg.ptr);
+  if (raw_args_seg.size < 36) {
+    ckb_debug("invalid script args");
+    return -1;
+  }
+  memcpy(rollup_script_hash, raw_args_seg.ptr, 32);
+  sudt_id = *(uint32_t*)(raw_args_seg.ptr + 32);
+  debug_print_data("rollup_script_hash", rollup_script_hash, 32);
   debug_print_int("sudt id", sudt_id);
   return 0;
 }
@@ -710,35 +718,39 @@ int create_new_account(gw_context_t* ctx,
   if (msg->kind == EVMC_CREATE) {
     /* create account id
        Include:
-       - [4 bytes] sudt id
-       - [4 bytes] sender account id
-       - [4 bytes] sender nonce (NOTE: only use first 4 bytes (u32))
+       - [32 bytes] rollup type hash
+       - [ 4 bytes] sudt id
+       - [ 4 bytes] sender account id
+       - [ 4 bytes] sender nonce (NOTE: only use first 4 bytes (u32))
     */
     debug_print_int("from_id", from_id);
     debug_print_int("to_id", *to_id);
-    memcpy(script_args, (uint8_t*)(&sudt_id), 4);
-    memcpy(script_args + 4, (uint8_t*)(&from_id), 4);
-    ret = ctx->sys_load_nonce(ctx, from_id, script_args + 8);
+    memcpy(script_args, rollup_script_hash, 32);
+    memcpy(script_args + 32, (uint8_t*)(&sudt_id), 4);
+    memcpy(script_args + (32 + 4), (uint8_t*)(&from_id), 4);
+    ret = ctx->sys_load_nonce(ctx, from_id, script_args + (32 + 4 + 4));
     if (ret != 0) {
       return ret;
     }
-    script_args_len = 4 + 4 + 4;
+    script_args_len = 32 + 4 + 4 + 4;
   } else if (msg->kind == EVMC_CREATE2) {
     /* create account id
        Include:
+       - [32 bytes] rollup type hash
        - [ 4 bytes] sudt id
        - [ 1 byte ] 0xff (refer to ethereum)
        - [ 4 bytes] sender account id
        - [32 bytes] create2_salt
        - [32 bytes] keccak256(init_code)
     */
-    memcpy(script_args, (uint8_t*)(&sudt_id), 4);
-    script_args[4] = 0xff;
-    memcpy(script_args + (4 + 1), (uint8_t*)(&from_id), 4);
-    memcpy(script_args + (4 + 1 + 4), msg->create2_salt.bytes, 32);
+    memcpy(script_args, rollup_script_hash, 32);
+    memcpy(script_args + 32, (uint8_t*)(&sudt_id), 4);
+    script_args[32 + 4] = 0xff;
+    memcpy(script_args + (32 + 4 + 1), (uint8_t*)(&from_id), 4);
+    memcpy(script_args + (32 + 4 + 1 + 4), msg->create2_salt.bytes, 32);
     union ethash_hash256 hash_result = ethash::keccak256(code_data, code_size);
-    memcpy(script_args + (4 + 1 + 4 + 32), hash_result.bytes, 32);
-    script_args_len = 4 + 1 + 4 + 32 + 32;
+    memcpy(script_args + (32 + 4 + 1 + 4 + 32), hash_result.bytes, 32);
+    script_args_len = 32 + 4 + 1 + 4 + 32 + 32;
   }
   if (script_args_len > 0) {
     mol_seg_t new_script_seg;

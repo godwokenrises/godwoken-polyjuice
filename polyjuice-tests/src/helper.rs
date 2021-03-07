@@ -25,6 +25,7 @@ use std::{fs, io::Read, path::PathBuf};
 pub const BIN_DIR: &str = "../build";
 pub const GENERATOR_NAME: &str = "generator_log";
 pub const VALIDATOR_NAME: &str = "validator_log";
+pub const ROLLUP_SCRIPT_HASH: [u8; 32] = [9u8; 32];
 
 lazy_static::lazy_static! {
     pub static ref GENERATOR_PROGRAM: Bytes = {
@@ -96,10 +97,11 @@ pub fn get_chain_view(store: &Store) -> ChainView {
 }
 
 pub fn new_account_script_with_nonce(from_id: u32, from_nonce: u32) -> Script {
-    let mut new_account_args = [0u8; 12];
-    new_account_args[0..4].copy_from_slice(&CKB_SUDT_ACCOUNT_ID.to_le_bytes()[..]);
-    new_account_args[4..8].copy_from_slice(&from_id.to_le_bytes()[..]);
-    new_account_args[8..12].copy_from_slice(&from_nonce.to_le_bytes()[..]);
+    let mut new_account_args = [0u8; 44];
+    new_account_args[0..32].copy_from_slice(&ROLLUP_SCRIPT_HASH);
+    new_account_args[32..36].copy_from_slice(&CKB_SUDT_ACCOUNT_ID.to_le_bytes()[..]);
+    new_account_args[36..40].copy_from_slice(&from_id.to_le_bytes()[..]);
+    new_account_args[40..44].copy_from_slice(&from_nonce.to_le_bytes()[..]);
     Script::new_builder()
         .code_hash(PROGRAM_CODE_HASH.pack())
         .args(Bytes::from(new_account_args.to_vec()).pack())
@@ -197,11 +199,14 @@ pub fn setup() -> (Store, DummyState, Generator, u32) {
         "ckb simple UDT account id"
     );
 
+    let mut args = [0u8; 36];
+    args[0..32].copy_from_slice(&ROLLUP_SCRIPT_HASH);
+    args[32..36].copy_from_slice(&ckb_sudt_id.to_le_bytes()[..]);
     let creator_account_id = tree
         .create_account_from_script(
             Script::new_builder()
                 .code_hash(PROGRAM_CODE_HASH.pack())
-                .args(ckb_sudt_id.to_le_bytes().to_vec().pack())
+                .args(args.to_vec().pack())
                 .build(),
         )
         .expect("create account");
