@@ -13,7 +13,7 @@ if [ -d "$GODWOKEN_DIR" ]
 then
     echo "godwoken project already exists"
 else
-    git clone https://github.com/nervosnetwork/godwoken.git $GODWOKEN_DIR
+    git clone -b master https://github.com/nervosnetwork/godwoken.git $GODWOKEN_DIR
 fi
 
 mkdir -p $GODWOKEN_DIR/c/build/account_locks
