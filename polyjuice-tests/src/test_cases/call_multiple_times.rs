@@ -2,7 +2,7 @@
 //!   See ./evm-contracts/CallContract.sol
 
 use crate::helper::{
-    account_id_to_eth_address, deploy, get_chain_view, new_account_script,
+    account_id_to_eth_address, build_l2_sudt_script, deploy, get_chain_view, new_account_script,
     new_account_script_with_nonce, new_block_info, setup, simple_storage_get, PolyjuiceArgsBuilder,
     CKB_SUDT_ACCOUNT_ID,
 };
@@ -18,7 +18,7 @@ const INIT_CODE: &str = include_str!("./evm-contracts/CallMultipleTimes.bin");
 fn test_call_multiple_times() {
     let (store, mut tree, generator, creator_account_id) = setup();
 
-    let from_script = gw_generator::sudt::build_l2_sudt_script([1u8; 32]);
+    let from_script = build_l2_sudt_script([1u8; 32]);
     let from_id = tree.create_account_from_script(from_script).unwrap();
     tree.mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, 280000)
         .unwrap();

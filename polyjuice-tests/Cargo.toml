@@ -11,6 +11,7 @@ gw-types = { path = "../integration-test/godwoken/crates/types" }
 gw-common = { path = "../integration-test/godwoken/crates/common" }
 gw-db = { path = "../integration-test/godwoken/crates/db" }
 gw-store = { path = "../integration-test/godwoken/crates/store" }
+gw-config = { path = "../integration-test/godwoken/crates/config" }
 gw-traits = { path = "../integration-test/godwoken/crates/traits" }
 gw-generator = { path = "../integration-test/godwoken/crates/generator" }
 gw-jsonrpc-types = { path = "../integration-test/godwoken/crates/jsonrpc-types" }

@@ -2,8 +2,8 @@
 //!   See ./evm-contracts/ERC20.bin
 
 use crate::helper::{
-    account_id_to_eth_address, deploy, get_chain_view, new_account_script, new_block_info, setup,
-    PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
+    account_id_to_eth_address, build_l2_sudt_script, deploy, get_chain_view, new_account_script,
+    new_block_info, setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
@@ -15,14 +15,14 @@ const INIT_CODE: &str = include_str!("../../../solidity/erc20/SudtERC20Proxy.bin
 #[test]
 fn test_sudt_erc20_proxy() {
     let (store, mut tree, generator, creator_account_id) = setup();
-    let new_sudt_script = gw_generator::sudt::build_l2_sudt_script([0xffu8; 32]);
+    let new_sudt_script = build_l2_sudt_script([0xffu8; 32]);
     let new_sudt_id = tree.create_account_from_script(new_sudt_script).unwrap();
 
-    let from_script1 = gw_generator::sudt::build_l2_sudt_script([1u8; 32]);
+    let from_script1 = build_l2_sudt_script([1u8; 32]);
     let from_id1 = tree.create_account_from_script(from_script1).unwrap();
-    let from_script2 = gw_generator::sudt::build_l2_sudt_script([2u8; 32]);
+    let from_script2 = build_l2_sudt_script([2u8; 32]);
     let from_id2 = tree.create_account_from_script(from_script2).unwrap();
-    let from_script3 = gw_generator::sudt::build_l2_sudt_script([3u8; 32]);
+    let from_script3 = build_l2_sudt_script([3u8; 32]);
     let from_id3 = tree.create_account_from_script(from_script3).unwrap();
     tree.mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id1, 2000000)
         .unwrap();

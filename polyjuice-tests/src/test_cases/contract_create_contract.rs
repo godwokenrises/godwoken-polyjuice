@@ -2,8 +2,9 @@
 //!   See ./evm-contracts/CreateContract.sol
 
 use crate::helper::{
-    deploy, get_chain_view, new_account_script, new_account_script_with_nonce, new_block_info,
-    setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
+    build_l2_sudt_script, deploy, get_chain_view, new_account_script,
+    new_account_script_with_nonce, new_block_info, setup, PolyjuiceArgsBuilder,
+    CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
@@ -16,7 +17,7 @@ const INIT_CODE: &str = include_str!("./evm-contracts/CreateContract.bin");
 fn test_contract_create_contract() {
     let (store, mut tree, generator, creator_account_id) = setup();
 
-    let from_script = gw_generator::sudt::build_l2_sudt_script([1u8; 32]);
+    let from_script = build_l2_sudt_script([1u8; 32]);
     let from_id = tree.create_account_from_script(from_script).unwrap();
     tree.mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, 200000)
         .unwrap();

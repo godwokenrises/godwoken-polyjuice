@@ -2,8 +2,8 @@
 //!   See ./evm-contracts/SimpleTransfer.sol
 
 use crate::helper::{
-    account_id_to_eth_address, deploy, get_chain_view, new_account_script, new_block_info, setup,
-    simple_storage_get, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
+    account_id_to_eth_address, build_l2_sudt_script, deploy, get_chain_view, new_account_script,
+    new_block_info, setup, simple_storage_get, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
@@ -17,12 +17,12 @@ const INIT_CODE: &str = include_str!("./evm-contracts/SimpleTransfer.bin");
 fn test_simple_transfer() {
     let (store, mut tree, generator, creator_account_id) = setup();
 
-    let from_script = gw_generator::sudt::build_l2_sudt_script([1u8; 32]);
+    let from_script = build_l2_sudt_script([1u8; 32]);
     let from_id = tree.create_account_from_script(from_script).unwrap();
     let mint_balance: u128 = 400000;
     tree.mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, mint_balance)
         .unwrap();
-    let target_script = gw_generator::sudt::build_l2_sudt_script([2u8; 32]);
+    let target_script = build_l2_sudt_script([2u8; 32]);
     let target_id = tree.create_account_from_script(target_script).unwrap();
 
     let from_balance = tree.get_sudt_balance(CKB_SUDT_ACCOUNT_ID, from_id).unwrap();

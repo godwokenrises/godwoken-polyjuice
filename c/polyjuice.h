@@ -763,6 +763,7 @@ int create_new_account(gw_context_t* ctx,
     ret = ctx->sys_create(ctx, new_script_seg.ptr, new_script_seg.size,
                           &new_account_id);
     if (ret != 0) {
+      debug_print_int("sys_create error", ret);
       ckb_debug("create account failed assume account already created by meta_contract");
       uint8_t script_hash[32];
       blake2b_hash(script_hash, new_script_seg.ptr, new_script_seg.size);

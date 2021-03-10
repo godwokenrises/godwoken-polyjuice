@@ -2,7 +2,8 @@
 //!   See ./evm-contracts/SimpleTransfer.sol
 
 use crate::helper::{
-    deploy, new_account_script, new_account_script_with_nonce, setup, CKB_SUDT_ACCOUNT_ID,
+    build_l2_sudt_script, deploy, new_account_script, new_account_script_with_nonce, setup,
+    CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
@@ -13,7 +14,7 @@ const SS_INIT_CODE: &str = include_str!("./evm-contracts/SimpleStorage.bin");
 fn test_account_already_exists() {
     let (store, mut tree, generator, creator_account_id) = setup();
 
-    let from_script = gw_generator::sudt::build_l2_sudt_script([1u8; 32]);
+    let from_script = build_l2_sudt_script([1u8; 32]);
     let from_id = tree.create_account_from_script(from_script).unwrap();
     let mint_balance: u128 = 400000;
     tree.mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, mint_balance)

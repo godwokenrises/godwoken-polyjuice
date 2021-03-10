@@ -2,8 +2,8 @@
 //!   See ./evm-contracts/BlockInfo.sol
 
 use crate::helper::{
-    get_chain_view, new_account_script, new_block_info, setup, PolyjuiceArgsBuilder,
-    CKB_SUDT_ACCOUNT_ID,
+    build_l2_sudt_script, get_chain_view, new_account_script, new_block_info, setup,
+    PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
 use gw_db::schema::COLUMN_INDEX;
@@ -33,11 +33,11 @@ fn test_get_block_info() {
         println!("block_hash(0): {:?}", tx.get_block_hash_by_number(0));
     }
 
-    let from_script = gw_generator::sudt::build_l2_sudt_script([1u8; 32]);
+    let from_script = build_l2_sudt_script([1u8; 32]);
     let from_id = tree.create_account_from_script(from_script).unwrap();
     tree.mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, 400000)
         .unwrap();
-    let aggregator_script = gw_generator::sudt::build_l2_sudt_script([2u8; 32]);
+    let aggregator_script = build_l2_sudt_script([2u8; 32]);
     let aggregator_id = tree.create_account_from_script(aggregator_script).unwrap();
     assert_eq!(aggregator_id, 4);
 

@@ -15,10 +15,10 @@ then
 else
     git clone -b master https://github.com/nervosnetwork/godwoken.git $GODWOKEN_DIR
 fi
-
-mkdir -p $GODWOKEN_DIR/c/build/account_locks
-cp $SCRIPT_DIR/*generator $SCRIPT_DIR/*validator $GODWOKEN_DIR/c/build
-touch $GODWOKEN_DIR/c/build/account_locks/eth-account-lock
+cd $GODWOKEN_DIR
+git submodule update --init --recursive
+cd godwoken-scripts/c
+make all-via-docker
 
 cd $PROJECT_ROOT
 git submodule update --init --recursive
