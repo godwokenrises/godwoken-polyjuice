@@ -15,7 +15,7 @@ CFLAGS_ETHASH := -Ideps/ethash/include -Ideps/ethash/lib/ethash -Ideps/ethash/li
 CFLAGS_CRYPTO_ALGORITHMS := -Ideps/crypto-algorithms
 CFLAGS_MBEDTLS := -Ideps/mbedtls/include
 CFLAGS_EVMONE := -Ideps/evmone/lib/evmone -Ideps/evmone/include -Ideps/evmone/evmc/include
-CFLAGS_GODWOKEN := -Ideps/godwoken/c
+CFLAGS_GODWOKEN := -Ideps/godwoken-scripts/c
 CFLAGS := -O3  -Ic/ripemd160 $(CFLAGS_CKB_STD) $(CFLAGS_EVMONE) $(CFLAGS_INTX) $(CFLAGS_BN128) $(CFLAGS_ETHASH) $(CFLAGS_CRYPTO_ALGORITHMS) $(CFLAGS_MBEDTLS) $(CFLAGS_GODWOKEN) $(CFLAGS_SECP) -Wall -g
 CXXFLAGS := $(CFLAGS) -std=c++1z
 LDFLAGS := -fdata-sections -ffunction-sections -Wl,--gc-sections
@@ -24,7 +24,8 @@ SECP256K1_SRC := $(SECP_DIR)/src/ecmult_static_pre_context.h
 
 MOLC := moleculec
 MOLC_VERSION := 0.6.1
-PROTOCOL_SCHEMA_DIR := ./deps/godwoken/crates/types/schemas
+PROTOCOL_VERSION := 73a0ca15428124d2f796a1d0389068e7f8959fb4
+PROTOCOL_SCHEMA_URL := https://raw.githubusercontent.com/nervosnetwork/godwoken/${PROTOCOL_VERSION}/crates/types/schemas
 
 ALL_OBJS := build/evmone.o build/baseline.o build/analysis.o build/instruction_metrics.o build/instruction_names.o build/execution.o build/instructions.o build/instructions_calls.o \
   build/keccak.o build/keccakf800.o \
@@ -35,7 +36,7 @@ ALL_OBJS := build/evmone.o build/baseline.o build/analysis.o build/instruction_m
 # docker pull nervos/ckb-riscv-gnu-toolchain:bionic-20190702
 BUILDER_DOCKER := nervos/ckb-riscv-gnu-toolchain@sha256:7b168b4b109a0f741078a71b7c4dddaf1d283a5244608f7851f5714fbad273ba
 
-all: build/generator build/validator build/generator_log build/validator_log build/test_contracts build/blockchain.h build/godwoken.h
+all: build/test_contracts build/generator build/validator build/generator_log build/validator_log build/test_ripemd160 build/blockchain.h build/godwoken.h
 
 all-via-docker: generate-protocol
 	mkdir -p build
@@ -79,6 +80,10 @@ build/test_contracts: c/tests/test_contracts.c c/contracts.h c/validator/secp256
 	$(OBJCOPY) --only-keep-debug $@ $@.debug
 	$(OBJCOPY) --strip-debug --strip-all $@
 	cd $(SECP_DIR) && (git apply -R workaround-fix-g++-linking.patch || true) && cd - # revert patch
+
+build/test_ripemd160: c/ripemd160/test_ripemd160.c c/ripemd160/ripemd160.h c/ripemd160/memzero.h $(ALL_OBJS)
+	$(CXX) $(CFLAGS) $(LDFLAGS) -Ibuild -o $@ c/ripemd160/test_ripemd160.c $(ALL_OBJS)
+	riscv64-unknown-elf-run build/test_ripemd160
 
 build/evmone.o: deps/evmone/lib/evmone/evmone.cpp
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -c -o $@ $< -DPROJECT_VERSION=\"0.5.0-dev\"
@@ -136,12 +141,18 @@ generate-protocol: check-moleculec-version build/blockchain.h build/godwoken.h
 check-moleculec-version:
 	test "$$(${MOLC} --version | awk '{ print $$2 }' | tr -d ' ')" = ${MOLC_VERSION}
 
-build/blockchain.h: ${PROTOCOL_SCHEMA_DIR}/blockchain.mol
+build/blockchain.mol:
 	mkdir -p build
+	curl -L -o $@ ${PROTOCOL_SCHEMA_URL}/blockchain.mol
+
+build/godwoken.mol:
+	mkdir -p build
+	curl -L -o $@ ${PROTOCOL_SCHEMA_URL}/godwoken.mol
+
+build/blockchain.h: build/blockchain.mol
 	${MOLC} --language c --schema-file $< > $@
 
-build/godwoken.h: ${PROTOCOL_SCHEMA_DIR}/godwoken.mol
-	mkdir -p build
+build/godwoken.h: build/godwoken.mol
 	${MOLC} --language c --schema-file $< > $@
 
 fmt:

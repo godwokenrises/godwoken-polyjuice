@@ -10,11 +10,14 @@ use gw_generator::traits::StateExt;
 // use gw_jsonrpc_types::parameter::RunResult;
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
 
-const INIT_CODE: &str = include_str!("./evm-contracts/ERC20.bin");
+const INIT_CODE: &str = include_str!("../../../solidity/erc20/SudtERC20Proxy.bin");
 
 #[test]
-fn test_erc20() {
+fn test_sudt_erc20_proxy() {
     let (store, mut tree, generator, creator_account_id) = setup();
+    let new_sudt_script = build_l2_sudt_script([0xffu8; 32]);
+    let new_sudt_id = tree.create_account_from_script(new_sudt_script).unwrap();
+
     let from_script1 = build_l2_sudt_script([1u8; 32]);
     let from_id1 = tree.create_account_from_script(from_script1).unwrap();
     let from_script2 = build_l2_sudt_script([2u8; 32]);
@@ -23,17 +26,23 @@ fn test_erc20() {
     let from_id3 = tree.create_account_from_script(from_script3).unwrap();
     tree.mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id1, 2000000)
         .unwrap();
-    tree.mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id3, 80000)
+    tree.mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id2, 2000000)
+        .unwrap();
+    tree.mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id3, 2000000)
         .unwrap();
 
+    assert_eq!(CKB_SUDT_ACCOUNT_ID, 1);
     // Deploy ERC20
+    // ethabi encode params -v string "test" -v string "tt" -v uint256 000000000000000000000000000000000000000204fce5e3e250261100000000 -v uint256 0000000000000000000000000000000000000000000000000000000000000001
+    let args = format!("000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000c0000000000000000000000000000000000000000204fce5e3e25026110000000000000000000000000000000000000000000000000000000000000000000000{:02x}0000000000000000000000000000000000000000000000000000000000000004746573740000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000027474000000000000000000000000000000000000000000000000000000000000", new_sudt_id);
+    let init_code = format!("{}{}", INIT_CODE, args);
     let _run_result = deploy(
         &generator,
         &store,
         &mut tree,
         creator_account_id,
         from_id1,
-        INIT_CODE,
+        init_code.as_str(),
         122000,
         0,
         1,
@@ -48,6 +57,18 @@ fn test_erc20() {
     let eoa1_hex = hex::encode(account_id_to_eth_address(from_id1, is_ethabi));
     let eoa2_hex = hex::encode(account_id_to_eth_address(from_id2, is_ethabi));
     let eoa3_hex = hex::encode(account_id_to_eth_address(from_id3, is_ethabi));
+    println!("eoa1_hex: {}", eoa1_hex);
+    println!("eoa2_hex: {}", eoa2_hex);
+    println!("eoa3_hex: {}", eoa3_hex);
+    tree.mint_sudt(new_sudt_id, from_id1, 160000000000000000000000000000u128)
+        .unwrap();
+
+    assert_eq!(
+        tree.get_sudt_balance(new_sudt_id, from_id1).unwrap(),
+        160000000000000000000000000000u128
+    );
+    assert_eq!(tree.get_sudt_balance(new_sudt_id, from_id2).unwrap(), 0);
+    assert_eq!(tree.get_sudt_balance(new_sudt_id, from_id3).unwrap(), 0);
     for (idx, (from_id, args_str, is_static, return_data_str)) in [
         // balanceOf(eoa1)
         (
@@ -71,7 +92,7 @@ fn test_erc20() {
                 eoa2_hex
             ),
             false,
-            "",
+            "0000000000000000000000000000000000000000000000000000000000000001",
         ),
         // balanceOf(eoa2)
         (
@@ -88,7 +109,7 @@ fn test_erc20() {
                 eoa2_hex
             ),
             false,
-            "",
+            "0000000000000000000000000000000000000000000000000000000000000001",
         ),
         // balanceOf(eoa2)
         (
@@ -97,19 +118,12 @@ fn test_erc20() {
             true,
             "0000000000000000000000000000000000000000000000000000000000000444",
         ),
-        // burn(8908)
-        (
-            from_id1,
-            "42966c6800000000000000000000000000000000000000000000000000000000000022cc".to_string(),
-            false,
-            "0000000000000000000000000000000000000000000000000000000000000001",
-        ),
         // balanceOf(eoa1)
         (
             from_id1,
             format!("70a08231{}", eoa1_hex),
             true,
-            "000000000000000000000000000000000000000204fce5e3e2502610ffffd8f0",
+            "000000000000000000000000000000000000000204fce5e3e2502610fffffbbc",
         ),
         // approve(eoa3, 0x3e8)
         (
@@ -130,6 +144,20 @@ fn test_erc20() {
             ),
             false,
             "0000000000000000000000000000000000000000000000000000000000000001",
+        ),
+        // balanceOf(eoa1)
+        (
+            from_id1,
+            format!("70a08231{}", eoa1_hex),
+            true,
+            "000000000000000000000000000000000000000204fce5e3e2502610fffff7d4",
+        ),
+        // balanceOf(eoa2)
+        (
+            from_id1,
+            format!("70a08231{}", eoa2_hex),
+            true,
+            "000000000000000000000000000000000000000000000000000000000000082c",
         ),
     ]
     .iter()

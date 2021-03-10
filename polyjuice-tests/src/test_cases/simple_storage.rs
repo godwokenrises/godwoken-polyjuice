@@ -2,7 +2,8 @@
 //!   See ./evm-contracts/SimpleStorage.sol
 
 use crate::helper::{
-    new_account_script, new_block_info, setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
+    build_l2_sudt_script, get_chain_view, new_account_script, new_block_info, setup,
+    PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
@@ -14,7 +15,7 @@ const INIT_CODE: &str = include_str!("./evm-contracts/SimpleStorage.bin");
 fn test_simple_storage() {
     let (store, mut tree, generator, creator_account_id) = setup();
 
-    let from_script = gw_generator::sudt::build_l2_sudt_script([1u8; 32]);
+    let from_script = build_l2_sudt_script([1u8; 32]);
     let from_id = tree.create_account_from_script(from_script).unwrap();
     tree.mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, 200000)
         .unwrap();
@@ -38,7 +39,7 @@ fn test_simple_storage() {
             .args(Bytes::from(args).pack())
             .build();
         let run_result = generator
-            .execute(&store.begin_transaction(), &tree, &block_info, &raw_tx)
+            .execute_transaction(&get_chain_view(&store), &tree, &block_info, &raw_tx)
             .expect("construct");
         tree.apply_run_result(&run_result).expect("update state");
         // println!("result {:?}", run_result);
@@ -70,7 +71,7 @@ fn test_simple_storage() {
             .args(Bytes::from(args).pack())
             .build();
         let run_result = generator
-            .execute(&store.begin_transaction(), &tree, &block_info, &raw_tx)
+            .execute_transaction(&get_chain_view(&store), &tree, &block_info, &raw_tx)
             .expect("construct");
         tree.apply_run_result(&run_result).expect("update state");
         // println!("result {:?}", run_result);
@@ -93,7 +94,7 @@ fn test_simple_storage() {
             .args(Bytes::from(args).pack())
             .build();
         let run_result = generator
-            .execute(&store.begin_transaction(), &tree, &block_info, &raw_tx)
+            .execute_transaction(&get_chain_view(&store), &tree, &block_info, &raw_tx)
             .expect("construct");
         tree.apply_run_result(&run_result).expect("update state");
         let mut expected_return_data = vec![0u8; 32];

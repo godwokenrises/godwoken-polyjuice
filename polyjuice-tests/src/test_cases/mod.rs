@@ -14,4 +14,4 @@ pub(crate) mod account_already_exists;
 
 pub(crate) mod pre_compiled_contracts;
 //  Special pre-compiled contract to support transfer to any sudt
-pub(crate) mod any_sudt_erc20;
+pub(crate) mod sudt_erc20_proxy;

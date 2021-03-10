@@ -2,12 +2,13 @@
 //!   See ./evm-contracts/CallContract.sol
 
 use crate::helper::{
-    account_id_to_eth_address, deploy, new_account_script, new_account_script_with_nonce,
-    new_block_info, setup, simple_storage_get, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
+    account_id_to_eth_address, build_l2_sudt_script, deploy, get_chain_view, new_account_script,
+    new_account_script_with_nonce, new_block_info, setup, simple_storage_get, PolyjuiceArgsBuilder,
+    CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
-use gw_jsonrpc_types::parameter::RunResult;
+// use gw_jsonrpc_types::parameter::RunResult;
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
 
 const SS_INIT_CODE: &str = include_str!("./evm-contracts/SimpleStorage.bin");
@@ -17,7 +18,7 @@ const INIT_CODE: &str = include_str!("./evm-contracts/DelegateCall.bin");
 fn test_delegatecall() {
     let (store, mut tree, generator, creator_account_id) = setup();
 
-    let from_script = gw_generator::sudt::build_l2_sudt_script([1u8; 32]);
+    let from_script = build_l2_sudt_script([1u8; 32]);
     let from_id = tree.create_account_from_script(from_script).unwrap();
     tree.mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, 280000)
         .unwrap();
@@ -43,7 +44,7 @@ fn test_delegatecall() {
         .unwrap();
 
     // Deploy DelegateCall
-    let run_result = deploy(
+    let _run_result = deploy(
         &generator,
         &store,
         &mut tree,
@@ -55,10 +56,10 @@ fn test_delegatecall() {
         block_number,
     );
     block_number += 1;
-    println!(
-        "result {}",
-        serde_json::to_string_pretty(&RunResult::from(run_result)).unwrap()
-    );
+    // println!(
+    //     "result {}",
+    //     serde_json::to_string_pretty(&RunResult::from(run_result)).unwrap()
+    // );
     let contract_account_script = new_account_script(&mut tree, from_id, false);
     let new_account_id = tree
         .get_account_id_by_script_hash(&contract_account_script.hash().into())
@@ -108,13 +109,13 @@ fn test_delegatecall() {
             .args(Bytes::from(args).pack())
             .build();
         let run_result = generator
-            .execute(&store.begin_transaction(), &tree, &block_info, &raw_tx)
+            .execute_transaction(&get_chain_view(&store), &tree, &block_info, &raw_tx)
             .expect("construct");
         tree.apply_run_result(&run_result).expect("update state");
-        println!(
-            "result {}",
-            serde_json::to_string_pretty(&RunResult::from(run_result)).unwrap()
-        );
+        // println!(
+        //     "result {}",
+        //     serde_json::to_string_pretty(&RunResult::from(run_result)).unwrap()
+        // );
         let run_result = simple_storage_get(
             &store,
             &tree,

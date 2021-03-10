@@ -4,25 +4,44 @@ pub use gw_common::{
     state::State,
     CKB_SUDT_SCRIPT_ARGS, H256,
 };
+use gw_config::{BackendConfig, BackendManageConfig};
+use gw_db::schema::{COLUMN_INDEX, COLUMN_META, META_TIP_BLOCK_HASH_KEY};
 pub use gw_generator::{
     account_lock_manage::{always_success::AlwaysSuccess, AccountLockManage},
     backend_manage::{Backend, BackendManage},
-    builtin_scripts::META_CONTRACT_VALIDATOR_CODE_HASH,
     dummy_state::DummyState,
     traits::StateExt,
+    types::RollupContext,
     Generator, RunResult,
 };
-pub use gw_store::Store;
+use gw_store::traits::KVStore;
+pub use gw_store::{chain_view::ChainView, Store};
 use gw_types::{
     bytes::Bytes,
-    packed::{BlockInfo, RawL2Transaction, Script},
+    core::ScriptHashType,
+    packed::{BlockInfo, RawL2Transaction, RollupConfig, Script, Uint64},
     prelude::*,
 };
 use std::{fs, io::Read, path::PathBuf};
 
+// meta contract
+pub const META_VALIDATOR_PATH: &str =
+    "../integration-test/godwoken/godwoken-scripts/c/build/meta-contract-validator";
+pub const META_GENERATOR_PATH: &str =
+    "../integration-test/godwoken/godwoken-scripts/c/build/meta-contract-generator";
+pub const META_VALIDATOR_SCRIPT_TYPE_HASH: [u8; 32] = [0xa1u8; 32];
+// simple UDT
+pub const SUDT_VALIDATOR_PATH: &str =
+    "../integration-test/godwoken/godwoken-scripts/c/build/sudt-validator";
+pub const SUDT_GENERATOR_PATH: &str =
+    "../integration-test/godwoken/godwoken-scripts/c/build/sudt-generator";
+pub const SUDT_VALIDATOR_SCRIPT_TYPE_HASH: [u8; 32] = [0xa2u8; 32];
+// polyjuice
 pub const BIN_DIR: &str = "../build";
 pub const GENERATOR_NAME: &str = "generator_log";
 pub const VALIDATOR_NAME: &str = "validator_log";
+
+pub const ROLLUP_SCRIPT_HASH: [u8; 32] = [0xa9u8; 32];
 
 lazy_static::lazy_static! {
     pub static ref GENERATOR_PROGRAM: Bytes = {
@@ -87,13 +106,21 @@ pub fn eth_address_to_account_id(data: &[u8]) -> Result<u32, String> {
     Ok(u32::from_le_bytes(id_data))
 }
 
+pub fn get_chain_view(store: &Store) -> ChainView {
+    let db = store.begin_transaction();
+    let tip_block_hash = store.get_tip_block_hash().unwrap();
+    ChainView::new(db, tip_block_hash)
+}
+
 pub fn new_account_script_with_nonce(from_id: u32, from_nonce: u32) -> Script {
-    let mut new_account_args = [0u8; 12];
-    new_account_args[0..4].copy_from_slice(&CKB_SUDT_ACCOUNT_ID.to_le_bytes()[..]);
-    new_account_args[4..8].copy_from_slice(&from_id.to_le_bytes()[..]);
-    new_account_args[8..12].copy_from_slice(&from_nonce.to_le_bytes()[..]);
+    let mut new_account_args = [0u8; 44];
+    new_account_args[0..32].copy_from_slice(&ROLLUP_SCRIPT_HASH);
+    new_account_args[32..36].copy_from_slice(&CKB_SUDT_ACCOUNT_ID.to_le_bytes()[..]);
+    new_account_args[36..40].copy_from_slice(&from_id.to_le_bytes()[..]);
+    new_account_args[40..44].copy_from_slice(&from_nonce.to_le_bytes()[..]);
     Script::new_builder()
         .code_hash(PROGRAM_CODE_HASH.pack())
+        .hash_type(ScriptHashType::Type.into())
         .args(Bytes::from(new_account_args.to_vec()).pack())
         .build()
 }
@@ -164,10 +191,8 @@ pub fn setup() -> (Store, DummyState, Generator, u32) {
     let reserved_id = tree
         .create_account_from_script(
             Script::new_builder()
-                .code_hash({
-                    let code_hash: [u8; 32] = (*META_CONTRACT_VALIDATOR_CODE_HASH).into();
-                    code_hash.pack()
-                })
+                .code_hash(META_VALIDATOR_SCRIPT_TYPE_HASH.clone().pack())
+                .hash_type(ScriptHashType::Type.into())
                 .build(),
         )
         .unwrap();
@@ -177,7 +202,7 @@ pub fn setup() -> (Store, DummyState, Generator, u32) {
     );
 
     // setup CKB simple UDT contract
-    let ckb_sudt_script = gw_generator::sudt::build_l2_sudt_script(CKB_SUDT_SCRIPT_ARGS);
+    let ckb_sudt_script = build_l2_sudt_script(CKB_SUDT_SCRIPT_ARGS);
     // assert_eq!(
     //     ckb_sudt_script.hash(),
     //     CKB_SUDT_SCRIPT_HASH,
@@ -189,26 +214,75 @@ pub fn setup() -> (Store, DummyState, Generator, u32) {
         "ckb simple UDT account id"
     );
 
+    let mut args = [0u8; 36];
+    args[0..32].copy_from_slice(&ROLLUP_SCRIPT_HASH);
+    args[32..36].copy_from_slice(&ckb_sudt_id.to_le_bytes()[..]);
     let creator_account_id = tree
         .create_account_from_script(
             Script::new_builder()
                 .code_hash(PROGRAM_CODE_HASH.pack())
-                .args(ckb_sudt_id.to_le_bytes().to_vec().pack())
+                .hash_type(ScriptHashType::Type.into())
+                .args(args.to_vec().pack())
                 .build(),
         )
         .expect("create account");
 
     // ==== Build generator
-    let mut backend_manage = BackendManage::default();
+    let config = BackendManageConfig {
+        meta_contract: BackendConfig {
+            validator_path: META_VALIDATOR_PATH.into(),
+            generator_path: META_GENERATOR_PATH.into(),
+            validator_script_type_hash: META_VALIDATOR_SCRIPT_TYPE_HASH.into(),
+        },
+        simple_udt: BackendConfig {
+            validator_path: SUDT_VALIDATOR_PATH.into(),
+            generator_path: SUDT_GENERATOR_PATH.into(),
+            validator_script_type_hash: SUDT_VALIDATOR_SCRIPT_TYPE_HASH.into(),
+        },
+    };
+    let mut backend_manage = BackendManage::from_config(config).expect("default backend");
     // NOTICE in this test we won't need SUM validator
-    backend_manage.register_backend(Backend::from_binaries(
-        VALIDATOR_PROGRAM.clone(),
-        GENERATOR_PROGRAM.clone(),
-    ));
+    backend_manage.register_backend(Backend {
+        validator: VALIDATOR_PROGRAM.clone(),
+        generator: GENERATOR_PROGRAM.clone(),
+        validator_script_type_hash: PROGRAM_CODE_HASH.clone().into(),
+    });
     let mut account_lock_manage = AccountLockManage::default();
     account_lock_manage.register_lock_algorithm(H256::zero(), Box::new(AlwaysSuccess::default()));
-    let generator = Generator::new(backend_manage, account_lock_manage, Default::default());
+    let rollup_config = RollupConfig::new_builder()
+        .allowed_contract_type_hashes(
+            vec![
+                META_VALIDATOR_SCRIPT_TYPE_HASH.clone().pack(),
+                SUDT_VALIDATOR_SCRIPT_TYPE_HASH.clone().pack(),
+                PROGRAM_CODE_HASH.clone().pack(),
+            ]
+            .pack(),
+        )
+        .build();
+    let rollup_context = RollupContext {
+        rollup_script_hash: ROLLUP_SCRIPT_HASH.clone().into(),
+        rollup_config,
+    };
+    let generator = Generator::new(backend_manage, account_lock_manage, rollup_context);
 
+    let tx = store.begin_transaction();
+    let tip_block_number: Uint64 = 8.pack();
+    let tip_block_hash = [8u8; 32];
+    tx.insert_raw(COLUMN_META, META_TIP_BLOCK_HASH_KEY, &tip_block_hash[..])
+        .unwrap();
+    tx.insert_raw(
+        COLUMN_INDEX,
+        tip_block_number.as_slice(),
+        &tip_block_hash[..],
+    )
+    .unwrap();
+    tx.insert_raw(
+        COLUMN_INDEX,
+        &tip_block_hash[..],
+        tip_block_number.as_slice(),
+    )
+    .unwrap();
+    tx.commit().unwrap();
     (store, tree, generator, creator_account_id)
 }
 
@@ -238,7 +312,7 @@ pub fn deploy(
         .args(Bytes::from(args).pack())
         .build();
     let run_result = generator
-        .execute(&store.begin_transaction(), tree, &block_info, &raw_tx)
+        .execute_transaction(&get_chain_view(&store), tree, &block_info, &raw_tx)
         .expect("construct");
     tree.apply_run_result(&run_result).expect("update state");
     run_result
@@ -307,6 +381,17 @@ pub fn simple_storage_get(
         .args(Bytes::from(args).pack())
         .build();
     generator
-        .execute(&store.begin_transaction(), tree, &block_info, &raw_tx)
+        .execute_transaction(&get_chain_view(&store), tree, &block_info, &raw_tx)
         .expect("construct")
+}
+
+pub fn build_l2_sudt_script(args: [u8; 32]) -> Script {
+    let mut script_args = Vec::with_capacity(64);
+    script_args.extend(&ROLLUP_SCRIPT_HASH);
+    script_args.extend(&args[..]);
+    Script::new_builder()
+        .args(Bytes::from(script_args).pack())
+        .code_hash(SUDT_VALIDATOR_SCRIPT_TYPE_HASH.clone().pack())
+        .hash_type(ScriptHashType::Type.into())
+        .build()
 }

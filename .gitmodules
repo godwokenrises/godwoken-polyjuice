@@ -10,12 +10,6 @@
 [submodule "deps/evmone"]
 	path = deps/evmone
 	url = https://github.com/ethereum/evmone
-[submodule "deps/godwoken"]
-	path = deps/godwoken
-	url = https://github.com/nervosnetwork/godwoken.git
-[submodule "deps/godwoken-fix"]
-	path = deps/godwoken-fix
-	url = https://github.com/TheWaWaR/godwoken.git
 [submodule "deps/secp256k1"]
 	path = deps/secp256k1
 	url = https://github.com/nervosnetwork/secp256k1
@@ -31,3 +25,6 @@
 [submodule "deps/bn128"]
 	path = deps/bn128
 	url = https://github.com/mohanson/bn128.git
+[submodule "deps/godwoken-scripts"]
+	path = deps/godwoken-scripts
+	url = https://github.com/nervosnetwork/godwoken-scripts.git
