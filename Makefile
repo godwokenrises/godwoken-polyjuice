@@ -24,7 +24,8 @@ SECP256K1_SRC := $(SECP_DIR)/src/ecmult_static_pre_context.h
 
 MOLC := moleculec
 MOLC_VERSION := 0.6.1
-PROTOCOL_SCHEMA_DIR := ./deps/godwoken-scripts/crates/types/schemas
+PROTOCOL_VERSION := 73a0ca15428124d2f796a1d0389068e7f8959fb4
+PROTOCOL_SCHEMA_URL := https://raw.githubusercontent.com/nervosnetwork/godwoken/${PROTOCOL_VERSION}/crates/types/schemas
 
 ALL_OBJS := build/evmone.o build/baseline.o build/analysis.o build/instruction_metrics.o build/instruction_names.o build/execution.o build/instructions.o build/instructions_calls.o \
   build/keccak.o build/keccakf800.o \
@@ -140,12 +141,18 @@ generate-protocol: check-moleculec-version build/blockchain.h build/godwoken.h
 check-moleculec-version:
 	test "$$(${MOLC} --version | awk '{ print $$2 }' | tr -d ' ')" = ${MOLC_VERSION}
 
-build/blockchain.h: ${PROTOCOL_SCHEMA_DIR}/blockchain.mol
+build/blockchain.mol:
 	mkdir -p build
+	curl -L -o $@ ${PROTOCOL_SCHEMA_URL}/blockchain.mol
+
+build/godwoken.mol:
+	mkdir -p build
+	curl -L -o $@ ${PROTOCOL_SCHEMA_URL}/godwoken.mol
+
+build/blockchain.h: build/blockchain.mol
 	${MOLC} --language c --schema-file $< > $@
 
-build/godwoken.h: ${PROTOCOL_SCHEMA_DIR}/godwoken.mol
-	mkdir -p build
+build/godwoken.h: build/godwoken.mol
 	${MOLC} --language c --schema-file $< > $@
 
 fmt:
