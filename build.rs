@@ -15,11 +15,11 @@ const CKB_HASH_PERSONALIZATION: &[u8] = b"ckb-default-hash";
 const BINARIES: &[(&str, &str)] = &[
     (
         "generator",
-        "f780ad5546c57ce90a4d64a6663c4059916fb8a00482d9dbd97a18bc7104fa14",
+        "1568faf8d4130afce35277ac03921ae584b57402a793737478c1dbf077f1328a",
     ),
     (
         "validator",
-        "cc223b18f4c17bd9bea64c0871fa176f89266d9ef48a3dbadd01cc19d70e173a",
+        "d3920ab92be1fb959e156a00167a22dd5471255556905e18e32a0f97b514ba07",
     ),
 ];
 
