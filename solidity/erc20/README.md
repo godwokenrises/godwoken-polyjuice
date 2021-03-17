@@ -5,7 +5,7 @@ The content of the file `./SudtERC20Proxy.ContractCode.hex` is copy from running
 Generate the contract code hash of SudtERC20Proxy:
 ```
 $ ckb-cli util blake2b --binary-path ./SudtERC20Proxy.ContractCode.bin
-0x7e92a77f129e70c8a950a6e7090c3149769482773f1ad5dae6cd9d022abbbcb5
+0x84fca35d11d31b80bd6b49e62450307af842bed3d61232fe90af6d555ad93aa5
 ```
 
 The code hash above will be checked in `transfer_to_any_sudt` pre-compiled contract.
