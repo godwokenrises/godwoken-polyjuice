@@ -6,15 +6,9 @@
 
 #define BALANCE_OF_ANY_SUDT_GAS 150
 #define TRANSFER_TO_ANY_SUDT_GAS 300
-#define SET_ALLOWANCE_GAS 150
-#define GET_ALLOWANCE_GAS 150
-#define TRANSFER_FROM_ANY_SUDT_GAS 450
 
 #define ERROR_BALANCE_OF_ANY_SUDT -30
 #define ERROR_TRANSFER_TO_ANY_SUDT -31
-#define ERROR_SET_ALLOWANCE -32
-#define ERROR_GET_ALLOWANCE -33
-#define ERROR_TRANSFER_FROM_ANY_SUDT -34
 
 /* Parse uint32_t/uint128_t from big endian byte32 data */
 int parse_integer(const uint8_t data_be[32], uint8_t *value, size_t value_size) {
@@ -69,7 +63,8 @@ int balance_of_any_sudt_gas(const uint8_t* input_src,
      output[0..32] => amount
  */
 int balance_of_any_sudt(gw_context_t* ctx,
-                        uint32_t parent_from_id,
+                        const uint8_t* code_data,
+                        const size_t code_size,
                         bool is_static_call,
                         const uint8_t* input_src,
                         const size_t input_size,
@@ -133,11 +128,33 @@ int transfer_to_any_sudt_gas(const uint8_t* input_src,
    output: []
  */
 int transfer_to_any_sudt(gw_context_t* ctx,
-                         uint32_t parent_from_id,
+                         const uint8_t* code_data,
+                         const size_t code_size,
                          bool is_static_call,
                          const uint8_t* input_src,
                          const size_t input_size,
                          uint8_t** output, size_t* output_size) {
+
+  /* Contract code hash of `SudtERC20Proxy.sol`
+     => 0x7e92a77f129e70c8a950a6e7090c3149769482773f1ad5dae6cd9d022abbbcb5 */
+  static const uint8_t sudt_erc20_proxy_contract_code_hash[32] =
+    {
+     0x7e, 0x92, 0xa7, 0x7f, 0x12, 0x9e, 0x70, 0xc8,
+     0xa9, 0x50, 0xa6, 0xe7, 0x09, 0x0c, 0x31, 0x49,
+     0x76, 0x94, 0x82, 0x77, 0x3f, 0x1a, 0xd5, 0xda,
+     0xe6, 0xcd, 0x9d, 0x02, 0x2a, 0xbb, 0xbc, 0xb5,
+    };
+  if (code_data == NULL || code_size == 0) {
+    ckb_debug("Invalid caller contract code");
+    return ERROR_TRANSFER_TO_ANY_SUDT;
+  }
+  uint8_t code_hash[32] = {0};
+  blake2b_hash(code_hash, (uint8_t *)code_data, code_size);
+  if (memcmp(code_hash, sudt_erc20_proxy_contract_code_hash, 32) != 0) {
+    ckb_debug("The contract is not allowed to call transfer_to_any_sudt");
+    return ERROR_TRANSFER_TO_ANY_SUDT;
+  }
+
   int ret;
   if (is_static_call) {
     ckb_debug("static call to transfer to any sudt is forbidden");
@@ -146,7 +163,6 @@ int transfer_to_any_sudt(gw_context_t* ctx,
   if (input_size != (32 + 32 + 32 + 32)) {
     return ERROR_TRANSFER_TO_ANY_SUDT;
   }
-  /* FIXME: check caller init_code */
 
   uint32_t sudt_id = 0;
   uint128_t amount = 0;
