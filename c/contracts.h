@@ -946,18 +946,6 @@ bool match_precompiled_address(const evmc_address* destination,
     *contract_gas = transfer_to_any_sudt_gas;
     *contract = transfer_to_any_sudt;
     break;
-  case 0xf2:
-    *contract_gas = set_allowance_gas;
-    *contract = set_allowance;
-    break;
-  case 0xf3:
-    *contract_gas = get_allowance_gas;
-    *contract = get_allowance;
-    break;
-  case 0xf4:
-    *contract_gas = transfer_from_any_sudt_gas;
-    *contract = transfer_from_any_sudt;
-    break;
   default:
     *contract_gas = NULL;
     *contract = NULL;

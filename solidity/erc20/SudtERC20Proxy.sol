@@ -126,7 +126,7 @@ interface IERC20 {
 contract ERC20 is Context, IERC20 {
     /* mapping (address => uint256) private _balances; */
 
-    /* mapping (address => mapping (address => uint256)) private _allowances; */
+    mapping (address => mapping (address => uint256)) private _allowances;
 
     uint256 private _totalSupply;
     uint256 private _sudtId;
@@ -148,6 +148,14 @@ contract ERC20 is Context, IERC20 {
         _symbol = symbol_;
         _totalSupply = totalSupply_;
         _sudtId = sudtId_;
+    }
+
+
+    /**
+     * @dev Returns the sudt id of the token.
+     */
+    function sudtId() public view virtual returns (uint256) {
+        return _sudtId;
     }
 
     /**
@@ -215,7 +223,7 @@ contract ERC20 is Context, IERC20 {
      * - the caller must have a balance of at least `amount`.
      */
     function transfer(address recipient, uint256 amount) public virtual override returns (bool) {
-        _transfer(recipient, amount);
+        _transfer(_msgSender(), recipient, amount);
         return true;
     }
 
@@ -223,18 +231,7 @@ contract ERC20 is Context, IERC20 {
      * @dev See {IERC20-allowance}.
      */
     function allowance(address owner, address spender) public virtual override returns (uint256) {
-        uint256[3] memory input;
-        input[0] = _sudtId;
-        input[1] = uint256(uint160(address(owner)));
-        input[2] = uint256(uint160(address(spender)));
-        uint256[1] memory output;
-        /* get_allowance */
-        assembly {
-            if iszero(call(not(0), 0xf3, 0x0, input, 0x60, output, 0x20)) {
-                revert(0x0, 0x0)
-            }
-        }
-        return output[0];
+        return _allowances[owner][spender];
     }
 
     /**
@@ -245,7 +242,7 @@ contract ERC20 is Context, IERC20 {
      * - `spender` cannot be the zero address.
      */
     function approve(address spender, uint256 amount) public virtual override returns (bool) {
-        _approve(spender, amount);
+        _approve(_msgSender(), spender, amount);
         return true;
     }
 
@@ -263,22 +260,12 @@ contract ERC20 is Context, IERC20 {
      * `amount`.
      */
     function transferFrom(address sender, address recipient, uint256 amount) public virtual override returns (bool) {
-        uint256 currentAllowance = allowance(sender, _msgSender());
+        _transfer(sender, recipient, amount);
 
-        uint256[4] memory input;
-        input[0] = _sudtId;
-        input[1] = uint256(uint160(address(sender)));
-        input[2] = uint256(uint160(address(recipient)));
-        input[3] = amount;
-        uint256[1] memory output;
-        /* transfer_from_any_sudt */
-        assembly {
-            if iszero(call(not(0), 0xf4, 0x0, input, 0x80, output, 0x20)) {
-                revert(0x0, 0x0)
-            }
-        }
+        uint256 currentAllowance = _allowances[sender][_msgSender()];
+        require(currentAllowance >= amount, "ERC20: transfer amount exceeds allowance");
+        _approve(sender, _msgSender(), currentAllowance - amount);
 
-        emit Approval(sender, _msgSender(), currentAllowance - amount);
         return true;
     }
 
@@ -295,7 +282,7 @@ contract ERC20 is Context, IERC20 {
      * - `spender` cannot be the zero address.
      */
     function increaseAllowance(address spender, uint256 addedValue) public virtual returns (bool) {
-        _approve(spender, allowance(_msgSender(), spender) + addedValue);
+        _approve(_msgSender(), spender, _allowances[_msgSender()][spender] + addedValue);
         return true;
     }
 
@@ -314,9 +301,9 @@ contract ERC20 is Context, IERC20 {
      * `subtractedValue`.
      */
     function decreaseAllowance(address spender, uint256 subtractedValue) public virtual returns (bool) {
-        uint256 currentAllowance = allowance(_msgSender(), spender);
+        uint256 currentAllowance = _allowances[_msgSender()][spender];
         require(currentAllowance >= subtractedValue, "ERC20: decreased allowance below zero");
-        _approve(spender, currentAllowance - subtractedValue);
+        _approve(_msgSender(), spender, currentAllowance - subtractedValue);
 
         return true;
     }
@@ -335,24 +322,26 @@ contract ERC20 is Context, IERC20 {
      * - `recipient` cannot be the zero address.
      * - `sender` must have a balance of at least `amount`.
      */
-    function _transfer(address recipient, uint256 amount) internal virtual {
+    function _transfer(address sender, address recipient, uint256 amount) internal virtual {
+        require(sender != address(0), "ERC20: transfer from the zero address");
         require(recipient != address(0), "ERC20: transfer to the zero address");
 
         _beforeTokenTransfer(_msgSender(), recipient, amount);
 
-        uint256[3] memory input;
+        uint256[4] memory input;
         input[0] = _sudtId;
-        input[1] = uint256(uint160(address(recipient)));
-        input[2] = amount;
+        input[1] = uint256(uint160(address(sender)));
+        input[2] = uint256(uint160(address(recipient)));
+        input[3] = amount;
         uint256[1] memory output;
         /* transfer_to_any_sudt */
         assembly {
-            if iszero(call(not(0), 0xf1, 0x0, input, 0x60, output, 0x20)) {
+            if iszero(call(not(0), 0xf1, 0x0, input, 0x80, output, 0x20)) {
                 revert(0x0, 0x0)
             }
         }
 
-        emit Transfer(_msgSender(), recipient, amount);
+        emit Transfer(sender, recipient, amount);
     }
 
     /**
@@ -368,22 +357,12 @@ contract ERC20 is Context, IERC20 {
      * - `owner` cannot be the zero address.
      * - `spender` cannot be the zero address.
      */
-    function _approve(address spender, uint256 amount) internal virtual {
+    function _approve(address owner, address spender, uint256 amount) internal virtual {
+        require(owner != address(0), "ERC20: approve from the zero address");
         require(spender != address(0), "ERC20: approve to the zero address");
 
-        /* NOTE: owner is always _msgSender() */
-        uint256[3] memory input;
-        input[0] = _sudtId;
-        input[1] = uint256(uint160(address(spender)));
-        input[2] = amount;
-        uint256[1] memory output;
-        /* set_allowance */
-        assembly {
-            if iszero(call(not(0), 0xf2, 0x0, input, 0x60, output, 0x20)) {
-                revert(0x0, 0x0)
-            }
-        }
-        emit Approval(_msgSender(), spender, amount);
+        _allowances[owner][spender] = amount;
+        emit Approval(owner, spender, amount);
     }
 
     /**
