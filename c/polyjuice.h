@@ -36,8 +36,6 @@
 #define is_special_call(kind) \
   ((kind) == EVMC_CALLCODE || (kind) == EVMC_DELEGATECALL)
 
-/* Max script buffer size: 1KB */
-#define MAX_SCRIPT_SIZE 1024
 /* Max data buffer size: 24KB */
 #define MAX_DATA_SIZE 24576
 #define POLYJUICE_SYSTEM_PREFIX 0xFF
@@ -682,9 +680,9 @@ int check_destructed(gw_context_t* ctx, uint32_t to_id) {
 }
 
 int load_globals(gw_context_t* ctx, uint32_t to_id) {
-  uint8_t buffer[MAX_SCRIPT_SIZE];
+  uint8_t buffer[GW_MAX_SCRIPT_SIZE];
   mol_seg_t script_seg;
-  int ret = load_account_script(ctx, to_id, buffer, MAX_SCRIPT_SIZE, &script_seg);
+  int ret = load_account_script(ctx, to_id, buffer, GW_MAX_SCRIPT_SIZE, &script_seg);
   if (ret != 0) {
     return ret;
   }
