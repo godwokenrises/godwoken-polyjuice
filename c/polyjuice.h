@@ -107,7 +107,8 @@ typedef int (*stream_data_loader_fn)(gw_context_t* ctx, long data_id,
 
 struct evmc_host_context {
   gw_context_t* gw_ctx;
-  uint32_t parent_from_id;
+  const uint8_t* code_data;
+  const size_t code_size;
   uint32_t from_id;
   uint32_t to_id;
   int error_code;
@@ -566,7 +567,9 @@ struct evmc_result call(struct evmc_host_context* context,
       return res;
     }
     res.gas_left = msg->gas - (int64_t)gas_cost;
-    ret = contract(gw_ctx, context->from_id, msg->flags == EVMC_STATIC,
+    ret = contract(gw_ctx,
+                   context->code_data, context->code_size,
+                   msg->flags == EVMC_STATIC,
                    msg->input_data, msg->input_size,
                    (uint8_t**)&res.output_data, &res.output_size);
     if (ret != 0) {
@@ -816,17 +819,17 @@ int handle_transfer(gw_context_t* ctx,
 
 int execute_in_evmone(gw_context_t* ctx,
                       evmc_message* msg,
-                      uint32_t parent_from_id,
+                      uint32_t _parent_from_id,
                       uint32_t from_id,
                       uint32_t to_id,
-                      uint8_t* code_data,
-                      size_t code_size,
+                      const uint8_t* code_data,
+                      const size_t code_size,
                       bool to_id_is_eoa,
                       struct evmc_result* res) {
   bool transfer_only = !is_create(msg->kind) && msg->input_size == 0;
   debug_print_int("to_id_is_eoa", to_id_is_eoa);
   debug_print_int("transfer_only", transfer_only);
-  struct evmc_host_context context {ctx, parent_from_id, from_id, to_id, 0};
+  struct evmc_host_context context {ctx, code_data, code_size, from_id, to_id, 0};
   struct evmc_vm* vm = evmc_create_evmone();
   struct evmc_host_interface interface = {account_exists, get_storage,    set_storage,    get_balance,
                                           get_code_size,  get_code_hash,  copy_code,      selfdestruct,

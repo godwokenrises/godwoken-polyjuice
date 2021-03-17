@@ -207,7 +207,8 @@ contract ERC20 is Context, IERC20 {
         uint256[1] memory output;
         /* balance_of_any_sudt */
         assembly {
-            if iszero(call(not(0), 0xf0, 0x0, input, 0x40, output, 0x20)) {
+            /* NOTE: INVALID specific */
+            if iszero(call(0xFFFFFFFFFFFFFFFFFFFF, 0xf0, 0x0, input, 0x40, output, 0x20)) {
                 revert(0x0, 0x0)
             }
         }
@@ -328,18 +329,17 @@ contract ERC20 is Context, IERC20 {
 
         _beforeTokenTransfer(_msgSender(), recipient, amount);
 
-        if (sender != recipient) {
-            uint256[4] memory input;
-            input[0] = _sudtId;
-            input[1] = uint256(uint160(address(sender)));
-            input[2] = uint256(uint160(address(recipient)));
-            input[3] = amount;
-            uint256[1] memory output;
-            /* transfer_to_any_sudt */
-            assembly {
-                if iszero(call(not(0), 0xf1, 0x0, input, 0x80, output, 0x20)) {
-                    revert(0x0, 0x0)
-                }
+        uint256[4] memory input;
+        input[0] = _sudtId;
+        input[1] = uint256(uint160(address(sender)));
+        input[2] = uint256(uint160(address(recipient)));
+        input[3] = amount;
+        uint256[1] memory output;
+        /* transfer_to_any_sudt */
+        assembly {
+            /* NOTE: INVALID specific */
+            if iszero(call(0xFFFFFFFFFFFFFFFFFFFF, 0xf1, 0x0, input, 0x80, output, 0x20)) {
+                revert(0x0, 0x0)
             }
         }
 
@@ -364,6 +364,8 @@ contract ERC20 is Context, IERC20 {
         require(spender != address(0), "ERC20: approve to the zero address");
 
         _allowances[owner][spender] = amount;
+        /* NOTE: INVALID specific */
+        emit Approval(owner, spender, amount);
         emit Approval(owner, spender, amount);
     }
 
