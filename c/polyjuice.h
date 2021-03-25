@@ -39,6 +39,7 @@
 /* Max data buffer size: 24KB */
 #define MAX_DATA_SIZE 24576
 #define POLYJUICE_SYSTEM_PREFIX 0xFF
+#define POLYJUICE_USER_LOG_PREFIX 0xF0
 #define POLYJUICE_CONTRACT_CODE 0x01
 #define POLYJUICE_DESTRUCTED 0x02
 
@@ -46,6 +47,8 @@ static bool has_touched = false;
 static uint8_t rollup_script_hash[32] = {0};
 static uint32_t sudt_id = UINT32_MAX;
 static uint32_t tx_origin_id = UINT32_MAX;
+/* Receipt.contractAddress - The contract address created, if the transaction was a contract creation, otherwise null */
+static uint32_t created_id = UINT32_MAX;
 static evmc_address tx_origin;
 static uint8_t script_code_hash[32];
 static uint8_t script_hash_type;
@@ -622,7 +625,15 @@ void emit_log(struct evmc_host_context* context, const evmc_address* address,
               const uint8_t* data, size_t data_size,
               const evmc_bytes32 topics[], size_t topics_count) {
   ckb_debug("BEGIN emit_log");
-  size_t output_size = 20 + (4 + data_size) + (4 + topics_count * 32);
+  /*
+    output[0]                          = POLYJUICE_USER_LOG_PREFIX
+    output[ 1..21]                     = callee_contract.address
+    output[21..25]                     = data_size_u32
+    output[25..25+data_size]           = data
+    ouptut[25+data_size..29+data_size] = topics_count_u32
+    ouptut[29+data_size..]             = topics
+   */
+  size_t output_size = 1 + 20 + (4 + data_size) + (4 + topics_count * 32);
   uint8_t* output = (uint8_t*)malloc(output_size);
   if (output == NULL) {
     context->error_code = -1;
@@ -630,7 +641,9 @@ void emit_log(struct evmc_host_context* context, const evmc_address* address,
   }
   uint32_t data_size_u32 = (uint32_t)(data_size);
   uint32_t topics_count_u32 = (uint32_t)(topics_count);
-  uint8_t* output_current = output;
+
+  output[0] = POLYJUICE_USER_LOG_PREFIX;
+  uint8_t* output_current = output + 1;
   memcpy(output_current, address->bytes, 20);
   output_current += 20;
   memcpy(output_current, (uint8_t*)(&data_size_u32), 4);
@@ -752,6 +765,9 @@ int create_new_account(gw_context_t* ctx,
     union ethash_hash256 hash_result = ethash::keccak256(code_data, code_size);
     memcpy(script_args + (32 + 4 + 1 + 4 + 32), hash_result.bytes, 32);
     script_args_len = 32 + 4 + 1 + 4 + 32 + 32;
+  } else {
+    // unreachable!
+    return -1;
   }
   if (script_args_len > 0) {
     mol_seg_t new_script_seg;
@@ -978,6 +994,11 @@ int handle_message(gw_context_t* ctx,
     if (ret != 0) {
       return ret;
     }
+
+    /* It's a creation polyjuice transaction */
+    if (parent_from_id == UINT32_MAX && parent_to_id == UINT32_MAX) {
+      created_id = to_id;
+    }
   }
 
   /* Handle transfer logic.
@@ -1008,6 +1029,43 @@ int handle_message(gw_context_t* ctx,
   return (int)res->status_code;
 }
 
+int emit_evm_result_log(gw_context_t* ctx, const uint64_t gas_used, const int status_code) {
+  /*
+    data = POLYJUICE_SYSTEM_PREFIX
+    + { gasUsed: u64, cumulativeGasUsed: u64, contractAddress: u32, status_code: u32 }
+
+    data[0]      = POLYJUICE_SYSTEM_PREFIX
+    data[ 1.. 9] = gas_used
+    data[ 9..17] = cumulative_gas_used
+    data[17..21] = created_id (UINT32_MAX means not created)
+    data[21..25] = status_code (EVM status_code)
+   */
+  uint64_t cumulative_gas_used = gas_used;
+  uint32_t status_code_u32 = (uint32_t)status_code;
+
+  uint32_t data_size = 1 + 8 + 8 + 4 + 4 + 4;
+  uint8_t data[1 + 8 + 8 + 4 + 4 + 4] = {0};
+  data[0] = POLYJUICE_SYSTEM_PREFIX;
+  uint8_t *ptr = data + 1;
+  memcpy(ptr, (uint8_t *)(&gas_used), 8);
+  ptr += 8;
+  memcpy(ptr, (uint8_t *)(&cumulative_gas_used), 8);
+  ptr += 8;
+  memcpy(ptr, (uint8_t *)(&created_id), 4);
+  ptr += 4;
+  memcpy(ptr, (uint8_t *)(&status_code_u32), 4);
+  ptr += 4;
+
+  /* NOTE: if create account failed the `to_id` will also be `context->to_id` */
+  uint32_t to_id = created_id == UINT32_MAX ? ctx->transaction_context.to_id : created_id;
+  int ret = ctx->sys_log(ctx, to_id, data_size, data);
+  if (ret != 0) {
+    ckb_debug("sys_log evm result failed");
+    return -1;
+  }
+  return 0;
+}
+
 int run_polyjuice() {
   int ret;
 
@@ -1029,9 +1087,16 @@ int run_polyjuice() {
   }
 
   struct evmc_result res;
-  ret = handle_message(&context, UINT32_MAX, UINT32_MAX, &msg, &res);
+  int ret_handle_message = handle_message(&context, UINT32_MAX, UINT32_MAX, &msg, &res);
+  uint64_t gas_used = (uint64_t)(msg.gas - res.gas_left);
+  ret = emit_evm_result_log(&context, gas_used, res.status_code);
   if (ret != 0) {
+    ckb_debug("emit_evm_result_log failed");
     return ret;
+  }
+  if (ret_handle_message != 0) {
+    ckb_debug("handle message failed");
+    return ret_handle_message;
   }
 
   ret = context.sys_set_program_return_data(&context, (uint8_t*)res.output_data,
@@ -1050,7 +1115,7 @@ int run_polyjuice() {
     ckb_debug("unreachable!");
     return -1;
   }
-  uint128_t fee = gas_price * (uint128_t)(msg.gas - res.gas_left);
+  uint128_t fee = gas_price * (uint128_t)gas_used;
   debug_print_int("gas limit", msg.gas);
   debug_print_int("gas left", res.gas_left);
   debug_print_int("gas price", gas_price);
