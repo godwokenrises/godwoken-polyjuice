@@ -3,7 +3,7 @@
 
 use crate::helper::{
     account_id_to_eth_address, build_l2_sudt_script, deploy, get_chain_view, new_account_script,
-    new_block_info, parse_log, setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
+    new_block_info, parse_log, setup, PolyjuiceArgsBuilder, PolyjuiceLog, CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
@@ -41,23 +41,55 @@ fn test_parse_log_event() {
         .get_account_id_by_script_hash(&contract_account_script.hash().into())
         .unwrap()
         .unwrap();
-    assert_eq!(run_result.logs.len(), 1);
-    let log_item = &run_result.logs[0];
-    let log_account_id: u32 = log_item.account_id().unpack();
-    assert_eq!(log_account_id, new_account_id);
-    let log_data: Bytes = log_item.data().raw_data();
-    let polyjuice_log = parse_log(log_data.as_ref());
-    println!("polyjuice_log: {:?}", polyjuice_log);
-    assert_eq!(
-        &polyjuice_log.address[..],
-        &account_id_to_eth_address(new_account_id, false)[..]
-    );
-    assert_eq!(polyjuice_log.data[31], deploy_value as u8);
-    assert_eq!(polyjuice_log.data[63], 1); // true
-    assert_eq!(
-        polyjuice_log.topics[1].as_slice(),
-        account_id_to_eth_address(from_id, true)
-    );
+    assert_eq!(run_result.logs.len(), 2);
+    {
+        let log_item = &run_result.logs[0];
+        let log_account_id: u32 = log_item.account_id().unpack();
+        assert_eq!(log_account_id, new_account_id);
+        let log_data: Bytes = log_item.data().raw_data();
+        let polyjuice_log = parse_log(log_data.as_ref());
+        println!("user polyjuice_log: {:?}", polyjuice_log);
+        if let PolyjuiceLog::User {
+            address,
+            data,
+            topics,
+        } = polyjuice_log
+        {
+            assert_eq!(
+                &address[..],
+                &account_id_to_eth_address(new_account_id, false)[..]
+            );
+            assert_eq!(data[31], deploy_value as u8);
+            assert_eq!(data[63], 1); // true
+            assert_eq!(
+                topics[1].as_slice(),
+                account_id_to_eth_address(from_id, true)
+            );
+        } else {
+            panic!("unexpected polyjuice log");
+        }
+    }
+    {
+        let log_item = &run_result.logs[1];
+        let log_account_id: u32 = log_item.account_id().unpack();
+        assert_eq!(log_account_id, new_account_id);
+        let log_data: Bytes = log_item.data().raw_data();
+        let polyjuice_log = parse_log(log_data.as_ref());
+        println!("system polyjuice_log: {:?}", polyjuice_log);
+        if let PolyjuiceLog::System {
+            gas_used,
+            cumulative_gas_used,
+            created_id,
+            status_code,
+        } = polyjuice_log
+        {
+            assert_eq!(gas_used, cumulative_gas_used);
+            assert_eq!(created_id, new_account_id);
+            assert_eq!(status_code, 0);
+        } else {
+            panic!("unexpected polyjuice log");
+        }
+    }
 
     block_number += 1;
     {
@@ -81,22 +113,54 @@ fn test_parse_log_event() {
             .expect("construct");
         tree.apply_run_result(&run_result).expect("update state");
 
-        assert_eq!(run_result.logs.len(), 1);
-        let log_item = &run_result.logs[0];
-        let log_account_id: u32 = log_item.account_id().unpack();
-        assert_eq!(log_account_id, new_account_id);
-        let log_data: Bytes = log_item.data().raw_data();
-        let polyjuice_log = parse_log(log_data.as_ref());
-        println!("polyjuice_log: {:?}", polyjuice_log);
-        assert_eq!(
-            &polyjuice_log.address[..],
-            &account_id_to_eth_address(new_account_id, false)[..]
-        );
-        assert_eq!(polyjuice_log.data[31], call_value as u8);
-        assert_eq!(polyjuice_log.data[63], 0); // false
-        assert_eq!(
-            polyjuice_log.topics[1].as_slice(),
-            account_id_to_eth_address(from_id, true)
-        );
+        assert_eq!(run_result.logs.len(), 2);
+        {
+            let log_item = &run_result.logs[0];
+            let log_account_id: u32 = log_item.account_id().unpack();
+            assert_eq!(log_account_id, new_account_id);
+            let log_data: Bytes = log_item.data().raw_data();
+            let polyjuice_log = parse_log(log_data.as_ref());
+            println!("user polyjuice_log: {:?}", polyjuice_log);
+            if let PolyjuiceLog::User {
+                address,
+                data,
+                topics,
+            } = polyjuice_log
+            {
+                assert_eq!(
+                    &address[..],
+                    &account_id_to_eth_address(new_account_id, false)[..]
+                );
+                assert_eq!(data[31], call_value as u8);
+                assert_eq!(data[63], 0); // false
+                assert_eq!(
+                    topics[1].as_slice(),
+                    account_id_to_eth_address(from_id, true)
+                );
+            } else {
+                panic!("unexpected polyjuice log");
+            }
+        }
+        {
+            let log_item = &run_result.logs[1];
+            let log_account_id: u32 = log_item.account_id().unpack();
+            assert_eq!(log_account_id, new_account_id);
+            let log_data: Bytes = log_item.data().raw_data();
+            let polyjuice_log = parse_log(log_data.as_ref());
+            println!("system polyjuice_log: {:?}", polyjuice_log);
+            if let PolyjuiceLog::System {
+                gas_used,
+                cumulative_gas_used,
+                created_id,
+                status_code,
+            } = polyjuice_log
+            {
+                assert_eq!(gas_used, cumulative_gas_used);
+                assert_eq!(created_id, u32::max_value());
+                assert_eq!(status_code, 0);
+            } else {
+                panic!("unexpected polyjuice log");
+            }
+        }
     }
 }

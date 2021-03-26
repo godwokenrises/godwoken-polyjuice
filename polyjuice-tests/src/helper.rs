@@ -71,11 +71,19 @@ lazy_static::lazy_static! {
     };
 }
 
-#[derive(Default, Clone, Debug)]
-pub struct PolyjuiceLog {
-    pub address: [u8; 20],
-    pub data: Vec<u8>,
-    pub topics: Vec<H256>,
+#[derive(Debug, Clone)]
+pub enum PolyjuiceLog {
+    System {
+        gas_used: u64,
+        cumulative_gas_used: u64,
+        created_id: u32,
+        status_code: u32,
+    },
+    User {
+        address: [u8; 20],
+        data: Vec<u8>,
+        topics: Vec<H256>,
+    },
 }
 
 pub fn new_block_info(block_producer_id: u32, number: u64, timestamp: u64) -> BlockInfo {
@@ -318,43 +326,76 @@ pub fn deploy(
     run_result
 }
 
-pub fn parse_log(data: &[u8]) -> PolyjuiceLog {
-    let mut offset: usize = 0;
-    let mut address = [0u8; 20];
-    address.copy_from_slice(&data[offset..offset + 20]);
-    offset += 20;
-    let mut data_size_bytes = [0u8; 4];
-    data_size_bytes.copy_from_slice(&data[offset..offset + 4]);
-    offset += 4;
-    let data_size: u32 = u32::from_le_bytes(data_size_bytes);
-    let mut log_data = vec![0u8; data_size as usize];
-    log_data.copy_from_slice(&data[offset..offset + (data_size as usize)]);
-    offset += data_size as usize;
-    println!("data_size: {}", data_size);
+pub fn parse_log(origin_data: &[u8]) -> PolyjuiceLog {
+    let kind: u8 = origin_data[0];
 
-    let mut topics_count_bytes = [0u8; 4];
-    topics_count_bytes.copy_from_slice(&data[offset..offset + 4]);
-    offset += 4;
-    let topics_count: u32 = u32::from_le_bytes(topics_count_bytes);
-    let mut topics = Vec::new();
-    println!("topics_count: {}", topics_count);
-    for _ in 0..topics_count {
-        let mut topic = [0u8; 32];
-        topic.copy_from_slice(&data[offset..offset + 32]);
-        offset += 32;
-        topics.push(topic.into());
-    }
-    if offset != data.len() {
-        panic!(
-            "Too many bytes for polyjuice log data: offset={}, data.len()={}",
-            offset,
-            data.len()
-        );
-    }
-    PolyjuiceLog {
-        address,
-        data: log_data,
-        topics,
+    let data = &origin_data[1..];
+    match kind {
+        0xFF => {
+            if data.len() != (8 + 8 + 4 + 4 + 4) {
+                panic!("invalid system log raw data length: {}", data.len());
+            }
+
+            let mut u64_bytes = [0u8; 8];
+            u64_bytes.copy_from_slice(&data[0..8]);
+            let gas_used = u64::from_le_bytes(u64_bytes.clone());
+            u64_bytes.copy_from_slice(&data[8..16]);
+            let cumulative_gas_used = u64::from_le_bytes(u64_bytes.clone());
+
+            let mut u32_bytes = [0u8; 4];
+            u32_bytes.copy_from_slice(&data[16..20]);
+            let created_id = u32::from_le_bytes(u32_bytes.clone());
+            u32_bytes.copy_from_slice(&data[20..24]);
+            let status_code = u32::from_le_bytes(u32_bytes.clone());
+            PolyjuiceLog::System {
+                gas_used,
+                cumulative_gas_used,
+                created_id,
+                status_code,
+            }
+        }
+        0xF0 => {
+            let mut offset: usize = 0;
+            let mut address = [0u8; 20];
+            address.copy_from_slice(&data[offset..offset + 20]);
+            offset += 20;
+            let mut data_size_bytes = [0u8; 4];
+            data_size_bytes.copy_from_slice(&data[offset..offset + 4]);
+            offset += 4;
+            let data_size: u32 = u32::from_le_bytes(data_size_bytes);
+            let mut log_data = vec![0u8; data_size as usize];
+            log_data.copy_from_slice(&data[offset..offset + (data_size as usize)]);
+            offset += data_size as usize;
+            println!("data_size: {}", data_size);
+
+            let mut topics_count_bytes = [0u8; 4];
+            topics_count_bytes.copy_from_slice(&data[offset..offset + 4]);
+            offset += 4;
+            let topics_count: u32 = u32::from_le_bytes(topics_count_bytes);
+            let mut topics = Vec::new();
+            println!("topics_count: {}", topics_count);
+            for _ in 0..topics_count {
+                let mut topic = [0u8; 32];
+                topic.copy_from_slice(&data[offset..offset + 32]);
+                offset += 32;
+                topics.push(topic.into());
+            }
+            if offset != data.len() {
+                panic!(
+                    "Too many bytes for polyjuice user log data: offset={}, data.len()={}",
+                    offset,
+                    data.len()
+                );
+            }
+            PolyjuiceLog::User {
+                address,
+                data: log_data,
+                topics,
+            }
+        }
+        _ => {
+            panic!("invalid log kind: {}", kind);
+        }
     }
 }
 
