@@ -28,3 +28,6 @@
 [submodule "deps/godwoken-scripts"]
 	path = deps/godwoken-scripts
 	url = https://github.com/nervosnetwork/godwoken-scripts.git
+[submodule "deps/godwoken-scripts-thewawar"]
+	path = deps/godwoken-scripts-thewawar
+	url = https://github.com/TheWaWaR/godwoken-scripts.git

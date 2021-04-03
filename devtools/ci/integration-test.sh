@@ -13,7 +13,7 @@ if [ -d "$GODWOKEN_DIR" ]
 then
     echo "godwoken project already exists"
 else
-    git clone -b master https://github.com/nervosnetwork/godwoken.git $GODWOKEN_DIR
+    git clone -b change-log-interface https://github.com/thewawar/godwoken.git $GODWOKEN_DIR
 fi
 cd $GODWOKEN_DIR
 git submodule update --init --recursive
