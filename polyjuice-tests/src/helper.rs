@@ -338,6 +338,33 @@ pub fn deploy(
     run_result
 }
 
+pub fn compute_create2_script(
+    sudt_id: u32,
+    sender_account_id: u32,
+    create2_salt: &[u8],
+    init_code: &[u8],
+) -> Script {
+    assert_eq!(create2_salt.len(), 32);
+
+    let init_code_hash = tiny_keccak::keccak256(init_code);
+    let mut script_args = vec![0u8; 32 + 4 + 1 + 4 + 32 + 32];
+    script_args[0..32].copy_from_slice(&ROLLUP_SCRIPT_HASH[..]);
+    script_args[32..(32 + 4)].copy_from_slice(&sudt_id.to_le_bytes()[..]);
+    script_args[(32 + 4)] = 0xff;
+    script_args[(32 + 4 + 1)..(32 + 4 + 1 + 4)]
+        .copy_from_slice(&sender_account_id.to_le_bytes()[..]);
+    script_args[(32 + 4 + 1 + 4)..(32 + 4 + 1 + 4 + 32)].copy_from_slice(&create2_salt[..]);
+    script_args[(32 + 4 + 1 + 4 + 32)..(32 + 4 + 1 + 4 + 32 + 32)]
+        .copy_from_slice(&init_code_hash[..]);
+    println!("init_code: {}", hex::encode(init_code));
+    println!("create2_script_args: {}", hex::encode(&script_args[..]));
+    Script::new_builder()
+        .code_hash(PROGRAM_CODE_HASH.pack())
+        .hash_type(ScriptHashType::Type.into())
+        .args(script_args.pack())
+        .build()
+}
+
 pub fn parse_log(item: &LogItem) -> Log {
     let service_flag: u8 = item.service_flag().into();
     let raw_data = item.data().raw_data();
