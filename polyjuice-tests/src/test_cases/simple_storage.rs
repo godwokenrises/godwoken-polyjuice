@@ -2,11 +2,12 @@
 //!   See ./evm-contracts/SimpleStorage.sol
 
 use crate::helper::{
-    build_l2_sudt_script, get_chain_view, new_account_script, new_block_info, setup,
-    PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
+    build_l2_sudt_script, new_account_script, new_block_info, setup, PolyjuiceArgsBuilder,
+    CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
+use gw_store::chain_view::ChainView;
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
 
 const INIT_CODE: &str = include_str!("./evm-contracts/SimpleStorage.bin");
@@ -38,8 +39,15 @@ fn test_simple_storage() {
             .to_id(creator_account_id.pack())
             .args(Bytes::from(args).pack())
             .build();
+        let db = store.begin_transaction();
+        let tip_block_hash = store.get_tip_block_hash().unwrap();
         let run_result = generator
-            .execute_transaction(&get_chain_view(&store), &tree, &block_info, &raw_tx)
+            .execute_transaction(
+                &ChainView::new(&db, tip_block_hash),
+                &tree,
+                &block_info,
+                &raw_tx,
+            )
             .expect("construct");
         tree.apply_run_result(&run_result).expect("update state");
         // println!("result {:?}", run_result);
@@ -70,8 +78,15 @@ fn test_simple_storage() {
             .to_id(new_account_id.pack())
             .args(Bytes::from(args).pack())
             .build();
+        let db = store.begin_transaction();
+        let tip_block_hash = store.get_tip_block_hash().unwrap();
         let run_result = generator
-            .execute_transaction(&get_chain_view(&store), &tree, &block_info, &raw_tx)
+            .execute_transaction(
+                &ChainView::new(&db, tip_block_hash),
+                &tree,
+                &block_info,
+                &raw_tx,
+            )
             .expect("construct");
         tree.apply_run_result(&run_result).expect("update state");
         // println!("result {:?}", run_result);
@@ -93,8 +108,15 @@ fn test_simple_storage() {
             .to_id(new_account_id.pack())
             .args(Bytes::from(args).pack())
             .build();
+        let db = store.begin_transaction();
+        let tip_block_hash = store.get_tip_block_hash().unwrap();
         let run_result = generator
-            .execute_transaction(&get_chain_view(&store), &tree, &block_info, &raw_tx)
+            .execute_transaction(
+                &ChainView::new(&db, tip_block_hash),
+                &tree,
+                &block_info,
+                &raw_tx,
+            )
             .expect("construct");
         tree.apply_run_result(&run_result).expect("update state");
         let mut expected_return_data = vec![0u8; 32];

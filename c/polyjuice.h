@@ -39,7 +39,6 @@
 /* Max data buffer size: 24KB */
 #define MAX_DATA_SIZE 24576
 #define POLYJUICE_SYSTEM_PREFIX 0xFF
-#define POLYJUICE_USER_LOG_PREFIX 0xF0
 #define POLYJUICE_CONTRACT_CODE 0x01
 #define POLYJUICE_DESTRUCTED 0x02
 
@@ -626,14 +625,13 @@ void emit_log(struct evmc_host_context* context, const evmc_address* address,
               const evmc_bytes32 topics[], size_t topics_count) {
   ckb_debug("BEGIN emit_log");
   /*
-    output[0]                          = POLYJUICE_USER_LOG_PREFIX
-    output[ 1..21]                     = callee_contract.address
-    output[21..25]                     = data_size_u32
-    output[25..25+data_size]           = data
-    ouptut[25+data_size..29+data_size] = topics_count_u32
-    ouptut[29+data_size..]             = topics
+    output[ 0..20]                     = callee_contract.address
+    output[20..24]                     = data_size_u32
+    output[24..24+data_size]           = data
+    ouptut[24+data_size..28+data_size] = topics_count_u32
+    ouptut[28+data_size..]             = topics
    */
-  size_t output_size = 1 + 20 + (4 + data_size) + (4 + topics_count * 32);
+  size_t output_size = 20 + (4 + data_size) + (4 + topics_count * 32);
   uint8_t* output = (uint8_t*)malloc(output_size);
   if (output == NULL) {
     context->error_code = -1;
@@ -642,8 +640,7 @@ void emit_log(struct evmc_host_context* context, const evmc_address* address,
   uint32_t data_size_u32 = (uint32_t)(data_size);
   uint32_t topics_count_u32 = (uint32_t)(topics_count);
 
-  output[0] = POLYJUICE_USER_LOG_PREFIX;
-  uint8_t* output_current = output + 1;
+  uint8_t* output_current = output;
   memcpy(output_current, address->bytes, 20);
   output_current += 20;
   memcpy(output_current, (uint8_t*)(&data_size_u32), 4);
@@ -657,7 +654,7 @@ void emit_log(struct evmc_host_context* context, const evmc_address* address,
     output_current += 32;
   }
   int ret = context->gw_ctx->sys_log(context->gw_ctx, context->to_id,
-                                     (uint32_t)output_size, output);
+                                     GW_LOG_POLYJUICE_USER, (uint32_t)output_size, output);
   if (ret != 0) {
     ckb_debug("sys_log failed");
     context->error_code = ret;
@@ -1031,22 +1028,19 @@ int handle_message(gw_context_t* ctx,
 
 int emit_evm_result_log(gw_context_t* ctx, const uint64_t gas_used, const int status_code) {
   /*
-    data = POLYJUICE_SYSTEM_PREFIX
-    + { gasUsed: u64, cumulativeGasUsed: u64, contractAddress: u32, status_code: u32 }
+    data = { gasUsed: u64, cumulativeGasUsed: u64, contractAddress: u32, status_code: u32 }
 
-    data[0]      = POLYJUICE_SYSTEM_PREFIX
-    data[ 1.. 9] = gas_used
-    data[ 9..17] = cumulative_gas_used
-    data[17..21] = created_id (UINT32_MAX means not created)
-    data[21..25] = status_code (EVM status_code)
+    data[ 0.. 8] = gas_used
+    data[ 8..16] = cumulative_gas_used
+    data[16..20] = created_id (UINT32_MAX means not created)
+    data[20..24] = status_code (EVM status_code)
    */
   uint64_t cumulative_gas_used = gas_used;
   uint32_t status_code_u32 = (uint32_t)status_code;
 
-  uint32_t data_size = 1 + 8 + 8 + 4 + 4 + 4;
-  uint8_t data[1 + 8 + 8 + 4 + 4 + 4] = {0};
-  data[0] = POLYJUICE_SYSTEM_PREFIX;
-  uint8_t *ptr = data + 1;
+  uint32_t data_size = 8 + 8 + 4 + 4 + 4;
+  uint8_t data[8 + 8 + 4 + 4 + 4] = {0};
+  uint8_t *ptr = data;
   memcpy(ptr, (uint8_t *)(&gas_used), 8);
   ptr += 8;
   memcpy(ptr, (uint8_t *)(&cumulative_gas_used), 8);
@@ -1058,7 +1052,7 @@ int emit_evm_result_log(gw_context_t* ctx, const uint64_t gas_used, const int st
 
   /* NOTE: if create account failed the `to_id` will also be `context->to_id` */
   uint32_t to_id = created_id == UINT32_MAX ? ctx->transaction_context.to_id : created_id;
-  int ret = ctx->sys_log(ctx, to_id, data_size, data);
+  int ret = ctx->sys_log(ctx, to_id, GW_LOG_POLYJUICE_SYSTEM, data_size, data);
   if (ret != 0) {
     ckb_debug("sys_log evm result failed");
     return -1;

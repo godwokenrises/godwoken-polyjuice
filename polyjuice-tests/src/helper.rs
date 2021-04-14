@@ -4,7 +4,7 @@ pub use gw_common::{
     state::State,
     CKB_SUDT_SCRIPT_ARGS, H256,
 };
-use gw_config::{BackendConfig, BackendManageConfig};
+use gw_config::BackendConfig;
 use gw_db::schema::{COLUMN_INDEX, COLUMN_META, META_TIP_BLOCK_HASH_KEY};
 pub use gw_generator::{
     account_lock_manage::{always_success::AlwaysSuccess, AccountLockManage},
@@ -19,7 +19,7 @@ pub use gw_store::{chain_view::ChainView, Store};
 use gw_types::{
     bytes::Bytes,
     core::ScriptHashType,
-    packed::{BlockInfo, RawL2Transaction, RollupConfig, Script, Uint64},
+    packed::{BlockInfo, LogItem, RawL2Transaction, RollupConfig, Script, Uint64},
     prelude::*,
 };
 use std::{fs, io::Read, path::PathBuf};
@@ -42,6 +42,11 @@ pub const GENERATOR_NAME: &str = "generator_log";
 pub const VALIDATOR_NAME: &str = "validator_log";
 
 pub const ROLLUP_SCRIPT_HASH: [u8; 32] = [0xa9u8; 32];
+
+pub const GW_LOG_SUDT_OPERATION: u8 = 0x0;
+pub const GW_LOG_POLYJUICE_SYSTEM: u8 = 0x1;
+pub const GW_LOG_POLYJUICE_USER: u8 = 0x2;
+pub const SUDT_OPERATION_TRANSFER: u8 = 0x0;
 
 lazy_static::lazy_static! {
     pub static ref GENERATOR_PROGRAM: Bytes = {
@@ -72,14 +77,20 @@ lazy_static::lazy_static! {
 }
 
 #[derive(Debug, Clone)]
-pub enum PolyjuiceLog {
-    System {
+pub enum Log {
+    SudtTransfer {
+        sudt_id: u32,
+        from_id: u32,
+        to_id: u32,
+        amount: u128,
+    },
+    PolyjuiceSystem {
         gas_used: u64,
         cumulative_gas_used: u64,
         created_id: u32,
         status_code: u32,
     },
-    User {
+    PolyjuiceUser {
         address: [u8; 20],
         data: Vec<u8>,
         topics: Vec<H256>,
@@ -112,12 +123,6 @@ pub fn eth_address_to_account_id(data: &[u8]) -> Result<u32, String> {
     let mut id_data = [0u8; 4];
     id_data.copy_from_slice(&data[0..4]);
     Ok(u32::from_le_bytes(id_data))
-}
-
-pub fn get_chain_view(store: &Store) -> ChainView {
-    let db = store.begin_transaction();
-    let tip_block_hash = store.get_tip_block_hash().unwrap();
-    ChainView::new(db, tip_block_hash)
 }
 
 pub fn new_account_script_with_nonce(from_id: u32, from_nonce: u32) -> Script {
@@ -236,19 +241,19 @@ pub fn setup() -> (Store, DummyState, Generator, u32) {
         .expect("create account");
 
     // ==== Build generator
-    let config = BackendManageConfig {
-        meta_contract: BackendConfig {
+    let configs = vec![
+        BackendConfig {
             validator_path: META_VALIDATOR_PATH.into(),
             generator_path: META_GENERATOR_PATH.into(),
             validator_script_type_hash: META_VALIDATOR_SCRIPT_TYPE_HASH.into(),
         },
-        simple_udt: BackendConfig {
+        BackendConfig {
             validator_path: SUDT_VALIDATOR_PATH.into(),
             generator_path: SUDT_GENERATOR_PATH.into(),
             validator_script_type_hash: SUDT_VALIDATOR_SCRIPT_TYPE_HASH.into(),
         },
-    };
-    let mut backend_manage = BackendManage::from_config(config).expect("default backend");
+    ];
+    let mut backend_manage = BackendManage::from_config(configs).expect("default backend");
     // NOTICE in this test we won't need SUM validator
     backend_manage.register_backend(Backend {
         validator: VALIDATOR_PROGRAM.clone(),
@@ -319,19 +324,53 @@ pub fn deploy(
         .to_id(creator_account_id.pack())
         .args(Bytes::from(args).pack())
         .build();
+    let db = store.begin_transaction();
+    let tip_block_hash = store.get_tip_block_hash().unwrap();
     let run_result = generator
-        .execute_transaction(&get_chain_view(&store), tree, &block_info, &raw_tx)
+        .execute_transaction(
+            &ChainView::new(&db, tip_block_hash),
+            tree,
+            &block_info,
+            &raw_tx,
+        )
         .expect("construct");
     tree.apply_run_result(&run_result).expect("update state");
     run_result
 }
 
-pub fn parse_log(origin_data: &[u8]) -> PolyjuiceLog {
-    let kind: u8 = origin_data[0];
+pub fn parse_log(item: &LogItem) -> Log {
+    let service_flag: u8 = item.service_flag().into();
+    let raw_data = item.data().raw_data();
+    let data = raw_data.as_ref();
+    match service_flag {
+        GW_LOG_SUDT_OPERATION => {
+            if data[0] != SUDT_OPERATION_TRANSFER {
+                panic!("Not a sudt transfer prefix: {}", data[1]);
+            }
+            let sudt_id: u32 = item.account_id().unpack();
+            if data.len() != (1 + 4 + 4 + 16) {
+                panic!("Invalid data length: {}", data.len());
+            }
+            let data = &data[1..];
 
-    let data = &origin_data[1..];
-    match kind {
-        0xFF => {
+            let mut u32_bytes = [0u8; 4];
+            u32_bytes.copy_from_slice(&data[0..4]);
+            let from_id = u32::from_le_bytes(u32_bytes.clone());
+
+            u32_bytes.copy_from_slice(&data[4..8]);
+            let to_id = u32::from_le_bytes(u32_bytes);
+
+            let mut u128_bytes = [0u8; 16];
+            u128_bytes.copy_from_slice(&data[8..24]);
+            let amount = u128::from_le_bytes(u128_bytes);
+            Log::SudtTransfer {
+                sudt_id,
+                from_id,
+                to_id,
+                amount,
+            }
+        }
+        GW_LOG_POLYJUICE_SYSTEM => {
             if data.len() != (8 + 8 + 4 + 4 + 4) {
                 panic!("invalid system log raw data length: {}", data.len());
             }
@@ -347,14 +386,14 @@ pub fn parse_log(origin_data: &[u8]) -> PolyjuiceLog {
             let created_id = u32::from_le_bytes(u32_bytes.clone());
             u32_bytes.copy_from_slice(&data[20..24]);
             let status_code = u32::from_le_bytes(u32_bytes.clone());
-            PolyjuiceLog::System {
+            Log::PolyjuiceSystem {
                 gas_used,
                 cumulative_gas_used,
                 created_id,
                 status_code,
             }
         }
-        0xF0 => {
+        GW_LOG_POLYJUICE_USER => {
             let mut offset: usize = 0;
             let mut address = [0u8; 20];
             address.copy_from_slice(&data[offset..offset + 20]);
@@ -387,14 +426,14 @@ pub fn parse_log(origin_data: &[u8]) -> PolyjuiceLog {
                     data.len()
                 );
             }
-            PolyjuiceLog::User {
+            Log::PolyjuiceUser {
                 address,
                 data: log_data,
                 topics,
             }
         }
         _ => {
-            panic!("invalid log kind: {}", kind);
+            panic!("invalid log service flag: {}", service_flag);
         }
     }
 }
@@ -421,8 +460,15 @@ pub fn simple_storage_get(
         .to_id(ss_account_id.pack())
         .args(Bytes::from(args).pack())
         .build();
+    let db = store.begin_transaction();
+    let tip_block_hash = store.get_tip_block_hash().unwrap();
     generator
-        .execute_transaction(&get_chain_view(&store), tree, &block_info, &raw_tx)
+        .execute_transaction(
+            &ChainView::new(&db, tip_block_hash),
+            tree,
+            &block_info,
+            &raw_tx,
+        )
         .expect("construct")
 }
 

@@ -2,13 +2,14 @@
 //!   See ./evm-contracts/BlockInfo.sol
 
 use crate::helper::{
-    build_l2_sudt_script, get_chain_view, new_account_script, new_block_info, setup,
-    PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
+    build_l2_sudt_script, new_account_script, new_block_info, setup, PolyjuiceArgsBuilder,
+    CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
 use gw_db::schema::COLUMN_INDEX;
 use gw_generator::traits::StateExt;
 // use gw_jsonrpc_types::parameter::RunResult;
+use gw_store::chain_view::ChainView;
 use gw_store::traits::KVStore;
 use gw_types::{
     bytes::Bytes,
@@ -58,8 +59,15 @@ fn test_get_block_info() {
         .to_id(creator_account_id.pack())
         .args(Bytes::from(args).pack())
         .build();
+    let db = store.begin_transaction();
+    let tip_block_hash = store.get_tip_block_hash().unwrap();
     let run_result = generator
-        .execute_transaction(&get_chain_view(&store), &tree, &block_info, &raw_tx)
+        .execute_transaction(
+            &ChainView::new(&db, tip_block_hash),
+            &tree,
+            &block_info,
+            &raw_tx,
+        )
         .expect("construct");
     tree.apply_run_result(&run_result).expect("update state");
     block_number += 1;
@@ -123,8 +131,15 @@ fn test_get_block_info() {
             .to_id(new_account_id.pack())
             .args(Bytes::from(args).pack())
             .build();
+        let db = store.begin_transaction();
+        let tip_block_hash = store.get_tip_block_hash().unwrap();
         let run_result = generator
-            .execute_transaction(&get_chain_view(&store), &tree, &block_info, &raw_tx)
+            .execute_transaction(
+                &ChainView::new(&db, tip_block_hash),
+                &tree,
+                &block_info,
+                &raw_tx,
+            )
             .expect("construct");
         assert_eq!(
             run_result.return_data,
