@@ -125,12 +125,6 @@ pub fn eth_address_to_account_id(data: &[u8]) -> Result<u32, String> {
     Ok(u32::from_le_bytes(id_data))
 }
 
-pub fn get_chain_view(store: &Store) -> ChainView {
-    let db = store.begin_transaction();
-    let tip_block_hash = store.get_tip_block_hash().unwrap();
-    ChainView::new(db, tip_block_hash)
-}
-
 pub fn new_account_script_with_nonce(from_id: u32, from_nonce: u32) -> Script {
     let mut new_account_args = [0u8; 44];
     new_account_args[0..32].copy_from_slice(&ROLLUP_SCRIPT_HASH);
@@ -330,8 +324,15 @@ pub fn deploy(
         .to_id(creator_account_id.pack())
         .args(Bytes::from(args).pack())
         .build();
+    let db = store.begin_transaction();
+    let tip_block_hash = store.get_tip_block_hash().unwrap();
     let run_result = generator
-        .execute_transaction(&get_chain_view(&store), tree, &block_info, &raw_tx)
+        .execute_transaction(
+            &ChainView::new(&db, tip_block_hash),
+            tree,
+            &block_info,
+            &raw_tx,
+        )
         .expect("construct");
     tree.apply_run_result(&run_result).expect("update state");
     run_result
@@ -459,8 +460,15 @@ pub fn simple_storage_get(
         .to_id(ss_account_id.pack())
         .args(Bytes::from(args).pack())
         .build();
+    let db = store.begin_transaction();
+    let tip_block_hash = store.get_tip_block_hash().unwrap();
     generator
-        .execute_transaction(&get_chain_view(&store), tree, &block_info, &raw_tx)
+        .execute_transaction(
+            &ChainView::new(&db, tip_block_hash),
+            tree,
+            &block_info,
+            &raw_tx,
+        )
         .expect("construct")
 }
 

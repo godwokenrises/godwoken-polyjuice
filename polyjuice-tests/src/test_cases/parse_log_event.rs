@@ -2,11 +2,12 @@
 //!   See ./evm-contracts/LogEvents.sol
 
 use crate::helper::{
-    account_id_to_eth_address, build_l2_sudt_script, deploy, get_chain_view, new_account_script,
-    new_block_info, parse_log, setup, Log, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
+    account_id_to_eth_address, build_l2_sudt_script, deploy, new_account_script, new_block_info,
+    parse_log, setup, Log, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
+use gw_store::chain_view::ChainView;
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
 
 const INIT_CODE: &str = include_str!("./evm-contracts/LogEvents.bin");
@@ -152,8 +153,15 @@ fn test_parse_log_event() {
             .to_id(new_account_id.pack())
             .args(Bytes::from(args).pack())
             .build();
+        let db = store.begin_transaction();
+        let tip_block_hash = store.get_tip_block_hash().unwrap();
         let run_result = generator
-            .execute_transaction(&get_chain_view(&store), &tree, &block_info, &raw_tx)
+            .execute_transaction(
+                &ChainView::new(&db, tip_block_hash),
+                &tree,
+                &block_info,
+                &raw_tx,
+            )
             .expect("construct");
         tree.apply_run_result(&run_result).expect("update state");
 
