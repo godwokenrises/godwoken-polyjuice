@@ -11,7 +11,7 @@ An Ethereum compatible backend for [Godwoken](https://github.com/nervosnetwork/g
   + [x] ripemd160hash
   + [x] dataCopy
   + [x] bigModExp
-  + [ ] bn256AddIstanbul
-  + [ ] bn256ScalarMulIstanbul
-  + [ ] bn256PairingIstanbul
+  + [x] bn256AddIstanbul
+  + [x] bn256ScalarMulIstanbul
+  + [ ] bn256PairingIstanbul (performance issue)
   + [x] blake2F

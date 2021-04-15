@@ -208,7 +208,7 @@ int build_script(uint8_t code_hash[32], uint8_t hash_type, uint8_t* args,
   }
   memcpy(args_seg.ptr, (uint8_t*)(&args_len), 4);
   memcpy(args_seg.ptr + 4, args, args_len);
-  debug_print_data("script.args", args_seg.ptr, args_seg.size);
+  debug_print_data("script.args", args, args_len);
   debug_print_data("script.code_hash", code_hash, 32);
   debug_print_int("script.hash_type", hash_type);
 
@@ -459,7 +459,7 @@ size_t copy_code(struct evmc_host_context* context, const evmc_address* address,
 
 evmc_uint256be get_balance(struct evmc_host_context* context,
                            const evmc_address* address) {
-  ckb_debug("BEGIN copy_code");
+  ckb_debug("BEGIN get_balance");
   int ret;
   evmc_uint256be balance{};
   uint32_t account_id = 0;
@@ -470,7 +470,6 @@ evmc_uint256be get_balance(struct evmc_host_context* context,
     return balance;
   }
 
-  ckb_debug("END copy_code");
   uint128_t value_u128 = 0;
   ret = sudt_get_balance(context->gw_ctx, sudt_id, account_id, &value_u128);
   if (ret != 0) {
@@ -482,6 +481,9 @@ evmc_uint256be get_balance(struct evmc_host_context* context,
   for (int i = 0; i < 16; i++) {
     balance.bytes[31 - i] = *(value_ptr + i);
   }
+  ckb_debug("END get_balance");
+  debug_print_int("account_id", account_id);
+  debug_print_int("balance", value_u128);
   return balance;
 }
 
@@ -490,6 +492,7 @@ void selfdestruct(struct evmc_host_context* context,
                   const evmc_address* beneficiary) {
   int ret;
   uint32_t beneficiary_account_id = 0;
+  ckb_debug("BEGIN selfdestruct");
   ret = address_to_account_id(beneficiary, &beneficiary_account_id);
   if (ret != 0) {
     ckb_debug("address to account_id failed");
@@ -532,6 +535,7 @@ void selfdestruct(struct evmc_host_context* context,
     ckb_debug("update selfdestruct special key failed");
     context->error_code = ret;
   }
+  ckb_debug("END selfdestruct");
   return;
 }
 
@@ -759,11 +763,12 @@ int create_new_account(gw_context_t* ctx,
     script_args[32 + 4] = 0xff;
     memcpy(script_args + (32 + 4 + 1), (uint8_t*)(&from_id), 4);
     memcpy(script_args + (32 + 4 + 1 + 4), msg->create2_salt.bytes, 32);
+    debug_print_data("create2 init_code", code_data, code_size);
     union ethash_hash256 hash_result = ethash::keccak256(code_data, code_size);
     memcpy(script_args + (32 + 4 + 1 + 4 + 32), hash_result.bytes, 32);
     script_args_len = 32 + 4 + 1 + 4 + 32 + 32;
   } else {
-    // unreachable!
+    ckb_debug("unreachable");
     return -1;
   }
   if (script_args_len > 0) {

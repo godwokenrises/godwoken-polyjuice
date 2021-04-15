@@ -16,7 +16,9 @@ gw-traits = { path = "../integration-test/godwoken/crates/traits" }
 gw-generator = { path = "../integration-test/godwoken/crates/generator" }
 gw-jsonrpc-types = { path = "../integration-test/godwoken/crates/jsonrpc-types" }
 ckb-vm = { git = "https://github.com/nervosnetwork/ckb-vm.git", tag = "0.19.1", features = ["detect-asm"] }
+ethabi = "14.0.0"
 lazy_static = "1.4"
+tiny-keccak = "1.4"
 blake2b-rs = "0.2"
 serde_json = "1.0"
 hex = "0.4.2"
