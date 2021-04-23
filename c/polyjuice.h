@@ -131,6 +131,10 @@ struct evmc_host_context {
 int parse_args(struct evmc_message* msg, uint128_t* gas_price,
                gw_transaction_context_t* tx_ctx) {
   debug_print_int("args_len", tx_ctx->args_len);
+  if (tx_ctx->args_len < 62) {
+    ckb_debug("invalid polyjuice arguments data");
+    return -1;
+  }
   /* == Args decoder */
   size_t offset = 0;
   uint8_t* args = tx_ctx->args;
