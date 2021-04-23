@@ -218,6 +218,7 @@ int build_script(uint8_t code_hash[32], uint8_t hash_type, uint8_t* args,
   MolBuilder_Script_set_hash_type(&script_builder, hash_type);
   MolBuilder_Script_set_args(&script_builder, args_seg.ptr, args_seg.size);
   mol_seg_res_t script_res = MolBuilder_Script_build(script_builder);
+  free(args_seg.ptr);
 
   /* https://stackoverflow.com/a/1545079 */
 #pragma push_macro("errno")
@@ -791,6 +792,7 @@ int create_new_account(gw_context_t* ctx,
         return ret;
       }
     }
+    free(new_script_seg.ptr);
     *to_id = new_account_id;
     debug_print_int(">> new to id", *to_id);
   }
