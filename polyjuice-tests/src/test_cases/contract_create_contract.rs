@@ -2,8 +2,8 @@
 //!   See ./evm-contracts/CreateContract.sol
 
 use crate::helper::{
-    build_eth_l2_script, deploy, new_account_script, new_account_script_with_nonce,
-    new_block_info, setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
+    build_eth_l2_script, deploy, new_account_script, new_account_script_with_nonce, new_block_info,
+    setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
@@ -19,7 +19,8 @@ fn test_contract_create_contract() {
 
     let from_script = build_eth_l2_script([1u8; 20]);
     let from_id = state.create_account_from_script(from_script).unwrap();
-    state.mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, 200000)
+    state
+        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, 200000)
         .unwrap();
 
     // Deploy CreateContract

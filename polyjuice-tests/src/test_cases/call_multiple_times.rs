@@ -21,7 +21,8 @@ fn test_call_multiple_times() {
 
     let from_script = build_eth_l2_script([1u8; 20]);
     let from_id = state.create_account_from_script(from_script).unwrap();
-    state.mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, 280000)
+    state
+        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, 280000)
         .unwrap();
     let mut block_number = 1;
 
@@ -55,7 +56,7 @@ fn test_call_multiple_times() {
     let input = format!(
         "{}{}",
         INIT_CODE,
-        hex::encode(account_id_to_eth_address(&state,ss1_account_id, true))
+        hex::encode(account_id_to_eth_address(&state, ss1_account_id, true))
     );
     let _run_result = deploy(
         &generator,
@@ -115,7 +116,7 @@ fn test_call_multiple_times() {
         let block_info = new_block_info(0, block_number, block_number);
         let input = hex::decode(format!(
             "bca0b9c2{}{}",
-            hex::encode(account_id_to_eth_address(&state,ss2_account_id, true)),
+            hex::encode(account_id_to_eth_address(&state, ss2_account_id, true)),
             "0000000000000000000000000000000000000000000000000000000000000014",
         ))
         .unwrap();

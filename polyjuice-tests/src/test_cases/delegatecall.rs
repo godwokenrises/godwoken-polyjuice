@@ -21,7 +21,8 @@ fn test_delegatecall() {
 
     let from_script = build_eth_l2_script([1u8; 20]);
     let from_id = state.create_account_from_script(from_script).unwrap();
-    state.mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, 280000)
+    state
+        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, 280000)
         .unwrap();
     let mut block_number = 1;
 
@@ -94,7 +95,7 @@ fn test_delegatecall() {
         let input = hex::decode(format!(
             "{}{}{}",
             fn_sighash,
-            hex::encode(&account_id_to_eth_address(&state,ss_account_id, true)),
+            hex::encode(&account_id_to_eth_address(&state, ss_account_id, true)),
             "0000000000000000000000000000000000000000000000000000000000000022",
         ))
         .unwrap();

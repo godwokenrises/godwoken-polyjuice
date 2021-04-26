@@ -18,10 +18,13 @@ fn test_parse_log_event() {
 
     let from_script = build_eth_l2_script([1u8; 20]);
     let from_id = state.create_account_from_script(from_script).unwrap();
-    state.mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, 200000)
+    state
+        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, 200000)
         .unwrap();
 
-    let from_balance1 = state.get_sudt_balance(CKB_SUDT_ACCOUNT_ID, from_id).unwrap();
+    let from_balance1 = state
+        .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, from_id)
+        .unwrap();
     println!("balance of {} = {}", from_id, from_balance1);
 
     let mut block_number = 0;
@@ -80,13 +83,13 @@ fn test_parse_log_event() {
         {
             assert_eq!(
                 &address[..],
-                &account_id_to_eth_address(&state,new_account_id, false)[..]
+                &account_id_to_eth_address(&state, new_account_id, false)[..]
             );
             assert_eq!(data[31], deploy_value as u8);
             assert_eq!(data[63], 1); // true
             assert_eq!(
                 topics[1].as_slice(),
-                account_id_to_eth_address(&state,from_id, true)
+                account_id_to_eth_address(&state, from_id, true)
             );
         } else {
             panic!("unexpected polyjuice log");
@@ -180,13 +183,13 @@ fn test_parse_log_event() {
             {
                 assert_eq!(
                     &address[..],
-                    &account_id_to_eth_address(&state,new_account_id, false)[..]
+                    &account_id_to_eth_address(&state, new_account_id, false)[..]
                 );
                 assert_eq!(data[31], call_value as u8);
                 assert_eq!(data[63], 0); // false
                 assert_eq!(
                     topics[1].as_slice(),
-                    account_id_to_eth_address(&state,from_id, true)
+                    account_id_to_eth_address(&state, from_id, true)
                 );
             } else {
                 panic!("unexpected polyjuice log");

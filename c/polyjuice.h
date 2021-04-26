@@ -569,6 +569,7 @@ struct evmc_result call(struct evmc_host_context* context,
   debug_print_data("call.destination", msg->destination.bytes, 20);
   int ret;
   struct evmc_result res;
+  res.output_data = NULL;
   res.release = release_result;
   gw_context_t* gw_ctx = context->gw_ctx;
 

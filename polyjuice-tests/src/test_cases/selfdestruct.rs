@@ -18,13 +18,17 @@ fn test_selfdestruct() {
 
     let from_script = build_eth_l2_script([1u8; 20]);
     let from_id = state.create_account_from_script(from_script).unwrap();
-    state.mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, 200000)
+    state
+        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, 200000)
         .unwrap();
 
     let beneficiary_script = build_eth_l2_script([2u8; 20]);
-    let beneficiary_id = state.create_account_from_script(beneficiary_script).unwrap();
+    let beneficiary_id = state
+        .create_account_from_script(beneficiary_script)
+        .unwrap();
     assert_eq!(
-        state.get_sudt_balance(CKB_SUDT_ACCOUNT_ID, beneficiary_id)
+        state
+            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, beneficiary_id)
             .unwrap(),
         0
     );
@@ -33,7 +37,7 @@ fn test_selfdestruct() {
         // Deploy SelfDestruct
         let block_info = new_block_info(0, 1, 0);
         let mut input = hex::decode(INIT_CODE).unwrap();
-        input.extend(account_id_to_eth_address(&state,beneficiary_id, true));
+        input.extend(account_id_to_eth_address(&state, beneficiary_id, true));
         let args = PolyjuiceArgsBuilder::default()
             .do_create(true)
             .gas_limit(22000)
@@ -66,12 +70,14 @@ fn test_selfdestruct() {
         .unwrap()
         .unwrap();
     assert_eq!(
-        state.get_sudt_balance(CKB_SUDT_ACCOUNT_ID, new_account_id)
+        state
+            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, new_account_id)
             .unwrap(),
         200
     );
     assert_eq!(
-        state.get_sudt_balance(CKB_SUDT_ACCOUNT_ID, beneficiary_id)
+        state
+            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, beneficiary_id)
             .unwrap(),
         0
     );
@@ -104,12 +110,14 @@ fn test_selfdestruct() {
         // println!("result {:?}", run_result);
     }
     assert_eq!(
-        state.get_sudt_balance(CKB_SUDT_ACCOUNT_ID, new_account_id)
+        state
+            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, new_account_id)
             .unwrap(),
         0
     );
     assert_eq!(
-        state.get_sudt_balance(CKB_SUDT_ACCOUNT_ID, beneficiary_id)
+        state
+            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, beneficiary_id)
             .unwrap(),
         200
     );

@@ -2,8 +2,8 @@
 //!   See ./evm-contracts/CallContract.sol
 
 use crate::helper::{
-    build_eth_l2_script, compute_create2_script, deploy, new_account_script, new_block_info,
-    setup, simple_storage_get, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
+    build_eth_l2_script, compute_create2_script, deploy, new_account_script, new_block_info, setup,
+    simple_storage_get, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
@@ -20,7 +20,8 @@ fn test_create2() {
 
     let from_script = build_eth_l2_script([1u8; 20]);
     let from_id = state.create_account_from_script(from_script).unwrap();
-    state.mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, 2000000)
+    state
+        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, 2000000)
         .unwrap();
     let mut block_number = 1;
 

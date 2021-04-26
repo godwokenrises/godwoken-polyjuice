@@ -21,12 +21,15 @@ fn test_simple_transfer() {
     let from_script = build_eth_l2_script([1u8; 20]);
     let from_id = state.create_account_from_script(from_script).unwrap();
     let mint_balance: u128 = 400000;
-    state.mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, mint_balance)
+    state
+        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, mint_balance)
         .unwrap();
     let target_script = build_eth_l2_script([2u8; 20]);
     let target_id = state.create_account_from_script(target_script).unwrap();
 
-    let from_balance = state.get_sudt_balance(CKB_SUDT_ACCOUNT_ID, from_id).unwrap();
+    let from_balance = state
+        .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, from_id)
+        .unwrap();
     assert_eq!(from_balance, mint_balance);
     let target_balance = state
         .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, target_id)
@@ -108,7 +111,7 @@ fn test_simple_transfer() {
         let block_info = new_block_info(0, block_number, block_number);
         let input = hex::decode(format!(
             "a03fa7e3{}",
-            hex::encode(account_id_to_eth_address(&state,target_id, true)),
+            hex::encode(account_id_to_eth_address(&state, target_id, true)),
         ))
         .unwrap();
         let args = PolyjuiceArgsBuilder::default()
@@ -150,7 +153,7 @@ fn test_simple_transfer() {
         let block_info = new_block_info(0, block_number, block_number);
         let input = hex::decode(format!(
             "f10c7360{}",
-            hex::encode(account_id_to_eth_address(&state,ss_account_id, true)),
+            hex::encode(account_id_to_eth_address(&state, ss_account_id, true)),
         ))
         .unwrap();
         let args = PolyjuiceArgsBuilder::default()
@@ -206,7 +209,7 @@ fn test_simple_transfer() {
         let block_info = new_block_info(0, block_number, block_number);
         let input = hex::decode(format!(
             "2a5eb963{}",
-            hex::encode(account_id_to_eth_address(&state,ss_account_id, true)),
+            hex::encode(account_id_to_eth_address(&state, ss_account_id, true)),
         ))
         .unwrap();
         let args = PolyjuiceArgsBuilder::default()

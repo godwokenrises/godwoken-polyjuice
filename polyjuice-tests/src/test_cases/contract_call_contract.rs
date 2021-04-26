@@ -20,7 +20,8 @@ fn test_contract_call_contract() {
 
     let from_script = build_eth_l2_script([1u8; 20]);
     let from_id = state.create_account_from_script(from_script).unwrap();
-    state.mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, 200000)
+    state
+        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, 200000)
         .unwrap();
     let mut block_number = 1;
 
@@ -47,7 +48,7 @@ fn test_contract_call_contract() {
     let input = format!(
         "{}{}",
         INIT_CODE,
-        hex::encode(account_id_to_eth_address(&state,ss_account_id, true))
+        hex::encode(account_id_to_eth_address(&state, ss_account_id, true))
     );
     let _run_result = deploy(
         &generator,

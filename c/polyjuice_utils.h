@@ -40,6 +40,7 @@ int account_id_to_address(gw_context_t* ctx, uint32_t account_id, evmc_address *
   uint8_t script_hash[32] = {0};
   int ret = ctx->sys_get_script_hash_by_account_id(ctx, account_id, script_hash);
   if (ret != 0) {
+    debug_print_int("get script hash by account id failed", account_id);
     return ret;
   }
 
@@ -52,13 +53,22 @@ int account_id_to_address(gw_context_t* ctx, uint32_t account_id, evmc_address *
   Must check eth_address[0..16] match the script_hash[0..16] of the account id
  */
 int address_to_account_id(gw_context_t* ctx, const evmc_address* address, uint32_t* account_id) {
+  /* Zero address is special case */
+  static uint8_t zero_address[20] = {0};
+  if (memcmp(address->bytes, zero_address, 20) == 0) {
+    *account_id = 0;
+    return 0;
+  }
+
   *account_id = *((uint32_t*)(address->bytes + 16));
   uint8_t script_hash[32] = {0};
   int ret = ctx->sys_get_script_hash_by_account_id(ctx, *account_id, script_hash);
   if (ret != 0) {
+    debug_print_int("get script hash by account id failed", *account_id);
     return ret;
   }
   if (memcmp(address->bytes, script_hash, 16) != 0) {
+    debug_print_data("check script hash failed, invalid eth address", address->bytes, 20);
     return -1;
   }
   return 0;

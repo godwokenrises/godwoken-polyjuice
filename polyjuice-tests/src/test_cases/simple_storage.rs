@@ -18,10 +18,13 @@ fn test_simple_storage() {
 
     let from_script = build_eth_l2_script([1u8; 20]);
     let from_id = state.create_account_from_script(from_script).unwrap();
-    state.mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, 200000)
+    state
+        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, 200000)
         .unwrap();
 
-    let from_balance1 = state.get_sudt_balance(CKB_SUDT_ACCOUNT_ID, from_id).unwrap();
+    let from_balance1 = state
+        .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, from_id)
+        .unwrap();
     println!("balance of {} = {}", from_id, from_balance1);
     {
         // Deploy SimpleStorage
@@ -59,7 +62,9 @@ fn test_simple_storage() {
         .get_account_id_by_script_hash(&contract_account_script.hash().into())
         .unwrap()
         .unwrap();
-    let from_balance2 = state.get_sudt_balance(CKB_SUDT_ACCOUNT_ID, from_id).unwrap();
+    let from_balance2 = state
+        .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, from_id)
+        .unwrap();
     println!("balance of {} = {}", from_id, from_balance2);
     {
         // SimpleStorage.set(0x0d10);

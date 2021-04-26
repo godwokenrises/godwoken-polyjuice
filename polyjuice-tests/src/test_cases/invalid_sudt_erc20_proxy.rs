@@ -25,11 +25,14 @@ fn test_invalid_sudt_erc20_proxy() {
     let from_id2 = state.create_account_from_script(from_script2).unwrap();
     let from_script3 = build_eth_l2_script([3u8; 20]);
     let from_id3 = state.create_account_from_script(from_script3).unwrap();
-    state.mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id1, 2000000)
+    state
+        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id1, 2000000)
         .unwrap();
-    state.mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id2, 2000000)
+    state
+        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id2, 2000000)
         .unwrap();
-    state.mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id3, 2000000)
+    state
+        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id3, 2000000)
         .unwrap();
 
     assert_eq!(CKB_SUDT_ACCOUNT_ID, 1);
@@ -55,13 +58,14 @@ fn test_invalid_sudt_erc20_proxy() {
         .unwrap()
         .unwrap();
     let is_ethabi = true;
-    let eoa1_hex = hex::encode(account_id_to_eth_address(&state,from_id1, is_ethabi));
-    let eoa2_hex = hex::encode(account_id_to_eth_address(&state,from_id2, is_ethabi));
-    let eoa3_hex = hex::encode(account_id_to_eth_address(&state,from_id3, is_ethabi));
+    let eoa1_hex = hex::encode(account_id_to_eth_address(&state, from_id1, is_ethabi));
+    let eoa2_hex = hex::encode(account_id_to_eth_address(&state, from_id2, is_ethabi));
+    let eoa3_hex = hex::encode(account_id_to_eth_address(&state, from_id3, is_ethabi));
     println!("eoa1_hex: {}", eoa1_hex);
     println!("eoa2_hex: {}", eoa2_hex);
     println!("eoa3_hex: {}", eoa3_hex);
-    state.mint_sudt(new_sudt_id, from_id1, 160000000000000000000000000000u128)
+    state
+        .mint_sudt(new_sudt_id, from_id1, 160000000000000000000000000000u128)
         .unwrap();
 
     assert_eq!(

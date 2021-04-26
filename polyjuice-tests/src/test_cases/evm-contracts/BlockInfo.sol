@@ -1,4 +1,4 @@
-pragma solidity >=0.4.0 <=0.8.0;
+pragma solidity >=0.6.0 <=0.8.2;
 
 contract BlockInfo {
   bytes32 blockHash;
@@ -8,14 +8,14 @@ contract BlockInfo {
   uint timestamp;
   address coinbase;
 
-  constructor() public payable {
+  constructor() payable {
     blockHash = blockhash(0);
     difficulty = block.difficulty;
     gasLimit = block.gaslimit;
     number = block.number;
     timestamp = block.timestamp;
     coinbase = block.coinbase;
-    require(coinbase == 0x0400000000000000000000000000000000000000);
+    require(coinbase == 0xA1Ad227AD369F593B5f3d0cC934a681a04000000);
     require(blockHash == 0x0707070707070707070707070707070707070707070707070707070707070707);
     require(gasLimit == 12500000);
   }

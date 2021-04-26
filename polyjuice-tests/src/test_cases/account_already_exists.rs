@@ -17,7 +17,8 @@ fn test_account_already_exists() {
     let from_script = build_eth_l2_script([1u8; 20]);
     let from_id = state.create_account_from_script(from_script).unwrap();
     let mint_balance: u128 = 400000;
-    state.mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, mint_balance)
+    state
+        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, mint_balance)
         .unwrap();
 
     let created_ss_account_script = new_account_script_with_nonce(from_id, 0);

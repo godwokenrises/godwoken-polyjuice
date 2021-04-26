@@ -110,8 +110,8 @@ pub fn account_id_to_eth_address(state: &DummyState, id: u32, ethabi: bool) -> V
     let offset = if ethabi { 12 } else { 0 };
     let mut data = vec![0u8; offset + 20];
     let account_script_hash = state.get_script_hash(id).unwrap();
-    data[offset..offset+16].copy_from_slice(&account_script_hash.as_slice()[0..16]);
-    data[offset+16..offset+20].copy_from_slice(&id.to_le_bytes()[..]);
+    data[offset..offset + 16].copy_from_slice(&account_script_hash.as_slice()[0..16]);
+    data[offset + 16..offset + 20].copy_from_slice(&id.to_le_bytes()[..]);
     data
 }
 
@@ -120,15 +120,21 @@ pub fn eth_address_to_account_id(state: &DummyState, data: &[u8]) -> Result<u32,
     if data.len() != 20 {
         return Err(format!("Invalid eth address length: {}", data.len()));
     }
+    if data == &[0u8; 20][..] {
+        // Zero address is special case
+        return Ok(0);
+    }
     let mut id_data = [0u8; 4];
     id_data.copy_from_slice(&data[16..20]);
     let account_id = u32::from_le_bytes(id_data);
-    let account_script_hash = state.get_script_hash(account_id).map_err(|err.to_string()|)?;
-    if data[0..16] != &account_script_hash.as_slice()[0..16] {
+    let account_script_hash = state
+        .get_script_hash(account_id)
+        .map_err(|err| err.to_string())?;
+    if &data[0..16] != &account_script_hash.as_slice()[0..16] {
         return Err(format!(
             "eth address first 16 bytes not match account script hash: expected={:?}, got={:?}",
             &account_script_hash.as_slice()[0..16],
-            data[0..16],
+            &data[0..16],
         ));
     }
     Ok(account_id)
