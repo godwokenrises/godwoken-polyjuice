@@ -43,6 +43,7 @@ pub const VALIDATOR_NAME: &str = "validator_log";
 
 pub const ROLLUP_SCRIPT_HASH: [u8; 32] = [0xa9u8; 32];
 pub const ETH_ACCOUNT_LOCK_CODE_HASH: [u8; 32] = [0xaau8; 32];
+pub const DEFAULT_CHAIN_ID: u32 = 0xaaccf3f3;
 
 pub const GW_LOG_SUDT_OPERATION: u8 = 0x0;
 pub const GW_LOG_POLYJUICE_SYSTEM: u8 = 0x1;
@@ -525,13 +526,18 @@ pub fn build_l2_sudt_script(args: [u8; 32]) -> Script {
         .build()
 }
 
-pub fn build_eth_l2_script(args: [u8; 20]) -> Script {
-    let mut script_args = Vec::with_capacity(32 + 20);
+pub fn build_eth_l2_script_with_chain_id(args: [u8; 20], chain_id: u32) -> Script {
+    let mut script_args = Vec::with_capacity(32 + 20 + 4);
     script_args.extend(&ROLLUP_SCRIPT_HASH);
     script_args.extend(&args[..]);
+    script_args.extend(&chain_id.to_le_bytes()[..]);
     Script::new_builder()
         .args(Bytes::from(script_args).pack())
         .code_hash(ETH_ACCOUNT_LOCK_CODE_HASH.clone().pack())
         .hash_type(ScriptHashType::Type.into())
         .build()
+}
+
+pub fn build_eth_l2_script(args: [u8; 20]) -> Script {
+    build_eth_l2_script_with_chain_id(args, DEFAULT_CHAIN_ID)
 }

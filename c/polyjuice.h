@@ -45,6 +45,7 @@ static bool has_touched = false;
 static uint8_t rollup_script_hash[32] = {0};
 static uint32_t sudt_id = UINT32_MAX;
 static uint32_t tx_origin_id = UINT32_MAX;
+static uint32_t chain_id = UINT32_MAX;
 /* Receipt.contractAddress - The contract address created, if the transaction was a contract creation, otherwise null */
 static uint32_t created_id = UINT32_MAX;
 static evmc_address tx_origin;
@@ -323,7 +324,7 @@ int load_account_script(gw_context_t* gw_ctx, uint32_t account_id,
 //// Callbacks
 ////////////////////////////////////////////////////////////////////////////
 struct evmc_tx_context get_tx_context(struct evmc_host_context* context) {
-  struct evmc_tx_context ctx {};
+  struct evmc_tx_context ctx{0};
   /* gas price = 1 */
   ctx.tx_gas_price.bytes[31] = 0x01;
   memcpy(ctx.tx_origin.bytes, tx_origin.bytes, 20);
@@ -343,8 +344,12 @@ struct evmc_tx_context get_tx_context(struct evmc_host_context* context) {
       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
       0x00, 0x00, 0x00, 0x08, 0xe1, 0xbc, 0x9b, 0xf0, 0x40, 0x00,
   };
-  /* chain id = 1 */
-  ctx.chain_id.bytes[31] = 0x01;
+  /* chain_id = eoa_sender.script.args[52..56] */
+  uint8_t *chain_id_ptr = (uint8_t *)(&chain_id);
+  ctx.chain_id.bytes[31] = chain_id_ptr[0];
+  ctx.chain_id.bytes[30] = chain_id_ptr[1];
+  ctx.chain_id.bytes[29] = chain_id_ptr[2];
+  ctx.chain_id.bytes[28] = chain_id_ptr[3];
   return ctx;
 }
 
@@ -735,13 +740,28 @@ int load_globals(gw_context_t* ctx, uint32_t to_id) {
   memcpy(script_code_hash, code_hash_seg.ptr, 32);
   script_hash_type = *hash_type_seg.ptr;
   if (raw_args_seg.size < 36) {
-    ckb_debug("invalid script args");
+    debug_print_data("invalid to account script args", raw_args_seg.ptr, raw_args_seg.size);
     return -1;
   }
   memcpy(rollup_script_hash, raw_args_seg.ptr, 32);
   sudt_id = *(uint32_t*)(raw_args_seg.ptr + 32);
   debug_print_data("rollup_script_hash", rollup_script_hash, 32);
   debug_print_int("sudt id", sudt_id);
+
+  /* Load chain id from eoa_sender.script.args[52..56] */
+  uint32_t from_id = ctx->transaction_context.from_id;
+  int ret = load_account_script(ctx, from_id, buffer, GW_MAX_SCRIPT_SIZE, &script_seg);
+  if (ret != 0) {
+    return ret;
+  }
+  mol_seg_t args_seg = MolReader_Script_get_args(&script_seg);
+  mol_seg_t raw_args_seg = MolReader_Bytes_raw_bytes(&args_seg);
+  if (raw_args_seg.size < 56) {
+    debug_print_data("invalid from account script args", raw_args_seg.ptr, raw_args_seg.size);
+  }
+  chain_id = *(uint32_t *)(raw_args_seg.ptr + 52);
+  debug_print_int("chain id", chain_id);
+
   return 0;
 }
 
