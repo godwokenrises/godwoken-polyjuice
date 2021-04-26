@@ -21,7 +21,6 @@
 #pragma pop_macro("errno")
 
 #include "sudt_utils.h"
-
 #include "polyjuice_utils.h"
 
 #ifdef GW_GENERATOR
@@ -129,7 +128,8 @@ struct evmc_host_context {
    ]
  */
 int parse_args(struct evmc_message* msg, uint128_t* gas_price,
-               gw_transaction_context_t* tx_ctx) {
+               gw_context_t* ctx) {
+  gw_transaction_context_t *tx_ctx = &ctx->transaction_context;
   debug_print_int("args_len", tx_ctx->args_len);
   if (tx_ctx->args_len < 62) {
     ckb_debug("invalid polyjuice arguments data");
@@ -183,8 +183,17 @@ int parse_args(struct evmc_message* msg, uint128_t* gas_price,
     return -1;
   }
 
-  evmc_address sender = account_id_to_address(tx_ctx->from_id);
-  evmc_address destination = account_id_to_address(tx_ctx->to_id);
+  int ret;
+  evmc_address sender{0};
+  ret = account_id_to_address(ctx, tx_ctx->from_id, &sender);
+  if (ret != 0) {
+    return ret;
+  }
+  evmc_address destination{0}
+  ret = account_id_to_address(ctx, tx_ctx->to_id, &destination);
+  if (ret != 0) {
+    return ret;
+  }
   tx_origin_id = tx_ctx->from_id;
   memcpy(tx_origin.bytes, sender.bytes, 20);
 
@@ -318,7 +327,12 @@ struct evmc_tx_context get_tx_context(struct evmc_host_context* context) {
   /* gas price = 1 */
   ctx.tx_gas_price.bytes[31] = 0x01;
   memcpy(ctx.tx_origin.bytes, tx_origin.bytes, 20);
-  ctx.block_coinbase = account_id_to_address(context->gw_ctx->block_info.block_producer_id);
+  int ret = account_id_to_address(context->gw_ctx,
+                                  context->gw_ctx->block_info.block_producer_id,
+                                  &ctx.block_coinbase);
+  if (ret != 0) {
+    return ret;
+  }
   ctx.block_number = context->gw_ctx->block_info.number;
   ctx.block_timestamp = context->gw_ctx->block_info.timestamp;
   /* Ethereum block gas limit */
@@ -338,7 +352,7 @@ bool account_exists(struct evmc_host_context* context,
                     const evmc_address* address) {
   ckb_debug("BEGIN account_exists");
   uint32_t account_id = 0;
-  int ret = address_to_account_id(address, &account_id);
+  int ret = address_to_account_id(context->gw_ctx, address, &account_id);
   if (ret != 0) {
     ckb_debug("address_to_account_id failed");
     context->error_code = ret;
@@ -397,7 +411,7 @@ size_t get_code_size(struct evmc_host_context* context,
   ckb_debug("BEGIN get_code_size");
   int ret;
   uint32_t account_id = 0;
-  ret = address_to_account_id(address, &account_id);
+  ret = address_to_account_id(context->gw_ctx, address, &account_id);
   if (ret != 0) {
     ckb_debug("address to account_id failed");
     context->error_code = ret;
@@ -420,7 +434,7 @@ evmc_bytes32 get_code_hash(struct evmc_host_context* context,
   ckb_debug("BEGIN get_code_hash");
   evmc_bytes32 hash{};
   uint32_t account_id = 0;
-  int ret = address_to_account_id(address, &account_id);
+  int ret = address_to_account_id(context->gw_ctx, address, &account_id);
   if (ret != 0) {
     ckb_debug("address_to_account_id failed");
     context->error_code = ret;
@@ -446,7 +460,7 @@ size_t copy_code(struct evmc_host_context* context, const evmc_address* address,
                  size_t code_offset, uint8_t* buffer_data, size_t buffer_size) {
   ckb_debug("BEGIN copy_code");
   uint32_t account_id = 0;
-  int ret = address_to_account_id(address, &account_id);
+  int ret = address_to_account_id(context->gw_ctx, address, &account_id);
   if (ret != 0) {
     return (size_t)ret;
   }
@@ -468,7 +482,7 @@ evmc_uint256be get_balance(struct evmc_host_context* context,
   int ret;
   evmc_uint256be balance{};
   uint32_t account_id = 0;
-  ret = address_to_account_id(address, &account_id);
+  ret = address_to_account_id(context->gw_ctx, address, &account_id);
   if (ret != 0) {
     ckb_debug("address to account_id failed");
     context->error_code = ret;
@@ -498,7 +512,7 @@ void selfdestruct(struct evmc_host_context* context,
   int ret;
   uint32_t beneficiary_account_id = 0;
   ckb_debug("BEGIN selfdestruct");
-  ret = address_to_account_id(beneficiary, &beneficiary_account_id);
+  ret = address_to_account_id(context->gw_ctx, beneficiary, &beneficiary_account_id);
   if (ret != 0) {
     ckb_debug("address to account_id failed");
     context->error_code = ret;
@@ -860,8 +874,15 @@ int execute_in_evmone(gw_context_t* ctx,
                                           call,           get_tx_context, get_block_hash, emit_log};
   if (!to_id_is_eoa && !transfer_only) {
     /* Execute the code in EVM */
-    msg->sender = account_id_to_address(from_id);
-    msg->destination = account_id_to_address(to_id);
+    int ret;
+    ret = account_id_to_address(ctx, from_id, &msg->sender);
+    if (ret != 0) {
+      return ret;
+    }
+    ret = account_id_to_address(ctx, to_id, &msg->destination);
+    if (ret != 0) {
+      return ret;
+    }
 
     debug_print_int("code size", code_size);
     debug_print_data("msg.input_data", msg->input_data, msg->input_size);
@@ -904,7 +925,10 @@ int store_contract_code(gw_context_t* ctx,
   if (ret != 0) {
     return ret;
   }
-  res->create_address = account_id_to_address(to_id);
+  ret = account_id_to_address(ctx, to_id, &res->create_address);
+  if (ret != 0) {
+    return ret;
+  }
   return 0;
 }
 
@@ -925,7 +949,7 @@ int handle_message(gw_context_t* ctx,
 
   uint32_t to_id;
   uint32_t from_id;
-  ret = address_to_account_id(&(msg.destination), &to_id);
+  ret = address_to_account_id(ctx, &(msg.destination), &to_id);
   if (ret != 0) {
     ckb_debug("address to account id failed");
     return -1;
@@ -933,7 +957,7 @@ int handle_message(gw_context_t* ctx,
   if (msg.kind == EVMC_DELEGATECALL) {
     from_id = parent_from_id;
   } else {
-    ret = address_to_account_id(&(msg.sender), &from_id);
+    ret = address_to_account_id(ctx, &(msg.sender), &from_id);
     if (ret != 0) {
       ckb_debug("address to account id failed");
       return -1;
@@ -1085,7 +1109,7 @@ int run_polyjuice() {
   uint128_t gas_price;
   /* Parse message */
   ckb_debug("BEGIN parse_message()");
-  ret = parse_args(&msg, &gas_price, &context.transaction_context);
+  ret = parse_args(&msg, &gas_price, &context);
   ckb_debug("END parse_message()");
   if (ret != 0) {
     return ret;

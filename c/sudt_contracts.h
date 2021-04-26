@@ -82,7 +82,7 @@ int balance_of_any_sudt(gw_context_t* ctx,
 
   evmc_address address = *((evmc_address *)(input_src + 32 + 12));
   uint32_t account_id;
-  ret = address_to_account_id(&address, &account_id);
+  ret = address_to_account_id(ctx, &address, &account_id);
   if (ret != 0) {
     ckb_debug("invalid address");
     return ERROR_BALANCE_OF_ANY_SUDT;
@@ -177,7 +177,7 @@ int transfer_to_any_sudt(gw_context_t* ctx,
 
   uint32_t from_id = 0;
   evmc_address from_address = *((evmc_address *)(input_src + 32 + 12));
-  ret = address_to_account_id(&from_address, &from_id);
+  ret = address_to_account_id(ctx, &from_address, &from_id);
   if (ret != 0) {
     ckb_debug("invalid from_address");
     return ERROR_TRANSFER_TO_ANY_SUDT;
@@ -185,7 +185,7 @@ int transfer_to_any_sudt(gw_context_t* ctx,
 
   uint32_t to_id = 0;
   evmc_address to_address = *((evmc_address *)(input_src + 64 + 12));
-  ret = address_to_account_id(&to_address, &to_id);
+  ret = address_to_account_id(ctx, &to_address, &to_id);
   if (ret != 0) {
     ckb_debug("invalid to_address");
     return ERROR_TRANSFER_TO_ANY_SUDT;
