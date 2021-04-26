@@ -120,7 +120,6 @@ fn test_get_block_info() {
         let block_info = new_block_info(aggregator_id, block_number + 1, timestamp + 1);
         let input = hex::decode(fn_sighash).unwrap();
         let args = PolyjuiceArgsBuilder::default()
-            .static_call(true)
             .gas_limit(21000)
             .gas_price(1)
             .value(0)

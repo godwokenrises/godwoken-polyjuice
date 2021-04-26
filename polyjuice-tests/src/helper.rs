@@ -164,7 +164,6 @@ pub fn new_account_script(state: &mut DummyState, from_id: u32, current_nonce: b
 #[derive(Default, Debug)]
 pub struct PolyjuiceArgsBuilder {
     is_create: bool,
-    is_static: bool,
     gas_limit: u64,
     gas_price: u128,
     value: u128,
@@ -174,10 +173,6 @@ pub struct PolyjuiceArgsBuilder {
 impl PolyjuiceArgsBuilder {
     pub fn do_create(mut self, value: bool) -> Self {
         self.is_create = value;
-        self
-    }
-    pub fn static_call(mut self, value: bool) -> Self {
-        self.is_static = value;
         self
     }
     pub fn gas_limit(mut self, value: u64) -> Self {
@@ -197,18 +192,13 @@ impl PolyjuiceArgsBuilder {
         self
     }
     pub fn build(self) -> Vec<u8> {
-        let mut output: Vec<u8> = vec![0u8; 62];
-        if self.is_create {
-            output[0] = 3;
-        }
-        if self.is_static {
-            output[1] = 1;
-        }
-        output[2..10].copy_from_slice(&self.gas_limit.to_le_bytes()[..]);
-        output[10..26].copy_from_slice(&self.gas_price.to_le_bytes()[..]);
-        output[26..42].copy_from_slice(&[0u8; 16][..]);
-        output[42..58].copy_from_slice(&self.value.to_be_bytes()[..]);
-        output[58..62].copy_from_slice(&(self.input.len() as u32).to_le_bytes()[..]);
+        let mut output: Vec<u8> = vec![0u8; 48];
+        let call_kind: u32 = if self.is_create { 3 } else { 0 };
+        output[0..8].copy_from_slice(&self.gas_limit.to_le_bytes()[..]);
+        output[8..24].copy_from_slice(&self.gas_price.to_le_bytes()[..]);
+        output[24..40].copy_from_slice(&self.value.to_le_bytes()[..]);
+        output[40..44].copy_from_slice(&call_kind.to_le_bytes()[..]);
+        output[44..48].copy_from_slice(&(self.input.len() as u32).to_le_bytes()[..]);
         output.extend(self.input);
         output
     }
@@ -492,7 +482,6 @@ pub fn simple_storage_get(
     let block_info = new_block_info(0, block_number, block_number);
     let input = hex::decode("6d4ce63c").unwrap();
     let args = PolyjuiceArgsBuilder::default()
-        .static_call(true)
         .gas_limit(21000)
         .gas_price(1)
         .value(0)

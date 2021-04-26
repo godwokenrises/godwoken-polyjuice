@@ -119,20 +119,19 @@ struct evmc_host_context {
 
 /**
    Message = [
-     depth      : u16, (little endian)
-     tx_origin  : Option<H160>,
-     call_kind  : u8
-     flags      : u8,
-     value      : U256 (big endian),
-     input_size : u32, (little endian)
-     input_data : [u8],
+     gas_limit  : u64                (little endian)
+     gas_price  : u128               (little endian)
+     value      : u128               (little endian)
+     call_kind  : u32                (only use first byte, rest 3 bytes must be zero)
+     input_size : u32                (little endian)
+     input_data : [u8; input_size]
    ]
  */
 int parse_args(struct evmc_message* msg, uint128_t* gas_price,
                gw_context_t* ctx) {
   gw_transaction_context_t *tx_ctx = &ctx->transaction_context;
   debug_print_int("args_len", tx_ctx->args_len);
-  if (tx_ctx->args_len < 62) {
+  if (tx_ctx->args_len < (8 + 16 + 16 + 4 + 4)) {
     ckb_debug("invalid polyjuice arguments data");
     return -1;
   }
@@ -140,32 +139,35 @@ int parse_args(struct evmc_message* msg, uint128_t* gas_price,
   size_t offset = 0;
   uint8_t* args = tx_ctx->args;
 
-  /* args[0] call kind */
-  evmc_call_kind kind = (evmc_call_kind) * (args + offset);
-  offset += 1;
-  debug_print_int("[kind]", kind);
-
-  /* args[1] flags */
-  uint8_t flags = *(args + offset);
-  offset += 1;
-  debug_print_int("[flags]", flags);
-
-  /* args[2..10] gas limit */
+  /* args[0..8] gas limit  */
   int64_t gas_limit = (int64_t) (*(uint64_t*)(args + offset));
   offset += 8;
   debug_print_int("[gas_limit]", gas_limit);
 
-  /* args[10..26] gas price */
+  /* args[8..24] gas price */
   *gas_price = *((uint128_t*)(args + offset));
   offset += 16;
   debug_print_int("[gas_price]", (int64_t)(*gas_price));
 
-  /* args[26..58] transfer value */
-  evmc_uint256be value = *((evmc_uint256be*)(args + offset));
-  offset += 32;
+  /* args[24..40] transfer value */
+  evmc_uint256be value{0};
+  for (size_t i = 0; i < 16; i++) {
+    value.bytes[31 - i] = args[offset + i];
+  }
+  offset += 16;
   debug_print_data("[value]", value.bytes, 32);
 
-  /* args[58..62] */
+  /* args[40..44] call kind (align to u32)*/
+  uint32_t kind_u32 = *(uint32_t *)(args + offset);
+  if (kind_u32 != EVMC_CALL && kind_u32 != EVMC_CREATE) {
+    debug_print_int("invalid call kind", kind_u32);
+    return -1;
+  }
+  evmc_call_kind kind = (evmc_call_kind)kind_u32;
+  offset += 4;
+  debug_print_int("[kind]", kind_u32);
+
+  /* args[44..48] */
   uint32_t input_size = *((uint32_t*)(args + offset));
   offset += 4;
   debug_print_int("[input_size]", input_size);
@@ -175,7 +177,7 @@ int parse_args(struct evmc_message* msg, uint128_t* gas_price,
     return -1;
   }
 
-  /* args[62..62+input_size] */
+  /* args[48..48+input_size] */
   uint8_t* input_data = args + offset;
   debug_print_data("[input_data]", input_data, input_size);
 
@@ -199,7 +201,7 @@ int parse_args(struct evmc_message* msg, uint128_t* gas_price,
   memcpy(tx_origin.bytes, sender.bytes, 20);
 
   msg->kind = kind;
-  msg->flags = flags;
+  msg->flags = 0;
   msg->depth = 0;
   msg->value = value;
   msg->input_data = input_data;
