@@ -42,6 +42,7 @@ pub const GENERATOR_NAME: &str = "generator_log";
 pub const VALIDATOR_NAME: &str = "validator_log";
 
 pub const ROLLUP_SCRIPT_HASH: [u8; 32] = [0xa9u8; 32];
+pub const ETH_ACCOUNT_LOCK_CODE_HASH: [u8; 32] = [0xaau8; 32];
 
 pub const GW_LOG_SUDT_OPERATION: u8 = 0x0;
 pub const GW_LOG_POLYJUICE_SYSTEM: u8 = 0x1;
@@ -105,24 +106,32 @@ pub fn new_block_info(block_producer_id: u32, number: u64, timestamp: u64) -> Bl
         .build()
 }
 
-pub fn account_id_to_eth_address(id: u32, ethabi: bool) -> Vec<u8> {
+pub fn account_id_to_eth_address(state: &DummyState, id: u32, ethabi: bool) -> Vec<u8> {
     let offset = if ethabi { 12 } else { 0 };
     let mut data = vec![0u8; offset + 20];
-    data[offset..offset + 4].copy_from_slice(&id.to_le_bytes()[..]);
+    let account_script_hash = state.get_script_hash(id).unwrap();
+    data[offset..offset+16].copy_from_slice(&account_script_hash.as_slice()[0..16]);
+    data[offset+16..offset+20].copy_from_slice(&id.to_le_bytes()[..]);
     data
 }
 
 #[allow(dead_code)]
-pub fn eth_address_to_account_id(data: &[u8]) -> Result<u32, String> {
+pub fn eth_address_to_account_id(state: &DummyState, data: &[u8]) -> Result<u32, String> {
     if data.len() != 20 {
         return Err(format!("Invalid eth address length: {}", data.len()));
     }
-    if data[4..20] != [0u8; 16][..] {
-        return Err(format!("Invalid eth address data: {:?}", &data[4..20]));
-    }
     let mut id_data = [0u8; 4];
-    id_data.copy_from_slice(&data[0..4]);
-    Ok(u32::from_le_bytes(id_data))
+    id_data.copy_from_slice(&data[16..20]);
+    let account_id = u32::from_le_bytes(id_data);
+    let account_script_hash = state.get_script_hash(account_id).map_err(|err.to_string()|)?;
+    if data[0..16] != &account_script_hash.as_slice()[0..16] {
+        return Err(format!(
+            "eth address first 16 bytes not match account script hash: expected={:?}, got={:?}",
+            &account_script_hash.as_slice()[0..16],
+            data[0..16],
+        ));
+    }
+    Ok(account_id)
 }
 
 pub fn new_account_script_with_nonce(from_id: u32, from_nonce: u32) -> Script {
@@ -137,8 +146,8 @@ pub fn new_account_script_with_nonce(from_id: u32, from_nonce: u32) -> Script {
         .args(Bytes::from(new_account_args.to_vec()).pack())
         .build()
 }
-pub fn new_account_script(tree: &mut DummyState, from_id: u32, current_nonce: bool) -> Script {
-    let mut from_nonce = tree.get_nonce(from_id).unwrap();
+pub fn new_account_script(state: &mut DummyState, from_id: u32, current_nonce: bool) -> Script {
+    let mut from_nonce = state.get_nonce(from_id).unwrap();
     if !current_nonce {
         from_nonce -= 1;
     }
@@ -200,8 +209,8 @@ impl PolyjuiceArgsBuilder {
 
 pub fn setup() -> (Store, DummyState, Generator, u32) {
     let store = Store::open_tmp().unwrap();
-    let mut tree = DummyState::default();
-    let reserved_id = tree
+    let mut state = DummyState::default();
+    let reserved_id = state
         .create_account_from_script(
             Script::new_builder()
                 .code_hash(META_VALIDATOR_SCRIPT_TYPE_HASH.clone().pack())
@@ -221,7 +230,7 @@ pub fn setup() -> (Store, DummyState, Generator, u32) {
     //     CKB_SUDT_SCRIPT_HASH,
     //     "ckb simple UDT script hash"
     // );
-    let ckb_sudt_id = tree.create_account_from_script(ckb_sudt_script).unwrap();
+    let ckb_sudt_id = state.create_account_from_script(ckb_sudt_script).unwrap();
     assert_eq!(
         ckb_sudt_id, CKB_SUDT_ACCOUNT_ID,
         "ckb simple UDT account id"
@@ -230,7 +239,7 @@ pub fn setup() -> (Store, DummyState, Generator, u32) {
     let mut args = [0u8; 36];
     args[0..32].copy_from_slice(&ROLLUP_SCRIPT_HASH);
     args[32..36].copy_from_slice(&ckb_sudt_id.to_le_bytes()[..]);
-    let creator_account_id = tree
+    let creator_account_id = state
         .create_account_from_script(
             Script::new_builder()
                 .code_hash(PROGRAM_CODE_HASH.pack())
@@ -296,13 +305,13 @@ pub fn setup() -> (Store, DummyState, Generator, u32) {
     )
     .unwrap();
     tx.commit().unwrap();
-    (store, tree, generator, creator_account_id)
+    (store, state, generator, creator_account_id)
 }
 
 pub fn deploy(
     generator: &Generator,
     store: &Store,
-    tree: &mut DummyState,
+    state: &mut DummyState,
     creator_account_id: u32,
     from_id: u32,
     init_code: &str,
@@ -329,12 +338,12 @@ pub fn deploy(
     let run_result = generator
         .execute_transaction(
             &ChainView::new(&db, tip_block_hash),
-            tree,
+            state,
             &block_info,
             &raw_tx,
         )
         .expect("construct");
-    tree.apply_run_result(&run_result).expect("update state");
+    state.apply_run_result(&run_result).expect("update state");
     run_result
 }
 
@@ -467,7 +476,7 @@ pub fn parse_log(item: &LogItem) -> Log {
 
 pub fn simple_storage_get(
     store: &Store,
-    tree: &DummyState,
+    state: &DummyState,
     generator: &Generator,
     block_number: u64,
     from_id: u32,
@@ -492,7 +501,7 @@ pub fn simple_storage_get(
     generator
         .execute_transaction(
             &ChainView::new(&db, tip_block_hash),
-            tree,
+            state,
             &block_info,
             &raw_tx,
         )
@@ -506,6 +515,17 @@ pub fn build_l2_sudt_script(args: [u8; 32]) -> Script {
     Script::new_builder()
         .args(Bytes::from(script_args).pack())
         .code_hash(SUDT_VALIDATOR_SCRIPT_TYPE_HASH.clone().pack())
+        .hash_type(ScriptHashType::Type.into())
+        .build()
+}
+
+pub fn build_eth_l2_script(args: [u8; 20]) -> Script {
+    let mut script_args = Vec::with_capacity(32 + 20);
+    script_args.extend(&ROLLUP_SCRIPT_HASH);
+    script_args.extend(&args[..]);
+    Script::new_builder()
+        .args(Bytes::from(script_args).pack())
+        .code_hash(ETH_ACCOUNT_LOCK_CODE_HASH.clone().pack())
         .hash_type(ScriptHashType::Type.into())
         .build()
 }

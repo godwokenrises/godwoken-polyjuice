@@ -2,7 +2,7 @@
 //!   See ./evm-contracts/BlockInfo.sol
 
 use crate::helper::{
-    build_l2_sudt_script, new_account_script, new_block_info, setup, PolyjuiceArgsBuilder,
+    build_eth_l2_script, new_account_script, new_block_info, setup, PolyjuiceArgsBuilder,
     CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
@@ -21,7 +21,7 @@ const INIT_CODE: &str = include_str!("./evm-contracts/BlockInfo.bin");
 
 #[test]
 fn test_get_block_info() {
-    let (store, mut tree, generator, creator_account_id) = setup();
+    let (store, mut state, generator, creator_account_id) = setup();
 
     {
         let genesis_number: Uint64 = 0.pack();
@@ -34,12 +34,12 @@ fn test_get_block_info() {
         println!("block_hash(0): {:?}", tx.get_block_hash_by_number(0));
     }
 
-    let from_script = build_l2_sudt_script([1u8; 32]);
-    let from_id = tree.create_account_from_script(from_script).unwrap();
-    tree.mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, 400000)
+    let from_script = build_eth_l2_script([1u8; 20]);
+    let from_id = state.create_account_from_script(from_script).unwrap();
+    state.mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, 400000)
         .unwrap();
-    let aggregator_script = build_l2_sudt_script([2u8; 32]);
-    let aggregator_id = tree.create_account_from_script(aggregator_script).unwrap();
+    let aggregator_script = build_eth_l2_script([2u8; 20]);
+    let aggregator_id = state.create_account_from_script(aggregator_script).unwrap();
     assert_eq!(aggregator_id, 4);
 
     // Deploy BlockInfo
@@ -64,20 +64,20 @@ fn test_get_block_info() {
     let run_result = generator
         .execute_transaction(
             &ChainView::new(&db, tip_block_hash),
-            &tree,
+            &state,
             &block_info,
             &raw_tx,
         )
         .expect("construct");
-    tree.apply_run_result(&run_result).expect("update state");
+    state.apply_run_result(&run_result).expect("update state");
     block_number += 1;
     // println!(
     //     "result {}",
     //     serde_json::to_string_pretty(&RunResult::from(run_result)).unwrap()
     // );
 
-    let contract_account_script = new_account_script(&mut tree, from_id, false);
-    let new_account_id = tree
+    let contract_account_script = new_account_script(&mut state, from_id, false);
+    let new_account_id = state
         .get_account_id_by_script_hash(&contract_account_script.hash().into())
         .unwrap()
         .unwrap();
@@ -136,7 +136,7 @@ fn test_get_block_info() {
         let run_result = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
-                &tree,
+                &state,
                 &block_info,
                 &raw_tx,
             )

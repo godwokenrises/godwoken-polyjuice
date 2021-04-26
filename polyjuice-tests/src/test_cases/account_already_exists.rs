@@ -2,7 +2,7 @@
 //!   See ./evm-contracts/SimpleTransfer.sol
 
 use crate::helper::{
-    build_l2_sudt_script, deploy, new_account_script, new_account_script_with_nonce, setup,
+    build_eth_l2_script, deploy, new_account_script, new_account_script_with_nonce, setup,
     CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
@@ -12,16 +12,16 @@ const SS_INIT_CODE: &str = include_str!("./evm-contracts/SimpleStorage.bin");
 
 #[test]
 fn test_account_already_exists() {
-    let (store, mut tree, generator, creator_account_id) = setup();
+    let (store, mut state, generator, creator_account_id) = setup();
 
-    let from_script = build_l2_sudt_script([1u8; 32]);
-    let from_id = tree.create_account_from_script(from_script).unwrap();
+    let from_script = build_eth_l2_script([1u8; 20]);
+    let from_id = state.create_account_from_script(from_script).unwrap();
     let mint_balance: u128 = 400000;
-    tree.mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, mint_balance)
+    state.mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, mint_balance)
         .unwrap();
 
     let created_ss_account_script = new_account_script_with_nonce(from_id, 0);
-    let created_ss_account_id = tree
+    let created_ss_account_id = state
         .create_account_from_script(created_ss_account_script)
         .unwrap();
 
@@ -29,7 +29,7 @@ fn test_account_already_exists() {
     let _run_result = deploy(
         &generator,
         &store,
-        &mut tree,
+        &mut state,
         creator_account_id,
         from_id,
         SS_INIT_CODE,
@@ -37,8 +37,8 @@ fn test_account_already_exists() {
         0,
         0,
     );
-    let ss_account_script = new_account_script(&mut tree, from_id, false);
-    let ss_account_id = tree
+    let ss_account_script = new_account_script(&mut state, from_id, false);
+    let ss_account_id = state
         .get_account_id_by_script_hash(&ss_account_script.hash().into())
         .unwrap()
         .unwrap();
