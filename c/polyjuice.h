@@ -189,7 +189,7 @@ int parse_args(struct evmc_message* msg, uint128_t* gas_price,
   if (ret != 0) {
     return ret;
   }
-  evmc_address destination{0}
+  evmc_address destination{0};
   ret = account_id_to_address(ctx, tx_ctx->to_id, &destination);
   if (ret != 0) {
     return ret;
@@ -331,7 +331,7 @@ struct evmc_tx_context get_tx_context(struct evmc_host_context* context) {
                                   context->gw_ctx->block_info.block_producer_id,
                                   &ctx.block_coinbase);
   if (ret != 0) {
-    return ret;
+    context->error_code = ret;
   }
   ctx.block_number = context->gw_ctx->block_info.number;
   ctx.block_timestamp = context->gw_ctx->block_info.timestamp;
@@ -462,14 +462,18 @@ size_t copy_code(struct evmc_host_context* context, const evmc_address* address,
   uint32_t account_id = 0;
   int ret = address_to_account_id(context->gw_ctx, address, &account_id);
   if (ret != 0) {
-    return (size_t)ret;
+    ckb_debug("address to account_id failed");
+    context->error_code = ret;
+    return 0;
   }
 
   uint32_t code_size = (uint32_t)buffer_size;
   ret = load_account_code(context->gw_ctx, account_id, &code_size,
                           (uint32_t)code_offset, buffer_data);
   if (ret != 0) {
-    return ret;
+    ckb_debug("load account code failed");
+    context->error_code = ret;
+    return 0;
   }
   debug_print_data("code slice", buffer_data, buffer_size);
   ckb_debug("END copy_code");
