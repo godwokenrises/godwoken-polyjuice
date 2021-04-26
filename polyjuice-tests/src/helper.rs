@@ -43,7 +43,8 @@ pub const VALIDATOR_NAME: &str = "validator_log";
 
 pub const ROLLUP_SCRIPT_HASH: [u8; 32] = [0xa9u8; 32];
 pub const ETH_ACCOUNT_LOCK_CODE_HASH: [u8; 32] = [0xaau8; 32];
-pub const DEFAULT_CHAIN_ID: u32 = 0xaaccf3f3;
+// Ethereum mainnet
+pub const DEFAULT_CHAIN_ID: u32 = 0x1;
 
 pub const GW_LOG_SUDT_OPERATION: u8 = 0x0;
 pub const GW_LOG_POLYJUICE_SYSTEM: u8 = 0x1;

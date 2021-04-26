@@ -2,8 +2,8 @@
 //!   See ./evm-contracts/SimpleStorage.sol
 
 use crate::helper::{
-    build_eth_l2_script, build_eth_l2_script_with_chain_id, new_account_script, new_block_info,
-    setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, DEFAULT_CHAIN_ID,
+    build_eth_l2_script, new_account_script, new_block_info, setup, PolyjuiceArgsBuilder,
+    CKB_SUDT_ACCOUNT_ID, DEFAULT_CHAIN_ID,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
@@ -95,45 +95,6 @@ fn test_get_chain_id() {
         state.apply_run_result(&run_result).expect("update state");
         let mut expected_return_data = vec![0u8; 32];
         expected_return_data[28..32].copy_from_slice(&DEFAULT_CHAIN_ID.to_be_bytes()[..]);
-        assert_eq!(run_result.return_data, expected_return_data);
-        // println!("result {:?}", run_result);
-    }
-
-    let new_chain_id: u32 = 0x3b56adef;
-    let from_script2 = build_eth_l2_script_with_chain_id([9u8; 20], new_chain_id);
-    let from_id2 = state.create_account_from_script(from_script2).unwrap();
-    state
-        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id2, 200000)
-        .unwrap();
-
-    {
-        // SimpleStorage.get();
-        let block_info = new_block_info(0, 3, 0);
-        let input = hex::decode("6d4ce63c").unwrap();
-        let args = PolyjuiceArgsBuilder::default()
-            .gas_limit(21000)
-            .gas_price(1)
-            .value(0)
-            .input(&input)
-            .build();
-        let raw_tx = RawL2Transaction::new_builder()
-            .from_id(from_id2.pack())
-            .to_id(new_account_id.pack())
-            .args(Bytes::from(args).pack())
-            .build();
-        let db = store.begin_transaction();
-        let tip_block_hash = store.get_tip_block_hash().unwrap();
-        let run_result = generator
-            .execute_transaction(
-                &ChainView::new(&db, tip_block_hash),
-                &state,
-                &block_info,
-                &raw_tx,
-            )
-            .expect("construct");
-        state.apply_run_result(&run_result).expect("update state");
-        let mut expected_return_data = vec![0u8; 32];
-        expected_return_data[28..32].copy_from_slice(&new_chain_id.to_be_bytes()[..]);
         assert_eq!(run_result.return_data, expected_return_data);
         // println!("result {:?}", run_result);
     }
