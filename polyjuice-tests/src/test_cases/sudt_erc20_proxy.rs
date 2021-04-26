@@ -2,7 +2,7 @@
 //!   See ./evm-contracts/ERC20.bin
 
 use crate::helper::{
-    account_id_to_eth_address, build_l2_sudt_script, deploy, new_account_script, new_block_info,
+    account_id_to_eth_address, build_eth_l2_script, deploy, new_account_script, new_block_info,
     setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
@@ -15,21 +15,24 @@ const INIT_CODE: &str = include_str!("../../../solidity/erc20/SudtERC20Proxy.bin
 
 #[test]
 fn test_sudt_erc20_proxy() {
-    let (store, mut tree, generator, creator_account_id) = setup();
-    let new_sudt_script = build_l2_sudt_script([0xffu8; 32]);
-    let new_sudt_id = tree.create_account_from_script(new_sudt_script).unwrap();
+    let (store, mut state, generator, creator_account_id) = setup();
+    let new_sudt_script = build_eth_l2_script([0xffu8; 20]);
+    let new_sudt_id = state.create_account_from_script(new_sudt_script).unwrap();
 
-    let from_script1 = build_l2_sudt_script([1u8; 32]);
-    let from_id1 = tree.create_account_from_script(from_script1).unwrap();
-    let from_script2 = build_l2_sudt_script([2u8; 32]);
-    let from_id2 = tree.create_account_from_script(from_script2).unwrap();
-    let from_script3 = build_l2_sudt_script([3u8; 32]);
-    let from_id3 = tree.create_account_from_script(from_script3).unwrap();
-    tree.mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id1, 2000000)
+    let from_script1 = build_eth_l2_script([1u8; 20]);
+    let from_id1 = state.create_account_from_script(from_script1).unwrap();
+    let from_script2 = build_eth_l2_script([2u8; 20]);
+    let from_id2 = state.create_account_from_script(from_script2).unwrap();
+    let from_script3 = build_eth_l2_script([3u8; 20]);
+    let from_id3 = state.create_account_from_script(from_script3).unwrap();
+    state
+        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id1, 2000000)
         .unwrap();
-    tree.mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id2, 2000000)
+    state
+        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id2, 2000000)
         .unwrap();
-    tree.mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id3, 2000000)
+    state
+        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id3, 2000000)
         .unwrap();
 
     assert_eq!(CKB_SUDT_ACCOUNT_ID, 1);
@@ -40,7 +43,7 @@ fn test_sudt_erc20_proxy() {
     let _run_result = deploy(
         &generator,
         &store,
-        &mut tree,
+        &mut state,
         creator_account_id,
         from_id1,
         init_code.as_str(),
@@ -49,27 +52,28 @@ fn test_sudt_erc20_proxy() {
         1,
     );
 
-    let contract_account_script = new_account_script(&mut tree, from_id1, false);
-    let new_account_id = tree
+    let contract_account_script = new_account_script(&mut state, from_id1, false);
+    let new_account_id = state
         .get_account_id_by_script_hash(&contract_account_script.hash().into())
         .unwrap()
         .unwrap();
     let is_ethabi = true;
-    let eoa1_hex = hex::encode(account_id_to_eth_address(from_id1, is_ethabi));
-    let eoa2_hex = hex::encode(account_id_to_eth_address(from_id2, is_ethabi));
-    let eoa3_hex = hex::encode(account_id_to_eth_address(from_id3, is_ethabi));
+    let eoa1_hex = hex::encode(account_id_to_eth_address(&state, from_id1, is_ethabi));
+    let eoa2_hex = hex::encode(account_id_to_eth_address(&state, from_id2, is_ethabi));
+    let eoa3_hex = hex::encode(account_id_to_eth_address(&state, from_id3, is_ethabi));
     println!("eoa1_hex: {}", eoa1_hex);
     println!("eoa2_hex: {}", eoa2_hex);
     println!("eoa3_hex: {}", eoa3_hex);
-    tree.mint_sudt(new_sudt_id, from_id1, 160000000000000000000000000000u128)
+    state
+        .mint_sudt(new_sudt_id, from_id1, 160000000000000000000000000000u128)
         .unwrap();
 
     assert_eq!(
-        tree.get_sudt_balance(new_sudt_id, from_id1).unwrap(),
+        state.get_sudt_balance(new_sudt_id, from_id1).unwrap(),
         160000000000000000000000000000u128
     );
-    assert_eq!(tree.get_sudt_balance(new_sudt_id, from_id2).unwrap(), 0);
-    assert_eq!(tree.get_sudt_balance(new_sudt_id, from_id3).unwrap(), 0);
+    assert_eq!(state.get_sudt_balance(new_sudt_id, from_id2).unwrap(), 0);
+    assert_eq!(state.get_sudt_balance(new_sudt_id, from_id3).unwrap(), 0);
     for (idx, (from_id, args_str, is_static, return_data_str)) in [
         // balanceOf(eoa1)
         (
@@ -185,12 +189,12 @@ fn test_sudt_erc20_proxy() {
         let run_result = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
-                &tree,
+                &state,
                 &block_info,
                 &raw_tx,
             )
             .expect("construct");
-        tree.apply_run_result(&run_result).expect("update state");
+        state.apply_run_result(&run_result).expect("update state");
         assert_eq!(
             run_result.return_data,
             hex::decode(return_data_str).unwrap()

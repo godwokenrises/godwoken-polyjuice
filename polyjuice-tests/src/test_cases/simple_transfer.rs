@@ -2,7 +2,7 @@
 //!   See ./evm-contracts/SimpleTransfer.sol
 
 use crate::helper::{
-    account_id_to_eth_address, build_l2_sudt_script, deploy, new_account_script, new_block_info,
+    account_id_to_eth_address, build_eth_l2_script, deploy, new_account_script, new_block_info,
     setup, simple_storage_get, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
@@ -16,19 +16,22 @@ const INIT_CODE: &str = include_str!("./evm-contracts/SimpleTransfer.bin");
 
 #[test]
 fn test_simple_transfer() {
-    let (store, mut tree, generator, creator_account_id) = setup();
+    let (store, mut state, generator, creator_account_id) = setup();
 
-    let from_script = build_l2_sudt_script([1u8; 32]);
-    let from_id = tree.create_account_from_script(from_script).unwrap();
+    let from_script = build_eth_l2_script([1u8; 20]);
+    let from_id = state.create_account_from_script(from_script).unwrap();
     let mint_balance: u128 = 400000;
-    tree.mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, mint_balance)
+    state
+        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, mint_balance)
         .unwrap();
-    let target_script = build_l2_sudt_script([2u8; 32]);
-    let target_id = tree.create_account_from_script(target_script).unwrap();
+    let target_script = build_eth_l2_script([2u8; 20]);
+    let target_id = state.create_account_from_script(target_script).unwrap();
 
-    let from_balance = tree.get_sudt_balance(CKB_SUDT_ACCOUNT_ID, from_id).unwrap();
+    let from_balance = state
+        .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, from_id)
+        .unwrap();
     assert_eq!(from_balance, mint_balance);
-    let target_balance = tree
+    let target_balance = state
         .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, target_id)
         .unwrap();
     assert_eq!(target_balance, 0);
@@ -40,7 +43,7 @@ fn test_simple_transfer() {
     let _run_result = deploy(
         &generator,
         &store,
-        &mut tree,
+        &mut state,
         creator_account_id,
         from_id,
         SS_INIT_CODE,
@@ -53,19 +56,19 @@ fn test_simple_transfer() {
     //     "result {}",
     //     serde_json::to_string_pretty(&RunResult::from(run_result)).unwrap()
     // );
-    let ss_account_script = new_account_script(&mut tree, from_id, false);
-    let ss_account_id = tree
+    let ss_account_script = new_account_script(&mut state, from_id, false);
+    let ss_account_id = state
         .get_account_id_by_script_hash(&ss_account_script.hash().into())
         .unwrap()
         .unwrap();
-    let ss_balance = tree
+    let ss_balance = state
         .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, ss_account_id)
         .unwrap();
     assert_eq!(ss_balance, 0);
     println!("--------");
     let run_result = simple_storage_get(
         &store,
-        &tree,
+        &state,
         &generator,
         block_number,
         from_id,
@@ -82,7 +85,7 @@ fn test_simple_transfer() {
     let _run_result = deploy(
         &generator,
         &store,
-        &mut tree,
+        &mut state,
         creator_account_id,
         from_id,
         INIT_CODE,
@@ -91,12 +94,12 @@ fn test_simple_transfer() {
         block_number,
     );
     block_number += 1;
-    let contract_account_script = new_account_script(&mut tree, from_id, false);
-    let new_account_id = tree
+    let contract_account_script = new_account_script(&mut state, from_id, false);
+    let new_account_id = state
         .get_account_id_by_script_hash(&contract_account_script.hash().into())
         .unwrap()
         .unwrap();
-    let new_balance = tree
+    let new_balance = state
         .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, new_account_id)
         .unwrap();
     assert_eq!(new_balance, deploy_value);
@@ -108,7 +111,7 @@ fn test_simple_transfer() {
         let block_info = new_block_info(0, block_number, block_number);
         let input = hex::decode(format!(
             "a03fa7e3{}",
-            hex::encode(account_id_to_eth_address(target_id, true)),
+            hex::encode(account_id_to_eth_address(&state, target_id, true)),
         ))
         .unwrap();
         let args = PolyjuiceArgsBuilder::default()
@@ -127,18 +130,18 @@ fn test_simple_transfer() {
         let run_result = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
-                &tree,
+                &state,
                 &block_info,
                 &raw_tx,
             )
             .expect("construct");
-        tree.apply_run_result(&run_result).expect("update state");
+        state.apply_run_result(&run_result).expect("update state");
 
-        let new_balance = tree
+        let new_balance = state
             .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, new_account_id)
             .unwrap();
         assert_eq!(new_balance, deploy_value - 1);
-        let target_balance = tree
+        let target_balance = state
             .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, target_id)
             .unwrap();
         assert_eq!(target_balance, 1);
@@ -150,7 +153,7 @@ fn test_simple_transfer() {
         let block_info = new_block_info(0, block_number, block_number);
         let input = hex::decode(format!(
             "f10c7360{}",
-            hex::encode(account_id_to_eth_address(ss_account_id, true)),
+            hex::encode(account_id_to_eth_address(&state, ss_account_id, true)),
         ))
         .unwrap();
         let args = PolyjuiceArgsBuilder::default()
@@ -169,25 +172,25 @@ fn test_simple_transfer() {
         let run_result = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
-                &tree,
+                &state,
                 &block_info,
                 &raw_tx,
             )
             .expect("construct");
-        tree.apply_run_result(&run_result).expect("update state");
+        state.apply_run_result(&run_result).expect("update state");
 
-        let new_balance = tree
+        let new_balance = state
             .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, new_account_id)
             .unwrap();
         assert_eq!(new_balance, deploy_value - 2);
-        let ss_balance = tree
+        let ss_balance = state
             .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, ss_account_id)
             .unwrap();
         assert_eq!(ss_balance, 1);
         println!("================");
         let run_result = simple_storage_get(
             &store,
-            &tree,
+            &state,
             &generator,
             block_number,
             from_id,
@@ -206,7 +209,7 @@ fn test_simple_transfer() {
         let block_info = new_block_info(0, block_number, block_number);
         let input = hex::decode(format!(
             "2a5eb963{}",
-            hex::encode(account_id_to_eth_address(ss_account_id, true)),
+            hex::encode(account_id_to_eth_address(&state, ss_account_id, true)),
         ))
         .unwrap();
         let args = PolyjuiceArgsBuilder::default()
@@ -225,24 +228,24 @@ fn test_simple_transfer() {
         let run_result = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
-                &tree,
+                &state,
                 &block_info,
                 &raw_tx,
             )
             .expect("construct");
-        tree.apply_run_result(&run_result).expect("update state");
+        state.apply_run_result(&run_result).expect("update state");
 
-        let new_balance = tree
+        let new_balance = state
             .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, new_account_id)
             .unwrap();
         assert_eq!(new_balance, deploy_value - 3);
-        let ss_balance = tree
+        let ss_balance = state
             .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, ss_account_id)
             .unwrap();
         assert_eq!(ss_balance, 2);
         let run_result = simple_storage_get(
             &store,
-            &tree,
+            &state,
             &generator,
             block_number,
             from_id,

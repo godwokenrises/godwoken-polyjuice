@@ -2,7 +2,7 @@
 //!   See ./evm-contracts/CallContract.sol
 
 use crate::helper::{
-    account_id_to_eth_address, build_l2_sudt_script, deploy, new_account_script, new_block_info,
+    account_id_to_eth_address, build_eth_l2_script, deploy, new_account_script, new_block_info,
     setup, simple_storage_get, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
@@ -16,11 +16,12 @@ const INIT_CODE: &str = include_str!("./evm-contracts/CallContract.bin");
 
 #[test]
 fn test_contract_call_contract() {
-    let (store, mut tree, generator, creator_account_id) = setup();
+    let (store, mut state, generator, creator_account_id) = setup();
 
-    let from_script = build_l2_sudt_script([1u8; 32]);
-    let from_id = tree.create_account_from_script(from_script).unwrap();
-    tree.mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, 200000)
+    let from_script = build_eth_l2_script([1u8; 20]);
+    let from_id = state.create_account_from_script(from_script).unwrap();
+    state
+        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, 200000)
         .unwrap();
     let mut block_number = 1;
 
@@ -28,7 +29,7 @@ fn test_contract_call_contract() {
     let _run_result = deploy(
         &generator,
         &store,
-        &mut tree,
+        &mut state,
         creator_account_id,
         from_id,
         SS_INIT_CODE,
@@ -37,8 +38,8 @@ fn test_contract_call_contract() {
         block_number,
     );
     block_number += 1;
-    let ss_account_script = new_account_script(&mut tree, from_id, false);
-    let ss_account_id = tree
+    let ss_account_script = new_account_script(&mut state, from_id, false);
+    let ss_account_id = state
         .get_account_id_by_script_hash(&ss_account_script.hash().into())
         .unwrap()
         .unwrap();
@@ -47,12 +48,12 @@ fn test_contract_call_contract() {
     let input = format!(
         "{}{}",
         INIT_CODE,
-        hex::encode(account_id_to_eth_address(ss_account_id, true))
+        hex::encode(account_id_to_eth_address(&state, ss_account_id, true))
     );
     let _run_result = deploy(
         &generator,
         &store,
-        &mut tree,
+        &mut state,
         creator_account_id,
         from_id,
         input.as_str(),
@@ -65,15 +66,15 @@ fn test_contract_call_contract() {
     //     "result {}",
     //     serde_json::to_string_pretty(&RunResult::from(run_result)).unwrap()
     // );
-    let contract_account_script = new_account_script(&mut tree, from_id, false);
-    let new_account_id = tree
+    let contract_account_script = new_account_script(&mut state, from_id, false);
+    let new_account_id = state
         .get_account_id_by_script_hash(&contract_account_script.hash().into())
         .unwrap()
         .unwrap();
 
     let run_result = simple_storage_get(
         &store,
-        &tree,
+        &state,
         &generator,
         block_number,
         from_id,
@@ -106,17 +107,17 @@ fn test_contract_call_contract() {
         let run_result = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
-                &tree,
+                &state,
                 &block_info,
                 &raw_tx,
             )
             .expect("construct");
-        tree.apply_run_result(&run_result).expect("update state");
+        state.apply_run_result(&run_result).expect("update state");
     }
 
     let run_result = simple_storage_get(
         &store,
-        &tree,
+        &state,
         &generator,
         block_number,
         from_id,
@@ -127,7 +128,7 @@ fn test_contract_call_contract() {
         hex::decode("00000000000000000000000000000000000000000000000000000000000000e1").unwrap()
     );
 
-    assert_eq!(tree.get_nonce(from_id).unwrap(), 3);
-    assert_eq!(tree.get_nonce(ss_account_id).unwrap(), 0);
-    assert_eq!(tree.get_nonce(new_account_id).unwrap(), 0);
+    assert_eq!(state.get_nonce(from_id).unwrap(), 3);
+    assert_eq!(state.get_nonce(ss_account_id).unwrap(), 0);
+    assert_eq!(state.get_nonce(new_account_id).unwrap(), 0);
 }

@@ -32,19 +32,45 @@ void debug_print_int(const char* prefix, int64_t ret) {
 }
 #endif  /* #ifdef NO_DEBUG_LOG */
 
-evmc_address account_id_to_address(uint32_t account_id) {
-  evmc_address addr{0};
-  memcpy(addr.bytes, (uint8_t*)(&account_id), 4);
-  return addr;
-}
-int address_to_account_id(const evmc_address* address, uint32_t* account_id) {
-  for (size_t i = 4; i < 20; i++) {
-    if (address->bytes[i] != 0) {
-      /* ERROR: invalid polyjuice address */
-      return -1;
-    }
+/*
+  eth_address[ 0..16] = script_hash[0..16]
+  eth_address[16..20] = account_id (little endian)
+ */
+int account_id_to_address(gw_context_t* ctx, uint32_t account_id, evmc_address *addr) {
+  uint8_t script_hash[32] = {0};
+  int ret = ctx->sys_get_script_hash_by_account_id(ctx, account_id, script_hash);
+  if (ret != 0) {
+    debug_print_int("get script hash by account id failed", account_id);
+    return ret;
   }
-  *account_id = *((uint32_t*)(address->bytes));
+
+  memcpy(addr->bytes, script_hash, 16);
+  memcpy(addr->bytes + 16, (uint8_t*)(&account_id), 4);
+  return 0;
+}
+
+/*
+  Must check eth_address[0..16] match the script_hash[0..16] of the account id
+ */
+int address_to_account_id(gw_context_t* ctx, const evmc_address* address, uint32_t* account_id) {
+  /* Zero address is special case */
+  static uint8_t zero_address[20] = {0};
+  if (memcmp(address->bytes, zero_address, 20) == 0) {
+    *account_id = 0;
+    return 0;
+  }
+
+  *account_id = *((uint32_t*)(address->bytes + 16));
+  uint8_t script_hash[32] = {0};
+  int ret = ctx->sys_get_script_hash_by_account_id(ctx, *account_id, script_hash);
+  if (ret != 0) {
+    debug_print_int("get script hash by account id failed", *account_id);
+    return ret;
+  }
+  if (memcmp(address->bytes, script_hash, 16) != 0) {
+    debug_print_data("check script hash failed, invalid eth address", address->bytes, 20);
+    return -1;
+  }
   return 0;
 }
 

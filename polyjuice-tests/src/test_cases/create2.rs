@@ -2,8 +2,8 @@
 //!   See ./evm-contracts/CallContract.sol
 
 use crate::helper::{
-    build_l2_sudt_script, compute_create2_script, deploy, new_account_script, new_block_info,
-    setup, simple_storage_get, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
+    build_eth_l2_script, compute_create2_script, deploy, new_account_script, new_block_info, setup,
+    simple_storage_get, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
@@ -16,11 +16,12 @@ const INIT_CODE: &str = include_str!("./evm-contracts/Create2Impl.bin");
 
 #[test]
 fn test_create2() {
-    let (store, mut tree, generator, creator_account_id) = setup();
+    let (store, mut state, generator, creator_account_id) = setup();
 
-    let from_script = build_l2_sudt_script([1u8; 32]);
-    let from_id = tree.create_account_from_script(from_script).unwrap();
-    tree.mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, 2000000)
+    let from_script = build_eth_l2_script([1u8; 20]);
+    let from_id = state.create_account_from_script(from_script).unwrap();
+    state
+        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, 2000000)
         .unwrap();
     let mut block_number = 1;
 
@@ -28,7 +29,7 @@ fn test_create2() {
     let _run_result = deploy(
         &generator,
         &store,
-        &mut tree,
+        &mut state,
         creator_account_id,
         from_id,
         INIT_CODE,
@@ -41,13 +42,13 @@ fn test_create2() {
     //     "result {}",
     //     serde_json::to_string_pretty(&RunResult::from(run_result)).unwrap()
     // );
-    let contract_account_script = new_account_script(&mut tree, from_id, false);
-    let new_account_id = tree
+    let contract_account_script = new_account_script(&mut state, from_id, false);
+    let new_account_id = state
         .get_account_id_by_script_hash(&contract_account_script.hash().into())
         .unwrap()
         .unwrap();
 
-    let new_account_balance = tree
+    let new_account_balance = state
         .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, new_account_id)
         .unwrap();
     assert_eq!(new_account_balance, 0);
@@ -82,13 +83,13 @@ fn test_create2() {
         let run_result = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
-                &tree,
+                &state,
                 &block_info,
                 &raw_tx,
             )
             .expect("construct");
         // println!("run_result: {:?}", run_result);
-        tree.apply_run_result(&run_result).expect("update state");
+        state.apply_run_result(&run_result).expect("update state");
     }
 
     let create2_script = compute_create2_script(
@@ -97,19 +98,19 @@ fn test_create2() {
         &hex::decode(input_salt).unwrap()[..],
         &hex::decode(SS_INIT_CODE).unwrap()[..],
     );
-    let create2_account_id = tree
+    let create2_account_id = state
         .get_account_id_by_script_hash(&create2_script.hash().into())
         .unwrap()
         .unwrap();
 
-    let create2_account_balance = tree
+    let create2_account_balance = state
         .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, create2_account_id)
         .unwrap();
     assert_eq!(create2_account_balance, input_value_u128);
 
     let run_result = simple_storage_get(
         &store,
-        &tree,
+        &state,
         &generator,
         block_number,
         from_id,

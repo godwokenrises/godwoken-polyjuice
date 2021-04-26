@@ -2,7 +2,7 @@
 //!   See ./evm-contracts/LogEvents.sol
 
 use crate::helper::{
-    account_id_to_eth_address, build_l2_sudt_script, deploy, new_account_script, new_block_info,
+    account_id_to_eth_address, build_eth_l2_script, deploy, new_account_script, new_block_info,
     parse_log, setup, Log, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
@@ -14,14 +14,17 @@ const INIT_CODE: &str = include_str!("./evm-contracts/LogEvents.bin");
 
 #[test]
 fn test_parse_log_event() {
-    let (store, mut tree, generator, creator_account_id) = setup();
+    let (store, mut state, generator, creator_account_id) = setup();
 
-    let from_script = build_l2_sudt_script([1u8; 32]);
-    let from_id = tree.create_account_from_script(from_script).unwrap();
-    tree.mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, 200000)
+    let from_script = build_eth_l2_script([1u8; 20]);
+    let from_id = state.create_account_from_script(from_script).unwrap();
+    state
+        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, 200000)
         .unwrap();
 
-    let from_balance1 = tree.get_sudt_balance(CKB_SUDT_ACCOUNT_ID, from_id).unwrap();
+    let from_balance1 = state
+        .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, from_id)
+        .unwrap();
     println!("balance of {} = {}", from_id, from_balance1);
 
     let mut block_number = 0;
@@ -29,7 +32,7 @@ fn test_parse_log_event() {
     let run_result = deploy(
         &generator,
         &store,
-        &mut tree,
+        &mut state,
         creator_account_id,
         from_id,
         INIT_CODE,
@@ -37,8 +40,8 @@ fn test_parse_log_event() {
         deploy_value,
         block_number,
     );
-    let contract_account_script = new_account_script(&mut tree, from_id, false);
-    let new_account_id = tree
+    let contract_account_script = new_account_script(&mut state, from_id, false);
+    let new_account_id = state
         .get_account_id_by_script_hash(&contract_account_script.hash().into())
         .unwrap()
         .unwrap();
@@ -80,13 +83,13 @@ fn test_parse_log_event() {
         {
             assert_eq!(
                 &address[..],
-                &account_id_to_eth_address(new_account_id, false)[..]
+                &account_id_to_eth_address(&state, new_account_id, false)[..]
             );
             assert_eq!(data[31], deploy_value as u8);
             assert_eq!(data[63], 1); // true
             assert_eq!(
                 topics[1].as_slice(),
-                account_id_to_eth_address(from_id, true)
+                account_id_to_eth_address(&state, from_id, true)
             );
         } else {
             panic!("unexpected polyjuice log");
@@ -158,12 +161,12 @@ fn test_parse_log_event() {
         let run_result = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
-                &tree,
+                &state,
                 &block_info,
                 &raw_tx,
             )
             .expect("construct");
-        tree.apply_run_result(&run_result).expect("update state");
+        state.apply_run_result(&run_result).expect("update state");
 
         assert_eq!(run_result.logs.len(), 4);
         {
@@ -180,13 +183,13 @@ fn test_parse_log_event() {
             {
                 assert_eq!(
                     &address[..],
-                    &account_id_to_eth_address(new_account_id, false)[..]
+                    &account_id_to_eth_address(&state, new_account_id, false)[..]
                 );
                 assert_eq!(data[31], call_value as u8);
                 assert_eq!(data[63], 0); // false
                 assert_eq!(
                     topics[1].as_slice(),
-                    account_id_to_eth_address(from_id, true)
+                    account_id_to_eth_address(&state, from_id, true)
                 );
             } else {
                 panic!("unexpected polyjuice log");
