@@ -750,12 +750,12 @@ int load_globals(gw_context_t* ctx, uint32_t to_id) {
 
   /* Load chain id from eoa_sender.script.args[52..56] */
   uint32_t from_id = ctx->transaction_context.from_id;
-  int ret = load_account_script(ctx, from_id, buffer, GW_MAX_SCRIPT_SIZE, &script_seg);
+  ret = load_account_script(ctx, from_id, buffer, GW_MAX_SCRIPT_SIZE, &script_seg);
   if (ret != 0) {
     return ret;
   }
-  mol_seg_t args_seg = MolReader_Script_get_args(&script_seg);
-  mol_seg_t raw_args_seg = MolReader_Bytes_raw_bytes(&args_seg);
+  args_seg = MolReader_Script_get_args(&script_seg);
+  raw_args_seg = MolReader_Bytes_raw_bytes(&args_seg);
   if (raw_args_seg.size < 56) {
     debug_print_data("invalid from account script args", raw_args_seg.ptr, raw_args_seg.size);
   }
