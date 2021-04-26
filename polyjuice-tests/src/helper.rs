@@ -192,13 +192,13 @@ impl PolyjuiceArgsBuilder {
         self
     }
     pub fn build(self) -> Vec<u8> {
-        let mut output: Vec<u8> = vec![0u8; 48];
-        let call_kind: u32 = if self.is_create { 3 } else { 0 };
-        output[0..8].copy_from_slice(&self.gas_limit.to_le_bytes()[..]);
-        output[8..24].copy_from_slice(&self.gas_price.to_le_bytes()[..]);
-        output[24..40].copy_from_slice(&self.value.to_le_bytes()[..]);
-        output[40..44].copy_from_slice(&call_kind.to_le_bytes()[..]);
-        output[44..48].copy_from_slice(&(self.input.len() as u32).to_le_bytes()[..]);
+        let mut output: Vec<u8> = vec![0u8; 52];
+        let call_kind: u8 = if self.is_create { 3 } else { 0 };
+        output[0..8].copy_from_slice(&[0xff, 0xff, 0xff, b'P', b'O', b'L', b'Y', call_kind][..]);
+        output[8..16].copy_from_slice(&self.gas_limit.to_le_bytes()[..]);
+        output[16..32].copy_from_slice(&self.gas_price.to_le_bytes()[..]);
+        output[32..48].copy_from_slice(&self.value.to_le_bytes()[..]);
+        output[48..52].copy_from_slice(&(self.input.len() as u32).to_le_bytes()[..]);
         output.extend(self.input);
         output
     }
