@@ -43,6 +43,8 @@ pub const VALIDATOR_NAME: &str = "validator_log";
 
 pub const ROLLUP_SCRIPT_HASH: [u8; 32] = [0xa9u8; 32];
 pub const ETH_ACCOUNT_LOCK_CODE_HASH: [u8; 32] = [0xaau8; 32];
+// Ethereum mainnet
+pub const DEFAULT_CHAIN_ID: u32 = 0x1;
 
 pub const GW_LOG_SUDT_OPERATION: u8 = 0x0;
 pub const GW_LOG_POLYJUICE_SYSTEM: u8 = 0x1;
@@ -163,7 +165,6 @@ pub fn new_account_script(state: &mut DummyState, from_id: u32, current_nonce: b
 #[derive(Default, Debug)]
 pub struct PolyjuiceArgsBuilder {
     is_create: bool,
-    is_static: bool,
     gas_limit: u64,
     gas_price: u128,
     value: u128,
@@ -173,10 +174,6 @@ pub struct PolyjuiceArgsBuilder {
 impl PolyjuiceArgsBuilder {
     pub fn do_create(mut self, value: bool) -> Self {
         self.is_create = value;
-        self
-    }
-    pub fn static_call(mut self, value: bool) -> Self {
-        self.is_static = value;
         self
     }
     pub fn gas_limit(mut self, value: u64) -> Self {
@@ -196,18 +193,13 @@ impl PolyjuiceArgsBuilder {
         self
     }
     pub fn build(self) -> Vec<u8> {
-        let mut output: Vec<u8> = vec![0u8; 62];
-        if self.is_create {
-            output[0] = 3;
-        }
-        if self.is_static {
-            output[1] = 1;
-        }
-        output[2..10].copy_from_slice(&self.gas_limit.to_le_bytes()[..]);
-        output[10..26].copy_from_slice(&self.gas_price.to_le_bytes()[..]);
-        output[26..42].copy_from_slice(&[0u8; 16][..]);
-        output[42..58].copy_from_slice(&self.value.to_be_bytes()[..]);
-        output[58..62].copy_from_slice(&(self.input.len() as u32).to_le_bytes()[..]);
+        let mut output: Vec<u8> = vec![0u8; 52];
+        let call_kind: u8 = if self.is_create { 3 } else { 0 };
+        output[0..8].copy_from_slice(&[0xff, 0xff, 0xff, b'P', b'O', b'L', b'Y', call_kind][..]);
+        output[8..16].copy_from_slice(&self.gas_limit.to_le_bytes()[..]);
+        output[16..32].copy_from_slice(&self.gas_price.to_le_bytes()[..]);
+        output[32..48].copy_from_slice(&self.value.to_le_bytes()[..]);
+        output[48..52].copy_from_slice(&(self.input.len() as u32).to_le_bytes()[..]);
         output.extend(self.input);
         output
     }
@@ -491,7 +483,6 @@ pub fn simple_storage_get(
     let block_info = new_block_info(0, block_number, block_number);
     let input = hex::decode("6d4ce63c").unwrap();
     let args = PolyjuiceArgsBuilder::default()
-        .static_call(true)
         .gas_limit(21000)
         .gas_price(1)
         .value(0)
@@ -525,13 +516,18 @@ pub fn build_l2_sudt_script(args: [u8; 32]) -> Script {
         .build()
 }
 
-pub fn build_eth_l2_script(args: [u8; 20]) -> Script {
-    let mut script_args = Vec::with_capacity(32 + 20);
+pub fn build_eth_l2_script_with_chain_id(args: [u8; 20], chain_id: u32) -> Script {
+    let mut script_args = Vec::with_capacity(32 + 20 + 4);
     script_args.extend(&ROLLUP_SCRIPT_HASH);
     script_args.extend(&args[..]);
+    script_args.extend(&chain_id.to_le_bytes()[..]);
     Script::new_builder()
         .args(Bytes::from(script_args).pack())
         .code_hash(ETH_ACCOUNT_LOCK_CODE_HASH.clone().pack())
         .hash_type(ScriptHashType::Type.into())
         .build()
+}
+
+pub fn build_eth_l2_script(args: [u8; 20]) -> Script {
+    build_eth_l2_script_with_chain_id(args, DEFAULT_CHAIN_ID)
 }

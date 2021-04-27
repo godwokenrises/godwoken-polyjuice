@@ -115,23 +115,21 @@ struct evmc_host_context {
   int error_code;
 };
 
-
 /**
    Message = [
-     depth      : u16, (little endian)
-     tx_origin  : Option<H160>,
-     call_kind  : u8
-     flags      : u8,
-     value      : U256 (big endian),
-     input_size : u32, (little endian)
-     input_data : [u8],
+     header     : [u8; 8]            0xff, 0xff, 0xff, "POLY", call_kind
+     gas_limit  : u64                (little endian)
+     gas_price  : u128               (little endian)
+     value      : u128               (little endian)
+     input_size : u32                (little endian)
+     input_data : [u8; input_size]
    ]
  */
 int parse_args(struct evmc_message* msg, uint128_t* gas_price,
                gw_context_t* ctx) {
   gw_transaction_context_t *tx_ctx = &ctx->transaction_context;
   debug_print_int("args_len", tx_ctx->args_len);
-  if (tx_ctx->args_len < 62) {
+  if (tx_ctx->args_len < (8 + 8 + 16 + 16 + 4)) {
     ckb_debug("invalid polyjuice arguments data");
     return -1;
   }
@@ -139,32 +137,35 @@ int parse_args(struct evmc_message* msg, uint128_t* gas_price,
   size_t offset = 0;
   uint8_t* args = tx_ctx->args;
 
-  /* args[0] call kind */
-  evmc_call_kind kind = (evmc_call_kind) * (args + offset);
-  offset += 1;
+  /* args[0..8] magic header + call kind */
+  static const uint8_t polyjuice_args_header[7] = {0xff, 0xff, 0xff, 'P', 'O', 'L', 'Y'};
+  if (memcmp(polyjuice_args_header, args, 7) != 0) {
+    debug_print_data("invalid polyjuice args header", args, 7);
+    return -1;
+  }
+  evmc_call_kind kind = (evmc_call_kind)args[7];
+  offset += 8;
   debug_print_int("[kind]", kind);
 
-  /* args[1] flags */
-  uint8_t flags = *(args + offset);
-  offset += 1;
-  debug_print_int("[flags]", flags);
-
-  /* args[2..10] gas limit */
+  /* args[8..16] gas limit  */
   int64_t gas_limit = (int64_t) (*(uint64_t*)(args + offset));
   offset += 8;
   debug_print_int("[gas_limit]", gas_limit);
 
-  /* args[10..26] gas price */
+  /* args[16..32] gas price */
   *gas_price = *((uint128_t*)(args + offset));
   offset += 16;
   debug_print_int("[gas_price]", (int64_t)(*gas_price));
 
-  /* args[26..58] transfer value */
-  evmc_uint256be value = *((evmc_uint256be*)(args + offset));
-  offset += 32;
+  /* args[32..48] transfer value */
+  evmc_uint256be value{0};
+  for (size_t i = 0; i < 16; i++) {
+    value.bytes[31 - i] = args[offset + i];
+  }
+  offset += 16;
   debug_print_data("[value]", value.bytes, 32);
 
-  /* args[58..62] */
+  /* args[48..52] */
   uint32_t input_size = *((uint32_t*)(args + offset));
   offset += 4;
   debug_print_int("[input_size]", input_size);
@@ -174,7 +175,7 @@ int parse_args(struct evmc_message* msg, uint128_t* gas_price,
     return -1;
   }
 
-  /* args[62..62+input_size] */
+  /* args[52..52+input_size] */
   uint8_t* input_data = args + offset;
   debug_print_data("[input_data]", input_data, input_size);
 
@@ -198,7 +199,7 @@ int parse_args(struct evmc_message* msg, uint128_t* gas_price,
   memcpy(tx_origin.bytes, sender.bytes, 20);
 
   msg->kind = kind;
-  msg->flags = flags;
+  msg->flags = 0;
   msg->depth = 0;
   msg->value = value;
   msg->input_data = input_data;
@@ -323,7 +324,7 @@ int load_account_script(gw_context_t* gw_ctx, uint32_t account_id,
 //// Callbacks
 ////////////////////////////////////////////////////////////////////////////
 struct evmc_tx_context get_tx_context(struct evmc_host_context* context) {
-  struct evmc_tx_context ctx {};
+  struct evmc_tx_context ctx{0};
   /* gas price = 1 */
   ctx.tx_gas_price.bytes[31] = 0x01;
   memcpy(ctx.tx_origin.bytes, tx_origin.bytes, 20);
@@ -343,8 +344,8 @@ struct evmc_tx_context get_tx_context(struct evmc_host_context* context) {
       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
       0x00, 0x00, 0x00, 0x08, 0xe1, 0xbc, 0x9b, 0xf0, 0x40, 0x00,
   };
-  /* chain id = 1 */
-  ctx.chain_id.bytes[31] = 0x01;
+  /* chain_id = 1 (ethereum mainnet) */
+  ctx.chain_id.bytes[31] = 0x1;
   return ctx;
 }
 
@@ -735,7 +736,7 @@ int load_globals(gw_context_t* ctx, uint32_t to_id) {
   memcpy(script_code_hash, code_hash_seg.ptr, 32);
   script_hash_type = *hash_type_seg.ptr;
   if (raw_args_seg.size < 36) {
-    ckb_debug("invalid script args");
+    debug_print_data("invalid to account script args", raw_args_seg.ptr, raw_args_seg.size);
     return -1;
   }
   memcpy(rollup_script_hash, raw_args_seg.ptr, 32);

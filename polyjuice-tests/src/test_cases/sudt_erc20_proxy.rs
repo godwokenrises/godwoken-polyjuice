@@ -74,19 +74,17 @@ fn test_sudt_erc20_proxy() {
     );
     assert_eq!(state.get_sudt_balance(new_sudt_id, from_id2).unwrap(), 0);
     assert_eq!(state.get_sudt_balance(new_sudt_id, from_id3).unwrap(), 0);
-    for (idx, (from_id, args_str, is_static, return_data_str)) in [
+    for (idx, (from_id, args_str, return_data_str)) in [
         // balanceOf(eoa1)
         (
             from_id1,
             format!("70a08231{}", eoa1_hex),
-            true,
             "000000000000000000000000000000000000000204fce5e3e250261100000000",
         ),
         // balanceOf(eoa2)
         (
             from_id1,
             format!("70a08231{}", eoa2_hex),
-            true,
             "0000000000000000000000000000000000000000000000000000000000000000",
         ),
         // transfer("eoa2", 0x22b)
@@ -96,14 +94,12 @@ fn test_sudt_erc20_proxy() {
                 "a9059cbb{}000000000000000000000000000000000000000000000000000000000000022b",
                 eoa2_hex
             ),
-            false,
             "0000000000000000000000000000000000000000000000000000000000000001",
         ),
         // balanceOf(eoa2)
         (
             from_id1,
             format!("70a08231{}", eoa2_hex),
-            true,
             "000000000000000000000000000000000000000000000000000000000000022b",
         ),
         // transfer("eoa2", 0x219)
@@ -113,21 +109,18 @@ fn test_sudt_erc20_proxy() {
                 "a9059cbb{}0000000000000000000000000000000000000000000000000000000000000219",
                 eoa2_hex
             ),
-            false,
             "0000000000000000000000000000000000000000000000000000000000000001",
         ),
         // balanceOf(eoa2)
         (
             from_id1,
             format!("70a08231{}", eoa2_hex),
-            true,
             "0000000000000000000000000000000000000000000000000000000000000444",
         ),
         // balanceOf(eoa1)
         (
             from_id1,
             format!("70a08231{}", eoa1_hex),
-            true,
             "000000000000000000000000000000000000000204fce5e3e2502610fffffbbc",
         ),
         // approve(eoa3, 0x3e8)
@@ -137,7 +130,6 @@ fn test_sudt_erc20_proxy() {
                 "095ea7b3{}00000000000000000000000000000000000000000000000000000000000003e8",
                 eoa3_hex
             ),
-            false,
             "0000000000000000000000000000000000000000000000000000000000000001",
         ),
         // transferFrom(eoa1, eoa2, 0x3e8)
@@ -147,21 +139,18 @@ fn test_sudt_erc20_proxy() {
                 "23b872dd{}{}00000000000000000000000000000000000000000000000000000000000003e8",
                 eoa1_hex, eoa2_hex
             ),
-            false,
             "0000000000000000000000000000000000000000000000000000000000000001",
         ),
         // balanceOf(eoa1)
         (
             from_id1,
             format!("70a08231{}", eoa1_hex),
-            true,
             "000000000000000000000000000000000000000204fce5e3e2502610fffff7d4",
         ),
         // balanceOf(eoa2)
         (
             from_id1,
             format!("70a08231{}", eoa2_hex),
-            true,
             "000000000000000000000000000000000000000000000000000000000000082c",
         ),
     ]
@@ -173,7 +162,6 @@ fn test_sudt_erc20_proxy() {
         println!(">> [input]: {}", args_str);
         let input = hex::decode(args_str).unwrap();
         let args = PolyjuiceArgsBuilder::default()
-            .static_call(*is_static)
             .gas_limit(80000)
             .gas_price(1)
             .value(0)

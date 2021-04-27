@@ -6,6 +6,7 @@ pub(crate) mod create2;
 pub(crate) mod delegatecall;
 pub(crate) mod erc20;
 pub(crate) mod get_block_info;
+pub(crate) mod get_chain_id;
 pub(crate) mod parse_log_event;
 pub(crate) mod selfdestruct;
 pub(crate) mod simple_storage;

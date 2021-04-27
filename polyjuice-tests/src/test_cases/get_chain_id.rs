@@ -3,17 +3,17 @@
 
 use crate::helper::{
     build_eth_l2_script, new_account_script, new_block_info, setup, PolyjuiceArgsBuilder,
-    CKB_SUDT_ACCOUNT_ID,
+    CKB_SUDT_ACCOUNT_ID, DEFAULT_CHAIN_ID,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
 use gw_store::chain_view::ChainView;
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
 
-const INIT_CODE: &str = include_str!("./evm-contracts/SimpleStorage.bin");
+const INIT_CODE: &str = include_str!("./evm-contracts/GetChainId.bin");
 
 #[test]
-fn test_simple_storage() {
+fn test_get_chain_id() {
     let (store, mut state, generator, creator_account_id) = setup();
 
     let from_script = build_eth_l2_script([1u8; 20]);
@@ -66,36 +66,6 @@ fn test_simple_storage() {
         .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, from_id)
         .unwrap();
     println!("balance of {} = {}", from_id, from_balance2);
-    {
-        // SimpleStorage.set(0x0d10);
-        let block_info = new_block_info(0, 2, 0);
-        let input =
-            hex::decode("60fe47b10000000000000000000000000000000000000000000000000000000000000d10")
-                .unwrap();
-        let args = PolyjuiceArgsBuilder::default()
-            .gas_limit(21000)
-            .gas_price(1)
-            .value(0)
-            .input(&input)
-            .build();
-        let raw_tx = RawL2Transaction::new_builder()
-            .from_id(from_id.pack())
-            .to_id(new_account_id.pack())
-            .args(Bytes::from(args).pack())
-            .build();
-        let db = store.begin_transaction();
-        let tip_block_hash = store.get_tip_block_hash().unwrap();
-        let run_result = generator
-            .execute_transaction(
-                &ChainView::new(&db, tip_block_hash),
-                &state,
-                &block_info,
-                &raw_tx,
-            )
-            .expect("construct");
-        state.apply_run_result(&run_result).expect("update state");
-        // println!("result {:?}", run_result);
-    }
 
     {
         // SimpleStorage.get();
@@ -124,8 +94,7 @@ fn test_simple_storage() {
             .expect("construct");
         state.apply_run_result(&run_result).expect("update state");
         let mut expected_return_data = vec![0u8; 32];
-        expected_return_data[30] = 0x0d;
-        expected_return_data[31] = 0x10;
+        expected_return_data[28..32].copy_from_slice(&DEFAULT_CHAIN_ID.to_be_bytes()[..]);
         assert_eq!(run_result.return_data, expected_return_data);
         // println!("result {:?}", run_result);
     }

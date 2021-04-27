@@ -51,19 +51,17 @@ fn test_erc20() {
     let eoa1_hex = hex::encode(account_id_to_eth_address(&state, from_id1, is_ethabi));
     let eoa2_hex = hex::encode(account_id_to_eth_address(&state, from_id2, is_ethabi));
     let eoa3_hex = hex::encode(account_id_to_eth_address(&state, from_id3, is_ethabi));
-    for (idx, (from_id, args_str, is_static, return_data_str)) in [
+    for (idx, (from_id, args_str, return_data_str)) in [
         // balanceOf(eoa1)
         (
             from_id1,
             format!("70a08231{}", eoa1_hex),
-            true,
             "000000000000000000000000000000000000000204fce5e3e250261100000000",
         ),
         // balanceOf(eoa2)
         (
             from_id1,
             format!("70a08231{}", eoa2_hex),
-            true,
             "0000000000000000000000000000000000000000000000000000000000000000",
         ),
         // transfer("eoa2", 0x22b)
@@ -73,14 +71,12 @@ fn test_erc20() {
                 "a9059cbb{}000000000000000000000000000000000000000000000000000000000000022b",
                 eoa2_hex
             ),
-            false,
             "",
         ),
         // balanceOf(eoa2)
         (
             from_id1,
             format!("70a08231{}", eoa2_hex),
-            true,
             "000000000000000000000000000000000000000000000000000000000000022b",
         ),
         // transfer("eoa2", 0x219)
@@ -90,28 +86,24 @@ fn test_erc20() {
                 "a9059cbb{}0000000000000000000000000000000000000000000000000000000000000219",
                 eoa2_hex
             ),
-            false,
             "",
         ),
         // balanceOf(eoa2)
         (
             from_id1,
             format!("70a08231{}", eoa2_hex),
-            true,
             "0000000000000000000000000000000000000000000000000000000000000444",
         ),
         // burn(8908)
         (
             from_id1,
             "42966c6800000000000000000000000000000000000000000000000000000000000022cc".to_string(),
-            false,
             "0000000000000000000000000000000000000000000000000000000000000001",
         ),
         // balanceOf(eoa1)
         (
             from_id1,
             format!("70a08231{}", eoa1_hex),
-            true,
             "000000000000000000000000000000000000000204fce5e3e2502610ffffd8f0",
         ),
         // approve(eoa3, 0x3e8)
@@ -121,7 +113,6 @@ fn test_erc20() {
                 "095ea7b3{}00000000000000000000000000000000000000000000000000000000000003e8",
                 eoa3_hex
             ),
-            false,
             "0000000000000000000000000000000000000000000000000000000000000001",
         ),
         // transferFrom(eoa1, eoa2, 0x3e8)
@@ -131,7 +122,6 @@ fn test_erc20() {
                 "23b872dd{}{}00000000000000000000000000000000000000000000000000000000000003e8",
                 eoa1_hex, eoa2_hex
             ),
-            false,
             "0000000000000000000000000000000000000000000000000000000000000001",
         ),
     ]
@@ -143,7 +133,6 @@ fn test_erc20() {
         println!(">> [input]: {}", args_str);
         let input = hex::decode(args_str).unwrap();
         let args = PolyjuiceArgsBuilder::default()
-            .static_call(*is_static)
             .gas_limit(80000)
             .gas_price(1)
             .value(0)

@@ -74,7 +74,7 @@ fn test_invalid_sudt_erc20_proxy() {
     );
     assert_eq!(state.get_sudt_balance(new_sudt_id, from_id2).unwrap(), 0);
     assert_eq!(state.get_sudt_balance(new_sudt_id, from_id3).unwrap(), 0);
-    for (idx, (from_id, args_str, is_static, return_data_str)) in [
+    for (idx, (from_id, args_str, success, return_data_str)) in [
         // balanceOf(eoa1)
         (
             from_id1,
@@ -108,7 +108,6 @@ fn test_invalid_sudt_erc20_proxy() {
         println!(">> [input]: {}", args_str);
         let input = hex::decode(args_str).unwrap();
         let args = PolyjuiceArgsBuilder::default()
-            .static_call(*is_static)
             .gas_limit(80000)
             .gas_price(1)
             .value(0)
@@ -127,7 +126,7 @@ fn test_invalid_sudt_erc20_proxy() {
             &block_info,
             &raw_tx,
         );
-        if *is_static {
+        if *success {
             let run_result = result.expect("execute");
             state.apply_run_result(&run_result).expect("update state");
             assert_eq!(
