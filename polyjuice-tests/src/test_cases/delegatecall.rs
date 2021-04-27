@@ -39,7 +39,7 @@ fn test_delegatecall() {
         block_number,
     );
     block_number += 1;
-    let ss_account_script = new_account_script_with_nonce(from_id, 0);
+    let ss_account_script = new_account_script_with_nonce(creator_account_id, from_id, 0);
     let ss_account_id = state
         .get_account_id_by_script_hash(&ss_account_script.hash().into())
         .unwrap()
@@ -62,7 +62,8 @@ fn test_delegatecall() {
     //     "result {}",
     //     serde_json::to_string_pretty(&RunResult::from(run_result)).unwrap()
     // );
-    let contract_account_script = new_account_script(&mut state, from_id, false);
+    let contract_account_script =
+        new_account_script(&mut state, creator_account_id, from_id, false);
     let new_account_id = state
         .get_account_id_by_script_hash(&contract_account_script.hash().into())
         .unwrap()

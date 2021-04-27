@@ -52,7 +52,7 @@ fn test_selfdestruct() {
         block_number,
     );
     block_number += 1;
-    let sd_account_script = new_account_script_with_nonce(from_id, 0);
+    let sd_account_script = new_account_script_with_nonce(creator_account_id, from_id, 0);
     let sd_account_id = state
         .get_account_id_by_script_hash(&sd_account_script.hash().into())
         .unwrap()
@@ -82,7 +82,7 @@ fn test_selfdestruct() {
         block_number,
     );
     block_number += 1;
-    let new_account_script = new_account_script_with_nonce(from_id, 1);
+    let new_account_script = new_account_script_with_nonce(creator_account_id, from_id, 1);
     let new_account_id = state
         .get_account_id_by_script_hash(&new_account_script.hash().into())
         .unwrap()

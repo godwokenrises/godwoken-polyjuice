@@ -43,8 +43,6 @@ pub const VALIDATOR_NAME: &str = "validator_log";
 
 pub const ROLLUP_SCRIPT_HASH: [u8; 32] = [0xa9u8; 32];
 pub const ETH_ACCOUNT_LOCK_CODE_HASH: [u8; 32] = [0xaau8; 32];
-// Ethereum mainnet
-pub const DEFAULT_CHAIN_ID: u32 = 0x1;
 
 pub const GW_LOG_SUDT_OPERATION: u8 = 0x0;
 pub const GW_LOG_POLYJUICE_SYSTEM: u8 = 0x1;
@@ -132,7 +130,7 @@ pub fn eth_address_to_account_id(state: &DummyState, data: &[u8]) -> Result<u32,
     let account_script_hash = state
         .get_script_hash(account_id)
         .map_err(|err| err.to_string())?;
-    if &data[0..16] != &account_script_hash.as_slice()[0..16] {
+    if data[0..16] != account_script_hash.as_slice()[0..16] {
         return Err(format!(
             "eth address first 16 bytes not match account script hash: expected={:?}, got={:?}",
             &account_script_hash.as_slice()[0..16],
@@ -142,10 +140,14 @@ pub fn eth_address_to_account_id(state: &DummyState, data: &[u8]) -> Result<u32,
     Ok(account_id)
 }
 
-pub fn new_account_script_with_nonce(from_id: u32, from_nonce: u32) -> Script {
+pub fn new_account_script_with_nonce(
+    creator_account_id: u32,
+    from_id: u32,
+    from_nonce: u32,
+) -> Script {
     let mut new_account_args = [0u8; 44];
     new_account_args[0..32].copy_from_slice(&ROLLUP_SCRIPT_HASH);
-    new_account_args[32..36].copy_from_slice(&CKB_SUDT_ACCOUNT_ID.to_le_bytes()[..]);
+    new_account_args[32..36].copy_from_slice(&creator_account_id.to_le_bytes()[..]);
     new_account_args[36..40].copy_from_slice(&from_id.to_le_bytes()[..]);
     new_account_args[40..44].copy_from_slice(&from_nonce.to_le_bytes()[..]);
     Script::new_builder()
@@ -154,12 +156,17 @@ pub fn new_account_script_with_nonce(from_id: u32, from_nonce: u32) -> Script {
         .args(Bytes::from(new_account_args.to_vec()).pack())
         .build()
 }
-pub fn new_account_script(state: &mut DummyState, from_id: u32, current_nonce: bool) -> Script {
+pub fn new_account_script(
+    state: &mut DummyState,
+    creator_account_id: u32,
+    from_id: u32,
+    current_nonce: bool,
+) -> Script {
     let mut from_nonce = state.get_nonce(from_id).unwrap();
     if !current_nonce {
         from_nonce -= 1;
     }
-    new_account_script_with_nonce(from_id, from_nonce)
+    new_account_script_with_nonce(creator_account_id, from_id, from_nonce)
 }
 
 #[derive(Default, Debug)]
@@ -346,7 +353,7 @@ pub fn deploy(
 }
 
 pub fn compute_create2_script(
-    sudt_id: u32,
+    creator_account_id: u32,
     sender_account_id: u32,
     create2_salt: &[u8],
     init_code: &[u8],
@@ -356,11 +363,11 @@ pub fn compute_create2_script(
     let init_code_hash = tiny_keccak::keccak256(init_code);
     let mut script_args = vec![0u8; 32 + 4 + 1 + 4 + 32 + 32];
     script_args[0..32].copy_from_slice(&ROLLUP_SCRIPT_HASH[..]);
-    script_args[32..(32 + 4)].copy_from_slice(&sudt_id.to_le_bytes()[..]);
+    script_args[32..(32 + 4)].copy_from_slice(&creator_account_id.to_le_bytes()[..]);
     script_args[(32 + 4)] = 0xff;
     script_args[(32 + 4 + 1)..(32 + 4 + 1 + 4)]
         .copy_from_slice(&sender_account_id.to_le_bytes()[..]);
-    script_args[(32 + 4 + 1 + 4)..(32 + 4 + 1 + 4 + 32)].copy_from_slice(&create2_salt[..]);
+    script_args[(32 + 4 + 1 + 4)..(32 + 4 + 1 + 4 + 32)].copy_from_slice(create2_salt);
     script_args[(32 + 4 + 1 + 4 + 32)..(32 + 4 + 1 + 4 + 32 + 32)]
         .copy_from_slice(&init_code_hash[..]);
     println!("init_code: {}", hex::encode(init_code));
@@ -389,7 +396,7 @@ pub fn parse_log(item: &LogItem) -> Log {
 
             let mut u32_bytes = [0u8; 4];
             u32_bytes.copy_from_slice(&data[0..4]);
-            let from_id = u32::from_le_bytes(u32_bytes.clone());
+            let from_id = u32::from_le_bytes(u32_bytes);
 
             u32_bytes.copy_from_slice(&data[4..8]);
             let to_id = u32::from_le_bytes(u32_bytes);
@@ -411,15 +418,15 @@ pub fn parse_log(item: &LogItem) -> Log {
 
             let mut u64_bytes = [0u8; 8];
             u64_bytes.copy_from_slice(&data[0..8]);
-            let gas_used = u64::from_le_bytes(u64_bytes.clone());
+            let gas_used = u64::from_le_bytes(u64_bytes);
             u64_bytes.copy_from_slice(&data[8..16]);
-            let cumulative_gas_used = u64::from_le_bytes(u64_bytes.clone());
+            let cumulative_gas_used = u64::from_le_bytes(u64_bytes);
 
             let mut u32_bytes = [0u8; 4];
             u32_bytes.copy_from_slice(&data[16..20]);
-            let created_id = u32::from_le_bytes(u32_bytes.clone());
+            let created_id = u32::from_le_bytes(u32_bytes);
             u32_bytes.copy_from_slice(&data[20..24]);
-            let status_code = u32::from_le_bytes(u32_bytes.clone());
+            let status_code = u32::from_le_bytes(u32_bytes);
             Log::PolyjuiceSystem {
                 gas_used,
                 cumulative_gas_used,
@@ -516,18 +523,13 @@ pub fn build_l2_sudt_script(args: [u8; 32]) -> Script {
         .build()
 }
 
-pub fn build_eth_l2_script_with_chain_id(args: [u8; 20], chain_id: u32) -> Script {
-    let mut script_args = Vec::with_capacity(32 + 20 + 4);
+pub fn build_eth_l2_script(args: [u8; 20]) -> Script {
+    let mut script_args = Vec::with_capacity(32 + 20);
     script_args.extend(&ROLLUP_SCRIPT_HASH);
     script_args.extend(&args[..]);
-    script_args.extend(&chain_id.to_le_bytes()[..]);
     Script::new_builder()
         .args(Bytes::from(script_args).pack())
         .code_hash(ETH_ACCOUNT_LOCK_CODE_HASH.clone().pack())
         .hash_type(ScriptHashType::Type.into())
         .build()
-}
-
-pub fn build_eth_l2_script(args: [u8; 20]) -> Script {
-    build_eth_l2_script_with_chain_id(args, DEFAULT_CHAIN_ID)
 }

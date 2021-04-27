@@ -3,7 +3,7 @@
 
 use crate::helper::{
     build_eth_l2_script, new_account_script, new_block_info, setup, PolyjuiceArgsBuilder,
-    CKB_SUDT_ACCOUNT_ID, DEFAULT_CHAIN_ID,
+    CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
@@ -57,7 +57,8 @@ fn test_get_chain_id() {
         println!("return_data: {}", hex::encode(&run_result.return_data[..]));
     }
 
-    let contract_account_script = new_account_script(&mut state, from_id, false);
+    let contract_account_script =
+        new_account_script(&mut state, creator_account_id, from_id, false);
     let new_account_id = state
         .get_account_id_by_script_hash(&contract_account_script.hash().into())
         .unwrap()
@@ -67,6 +68,7 @@ fn test_get_chain_id() {
         .unwrap();
     println!("balance of {} = {}", from_id, from_balance2);
 
+    let chain_id: u32 = creator_account_id;
     {
         // SimpleStorage.get();
         let block_info = new_block_info(0, 3, 0);
@@ -94,7 +96,7 @@ fn test_get_chain_id() {
             .expect("construct");
         state.apply_run_result(&run_result).expect("update state");
         let mut expected_return_data = vec![0u8; 32];
-        expected_return_data[28..32].copy_from_slice(&DEFAULT_CHAIN_ID.to_be_bytes()[..]);
+        expected_return_data[28..32].copy_from_slice(&chain_id.to_be_bytes()[..]);
         assert_eq!(run_result.return_data, expected_return_data);
         // println!("result {:?}", run_result);
     }
