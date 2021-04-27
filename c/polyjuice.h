@@ -47,9 +47,15 @@ static uint32_t sudt_id = UINT32_MAX;
 static uint32_t tx_origin_id = UINT32_MAX;
 /* Receipt.contractAddress - The contract address created, if the transaction was a contract creation, otherwise null */
 static uint32_t created_id = UINT32_MAX;
+static uint32_t creator_account_id = UINT32_MAX;
 static evmc_address tx_origin;
 static uint8_t script_code_hash[32];
 static uint8_t script_hash_type;
+
+/* normal polyjuice contract account */
+static const uint32_t NORMAL_ARGS_SIZE = 32 + 4 + 4 + 4;
+/* create2 polyjuice contract account */
+static const uint32_t CREATE2_ARGS_SIZE = 32 + 4 + 1 + 4 + 32 + 32;
 
 void polyjuice_build_system_key(uint32_t id, uint8_t polyjuice_field_type,
                                 uint8_t key[GW_KEY_BYTES]) {
@@ -260,13 +266,60 @@ void release_result(const struct evmc_result* result) {
   return;
 }
 
+int load_account_script(gw_context_t* gw_ctx, uint32_t account_id,
+                        uint8_t* buffer, uint32_t buffer_size,
+                        mol_seg_t* script_seg) {
+  debug_print_int("load_account_script, account_id:", account_id);
+  int ret;
+  uint32_t len = buffer_size;
+  ret = gw_ctx->sys_get_account_script(gw_ctx, account_id, &len, 0, buffer);
+  if (ret != 0) {
+    ckb_debug("load account script failed");
+    return ret;
+  }
+  script_seg->ptr = buffer;
+  script_seg->size = len;
+  if (MolReader_Script_verify(script_seg, false) != MOL_OK) {
+    ckb_debug("load account script: invalid script");
+    return -1;
+  }
+  return 0;
+}
+
 int load_account_code(gw_context_t* gw_ctx, uint32_t account_id,
                       uint32_t* code_size, uint32_t offset, uint8_t* code) {
+
+  int ret;
+  uint8_t buffer[GW_MAX_SCRIPT_SIZE];
+  mol_seg_t script_seg;
+  ret = load_account_script(gw_ctx, account_id, buffer, GW_MAX_SCRIPT_SIZE, &script_seg);
+  if (ret != 0) {
+    return ret;
+  }
+  mol_seg_t code_hash_seg = MolReader_Script_get_code_hash(&script_seg);
+  mol_seg_t hash_type_seg = MolReader_Script_get_hash_type(&script_seg);
+  mol_seg_t args_seg = MolReader_Script_get_args(&script_seg);
+  mol_seg_t raw_args_seg = MolReader_Bytes_raw_bytes(&args_seg);
+  if (raw_args_seg.size != NORMAL_ARGS_SIZE && raw_args_seg.size != CREATE2_ARGS_SIZE) {
+    debug_print_int("invalid account script", account_id);
+    debug_print_int("raw_args_seg.size", raw_args_seg.size);
+    return -1;
+  }
+  if (memcmp(code_hash_seg.ptr, script_code_hash, 32) != 0
+      || *hash_type_seg.ptr != script_hash_type
+      /* compare rollup_script_hash */
+      || memcmp(raw_args_seg.ptr, rollup_script_hash, 32) != 0
+      /* compare creator account id */
+      || creator_account_id != *(uint32_t *)(raw_args_seg.ptr + 32)) {
+    debug_print_int("creator account id not match for account", account_id);
+    return -1;
+  }
+
   debug_print_int("load_account_code, account_id:", account_id);
   uint8_t key[32];
   uint8_t data_hash[32];
   polyjuice_build_contract_code_key(account_id, key);
-  int ret = gw_ctx->sys_load(gw_ctx, account_id, key, data_hash);
+  ret = gw_ctx->sys_load(gw_ctx, account_id, key, data_hash);
   if (ret != 0) {
     ckb_debug("sys_load failed");
     return ret;
@@ -300,26 +353,6 @@ int load_account_code(gw_context_t* gw_ctx, uint32_t account_id,
   return 0;
 }
 
-int load_account_script(gw_context_t* gw_ctx, uint32_t account_id,
-                        uint8_t* buffer, uint32_t buffer_size,
-                        mol_seg_t* script_seg) {
-  debug_print_int("load_account_script, account_id:", account_id);
-  int ret;
-  uint32_t len = buffer_size;
-  ret = gw_ctx->sys_get_account_script(gw_ctx, account_id, &len, 0, buffer);
-  if (ret != 0) {
-    ckb_debug("load account script failed");
-    return ret;
-  }
-  script_seg->ptr = buffer;
-  script_seg->size = len;
-  if (MolReader_Script_verify(script_seg, false) != MOL_OK) {
-    ckb_debug("load account script: invalid script");
-    return -1;
-  }
-  return 0;
-}
-
 ////////////////////////////////////////////////////////////////////////////
 //// Callbacks
 ////////////////////////////////////////////////////////////////////////////
@@ -344,8 +377,12 @@ struct evmc_tx_context get_tx_context(struct evmc_host_context* context) {
       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
       0x00, 0x00, 0x00, 0x08, 0xe1, 0xbc, 0x9b, 0xf0, 0x40, 0x00,
   };
-  /* chain_id = 1 (ethereum mainnet) */
-  ctx.chain_id.bytes[31] = 0x1;
+  /* chain_id = creator_account_id */
+  uint8_t *creator_account_id_ptr = (uint8_t *)(&creator_account_id);
+  ctx.chain_id.bytes[31] = creator_account_id_ptr[0];
+  ctx.chain_id.bytes[30] = creator_account_id_ptr[1];
+  ctx.chain_id.bytes[29] = creator_account_id_ptr[2];
+  ctx.chain_id.bytes[28] = creator_account_id_ptr[3];
   return ctx;
 }
 
@@ -721,7 +758,8 @@ int check_destructed(gw_context_t* ctx, uint32_t to_id) {
   return 0;
 }
 
-int load_globals(gw_context_t* ctx, uint32_t to_id) {
+int load_globals(gw_context_t* ctx, uint32_t to_id, evmc_call_kind call_kind) {
+
   uint8_t buffer[GW_MAX_SCRIPT_SIZE];
   mol_seg_t script_seg;
   int ret = load_account_script(ctx, to_id, buffer, GW_MAX_SCRIPT_SIZE, &script_seg);
@@ -735,12 +773,45 @@ int load_globals(gw_context_t* ctx, uint32_t to_id) {
 
   memcpy(script_code_hash, code_hash_seg.ptr, 32);
   script_hash_type = *hash_type_seg.ptr;
-  if (raw_args_seg.size < 36) {
+
+  uint8_t creator_script_buffer[GW_MAX_SCRIPT_SIZE];
+  mol_seg_t creator_script_seg;
+  mol_seg_t *creator_raw_args_seg_ptr = NULL;
+  if (raw_args_seg.size == 36) {
+    /* polyjuice creator account */
+    creator_account_id = to_id;
+    creator_raw_args_seg_ptr = &raw_args_seg;
+  } else if (raw_args_seg.size == NORMAL_ARGS_SIZE || raw_args_seg.size == CREATE2_ARGS_SIZE) {
+    /* read creator account and then read sudt id from it */
+    creator_account_id = *(uint32_t *)(raw_args_seg.ptr + 32);
+    int ret = load_account_script(ctx,
+                                  creator_account_id,
+                                  creator_script_buffer,
+                                  GW_MAX_SCRIPT_SIZE,
+                                  &creator_script_seg);
+    if (ret != 0) {
+      return ret;
+    }
+    mol_seg_t creator_code_hash_seg = MolReader_Script_get_code_hash(&creator_script_seg);
+    mol_seg_t creator_hash_type_seg = MolReader_Script_get_hash_type(&creator_script_seg);
+    mol_seg_t creator_args_seg = MolReader_Script_get_args(&creator_script_seg);
+    mol_seg_t creator_raw_args_seg = MolReader_Bytes_raw_bytes(&creator_args_seg);
+    if (memcmp(creator_code_hash_seg.ptr, code_hash_seg.ptr, 32) != 0
+        || *creator_hash_type_seg.ptr != *hash_type_seg.ptr
+        /* compare rollup_script_hash */
+        || memcmp(creator_raw_args_seg.ptr, raw_args_seg.ptr, 32) != 0
+        || creator_raw_args_seg.size != 36) {
+      debug_print_int("invalid creator account id in normal contract account script args", creator_account_id);
+      return -1;
+    }
+    creator_raw_args_seg_ptr = &creator_raw_args_seg;
+  } else {
     debug_print_data("invalid to account script args", raw_args_seg.ptr, raw_args_seg.size);
     return -1;
   }
-  memcpy(rollup_script_hash, raw_args_seg.ptr, 32);
-  sudt_id = *(uint32_t*)(raw_args_seg.ptr + 32);
+
+  memcpy(rollup_script_hash, creator_raw_args_seg_ptr->ptr, 32);
+  sudt_id = *(uint32_t *)(creator_raw_args_seg_ptr->ptr + 32);
   debug_print_data("rollup_script_hash", rollup_script_hash, 32);
   debug_print_int("sudt id", sudt_id);
   return 0;
@@ -759,14 +830,14 @@ int create_new_account(gw_context_t* ctx,
     /* create account id
        Include:
        - [32 bytes] rollup type hash
-       - [ 4 bytes] sudt id
+       - [ 4 bytes] creator account id (chain id)
        - [ 4 bytes] sender account id
        - [ 4 bytes] sender nonce (NOTE: only use first 4 bytes (u32))
     */
     debug_print_int("from_id", from_id);
     debug_print_int("to_id", *to_id);
     memcpy(script_args, rollup_script_hash, 32);
-    memcpy(script_args + 32, (uint8_t*)(&sudt_id), 4);
+    memcpy(script_args + 32, (uint8_t*)(&creator_account_id), 4);
     memcpy(script_args + (32 + 4), (uint8_t*)(&from_id), 4);
     ret = ctx->sys_load_nonce(ctx, from_id, script_args + (32 + 4 + 4));
     if (ret != 0) {
@@ -777,14 +848,14 @@ int create_new_account(gw_context_t* ctx,
     /* create account id
        Include:
        - [32 bytes] rollup type hash
-       - [ 4 bytes] sudt id
+       - [ 4 bytes] creator account id (chain id)
        - [ 1 byte ] 0xff (refer to ethereum)
        - [ 4 bytes] sender account id
        - [32 bytes] create2_salt
        - [32 bytes] keccak256(init_code)
     */
     memcpy(script_args, rollup_script_hash, 32);
-    memcpy(script_args + 32, (uint8_t*)(&sudt_id), 4);
+    memcpy(script_args + 32, (uint8_t*)(&creator_account_id), 4);
     script_args[32 + 4] = 0xff;
     memcpy(script_args + (32 + 4 + 1), (uint8_t*)(&from_id), 4);
     memcpy(script_args + (32 + 4 + 1 + 4), msg->create2_salt.bytes, 32);
@@ -980,7 +1051,7 @@ int handle_message(gw_context_t* ctx,
 
   /* Load: validator_code_hash, hash_type, sudt_id */
   if (!has_touched) {
-    ret = load_globals(ctx, to_id);
+    ret = load_globals(ctx, to_id, msg.kind);
     if (ret != 0) {
       return ret;
     }
@@ -1006,16 +1077,20 @@ int handle_message(gw_context_t* ctx,
     msg.input_size = 0;
   } else {
     /* call kind: CALL/CALLCODE/DELEGATECALL */
-    ret = load_account_code(ctx, to_id, &code_size_u32, 0, code_data_buffer);
-    if (ret != 0) {
-      return ret;
-    }
-    if (code_size_u32 > 0) {
-      code_data = code_data_buffer;
-      code_size = (size_t)code_size_u32;
-    } else {
+    if (msg.input_size == 0) {
       /* call EoA account */
       to_id_is_eoa = true;
+    } else {
+      ret = load_account_code(ctx, to_id, &code_size_u32, 0, code_data_buffer);
+      if (ret != 0) {
+        return ret;
+      }
+      if (code_size_u32 == 0) {
+        debug_print_int("empty contract code for account", to_id);
+        return -1;
+      }
+      code_data = code_data_buffer;
+      code_size = (size_t)code_size_u32;
     }
   }
 

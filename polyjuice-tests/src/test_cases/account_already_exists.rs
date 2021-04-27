@@ -21,7 +21,7 @@ fn test_account_already_exists() {
         .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, mint_balance)
         .unwrap();
 
-    let created_ss_account_script = new_account_script_with_nonce(from_id, 0);
+    let created_ss_account_script = new_account_script_with_nonce(creator_account_id, from_id, 0);
     let created_ss_account_id = state
         .create_account_from_script(created_ss_account_script)
         .unwrap();
@@ -38,7 +38,7 @@ fn test_account_already_exists() {
         0,
         0,
     );
-    let ss_account_script = new_account_script(&mut state, from_id, false);
+    let ss_account_script = new_account_script(&mut state, creator_account_id, from_id, false);
     let ss_account_id = state
         .get_account_id_by_script_hash(&ss_account_script.hash().into())
         .unwrap()

@@ -42,7 +42,8 @@ fn test_erc20() {
         1,
     );
 
-    let contract_account_script = new_account_script(&mut state, from_id1, false);
+    let contract_account_script =
+        new_account_script(&mut state, creator_account_id, from_id1, false);
     let new_account_id = state
         .get_account_id_by_script_hash(&contract_account_script.hash().into())
         .unwrap()

@@ -37,6 +37,11 @@ void debug_print_int(const char* prefix, int64_t ret) {
   eth_address[16..20] = account_id (little endian)
  */
 int account_id_to_address(gw_context_t* ctx, uint32_t account_id, evmc_address *addr) {
+  if (account_id == 0) {
+    memset(addr->bytes, 0, 20);
+    return 0;
+  }
+
   uint8_t script_hash[32] = {0};
   int ret = ctx->sys_get_script_hash_by_account_id(ctx, account_id, script_hash);
   if (ret != 0) {
