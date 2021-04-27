@@ -117,16 +117,16 @@ fn test_parse_log_event() {
             panic!("unexpected polyjuice log");
         }
     }
-    // Transaction fee log
+    // Transaction pay fee log
     {
         let log_item = &run_result.logs[3];
         let log_account_id: u32 = log_item.account_id().unpack();
         assert_eq!(log_account_id, CKB_SUDT_ACCOUNT_ID);
         let log = parse_log(&log_item);
         println!("user log: {:?}", log);
-        if let Log::SudtTransfer {
+        if let Log::SudtPayFee {
             from_id: the_from_id,
-            to_id: the_to_id,
+            block_producer_id: the_to_id,
             amount,
             ..
         } = log

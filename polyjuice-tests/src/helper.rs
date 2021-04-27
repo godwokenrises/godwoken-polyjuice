@@ -44,10 +44,10 @@ pub const VALIDATOR_NAME: &str = "validator_log";
 pub const ROLLUP_SCRIPT_HASH: [u8; 32] = [0xa9u8; 32];
 pub const ETH_ACCOUNT_LOCK_CODE_HASH: [u8; 32] = [0xaau8; 32];
 
-pub const GW_LOG_SUDT_OPERATION: u8 = 0x0;
-pub const GW_LOG_POLYJUICE_SYSTEM: u8 = 0x1;
-pub const GW_LOG_POLYJUICE_USER: u8 = 0x2;
-pub const SUDT_OPERATION_TRANSFER: u8 = 0x0;
+pub const GW_LOG_SUDT_TRANSFER: u8 = 0x0;
+pub const GW_LOG_SUDT_PAY_FEE: u8 = 0x1;
+pub const GW_LOG_POLYJUICE_SYSTEM: u8 = 0x2;
+pub const GW_LOG_POLYJUICE_USER: u8 = 0x3;
 
 lazy_static::lazy_static! {
     pub static ref GENERATOR_PROGRAM: Bytes = {
@@ -85,6 +85,12 @@ pub enum Log {
         to_id: u32,
         amount: u128,
     },
+    SudtPayFee {
+        sudt_id: u32,
+        from_id: u32,
+        block_producer_id: u32,
+        amount: u128,
+    },
     PolyjuiceSystem {
         gas_used: u64,
         cumulative_gas_used: u64,
@@ -96,6 +102,119 @@ pub enum Log {
         data: Vec<u8>,
         topics: Vec<H256>,
     },
+}
+
+fn parse_sudt_log_data(data: &[u8]) -> (u32, u32, u128) {
+    let mut u32_bytes = [0u8; 4];
+    u32_bytes.copy_from_slice(&data[0..4]);
+    let from_id = u32::from_le_bytes(u32_bytes);
+
+    u32_bytes.copy_from_slice(&data[4..8]);
+    let to_id = u32::from_le_bytes(u32_bytes);
+
+    let mut u128_bytes = [0u8; 16];
+    u128_bytes.copy_from_slice(&data[8..24]);
+    let amount = u128::from_le_bytes(u128_bytes);
+    (from_id, to_id, amount)
+}
+
+pub fn parse_log(item: &LogItem) -> Log {
+    let service_flag: u8 = item.service_flag().into();
+    let raw_data = item.data().raw_data();
+    let data = raw_data.as_ref();
+    match service_flag {
+        GW_LOG_SUDT_TRANSFER => {
+            let sudt_id: u32 = item.account_id().unpack();
+            if data.len() != (4 + 4 + 16) {
+                panic!("Invalid data length: {}", data.len());
+            }
+            let (from_id, to_id, amount) = parse_sudt_log_data(data);
+            Log::SudtTransfer {
+                sudt_id,
+                from_id,
+                to_id,
+                amount,
+            }
+        }
+        GW_LOG_SUDT_PAY_FEE => {
+            let sudt_id: u32 = item.account_id().unpack();
+            if data.len() != (4 + 4 + 16) {
+                panic!("Invalid data length: {}", data.len());
+            }
+            let (from_id, block_producer_id, amount) = parse_sudt_log_data(data);
+            Log::SudtPayFee {
+                sudt_id,
+                from_id,
+                block_producer_id,
+                amount,
+            }
+        }
+        GW_LOG_POLYJUICE_SYSTEM => {
+            if data.len() != (8 + 8 + 4 + 4 + 4) {
+                panic!("invalid system log raw data length: {}", data.len());
+            }
+
+            let mut u64_bytes = [0u8; 8];
+            u64_bytes.copy_from_slice(&data[0..8]);
+            let gas_used = u64::from_le_bytes(u64_bytes);
+            u64_bytes.copy_from_slice(&data[8..16]);
+            let cumulative_gas_used = u64::from_le_bytes(u64_bytes);
+
+            let mut u32_bytes = [0u8; 4];
+            u32_bytes.copy_from_slice(&data[16..20]);
+            let created_id = u32::from_le_bytes(u32_bytes);
+            u32_bytes.copy_from_slice(&data[20..24]);
+            let status_code = u32::from_le_bytes(u32_bytes);
+            Log::PolyjuiceSystem {
+                gas_used,
+                cumulative_gas_used,
+                created_id,
+                status_code,
+            }
+        }
+        GW_LOG_POLYJUICE_USER => {
+            let mut offset: usize = 0;
+            let mut address = [0u8; 20];
+            address.copy_from_slice(&data[offset..offset + 20]);
+            offset += 20;
+            let mut data_size_bytes = [0u8; 4];
+            data_size_bytes.copy_from_slice(&data[offset..offset + 4]);
+            offset += 4;
+            let data_size: u32 = u32::from_le_bytes(data_size_bytes);
+            let mut log_data = vec![0u8; data_size as usize];
+            log_data.copy_from_slice(&data[offset..offset + (data_size as usize)]);
+            offset += data_size as usize;
+            println!("data_size: {}", data_size);
+
+            let mut topics_count_bytes = [0u8; 4];
+            topics_count_bytes.copy_from_slice(&data[offset..offset + 4]);
+            offset += 4;
+            let topics_count: u32 = u32::from_le_bytes(topics_count_bytes);
+            let mut topics = Vec::new();
+            println!("topics_count: {}", topics_count);
+            for _ in 0..topics_count {
+                let mut topic = [0u8; 32];
+                topic.copy_from_slice(&data[offset..offset + 32]);
+                offset += 32;
+                topics.push(topic.into());
+            }
+            if offset != data.len() {
+                panic!(
+                    "Too many bytes for polyjuice user log data: offset={}, data.len()={}",
+                    offset,
+                    data.len()
+                );
+            }
+            Log::PolyjuiceUser {
+                address,
+                data: log_data,
+                topics,
+            }
+        }
+        _ => {
+            panic!("invalid log service flag: {}", service_flag);
+        }
+    }
 }
 
 pub fn new_block_info(block_producer_id: u32, number: u64, timestamp: u64) -> BlockInfo {
@@ -377,106 +496,6 @@ pub fn compute_create2_script(
         .hash_type(ScriptHashType::Type.into())
         .args(script_args.pack())
         .build()
-}
-
-pub fn parse_log(item: &LogItem) -> Log {
-    let service_flag: u8 = item.service_flag().into();
-    let raw_data = item.data().raw_data();
-    let data = raw_data.as_ref();
-    match service_flag {
-        GW_LOG_SUDT_OPERATION => {
-            if data[0] != SUDT_OPERATION_TRANSFER {
-                panic!("Not a sudt transfer prefix: {}", data[1]);
-            }
-            let sudt_id: u32 = item.account_id().unpack();
-            if data.len() != (1 + 4 + 4 + 16) {
-                panic!("Invalid data length: {}", data.len());
-            }
-            let data = &data[1..];
-
-            let mut u32_bytes = [0u8; 4];
-            u32_bytes.copy_from_slice(&data[0..4]);
-            let from_id = u32::from_le_bytes(u32_bytes);
-
-            u32_bytes.copy_from_slice(&data[4..8]);
-            let to_id = u32::from_le_bytes(u32_bytes);
-
-            let mut u128_bytes = [0u8; 16];
-            u128_bytes.copy_from_slice(&data[8..24]);
-            let amount = u128::from_le_bytes(u128_bytes);
-            Log::SudtTransfer {
-                sudt_id,
-                from_id,
-                to_id,
-                amount,
-            }
-        }
-        GW_LOG_POLYJUICE_SYSTEM => {
-            if data.len() != (8 + 8 + 4 + 4 + 4) {
-                panic!("invalid system log raw data length: {}", data.len());
-            }
-
-            let mut u64_bytes = [0u8; 8];
-            u64_bytes.copy_from_slice(&data[0..8]);
-            let gas_used = u64::from_le_bytes(u64_bytes);
-            u64_bytes.copy_from_slice(&data[8..16]);
-            let cumulative_gas_used = u64::from_le_bytes(u64_bytes);
-
-            let mut u32_bytes = [0u8; 4];
-            u32_bytes.copy_from_slice(&data[16..20]);
-            let created_id = u32::from_le_bytes(u32_bytes);
-            u32_bytes.copy_from_slice(&data[20..24]);
-            let status_code = u32::from_le_bytes(u32_bytes);
-            Log::PolyjuiceSystem {
-                gas_used,
-                cumulative_gas_used,
-                created_id,
-                status_code,
-            }
-        }
-        GW_LOG_POLYJUICE_USER => {
-            let mut offset: usize = 0;
-            let mut address = [0u8; 20];
-            address.copy_from_slice(&data[offset..offset + 20]);
-            offset += 20;
-            let mut data_size_bytes = [0u8; 4];
-            data_size_bytes.copy_from_slice(&data[offset..offset + 4]);
-            offset += 4;
-            let data_size: u32 = u32::from_le_bytes(data_size_bytes);
-            let mut log_data = vec![0u8; data_size as usize];
-            log_data.copy_from_slice(&data[offset..offset + (data_size as usize)]);
-            offset += data_size as usize;
-            println!("data_size: {}", data_size);
-
-            let mut topics_count_bytes = [0u8; 4];
-            topics_count_bytes.copy_from_slice(&data[offset..offset + 4]);
-            offset += 4;
-            let topics_count: u32 = u32::from_le_bytes(topics_count_bytes);
-            let mut topics = Vec::new();
-            println!("topics_count: {}", topics_count);
-            for _ in 0..topics_count {
-                let mut topic = [0u8; 32];
-                topic.copy_from_slice(&data[offset..offset + 32]);
-                offset += 32;
-                topics.push(topic.into());
-            }
-            if offset != data.len() {
-                panic!(
-                    "Too many bytes for polyjuice user log data: offset={}, data.len()={}",
-                    offset,
-                    data.len()
-                );
-            }
-            Log::PolyjuiceUser {
-                address,
-                data: log_data,
-                topics,
-            }
-        }
-        _ => {
-            panic!("invalid log service flag: {}", service_flag);
-        }
-    }
 }
 
 pub fn simple_storage_get(
