@@ -33,35 +33,47 @@ input_size : u32      (little endian)
 input_data : [u8; input_size]   (input data)
 ```
 
+Every polyjuice argument fields must been serialized one by one and put into godwoken [`RawL2Transaction.args`][rawl2tx-args] for polyjuice to read. If the `input_data` have 56 bytes, then the serialized data size is `8 + 8 + 16 + 16 + 4 + 56 = 108` bytes.
+
+
 ### Creator account script
 ```
 code_hash: polyjuice_validator_type_script_hash
-hash_type: type | data
+hash_type: type
 args:
     rollup_type_hash : [u8; 32]
     sudt_id          : u32          (little endian, the token id)
 ```
 
+Polyjuice creator account is a godwoken account for creating polyjuice contract account. This account can only been created by [meta contract][meta-contract], and the account id is used as the chain id in polyjuice. The `sudt_id` field in script args is the sudt token current polyjuice instance bind to.
+
 ### Normal contract account script
 ```
 code_hash: polyjuice_validator_type_script_hash
-hash_type: type | data
+hash_type: type
 args:
     rollup_type_hash   : [u8; 32]
-    creator_account_id : u32        (little endian, also chain id, for reading 'sudt_id' from creator account script)
+    creator_account_id : u32        (little endian, also chain id, and for reading 'sudt_id' from creator account script)
     sender_account_id  : u32        (little endian)
     sender_nonce       : u32        (little endian)
 ```
 
+The polyjuice contract account created in polyjuice by `CREATE` call kind or op code.
+
 ### Create2 contract account script
 ```
 code_hash: polyjuice_validator_type_script_hash
-hash_type: type | data
+hash_type: type
 args:
     rollup_type_hash   : [u8; 32]
-    creator_account_id : u32        (little endian, also chain id, for reading 'sudt_id' from creator account script)
+    creator_account_id : u32        (little endian, also chain id, and for reading 'sudt_id' from creator account script)
     special_byte       : u8         (value is '0xff', refer to ethereum)
     sender_account_id  : u32        (little endian)
     create2_salt       : [u8; 32]   (create2 salt)
     init_code_hash     : [u8; 32]   (keccak256(init_code))
 ```
+
+The polyjuice contract account created in polyjuice by `CREATE2` op code.
+
+[rawl2tx-args]: https://github.com/nervosnetwork/godwoken/blob/26d15dbe42d15ad902593fcc89cf82b1ccc18d66/crates/types/schemas/godwoken.mol#L50
+[meta-contract]: https://github.com/nervosnetwork/godwoken-scripts/blob/32f98ac2ce1ab416cb4ffa143ec1f5ba3ddce51f/c/contracts/meta_contract.c
