@@ -271,7 +271,7 @@ int load_account_script(gw_context_t* gw_ctx, uint32_t account_id,
                         mol_seg_t* script_seg) {
   debug_print_int("load_account_script, account_id:", account_id);
   int ret;
-  uint32_t len = buffer_size;
+  uint64_t len = buffer_size;
   ret = gw_ctx->sys_get_account_script(gw_ctx, account_id, &len, 0, buffer);
   if (ret != 0) {
     ckb_debug("load account script failed");
@@ -287,7 +287,7 @@ int load_account_script(gw_context_t* gw_ctx, uint32_t account_id,
 }
 
 int load_account_code(gw_context_t* gw_ctx, uint32_t account_id,
-                      uint32_t* code_size, uint32_t offset, uint8_t* code) {
+                      uint64_t* code_size, uint64_t offset, uint8_t* code) {
 
   int ret;
   uint8_t buffer[GW_MAX_SCRIPT_SIZE];
@@ -339,14 +339,14 @@ int load_account_code(gw_context_t* gw_ctx, uint32_t account_id,
     return 0;
   }
 
-  uint32_t old_code_size = *code_size;
+  uint64_t old_code_size = *code_size;
   ret = gw_ctx->sys_load_data(gw_ctx, data_hash, code_size, offset, code);
   debug_print_data("code data", code, *code_size);
   if (ret != 0) {
     ckb_debug("sys_load_data failed");
     return ret;
   }
-  if (*code_size >= old_code_size) {
+  if (*code_size > old_code_size) {
     ckb_debug("code can't be larger than MAX_DATA_SIZE");
     return -1;
   }
@@ -456,7 +456,7 @@ size_t get_code_size(struct evmc_host_context* context,
     return 0;
   }
   uint8_t code[MAX_DATA_SIZE];
-  uint32_t code_size = MAX_DATA_SIZE;
+  uint64_t code_size = MAX_DATA_SIZE;
   ret = load_account_code(context->gw_ctx, account_id, &code_size, 0, code);
   if (ret != 0) {
     ckb_debug("load_account_code failed");
@@ -480,7 +480,7 @@ evmc_bytes32 get_code_hash(struct evmc_host_context* context,
   }
 
   uint8_t code[MAX_DATA_SIZE];
-  uint32_t code_size = MAX_DATA_SIZE;
+  uint64_t code_size = MAX_DATA_SIZE;
   ret = load_account_code(context->gw_ctx, account_id, &code_size, 0, code);
   if (ret != 0) {
     ckb_debug("load_account_code failed");
@@ -505,7 +505,7 @@ size_t copy_code(struct evmc_host_context* context, const evmc_address* address,
     return 0;
   }
 
-  uint32_t code_size = (uint32_t)buffer_size;
+  uint64_t code_size = (uint32_t)buffer_size;
   ret = load_account_code(context->gw_ctx, account_id, &code_size,
                           (uint32_t)code_offset, buffer_data);
   if (ret != 0) {
@@ -1068,7 +1068,7 @@ int handle_message(gw_context_t* ctx,
   size_t code_size = 0;
   bool to_id_is_eoa = false;
   uint8_t code_data_buffer[MAX_DATA_SIZE];
-  uint32_t code_size_u32 = MAX_DATA_SIZE;
+  uint64_t code_size_u32 = MAX_DATA_SIZE;
   if (is_create(msg.kind)) {
     /* use input as code */
     code_data = (uint8_t*)msg.input_data;

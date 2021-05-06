@@ -12,13 +12,14 @@ pub use gw_generator::{
     dummy_state::DummyState,
     traits::StateExt,
     types::RollupContext,
-    Generator, RunResult,
+    Generator,
 };
 use gw_store::traits::KVStore;
 pub use gw_store::{chain_view::ChainView, Store};
 use gw_types::{
     bytes::Bytes,
     core::ScriptHashType,
+    offchain::RunResult,
     packed::{BlockInfo, LogItem, RawL2Transaction, RollupConfig, Script, Uint64},
     prelude::*,
 };
@@ -396,6 +397,7 @@ pub fn setup() -> (Store, DummyState, Generator, u32) {
     let mut account_lock_manage = AccountLockManage::default();
     account_lock_manage.register_lock_algorithm(H256::zero(), Box::new(AlwaysSuccess::default()));
     let rollup_config = RollupConfig::new_builder()
+        .l2_sudt_validator_script_type_hash(SUDT_VALIDATOR_SCRIPT_TYPE_HASH.pack())
         .allowed_contract_type_hashes(
             vec![
                 META_VALIDATOR_SCRIPT_TYPE_HASH.clone().pack(),
