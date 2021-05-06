@@ -2,8 +2,8 @@
 //!   See ./evm-contracts/ERC20.bin
 
 use crate::helper::{
-    account_id_to_eth_address, build_eth_l2_script, deploy, new_account_script, new_block_info,
-    setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
+    account_id_to_eth_address, build_eth_l2_script, build_l2_sudt_script, deploy,
+    new_account_script, new_block_info, setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
 use gw_generator::{error::TransactionError, traits::StateExt};
@@ -16,7 +16,7 @@ const INIT_CODE: &str = include_str!("./evm-contracts/InvalidSudtERC20Proxy.bin"
 #[test]
 fn test_invalid_sudt_erc20_proxy() {
     let (store, mut state, generator, creator_account_id) = setup();
-    let new_sudt_script = build_eth_l2_script([0xffu8; 20]);
+    let new_sudt_script = build_l2_sudt_script([0xffu8; 32]);
     let new_sudt_id = state.create_account_from_script(new_sudt_script).unwrap();
 
     let from_script1 = build_eth_l2_script([1u8; 20]);

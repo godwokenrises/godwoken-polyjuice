@@ -598,6 +598,7 @@ dependencies = [
  "gw-store",
  "gw-traits",
  "gw-types",
+ "hex",
  "lazy_static",
  "secp256k1",
  "sha3",

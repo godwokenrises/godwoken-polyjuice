@@ -1,10 +1,11 @@
 use ckb_vm::{
     machine::asm::{AsmCoreMachine, AsmMachine},
     memory::Memory,
-    registers::{A0, A1, A2, A3, A7},
+    registers::{A0, A3, A7},
     DefaultMachineBuilder, Error as VMError, Register, SupportMachine, Syscalls,
 };
 use gw_common::{blake2b::new_blake2b, H256};
+use gw_generator::syscalls::store_data;
 use gw_types::bytes::Bytes;
 use std::collections::HashMap;
 
@@ -15,17 +16,6 @@ const DEBUG_PRINT_SYSCALL_NUMBER: u64 = 2177;
 
 pub struct L2Syscalls {
     data: HashMap<H256, Bytes>,
-}
-
-fn load_data_u32<Mac: SupportMachine>(machine: &mut Mac, addr: u64) -> Result<u32, VMError> {
-    let mut data = [0u8; 4];
-    for (i, c) in data.iter_mut().enumerate() {
-        *c = machine
-            .memory_mut()
-            .load8(&Mac::REG::from_u64(addr).overflowing_add(&Mac::REG::from_u64(i as u64)))?
-            .to_u8();
-    }
-    Ok(u32::from_le_bytes(data))
 }
 
 fn load_data_h256<Mac: SupportMachine>(machine: &mut Mac, addr: u64) -> Result<H256, VMError> {
@@ -52,34 +42,11 @@ impl<Mac: SupportMachine> Syscalls<Mac> for L2Syscalls {
         }
         match code {
             4057 => {
-                let data_hash_addr = machine.registers()[A0].to_u64();
-                let len_addr = machine.registers()[A1].to_u64();
-                let offset = machine.registers()[A2].to_u32() as usize;
-                let data_addr = machine.registers()[A3].to_u64();
-
+                let data_hash_addr = machine.registers()[A3].to_u64();
                 let data_hash = load_data_h256(machine, data_hash_addr)?;
-                let len = load_data_u32(machine, len_addr)? as usize;
-                println!(
-                    "data_hash: {:?}, len: {}, offset: {}",
-                    data_hash, len, offset
-                );
+                println!("data_hash: {:?}", data_hash);
                 let data = self.data.get(&data_hash).unwrap();
-                let data_ref = data.as_ref();
-                let new_len = if offset >= data_ref.len() {
-                    0
-                } else if (offset + len) > data_ref.len() {
-                    data_ref.len() - offset
-                } else {
-                    len
-                };
-                if new_len > 0 {
-                    machine
-                        .memory_mut()
-                        .store_bytes(data_addr, &data_ref[offset..offset + new_len])?;
-                }
-                machine
-                    .memory_mut()
-                    .store_bytes(len_addr, &(new_len as u32).to_le_bytes())?;
+                store_data(machine, data.as_ref())?;
                 machine.set_register(A0, Mac::REG::from_u8(SUCCESS));
                 Ok(true)
             }
