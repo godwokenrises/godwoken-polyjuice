@@ -600,6 +600,8 @@ dependencies = [
  "gw-types",
  "hex",
  "lazy_static",
+ "log",
+ "rlp",
  "secp256k1",
  "sha3",
  "thiserror",
@@ -635,6 +637,7 @@ dependencies = [
  "gw-db",
  "gw-traits",
  "gw-types",
+ "log",
  "parking_lot",
  "thiserror",
 ]
