@@ -94,6 +94,7 @@ fn test_create2() {
     }
 
     let create2_script = compute_create2_script(
+        &state,
         creator_account_id,
         new_account_id,
         &hex::decode(input_salt).unwrap()[..],

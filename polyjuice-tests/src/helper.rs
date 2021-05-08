@@ -160,7 +160,7 @@ pub fn parse_log(item: &LogItem) -> Log {
             }
         }
         GW_LOG_POLYJUICE_SYSTEM => {
-            if data.len() != (8 + 8 + 4 + 4 + 4) {
+            if data.len() != (8 + 8 + 4 + 4) {
                 panic!("invalid system log raw data length: {}", data.len());
             }
 
@@ -270,23 +270,30 @@ pub fn eth_address_to_account_id(state: &DummyState, data: &[u8]) -> Result<u32,
 }
 
 pub fn new_account_script_with_nonce(
+    state: &DummyState,
     creator_account_id: u32,
     from_id: u32,
     from_nonce: u32,
 ) -> Script {
-    let mut new_account_args = [0u8; 44];
+    let sender = account_id_to_eth_address(state, from_id, false);
+    let mut data = [0u8; 20 + 4];
+    data[0..20].copy_from_slice(&sender);
+    data[20..24].copy_from_slice(&from_nonce.to_le_bytes());
+    let data_hash = tiny_keccak::keccak256(&data);
+
+    let mut new_account_args = vec![0u8; 32 + 4 + 20];
     new_account_args[0..32].copy_from_slice(&ROLLUP_SCRIPT_HASH);
     new_account_args[32..36].copy_from_slice(&creator_account_id.to_le_bytes()[..]);
-    new_account_args[36..40].copy_from_slice(&from_id.to_le_bytes()[..]);
-    new_account_args[40..44].copy_from_slice(&from_nonce.to_le_bytes()[..]);
+    new_account_args[36..36 + 20].copy_from_slice(&data_hash[12..]);
+
     Script::new_builder()
         .code_hash(PROGRAM_CODE_HASH.pack())
         .hash_type(ScriptHashType::Type.into())
-        .args(Bytes::from(new_account_args.to_vec()).pack())
+        .args(new_account_args.pack())
         .build()
 }
 pub fn new_account_script(
-    state: &mut DummyState,
+    state: &DummyState,
     creator_account_id: u32,
     from_id: u32,
     current_nonce: bool,
@@ -295,7 +302,7 @@ pub fn new_account_script(
     if !current_nonce {
         from_nonce -= 1;
     }
-    new_account_script_with_nonce(creator_account_id, from_id, from_nonce)
+    new_account_script_with_nonce(state, creator_account_id, from_id, from_nonce)
 }
 
 #[derive(Default, Debug)]
@@ -486,6 +493,7 @@ pub fn deploy(
 }
 
 pub fn compute_create2_script(
+    state: &DummyState,
     creator_account_id: u32,
     sender_account_id: u32,
     create2_salt: &[u8],
@@ -493,16 +501,20 @@ pub fn compute_create2_script(
 ) -> Script {
     assert_eq!(create2_salt.len(), 32);
 
+    let sender = account_id_to_eth_address(state, sender_account_id, false);
     let init_code_hash = tiny_keccak::keccak256(init_code);
-    let mut script_args = vec![0u8; 32 + 4 + 1 + 4 + 32 + 32];
+    let mut data = [0u8; 1 + 20 + 32 + 32];
+    data[0] = 0xff;
+    data[1..1 + 20].copy_from_slice(&sender);
+    data[1 + 20..1 + 20 + 32].copy_from_slice(create2_salt);
+    data[1 + 20 + 32..1 + 20 + 32 + 32].copy_from_slice(&init_code_hash[..]);
+    let data_hash = tiny_keccak::keccak256(&data);
+
+    let mut script_args = vec![0u8; 32 + 4 + 20];
     script_args[0..32].copy_from_slice(&ROLLUP_SCRIPT_HASH[..]);
-    script_args[32..(32 + 4)].copy_from_slice(&creator_account_id.to_le_bytes()[..]);
-    script_args[(32 + 4)] = 0xff;
-    script_args[(32 + 4 + 1)..(32 + 4 + 1 + 4)]
-        .copy_from_slice(&sender_account_id.to_le_bytes()[..]);
-    script_args[(32 + 4 + 1 + 4)..(32 + 4 + 1 + 4 + 32)].copy_from_slice(create2_salt);
-    script_args[(32 + 4 + 1 + 4 + 32)..(32 + 4 + 1 + 4 + 32 + 32)]
-        .copy_from_slice(&init_code_hash[..]);
+    script_args[32..32 + 4].copy_from_slice(&creator_account_id.to_le_bytes()[..]);
+    script_args[32 + 4..32 + 4 + 20].copy_from_slice(&data_hash[12..]);
+
     println!("init_code: {}", hex::encode(init_code));
     println!("create2_script_args: {}", hex::encode(&script_args[..]));
     Script::new_builder()
