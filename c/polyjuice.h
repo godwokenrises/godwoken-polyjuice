@@ -824,7 +824,8 @@ int create_new_account(gw_context_t* ctx,
                        uint32_t from_id,
                        uint32_t* to_id,
                        uint8_t* code_data,
-                       size_t code_size) {
+                       size_t code_size,
+                       uint8_t create2_address[20]) {
   int ret = 0;
   static const uint32_t script_args_len = 32 + 4 + 20;
   uint8_t script_args[script_args_len];
@@ -871,6 +872,9 @@ int create_new_account(gw_context_t* ctx,
   memcpy(script_args + 32, (uint8_t*)(&creator_account_id), 4);
   union ethash_hash256 data_hash_result = ethash::keccak256(data, data_len);
   memcpy(script_args + 32 + 4, data_hash_result.bytes + 12, 20);
+  if (msg->kind == EVMC_CREATE2) {
+    memcpy(create2_address, data_hash_result.bytes + 12, 20);
+  }
 
   mol_seg_t new_script_seg;
   uint32_t new_account_id;
@@ -1108,9 +1112,10 @@ int handle_message(gw_context_t* ctx,
   }
 
   /* Create new account by script */
+  uint8_t create2_address[20] = {0};
   /* NOTE: to_id may be rewritten */
   if (is_create(msg.kind)) {
-    ret = create_new_account(ctx, &msg, from_id, &to_id, code_data, code_size);
+    ret = create_new_account(ctx, &msg, from_id, &to_id, code_data, code_size, create2_address);
     if (ret != 0) {
       return ret;
     }
@@ -1140,6 +1145,11 @@ int handle_message(gw_context_t* ctx,
     if (ret != 0) {
       return ret;
     }
+  }
+
+  /* Rewrite create_address when call kind is CREATE2 */
+  if (msg.kind == EVMC_CREATE2) {
+    memcpy(res->create_address.bytes, create2_address, 20);
   }
 
   debug_print_data("output data", res->output_data, res->output_size);

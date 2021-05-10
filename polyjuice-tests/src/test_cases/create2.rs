@@ -58,7 +58,7 @@ fn test_create2() {
 
     let input_value_u128: u128 = 0x9a;
     let input_salt = "1111111111111111111111111111111111111111111111111111111111111111";
-    {
+    let run_result = {
         let block_info = new_block_info(0, block_number, block_number);
 
         // Create2Impl.deploy()
@@ -91,7 +91,8 @@ fn test_create2() {
             .expect("construct");
         // println!("run_result: {:?}", run_result);
         state.apply_run_result(&run_result).expect("update state");
-    }
+        run_result
+    };
 
     let create2_script = compute_create2_script(
         &state,
@@ -99,6 +100,11 @@ fn test_create2() {
         new_account_id,
         &hex::decode(input_salt).unwrap()[..],
         &hex::decode(SS_INIT_CODE).unwrap()[..],
+    );
+    println!("create2_address: {}", hex::encode(&run_result.return_data));
+    assert_eq!(
+        &run_result.return_data[12..32],
+        &create2_script.args().raw_data().as_ref()[36..36 + 20]
     );
     let create2_account_id = state
         .get_account_id_by_script_hash(&create2_script.hash().into())

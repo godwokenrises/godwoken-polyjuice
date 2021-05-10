@@ -5,8 +5,8 @@ pragma solidity ^0.8.0;
 contract Create2Impl {
     constructor() payable {}
 
-    function deploy(uint256 value, bytes32 salt, bytes memory code) public payable {
-        Create2.deploy(value, salt, code);
+    function deploy(uint256 value, bytes32 salt, bytes memory code) public payable returns (address) {
+        return Create2.deploy(value, salt, code);
     }
 
     function computeAddress(bytes32 salt, bytes32 codeHash) public view returns (address) {
