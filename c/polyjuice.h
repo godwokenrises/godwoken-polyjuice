@@ -646,6 +646,7 @@ struct evmc_result call(struct evmc_host_context* context,
       res.status_code = EVMC_REVERT;
       return res;
     }
+    res.status_code = EVMC_SUCCESS;
     debug_print_data("output data", res.output_data, res.output_size);
   } else {
     ret = handle_message(gw_ctx, context->from_id, context->to_id, msg, &res);
@@ -667,6 +668,7 @@ struct evmc_result call(struct evmc_host_context* context,
       return res;
     }
   }
+  debug_print_int("call.res.status_code", res.status_code);
   ckb_debug("END call");
 
   return res;
@@ -690,6 +692,7 @@ void emit_log(struct evmc_host_context* context, const evmc_address* address,
               const uint8_t* data, size_t data_size,
               const evmc_bytes32 topics[], size_t topics_count) {
   ckb_debug("BEGIN emit_log");
+  debug_print_data("log.data", data, data_size);
   /*
     output[ 0..20]                     = callee_contract.address
     output[20..24]                     = data_size_u32
@@ -716,6 +719,7 @@ void emit_log(struct evmc_host_context* context, const evmc_address* address,
   memcpy(output_current, (uint8_t*)(&topics_count_u32), 4);
   output_current += 4;
   for (size_t i = 0; i < topics_count; i++) {
+    debug_print_data("log.topic", topics[i].bytes, 32);
     memcpy(output_current, topics[i].bytes, 32);
     output_current += 32;
   }
