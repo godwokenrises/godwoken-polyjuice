@@ -14,6 +14,7 @@ pub use gw_generator::{
     types::RollupContext,
     Generator,
 };
+use gw_traits::CodeStore;
 use gw_store::traits::KVStore;
 pub use gw_store::{chain_view::ChainView, Store};
 use gw_types::{
@@ -37,6 +38,7 @@ pub const SUDT_VALIDATOR_PATH: &str =
 pub const SUDT_GENERATOR_PATH: &str =
     "../integration-test/godwoken/godwoken-scripts/c/build/sudt-generator";
 pub const SUDT_VALIDATOR_SCRIPT_TYPE_HASH: [u8; 32] = [0xa2u8; 32];
+pub const SECP_DATA: &[u8] = include_bytes!("../../build/secp256k1_data");
 // polyjuice
 pub const BIN_DIR: &str = "../build";
 pub const GENERATOR_NAME: &str = "generator_log";
@@ -51,6 +53,13 @@ pub const GW_LOG_POLYJUICE_SYSTEM: u8 = 0x2;
 pub const GW_LOG_POLYJUICE_USER: u8 = 0x3;
 
 lazy_static::lazy_static! {
+    pub static ref SECP_DATA_HASH: H256 = {
+        let mut buf = [0u8; 32];
+        let mut hasher = new_blake2b();
+        hasher.update(&SECP_DATA);
+        hasher.finalize(&mut buf);
+        buf.into()
+    };
     pub static ref GENERATOR_PROGRAM: Bytes = {
         let mut buf = Vec::new();
         let mut path = PathBuf::new();
@@ -333,6 +342,7 @@ impl PolyjuiceArgsBuilder {
 }
 
 pub fn setup() -> (Store, DummyState, Generator, u32) {
+    let _ = env_logger::try_init();
     let store = Store::open_tmp().unwrap();
     let mut state = DummyState::default();
     let reserved_id = state
@@ -373,6 +383,8 @@ pub fn setup() -> (Store, DummyState, Generator, u32) {
                 .build(),
         )
         .expect("create account");
+
+    state.insert_data(*SECP_DATA_HASH, Bytes::from(SECP_DATA));
 
     // ==== Build generator
     let configs = vec![

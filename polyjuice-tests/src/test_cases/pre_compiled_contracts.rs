@@ -1,16 +1,16 @@
+use crate::helper::{SECP_DATA_HASH, SECP_DATA};
 use ckb_vm::{
     machine::asm::{AsmCoreMachine, AsmMachine},
     memory::Memory,
     registers::{A0, A3, A7},
     DefaultMachineBuilder, Error as VMError, Register, SupportMachine, Syscalls,
 };
-use gw_common::{blake2b::new_blake2b, H256};
+use gw_common::H256;
 use gw_generator::syscalls::store_data;
 use gw_types::bytes::Bytes;
 use std::collections::HashMap;
 
 const BINARY: &[u8] = include_bytes!("../../../build/test_contracts");
-const SECP_DATA: &[u8] = include_bytes!("../../../build/secp256k1_data");
 const SUCCESS: u8 = 0;
 const DEBUG_PRINT_SYSCALL_NUMBER: u64 = 2177;
 
@@ -85,20 +85,13 @@ impl L2Syscalls {
 #[test]
 fn test_contracts() {
     let binary: Bytes = BINARY.to_vec().into();
-    let secp_data_hash: H256 = {
-        let mut buf = [0u8; 32];
-        let mut hasher = new_blake2b();
-        hasher.update(&SECP_DATA);
-        hasher.finalize(&mut buf);
-        buf.into()
-    };
     println!(
         "secp_data_hash: {:?}, data.len(): {}",
-        secp_data_hash,
+        *SECP_DATA_HASH,
         SECP_DATA.len()
     );
     let mut data = HashMap::default();
-    data.insert(secp_data_hash, Bytes::from(SECP_DATA.to_vec()));
+    data.insert(SECP_DATA_HASH.clone(), Bytes::from(SECP_DATA.to_vec()));
 
     let core_machine = Box::<AsmCoreMachine>::default();
     let machine_builder =
