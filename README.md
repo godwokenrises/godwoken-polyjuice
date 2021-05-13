@@ -61,9 +61,11 @@ args:
 
 #### Normal contract account script
 ```
-info_data:
+info_content:
     sender_address  : [u8; 20]   (the msg.sender: blake128(sender_script) + account id)
-    sender_nonce    : u32        (little endian)
+    sender_nonce    : u32 
+    
+info_data: rlp_encode(sender_address, sender_nonce)
 ```
 
 The polyjuice contract account created in polyjuice by `CREATE` call kind or op code.
