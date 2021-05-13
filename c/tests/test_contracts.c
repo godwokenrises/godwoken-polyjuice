@@ -15,6 +15,7 @@
 #include "common.h"
 #include "gw_syscalls.h"
 #include "sudt_utils.h"
+#include "./test_utils.h"
 #include "../generator/secp256k1_helper.h"
 #include "../contracts.h"
 
@@ -22,21 +23,6 @@ evmc_address build_pre_compiled_contract_address(uint8_t n) {
   evmc_address addr{0};
   addr.bytes[19] = n;
   return addr;
-}
-
-void hex2bin(const char *hex, uint8_t **out, size_t *out_len) {
-  size_t hex_length = strlen(hex);
-  *out_len = hex_length / 2;
-  *out = (uint8_t *)malloc(*out_len);
-  char part1;
-  char part2;
-  for (size_t i = 0; i < *out_len; i++) {
-    part1 = hex[i*2];
-    part2 = hex[i*2 + 1];
-    part1 = part1 >= 'a' ? (part1 - 'a' + 10) : (part1 >= 'A' ? (part1 - 'A' + 10) : (part1 - '0'));
-    part2 = part2 >= 'a' ? (part2 - 'a' + 10) : (part2 >= 'A' ? (part2 - 'A' + 10) : (part2 - '0'));
-    (*out)[i] = (uint8_t)(part1 * 16 + part2);
-  }
 }
 
 int test_contract(const uint8_t n,

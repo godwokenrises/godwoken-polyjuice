@@ -47,30 +47,36 @@ args:
 
 Polyjuice creator account is a godwoken account for creating polyjuice contract account. This account can only been created by [meta contract][meta-contract], and the account id is used as the chain id in polyjuice. The `sudt_id` field in script args is the sudt token current polyjuice instance bind to.
 
-### Normal contract account script
+### Contract account script
+
 ```
 code_hash: polyjuice_validator_type_script_hash
 hash_type: type
 args:
     rollup_type_hash   : [u8; 32]
     creator_account_id : u32        (little endian, also chain id, and for reading 'sudt_id' from creator account script)
-    sender_account_id  : u32        (little endian)
-    sender_nonce       : u32        (little endian)
+    info_data_hash     : [u8; 20]   (The information to be hashed is depend on how the account been created: [normal, create2], 
+                                      the 20 bytes value is keccak256(info_data)[12..])
+```
+
+#### Normal contract account script
+```
+info_content:
+    sender_address  : [u8; 20]   (the msg.sender: blake128(sender_script) + account id)
+    sender_nonce    : u32 
+    
+info_data: rlp_encode(sender_address, sender_nonce)
 ```
 
 The polyjuice contract account created in polyjuice by `CREATE` call kind or op code.
 
-### Create2 contract account script
+#### Create2 contract account script
 ```
-code_hash: polyjuice_validator_type_script_hash
-hash_type: type
-args:
-    rollup_type_hash   : [u8; 32]
-    creator_account_id : u32        (little endian, also chain id, and for reading 'sudt_id' from creator account script)
-    special_byte       : u8         (value is '0xff', refer to ethereum)
-    sender_account_id  : u32        (little endian)
-    create2_salt       : [u8; 32]   (create2 salt)
-    init_code_hash     : [u8; 32]   (keccak256(init_code))
+info_data:
+    special_byte    : u8         (value is '0xff', refer to ethereum)
+    sender_address  : [u8; 20]   (the msg.sender: blake128(sender_script) + account id)
+    create2_salt    : [u8; 32]   (create2 salt)
+    init_code_hash  : [u8; 32]   (keccak256(init_code))
 ```
 
 The polyjuice contract account created in polyjuice by `CREATE2` op code.

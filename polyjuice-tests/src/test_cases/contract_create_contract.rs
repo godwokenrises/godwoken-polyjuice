@@ -50,7 +50,8 @@ fn test_contract_create_contract() {
     let contract_account_nonce = state.get_nonce(new_account_id).unwrap();
     // 1 => new SimpleStorage()
     assert_eq!(contract_account_nonce, 1);
-    let ss_account_script = new_account_script_with_nonce(creator_account_id, new_account_id, 0);
+    let ss_account_script =
+        new_account_script_with_nonce(&state, creator_account_id, new_account_id, 0);
     let ss_account_id = state
         .get_account_id_by_script_hash(&ss_account_script.hash().into())
         .unwrap()
