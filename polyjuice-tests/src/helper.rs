@@ -14,9 +14,9 @@ pub use gw_generator::{
     types::RollupContext,
     Generator,
 };
-use gw_traits::CodeStore;
 use gw_store::traits::KVStore;
 pub use gw_store::{chain_view::ChainView, Store};
+use gw_traits::CodeStore;
 use gw_types::{
     bytes::Bytes,
     core::ScriptHashType,
@@ -24,6 +24,7 @@ use gw_types::{
     packed::{BlockInfo, LogItem, RawL2Transaction, RollupConfig, Script, Uint64},
     prelude::*,
 };
+use rlp::RlpStream;
 use std::{fs, io::Read, path::PathBuf};
 
 // meta contract
@@ -276,10 +277,11 @@ pub fn new_account_script_with_nonce(
     from_nonce: u32,
 ) -> Script {
     let sender = account_id_to_eth_address(state, from_id, false);
-    let mut data = [0u8; 20 + 4];
-    data[0..20].copy_from_slice(&sender);
-    data[20..24].copy_from_slice(&from_nonce.to_le_bytes());
-    let data_hash = tiny_keccak::keccak256(&data);
+    let mut stream = RlpStream::new_list(2);
+    stream.append(&sender);
+    stream.append(&from_nonce);
+    println!("rlp data: {}", hex::encode(stream.as_raw()));
+    let data_hash = tiny_keccak::keccak256(stream.as_raw());
 
     let mut new_account_args = vec![0u8; 32 + 4 + 20];
     new_account_args[0..32].copy_from_slice(&ROLLUP_SCRIPT_HASH);

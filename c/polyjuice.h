@@ -826,23 +826,27 @@ int create_new_account(gw_context_t* ctx,
                        uint8_t* code_data,
                        size_t code_size,
                        uint8_t create2_address[20]) {
+  static const uint32_t SCRIPT_ARGS_LEN = 32 + 4 + 20;
+
   int ret = 0;
-  static const uint32_t script_args_len = 32 + 4 + 20;
-  uint8_t script_args[script_args_len];
+  uint8_t script_args[SCRIPT_ARGS_LEN];
   uint8_t data[128] = {0};
   uint32_t data_len = 0;
   if (msg->kind == EVMC_CREATE) {
     /* normal contract account script.args[36..36+20] content before hash
        Include:
        - [20 bytes] sender address
-       - [ 4 bytes] sender nonce (NOTE: only use first 4 bytes (u32))
+       - [4  bytes] sender nonce (NOTE: only use first 4 bytes (u32))
+
+       Above data will be RLP encoded.
     */
-    memcpy(data, msg->sender.bytes, 20);
-    ret = ctx->sys_load_nonce(ctx, from_id, data + 20);
+    uint8_t nonce_value[32] = {0};
+    ret = ctx->sys_load_nonce(ctx, from_id, nonce_value);
     if (ret != 0) {
       return ret;
     }
-    data_len = 20 + 4;
+    rlp_encode_contract_address(&msg->sender, *((uint32_t *)nonce_value), data, &data_len);
+    debug_print_data("rlp data", data, data_len);
   } else if (msg->kind == EVMC_CREATE2) {
     /* CREATE2 contract account script.args[36..36+20] content before hash
        Include:
@@ -879,7 +883,7 @@ int create_new_account(gw_context_t* ctx,
   mol_seg_t new_script_seg;
   uint32_t new_account_id;
   ret = build_script(script_code_hash, script_hash_type, script_args,
-                     script_args_len, &new_script_seg);
+                     SCRIPT_ARGS_LEN, &new_script_seg);
   if (ret != 0) {
     return ret;
   }

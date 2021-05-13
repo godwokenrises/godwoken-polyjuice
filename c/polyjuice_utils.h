@@ -79,4 +79,42 @@ int address_to_account_id(gw_context_t* ctx, const evmc_address* address, uint32
   return 0;
 }
 
+void rlp_encode_contract_address(const evmc_address *sender, uint32_t nonce,
+                                 uint8_t *data, uint32_t *data_len) {
+  static const uint8_t RLP_ITEM_OFFSET = 0x80;
+  static const uint8_t RLP_LIST_OFFSET = 0xc0;
+
+  uint8_t *nonce_le = (uint8_t *)(&nonce);
+  uint8_t nonce_be[4] = {0};
+  nonce_be[0] = nonce_le[3];
+  nonce_be[1] = nonce_le[2];
+  nonce_be[2] = nonce_le[1];
+  nonce_be[3] = nonce_le[0];
+  uint32_t nonce_bytes_len = 0;
+  for (size_t i = 0; i < 4; i++) {
+    if (nonce_be[i] != 0) {
+      nonce_bytes_len = 4 - i;
+      break;
+    }
+  }
+
+  /* == RLP encode == */
+  /* sender header */
+  data[1] = 20 + RLP_ITEM_OFFSET;
+  /* sender content */
+  memcpy(data + 2, sender->bytes, 20);
+  if (nonce_bytes_len == 1 && nonce_be[3] < RLP_ITEM_OFFSET) {
+    data[2 + 20] = nonce_be[3];
+    *data_len = 2 + 20 + 1;
+  } else {
+    /* nonce header */
+    data[2 + 20] = nonce_bytes_len + RLP_ITEM_OFFSET;
+    /* nonce content */
+    memcpy(data + 2 + 20 + 1, nonce_be + (4 - nonce_bytes_len), nonce_bytes_len);
+    *data_len = 2 + 20 + 1 + nonce_bytes_len;
+  }
+  /* list header */
+  data[0] = *data_len - 1 + RLP_LIST_OFFSET;
+}
+
 #endif // POLYJUICE_UTILS_H

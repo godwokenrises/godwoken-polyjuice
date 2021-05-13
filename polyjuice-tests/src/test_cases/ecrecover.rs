@@ -2,8 +2,7 @@
 //!   See ./evm-contracts/SimpleStorage.sol
 
 use crate::helper::{
-    deploy,
-    build_eth_l2_script, new_account_script, new_block_info, setup, PolyjuiceArgsBuilder,
+    build_eth_l2_script, deploy, new_account_script, new_block_info, setup, PolyjuiceArgsBuilder,
     CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
@@ -81,7 +80,11 @@ fn test_ecrecover() {
             )
             .expect("construct");
         state.apply_run_result(&run_result).expect("update state");
-        assert_eq!(run_result.return_data, hex::decode("000000000000000000000000f175db82ceaaadd50a606d70e389e9a1284a6690").unwrap());
+        assert_eq!(
+            run_result.return_data,
+            hex::decode("000000000000000000000000f175db82ceaaadd50a606d70e389e9a1284a6690")
+                .unwrap()
+        );
         println!("return_data: {}", hex::encode(&run_result.return_data));
     }
 }

@@ -39,7 +39,7 @@ VALIDATOR_DEPS := c/validator/secp256k1_helper.h $(BIN_DEPS)
 # docker pull nervos/ckb-riscv-gnu-toolchain:bionic-20190702
 BUILDER_DOCKER := nervos/ckb-riscv-gnu-toolchain@sha256:7b168b4b109a0f741078a71b7c4dddaf1d283a5244608f7851f5714fbad273ba
 
-all: build/test_contracts build/generator build/validator build/generator_log build/validator_log build/test_ripemd160 build/blockchain.h build/godwoken.h
+all: build/test_contracts build/test_rlp build/generator build/validator build/generator_log build/validator_log build/test_ripemd160 build/blockchain.h build/godwoken.h
 
 all-via-docker: generate-protocol
 	mkdir -p build
@@ -80,6 +80,13 @@ build/validator_log: c/validator.c $(VALIDATOR_DEPS)
 build/test_contracts: c/tests/test_contracts.c $(VALIDATOR_DEPS)
 	cd $(SECP_DIR) && (git apply workaround-fix-g++-linking.patch || true) && cd - # apply patch
 	$(CXX) $(CFLAGS) $(LDFLAGS) -Ibuild -o $@ c/tests/test_contracts.c $(ALL_OBJS)
+	$(OBJCOPY) --only-keep-debug $@ $@.debug
+	$(OBJCOPY) --strip-debug --strip-all $@
+	cd $(SECP_DIR) && (git apply -R workaround-fix-g++-linking.patch || true) && cd - # revert patch
+
+build/test_rlp: c/tests/test_rlp.c $(VALIDATOR_DEPS)
+	cd $(SECP_DIR) && (git apply workaround-fix-g++-linking.patch || true) && cd - # apply patch
+	$(CXX) $(CFLAGS) $(LDFLAGS) -Ibuild -o $@ c/tests/test_rlp.c $(ALL_OBJS)
 	$(OBJCOPY) --only-keep-debug $@ $@.debug
 	$(OBJCOPY) --strip-debug --strip-all $@
 	cd $(SECP_DIR) && (git apply -R workaround-fix-g++-linking.patch || true) && cd - # revert patch
