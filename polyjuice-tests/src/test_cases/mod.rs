@@ -14,6 +14,7 @@ pub(crate) mod simple_transfer;
 //  The account polyjuice want to create already created by meta_contract
 pub(crate) mod account_already_exists;
 
+pub(crate) mod ecrecover;
 pub(crate) mod pre_compiled_contracts;
 //  Special pre-compiled contract to support transfer to any sudt
 pub(crate) mod invalid_sudt_erc20_proxy;
