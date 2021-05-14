@@ -81,5 +81,15 @@ info_data:
 
 The polyjuice contract account created in polyjuice by `CREATE2` op code.
 
+### Address used in polyjuice
+
+The calculate method of `contract` eth address is the same as the method in Ethereum, the data is equals to `contract_script.args[36..56]`.
+
+The EoA eth address is: 
+
+```
+blake128(account_script) + account_id
+```
+
 [rawl2tx-args]: https://github.com/nervosnetwork/godwoken/blob/26d15dbe42d15ad902593fcc89cf82b1ccc18d66/crates/types/schemas/godwoken.mol#L50
 [meta-contract]: https://github.com/nervosnetwork/godwoken-scripts/blob/32f98ac2ce1ab416cb4ffa143ec1f5ba3ddce51f/c/contracts/meta_contract.c
