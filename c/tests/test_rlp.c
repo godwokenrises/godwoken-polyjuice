@@ -42,7 +42,7 @@ void test(const char *sender_hex, uint32_t nonce, const char *expected_rlp, cons
 
   uint8_t rlp_data[128] = {0};
   uint32_t rlp_data_len = 0;
-  rlp_encode_contract_address(&sender, nonce, rlp_data, &rlp_data_len);
+  rlp_encode_sender_and_nonce(&sender, nonce, rlp_data, &rlp_data_len);
   if (rlp_data_len != expected_rlp_data_len) {
     ckb_exit(-3);
   }

@@ -67,6 +67,14 @@ fn test_simple_storage() {
         .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, from_id)
         .unwrap();
     println!("balance of {} = {}", from_id, from_balance2);
+    println!(
+        "contract account script: {}",
+        hex::encode(contract_account_script.as_slice())
+    );
+    println!(
+        "eth address: {}",
+        hex::encode(&contract_account_script.args().raw_data().as_ref()[36..])
+    );
     {
         // SimpleStorage.set(0x0d10);
         let block_info = new_block_info(0, 2, 0);

@@ -2,8 +2,8 @@
 //!   See ./evm-contracts/CallContract.sol
 
 use crate::helper::{
-    account_id_to_eth_address, build_eth_l2_script, deploy, new_account_script, new_block_info,
-    setup, simple_storage_get, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
+    build_eth_l2_script, contract_script_to_eth_address, deploy, new_account_script,
+    new_block_info, setup, simple_storage_get, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
@@ -48,7 +48,7 @@ fn test_contract_call_contract() {
     let input = format!(
         "{}{}",
         INIT_CODE,
-        hex::encode(account_id_to_eth_address(&state, ss_account_id, true))
+        hex::encode(contract_script_to_eth_address(&ss_account_script, true)),
     );
     let _run_result = deploy(
         &generator,

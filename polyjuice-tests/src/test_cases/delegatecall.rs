@@ -2,7 +2,7 @@
 //!   See ./evm-contracts/CallContract.sol
 
 use crate::helper::{
-    account_id_to_eth_address, build_eth_l2_script, deploy, new_account_script,
+    build_eth_l2_script, contract_script_to_eth_address, deploy, new_account_script,
     new_account_script_with_nonce, new_block_info, setup, simple_storage_get, PolyjuiceArgsBuilder,
     CKB_SUDT_ACCOUNT_ID,
 };
@@ -96,7 +96,7 @@ fn test_delegatecall() {
         let input = hex::decode(format!(
             "{}{}{}",
             fn_sighash,
-            hex::encode(&account_id_to_eth_address(&state, ss_account_id, true)),
+            hex::encode(contract_script_to_eth_address(&ss_account_script, true)),
             "0000000000000000000000000000000000000000000000000000000000000022",
         ))
         .unwrap();

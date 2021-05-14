@@ -32,6 +32,9 @@ void debug_print_int(const char* prefix, int64_t ret) {
 }
 #endif  /* #ifdef NO_DEBUG_LOG */
 
+/* polyjuice contract account (normal/create2) script args size*/
+static const uint32_t CONTRACT_ACCOUNT_SCRIPT_ARGS_SIZE = 32 + 4 + 20;
+
 /*
   eth_address[ 0..16] = script_hash[0..16]
   eth_address[16..20] = account_id (little endian)
@@ -72,6 +75,18 @@ int address_to_account_id(gw_context_t* ctx, const evmc_address* address, uint32
     debug_print_int("get script hash by account id failed", *account_id);
     return ret;
   }
+  bool exists = false;
+  for (int i = 0; i < 32; i++) {
+    /* if account not exists script_hash will be zero */
+    if (script_hash[i] != 0) {
+      exists = true;
+      break;
+    }
+  }
+  if (!exists) {
+    debug_print_int("script hash not exists by account id", *account_id);
+    return -1;
+  }
   if (memcmp(address->bytes, script_hash, 16) != 0) {
     debug_print_data("check script hash failed, invalid eth address", address->bytes, 20);
     return -1;
@@ -79,7 +94,77 @@ int address_to_account_id(gw_context_t* ctx, const evmc_address* address, uint32
   return 0;
 }
 
-void rlp_encode_contract_address(const evmc_address *sender, uint32_t nonce,
+int build_script(const uint8_t code_hash[32], const uint8_t hash_type,
+                 const uint8_t* args, const uint32_t args_len,
+                 mol_seg_t* script_seg) {
+  /* 1. Build Script by receipt.return_data */
+  mol_seg_t args_seg;
+  args_seg.size = 4 + args_len;
+  args_seg.ptr = (uint8_t*)malloc(args_seg.size);
+  if (args_seg.ptr == NULL) {
+    return -1;
+  }
+  memcpy(args_seg.ptr, (uint8_t*)(&args_len), 4);
+  memcpy(args_seg.ptr + 4, args, args_len);
+  debug_print_data("script.args", args, args_len);
+  debug_print_data("script.code_hash", code_hash, 32);
+  debug_print_int("script.hash_type", hash_type);
+
+  mol_builder_t script_builder;
+  MolBuilder_Script_init(&script_builder);
+  MolBuilder_Script_set_code_hash(&script_builder, code_hash, 32);
+  MolBuilder_Script_set_hash_type(&script_builder, hash_type);
+  MolBuilder_Script_set_args(&script_builder, args_seg.ptr, args_seg.size);
+  mol_seg_res_t script_res = MolBuilder_Script_build(script_builder);
+  free(args_seg.ptr);
+
+  /* https://stackoverflow.com/a/1545079 */
+#pragma push_macro("errno")
+#undef errno
+  if (script_res.errno != MOL_OK) {
+    ckb_debug("molecule build script failed");
+    return -1;
+  }
+#pragma pop_macro("errno")
+
+  *script_seg = script_res.seg;
+
+  debug_print_data("script ", script_seg->ptr, script_seg->size);
+  if (MolReader_Script_verify(script_seg, false) != MOL_OK) {
+    ckb_debug("built an invalid script");
+    return -1;
+  }
+  return 0;
+}
+
+int get_contract_account_id(gw_context_t* ctx,
+                            const uint8_t script_code_hash[32],
+                            const uint8_t script_hash_type,
+                            const uint8_t rollup_script_hash[32],
+                            const uint32_t creator_account_id,
+                            const uint8_t eth_address[20],
+                            uint32_t *account_id) {
+  int ret;
+  uint8_t args[CONTRACT_ACCOUNT_SCRIPT_ARGS_SIZE] = {0};
+  memcpy(args, rollup_script_hash, 32);
+  memcpy(args + 32, (uint8_t *)(&creator_account_id), 4);
+  memcpy(args + 32 + 4, eth_address, 20);
+
+  mol_seg_t script_seg;
+  ret = build_script(script_code_hash, script_hash_type, args, CONTRACT_ACCOUNT_SCRIPT_ARGS_SIZE, &script_seg);
+  if (ret != 0) {
+    return ret;
+  }
+  uint8_t script_hash[32] = {0};
+  blake2b_hash(script_hash, script_seg.ptr, script_seg.size);
+  ret = ctx->sys_get_account_id_by_script_hash(ctx, script_hash, account_id);
+  if (ret != 0) {
+    return ret;
+  }
+  return 0;
+}
+
+void rlp_encode_sender_and_nonce(const evmc_address *sender, uint32_t nonce,
                                  uint8_t *data, uint32_t *data_len) {
   static const uint8_t RLP_ITEM_OFFSET = 0x80;
   static const uint8_t RLP_LIST_OFFSET = 0xc0;
