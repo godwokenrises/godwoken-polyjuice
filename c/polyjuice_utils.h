@@ -150,13 +150,14 @@ int get_contract_account_id(gw_context_t* ctx,
   memcpy(args + 32, (uint8_t *)(&creator_account_id), 4);
   memcpy(args + 32 + 4, eth_address, 20);
 
-  mol_seg_t script_seg;
-  ret = build_script(script_code_hash, script_hash_type, args, CONTRACT_ACCOUNT_SCRIPT_ARGS_SIZE, &script_seg);
+  mol_seg_t new_script_seg;
+  ret = build_script(script_code_hash, script_hash_type, args, CONTRACT_ACCOUNT_SCRIPT_ARGS_SIZE, &new_script_seg);
   if (ret != 0) {
     return ret;
   }
   uint8_t script_hash[32] = {0};
-  blake2b_hash(script_hash, script_seg.ptr, script_seg.size);
+  blake2b_hash(script_hash, new_script_seg.ptr, new_script_seg.size);
+  free(new_script_seg.ptr);
   ret = ctx->sys_get_account_id_by_script_hash(ctx, script_hash, account_id);
   if (ret != 0) {
     return ret;

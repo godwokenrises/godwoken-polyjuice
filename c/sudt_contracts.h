@@ -224,5 +224,6 @@ int transfer_to_any_sudt(gw_context_t* ctx,
   *output_size = 0;
   return 0;
 }
-#endif
+
+#endif  /* #define SUDT_CONTRACTS_H_ */
 
