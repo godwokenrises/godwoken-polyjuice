@@ -2,8 +2,9 @@
 //!   See ./evm-contracts/SelfDestruct.sol
 
 use crate::helper::{
-    account_id_to_eth_address, build_eth_l2_script, deploy, new_account_script_with_nonce,
-    new_block_info, setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
+    account_id_to_eth_address, build_eth_l2_script, contract_script_to_eth_address, deploy,
+    new_account_script_with_nonce, new_block_info, setup, PolyjuiceArgsBuilder,
+    CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
@@ -97,7 +98,7 @@ fn test_selfdestruct() {
         let block_info = new_block_info(0, block_number, block_number);
         let input = hex::decode(format!(
             "9a33d968{}",
-            hex::encode(account_id_to_eth_address(&state, sd_account_id, true)),
+            hex::encode(contract_script_to_eth_address(&sd_account_script, true)),
         ))
         .unwrap();
         let args = PolyjuiceArgsBuilder::default()
@@ -174,7 +175,7 @@ fn test_selfdestruct() {
         let block_info = new_block_info(0, block_number, block_number);
         let input = hex::decode(format!(
             "9a33d968{}",
-            hex::encode(account_id_to_eth_address(&state, sd_account_id, true)),
+            hex::encode(contract_script_to_eth_address(&sd_account_script, true)),
         ))
         .unwrap();
         let args = PolyjuiceArgsBuilder::default()

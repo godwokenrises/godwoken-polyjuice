@@ -9,6 +9,7 @@
 
 #include "polyjuice_utils.h"
 #include "sudt_contracts.h"
+#include "other_contracts.h"
 
 /* Protocol Params:
    [Referenced]:
@@ -956,6 +957,10 @@ bool match_precompiled_address(const evmc_address* destination,
     *contract_gas = transfer_to_any_sudt_gas;
     *contract = transfer_to_any_sudt;
     break;
+  case 0xf2:
+    *contract_gas = eth_to_polyjuice_address_gas;
+    *contract = eth_to_polyjuice_address;
+    break;
   default:
     *contract_gas = NULL;
     *contract = NULL;
@@ -964,4 +969,4 @@ bool match_precompiled_address(const evmc_address* destination,
   return true;
 }
 
-#endif
+#endif  /* #define CONTRACTS_H_ */

@@ -19,6 +19,7 @@
 #include "../generator/secp256k1_helper.h"
 #include "../contracts.h"
 
+
 evmc_address build_pre_compiled_contract_address(uint8_t n) {
   evmc_address addr{0};
   addr.bytes[19] = n;
@@ -601,6 +602,14 @@ int test_blake2f() {
 }
 
 int main() {
+  /* NOTE: just want the unused variable warnings go away. */
+  g_tx_origin_id = 0;
+  g_sudt_id = 0;
+  g_created_id = 0;
+  memset(g_created_address, 0, 20);
+  g_creator_account_id = 0;
+  g_tx_origin = {0};
+
   if (test_ecrecover() != 0) {
     return -1;
   }

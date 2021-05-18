@@ -30,7 +30,7 @@ PROTOCOL_SCHEMA_URL := https://raw.githubusercontent.com/nervosnetwork/godwoken/
 ALL_OBJS := build/evmone.o build/baseline.o build/analysis.o build/instruction_metrics.o build/instruction_names.o build/execution.o build/instructions.o build/instructions_calls.o \
   build/keccak.o build/keccakf800.o \
   build/sha256.o build/memzero.o build/ripemd160.o build/bignum.o build/platform_util.o
-BIN_DEPS := c/contracts.h c/sudt_contracts.h c/polyjuice.h c/polyjuice_utils.h build/secp256k1_data_info.h $(ALL_OBJS)
+BIN_DEPS := c/contracts.h c/sudt_contracts.h c/other_contracts.h c/polyjuice.h c/polyjuice_utils.h build/secp256k1_data_info.h $(ALL_OBJS)
 GENERATOR_DEPS := c/generator/secp256k1_helper.h $(BIN_DEPS)
 VALIDATOR_DEPS := c/validator/secp256k1_helper.h $(BIN_DEPS)
 

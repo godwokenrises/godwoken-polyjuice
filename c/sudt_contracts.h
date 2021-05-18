@@ -3,6 +3,7 @@
 #define SUDT_CONTRACTS_H_
 
 #include "polyjuice_utils.h"
+#include "polyjuice_globals.h"
 
 #define BALANCE_OF_ANY_SUDT_GAS 150
 #define TRANSFER_TO_ANY_SUDT_GAS 300
@@ -84,8 +85,13 @@ int balance_of_any_sudt(gw_context_t* ctx,
   uint32_t account_id;
   ret = address_to_account_id(ctx, &address, &account_id);
   if (ret != 0) {
-    ckb_debug("invalid address");
-    return ERROR_BALANCE_OF_ANY_SUDT;
+    ret = get_contract_account_id(ctx, g_script_code_hash, g_script_hash_type,
+                                  g_rollup_script_hash, g_creator_account_id,
+                                  address.bytes, &account_id);
+    if (ret != 0) {
+      ckb_debug("invalid address");
+      return ERROR_BALANCE_OF_ANY_SUDT;
+    }
   }
 
   uint128_t balance;
@@ -179,16 +185,26 @@ int transfer_to_any_sudt(gw_context_t* ctx,
   evmc_address from_address = *((evmc_address *)(input_src + 32 + 12));
   ret = address_to_account_id(ctx, &from_address, &from_id);
   if (ret != 0) {
-    ckb_debug("invalid from_address");
-    return ERROR_TRANSFER_TO_ANY_SUDT;
+    ret = get_contract_account_id(ctx, g_script_code_hash, g_script_hash_type,
+                                  g_rollup_script_hash, g_creator_account_id,
+                                  from_address.bytes, &from_id);
+    if (ret != 0) {
+      ckb_debug("invalid from_address");
+      return ERROR_TRANSFER_TO_ANY_SUDT;
+    }
   }
 
   uint32_t to_id = 0;
   evmc_address to_address = *((evmc_address *)(input_src + 64 + 12));
   ret = address_to_account_id(ctx, &to_address, &to_id);
   if (ret != 0) {
-    ckb_debug("invalid to_address");
-    return ERROR_TRANSFER_TO_ANY_SUDT;
+    ret = get_contract_account_id(ctx, g_script_code_hash, g_script_hash_type,
+                                  g_rollup_script_hash, g_creator_account_id,
+                                  to_address.bytes, &to_id);
+    if (ret != 0) {
+      ckb_debug("invalid to_address");
+      return ERROR_TRANSFER_TO_ANY_SUDT;
+    }
   }
 
   if (from_id == to_id) {
@@ -208,5 +224,6 @@ int transfer_to_any_sudt(gw_context_t* ctx,
   *output_size = 0;
   return 0;
 }
-#endif
+
+#endif  /* #define SUDT_CONTRACTS_H_ */
 

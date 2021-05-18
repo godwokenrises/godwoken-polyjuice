@@ -105,7 +105,7 @@ pub enum Log {
     PolyjuiceSystem {
         gas_used: u64,
         cumulative_gas_used: u64,
-        created_id: u32,
+        created_address: [u8; 20],
         status_code: u32,
     },
     PolyjuiceUser {
@@ -161,7 +161,7 @@ pub fn parse_log(item: &LogItem) -> Log {
             }
         }
         GW_LOG_POLYJUICE_SYSTEM => {
-            if data.len() != (8 + 8 + 4 + 4) {
+            if data.len() != (8 + 8 + 20 + 4) {
                 panic!("invalid system log raw data length: {}", data.len());
             }
 
@@ -171,15 +171,15 @@ pub fn parse_log(item: &LogItem) -> Log {
             u64_bytes.copy_from_slice(&data[8..16]);
             let cumulative_gas_used = u64::from_le_bytes(u64_bytes);
 
+            let mut created_address = [0u8; 20];
+            created_address.copy_from_slice(&data[16..36]);
             let mut u32_bytes = [0u8; 4];
-            u32_bytes.copy_from_slice(&data[16..20]);
-            let created_id = u32::from_le_bytes(u32_bytes);
-            u32_bytes.copy_from_slice(&data[20..24]);
+            u32_bytes.copy_from_slice(&data[36..40]);
             let status_code = u32::from_le_bytes(u32_bytes);
             Log::PolyjuiceSystem {
                 gas_used,
                 cumulative_gas_used,
-                created_id,
+                created_address,
                 status_code,
             }
         }
@@ -307,6 +307,13 @@ pub fn new_account_script(
     new_account_script_with_nonce(state, creator_account_id, from_id, from_nonce)
 }
 
+pub fn contract_script_to_eth_address(script: &Script, ethabi: bool) -> Vec<u8> {
+    let offset = if ethabi { 12 } else { 0 };
+    let mut data = vec![0u8; offset + 20];
+    data[offset..].copy_from_slice(&script.args().raw_data().as_ref()[36..36 + 20]);
+    data
+}
+
 #[derive(Default, Debug)]
 pub struct PolyjuiceArgsBuilder {
     is_create: bool,
@@ -392,6 +399,7 @@ pub fn setup() -> (Store, DummyState, Generator, u32) {
                 .build(),
         )
         .expect("create account");
+    println!("creator_account_id: {}", creator_account_id);
 
     state.insert_data(*SECP_DATA_HASH, Bytes::from(SECP_DATA));
 

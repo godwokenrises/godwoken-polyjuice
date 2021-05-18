@@ -106,12 +106,15 @@ fn test_parse_log_event() {
         if let Log::PolyjuiceSystem {
             gas_used,
             cumulative_gas_used,
-            created_id,
+            created_address,
             status_code,
         } = log
         {
             assert_eq!(gas_used, cumulative_gas_used);
-            assert_eq!(created_id, new_account_id);
+            assert_eq!(
+                created_address,
+                contract_account_script.args().raw_data().as_ref()[36..]
+            );
             assert_eq!(status_code, 0);
         } else {
             panic!("unexpected polyjuice log");
@@ -205,12 +208,12 @@ fn test_parse_log_event() {
             if let Log::PolyjuiceSystem {
                 gas_used,
                 cumulative_gas_used,
-                created_id,
+                created_address,
                 status_code,
             } = log
             {
                 assert_eq!(gas_used, cumulative_gas_used);
-                assert_eq!(created_id, u32::max_value());
+                assert_eq!(created_address, [0u8; 20]);
                 assert_eq!(status_code, 0);
             } else {
                 panic!("unexpected polyjuice log");
