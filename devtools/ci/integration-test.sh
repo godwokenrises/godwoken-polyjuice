@@ -16,7 +16,7 @@ else
     git clone https://github.com/nervosnetwork/godwoken.git $GODWOKEN_DIR
 fi
 cd $GODWOKEN_DIR
-git checkout 247665180140ff1ff1c4520631203bc2fc7b6189
+git checkout v0.2.x
 git submodule update --init --recursive
 cd godwoken-scripts/c
 make all-via-docker
