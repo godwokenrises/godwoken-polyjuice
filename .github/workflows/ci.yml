@@ -1,0 +1,24 @@
+name: MainCI
+
+on: [push, pull_request]
+
+jobs:
+  build:
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v1
+    - name: Install Rust components
+      run: rustup component add rustfmt && rustup component add clippy
+    - uses: actions/cache@v2
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
+    - name: Install moleculec
+      run: CARGO_TARGET_DIR=target/ cargo install moleculec --version 0.6.1
+    - name: Run Integration-Test
+      run: bash devtools/ci/integration-test.sh
