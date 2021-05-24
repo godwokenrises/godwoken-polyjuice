@@ -47,7 +47,7 @@ fn test_get_block_info() {
 
     // Deploy BlockInfo
     let mut block_number = 0x05;
-    let timestamp: u64 = 0xff33;
+    let timestamp: u64 = 0xff33 * 1000;
     let block_info = new_block_info(aggregator_id, block_number, timestamp);
     let input = hex::decode(INIT_CODE).unwrap();
     let args = PolyjuiceArgsBuilder::default()

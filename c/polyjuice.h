@@ -368,7 +368,11 @@ struct evmc_tx_context get_tx_context(struct evmc_host_context* context) {
     context->error_code = ret;
   }
   ctx.block_number = context->gw_ctx->block_info.number;
-  ctx.block_timestamp = context->gw_ctx->block_info.timestamp;
+  /*
+    block_timestamp      => second
+    block_info.timestamp => millisecond
+  */
+  ctx.block_timestamp = context->gw_ctx->block_info.timestamp / 1000;
   /* Ethereum block gas limit */
   ctx.block_gas_limit = 12500000;
   /* 2500000000000000 */
