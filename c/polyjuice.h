@@ -1232,10 +1232,15 @@ int run_polyjuice() {
   debug_print_int("gas left", res.gas_left);
   debug_print_int("gas price", gas_price);
   debug_print_int("fee", fee);
-  ret = sudt_pay_fee(&context, g_sudt_id, context.transaction_context.from_id, fee);
-  if (ret != 0) {
-    debug_print_int("pay fee to block_producer failed", ret);
-    return ret;
+  if (fee > 0) {
+    ret = sudt_pay_fee(&context, g_sudt_id, context.transaction_context.from_id, fee);
+    if (ret != 0) {
+      debug_print_int("pay fee to block_producer failed", ret);
+      return ret;
+    }
+  } else {
+    /* For support execute transaction without applying */
+    ckb_debug("zero fee");
   }
 
   ret = gw_finalize(&context);
