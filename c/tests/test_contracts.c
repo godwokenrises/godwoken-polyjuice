@@ -609,6 +609,7 @@ int main() {
   g_creator_account_id = 0;
   g_tx_origin = {0};
   g_script_hash_type = 0xff;
+  memset(g_rollup_script_hash, 0, 32);
   memset(g_script_code_hash, 0, 32);
 
   if (test_ecrecover() != 0) {

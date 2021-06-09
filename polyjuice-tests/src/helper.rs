@@ -7,7 +7,7 @@ pub use gw_common::{
 use gw_config::BackendConfig;
 use gw_db::schema::{COLUMN_INDEX, COLUMN_META, META_TIP_BLOCK_HASH_KEY};
 pub use gw_generator::{
-    account_lock_manage::{always_success::AlwaysSuccess, AccountLockManage},
+    account_lock_manage::{always_success::AlwaysSuccess, secp256k1::Secp256k1, AccountLockManage},
     backend_manage::{Backend, BackendManage},
     dummy_state::DummyState,
     traits::StateExt,
@@ -47,6 +47,7 @@ pub const VALIDATOR_NAME: &str = "validator_log";
 
 pub const ROLLUP_SCRIPT_HASH: [u8; 32] = [0xa9u8; 32];
 pub const ETH_ACCOUNT_LOCK_CODE_HASH: [u8; 32] = [0xaau8; 32];
+pub const SECP_LOCK_CODE_HASH: [u8; 32] = [0xbbu8; 32];
 
 pub const GW_LOG_SUDT_TRANSFER: u8 = 0x0;
 pub const GW_LOG_SUDT_PAY_FEE: u8 = 0x1;
@@ -420,7 +421,8 @@ pub fn setup() -> (Store, DummyState, Generator, u32) {
         validator_script_type_hash: PROGRAM_CODE_HASH.clone().into(),
     });
     let mut account_lock_manage = AccountLockManage::default();
-    account_lock_manage.register_lock_algorithm(H256::zero(), Box::new(AlwaysSuccess::default()));
+    account_lock_manage
+        .register_lock_algorithm(SECP_LOCK_CODE_HASH.into(), Box::new(Secp256k1::default()));
     let rollup_config = RollupConfig::new_builder()
         .l2_sudt_validator_script_type_hash(SUDT_VALIDATOR_SCRIPT_TYPE_HASH.pack())
         .allowed_contract_type_hashes(

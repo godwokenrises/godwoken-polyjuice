@@ -27,8 +27,6 @@ fn test_erc20() {
     let from_id1 = state.create_account_from_script(from_script1).unwrap();
 
     let from_script2 = build_eth_l2_script([2u8; 20]);
-    let from_script_hash2 = from_script2.hash();
-    let from_short_address2 = &from_script_hash2[0..20];
     let from_id2 = state.create_account_from_script(from_script2).unwrap();
 
     let from_script3 = build_eth_l2_script([3u8; 20]);

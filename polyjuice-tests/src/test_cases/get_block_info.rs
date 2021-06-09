@@ -23,7 +23,7 @@ const INIT_CODE: &str = include_str!("./evm-contracts/BlockInfo.bin");
 fn test_get_block_info() {
     let (store, mut state, generator, creator_account_id) = setup();
     let block_producer_script = build_eth_l2_script([0x99u8; 20]);
-    let block_producer_id = state
+    let _block_producer_id = state
         .create_account_from_script(block_producer_script)
         .unwrap();
 
