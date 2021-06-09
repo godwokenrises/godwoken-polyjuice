@@ -603,12 +603,13 @@ int test_blake2f() {
 
 int main() {
   /* NOTE: just want the unused variable warnings go away. */
-  g_tx_origin_id = 0;
   g_sudt_id = 0;
   g_created_id = 0;
   memset(g_created_address, 0, 20);
   g_creator_account_id = 0;
   g_tx_origin = {0};
+  g_script_hash_type = 0xff;
+  memset(g_script_code_hash, 0, 32);
 
   if (test_ecrecover() != 0) {
     return -1;

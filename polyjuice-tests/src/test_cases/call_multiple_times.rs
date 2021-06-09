@@ -18,11 +18,17 @@ const INIT_CODE: &str = include_str!("./evm-contracts/CallMultipleTimes.bin");
 #[test]
 fn test_call_multiple_times() {
     let (store, mut state, generator, creator_account_id) = setup();
+    let block_producer_script = build_eth_l2_script([0x99u8; 20]);
+    let block_producer_id = state
+        .create_account_from_script(block_producer_script)
+        .unwrap();
 
     let from_script = build_eth_l2_script([1u8; 20]);
+    let from_script_hash = from_script.hash();
+    let from_short_address = &from_script_hash[0..20];
     let from_id = state.create_account_from_script(from_script).unwrap();
     state
-        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, 280000)
+        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_short_address, 280000)
         .unwrap();
     let mut block_number = 1;
 
@@ -37,6 +43,7 @@ fn test_call_multiple_times() {
             SS_INIT_CODE,
             122000,
             0,
+            block_producer_id,
             block_number,
         );
         block_number += 1;
@@ -67,6 +74,7 @@ fn test_call_multiple_times() {
         input.as_str(),
         122000,
         0,
+        block_producer_id,
         block_number,
     );
     block_number += 1;

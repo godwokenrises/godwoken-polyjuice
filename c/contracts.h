@@ -958,8 +958,8 @@ bool match_precompiled_address(const evmc_address* destination,
     *contract = transfer_to_any_sudt;
     break;
   case 0xf2:
-    *contract_gas = eth_to_polyjuice_address_gas;
-    *contract = eth_to_polyjuice_address;
+    *contract_gas = recover_account_gas;
+    *contract = recover_account;
     break;
   default:
     *contract_gas = NULL;

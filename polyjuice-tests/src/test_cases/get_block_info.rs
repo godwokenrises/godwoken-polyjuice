@@ -22,6 +22,10 @@ const INIT_CODE: &str = include_str!("./evm-contracts/BlockInfo.bin");
 #[test]
 fn test_get_block_info() {
     let (store, mut state, generator, creator_account_id) = setup();
+    let block_producer_script = build_eth_l2_script([0x99u8; 20]);
+    let block_producer_id = state
+        .create_account_from_script(block_producer_script)
+        .unwrap();
 
     {
         let genesis_number: Uint64 = 0.pack();
@@ -35,13 +39,15 @@ fn test_get_block_info() {
     }
 
     let from_script = build_eth_l2_script([1u8; 20]);
+    let from_script_hash = from_script.hash();
+    let from_short_address = &from_script_hash[0..20];
     let from_id = state.create_account_from_script(from_script).unwrap();
     state
-        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, 400000)
+        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_short_address, 400000)
         .unwrap();
     let aggregator_script = build_eth_l2_script([2u8; 20]);
     let aggregator_id = state.create_account_from_script(aggregator_script).unwrap();
-    assert_eq!(aggregator_id, 4);
+    assert_eq!(aggregator_id, 5);
     let coinbase_hex = hex::encode(&account_id_to_eth_address(&state, aggregator_id, true));
     println!("coinbase_hex: {}", coinbase_hex);
 
@@ -85,7 +91,7 @@ fn test_get_block_info() {
         .get_account_id_by_script_hash(&contract_account_script.hash().into())
         .unwrap()
         .unwrap();
-    assert_eq!(new_account_id, 5);
+    assert_eq!(new_account_id, 6);
 
     for (fn_sighash, expected_return_data) in [
         // getGenesisHash()

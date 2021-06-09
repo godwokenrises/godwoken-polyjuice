@@ -16,17 +16,30 @@ const INIT_CODE: &str = include_str!("./evm-contracts/ERC20.bin");
 #[test]
 fn test_erc20() {
     let (store, mut state, generator, creator_account_id) = setup();
+    let block_producer_script = build_eth_l2_script([0x99u8; 20]);
+    let block_producer_id = state
+        .create_account_from_script(block_producer_script)
+        .unwrap();
+
     let from_script1 = build_eth_l2_script([1u8; 20]);
+    let from_script_hash1 = from_script1.hash();
+    let from_short_address1 = &from_script_hash1[0..20];
     let from_id1 = state.create_account_from_script(from_script1).unwrap();
+
     let from_script2 = build_eth_l2_script([2u8; 20]);
+    let from_script_hash2 = from_script2.hash();
+    let from_short_address2 = &from_script_hash2[0..20];
     let from_id2 = state.create_account_from_script(from_script2).unwrap();
+
     let from_script3 = build_eth_l2_script([3u8; 20]);
+    let from_script_hash3 = from_script3.hash();
+    let from_short_address3 = &from_script_hash3[0..20];
     let from_id3 = state.create_account_from_script(from_script3).unwrap();
     state
-        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id1, 2000000)
+        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_short_address1, 2000000)
         .unwrap();
     state
-        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id3, 80000)
+        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_short_address3, 80000)
         .unwrap();
 
     // Deploy ERC20
@@ -39,6 +52,7 @@ fn test_erc20() {
         INIT_CODE,
         122000,
         0,
+        block_producer_id,
         1,
     );
 

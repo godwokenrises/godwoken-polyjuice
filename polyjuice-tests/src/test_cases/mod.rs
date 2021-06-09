@@ -15,7 +15,8 @@ pub(crate) mod simple_transfer;
 pub(crate) mod account_already_exists;
 
 pub(crate) mod ecrecover;
-pub(crate) mod eth_to_polyjuice_address;
+// FIXME: Recover Account
+// pub(crate) mod eth_to_polyjuice_address;
 pub(crate) mod pre_compiled_contracts;
 pub(crate) mod rlp;
 //  Special pre-compiled contract to support transfer to any sudt

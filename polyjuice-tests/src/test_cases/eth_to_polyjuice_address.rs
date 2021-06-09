@@ -15,17 +15,21 @@ const INIT_CODE: &str = include_str!("./evm-contracts/EthToPolyjuiceAddress.bin"
 #[test]
 fn test_to_polyjuice_address() {
     let (store, mut state, generator, creator_account_id) = setup();
+    let block_producer_script = build_eth_l2_script([0x99u8; 20]);
+    let block_producer_id = state.create_account_from_script(block_producer_script).unwrap();
 
     let from_args = [1u8; 20];
     let from_script = build_eth_l2_script(from_args.clone());
+    let from_script_hash = from_script.hash();
+    let from_short_address = &from_script_hash[0..20];
     println!("from_script: {}", hex::encode(from_script.as_slice()));
     let from_id = state.create_account_from_script(from_script).unwrap();
     state
-        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, 200000)
+        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_short_address, 200000)
         .unwrap();
 
     let from_balance1 = state
-        .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, from_id)
+        .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, from_short_address)
         .unwrap();
     println!("balance of {} = {}", from_id, from_balance1);
 
@@ -38,6 +42,7 @@ fn test_to_polyjuice_address() {
         INIT_CODE,
         122000,
         0,
+        block_producer_id,
         0,
     );
 

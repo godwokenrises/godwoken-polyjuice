@@ -19,21 +19,30 @@ fn _test_sudt_erc20_proxy(
     state: &mut DummyState,
     creator_account_id: u32,
     new_sudt_id: u32,
+    block_producer_id: u32,
 ) -> Result<(), TransactionError> {
     let from_script1 = build_eth_l2_script([1u8; 20]);
+    let from_script_hash1 = from_script1.hash();
+    let from_short_address1 = &from_script_hash1[0..20];
     let from_id1 = state.create_account_from_script(from_script1).unwrap();
+
     let from_script2 = build_eth_l2_script([2u8; 20]);
+    let from_script_hash2 = from_script2.hash();
+    let from_short_address2 = &from_script_hash2[0..20];
     let from_id2 = state.create_account_from_script(from_script2).unwrap();
+
     let from_script3 = build_eth_l2_script([3u8; 20]);
+    let from_script_hash3 = from_script3.hash();
+    let from_short_address3 = &from_script_hash3[0..20];
     let from_id3 = state.create_account_from_script(from_script3).unwrap();
     state
-        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id1, 2000000)
+        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_short_address1, 2000000)
         .unwrap();
     state
-        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id2, 2000000)
+        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_short_address2, 2000000)
         .unwrap();
     state
-        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id3, 2000000)
+        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_short_address3, 2000000)
         .unwrap();
 
     // Deploy ERC20
@@ -49,6 +58,7 @@ fn _test_sudt_erc20_proxy(
         init_code.as_str(),
         122000,
         0,
+        block_producer_id,
         1,
     );
 
@@ -65,15 +75,31 @@ fn _test_sudt_erc20_proxy(
     println!("eoa2_hex: {}", eoa2_hex);
     println!("eoa3_hex: {}", eoa3_hex);
     state
-        .mint_sudt(new_sudt_id, from_id1, 160000000000000000000000000000u128)
+        .mint_sudt(
+            new_sudt_id,
+            from_short_address1,
+            160000000000000000000000000000u128,
+        )
         .unwrap();
 
     assert_eq!(
-        state.get_sudt_balance(new_sudt_id, from_id1).unwrap(),
+        state
+            .get_sudt_balance(new_sudt_id, from_short_address1)
+            .unwrap(),
         160000000000000000000000000000u128
     );
-    assert_eq!(state.get_sudt_balance(new_sudt_id, from_id2).unwrap(), 0);
-    assert_eq!(state.get_sudt_balance(new_sudt_id, from_id3).unwrap(), 0);
+    assert_eq!(
+        state
+            .get_sudt_balance(new_sudt_id, from_short_address2)
+            .unwrap(),
+        0
+    );
+    assert_eq!(
+        state
+            .get_sudt_balance(new_sudt_id, from_short_address3)
+            .unwrap(),
+        0
+    );
     for (idx, (from_id, args_str, return_data_str)) in [
         // balanceOf(eoa1)
         (
@@ -158,7 +184,7 @@ fn _test_sudt_erc20_proxy(
     .enumerate()
     {
         let block_number = 2 + idx as u64;
-        let block_info = new_block_info(0, block_number, block_number);
+        let block_info = new_block_info(block_producer_id, block_number, block_number);
         println!(">> [input]: {}", args_str);
         let input = hex::decode(args_str).unwrap();
         let args = PolyjuiceArgsBuilder::default()
@@ -196,10 +222,11 @@ fn _test_sudt_erc20_proxy(
 #[test]
 fn test_sudt_erc20_proxy() {
     let (store, mut state, generator, creator_account_id) = setup();
-    let error_new_sudt_script = build_eth_l2_script([0xffu8; 20]);
-    let error_new_sudt_id = state
-        .create_account_from_script(error_new_sudt_script)
+    let block_producer_script = build_eth_l2_script([0x99u8; 20]);
+    let block_producer_id = state
+        .create_account_from_script(block_producer_script)
         .unwrap();
+
     let new_sudt_script = build_l2_sudt_script([0xffu8; 32]);
     let new_sudt_id = state.create_account_from_script(new_sudt_script).unwrap();
 
@@ -211,17 +238,35 @@ fn test_sudt_erc20_proxy() {
             &store,
             &mut state,
             creator_account_id,
-            new_sudt_id
+            new_sudt_id,
+            block_producer_id,
         ),
         Ok(())
     );
+}
+
+#[test]
+fn test_error_sudt_id_sudt_erc20_proxy() {
+    let (store, mut state, generator, creator_account_id) = setup();
+    let block_producer_script = build_eth_l2_script([0x99u8; 20]);
+    let block_producer_id = state
+        .create_account_from_script(block_producer_script)
+        .unwrap();
+
+    let error_new_sudt_script = build_eth_l2_script([0xffu8; 20]);
+    let error_new_sudt_id = state
+        .create_account_from_script(error_new_sudt_script)
+        .unwrap();
+
+    assert_eq!(CKB_SUDT_ACCOUNT_ID, 1);
     assert_eq!(
         _test_sudt_erc20_proxy(
             &generator,
             &store,
             &mut state,
             creator_account_id,
-            error_new_sudt_id
+            error_new_sudt_id,
+            block_producer_id,
         ),
         Err(TransactionError::InvalidExitCode(-30))
     );

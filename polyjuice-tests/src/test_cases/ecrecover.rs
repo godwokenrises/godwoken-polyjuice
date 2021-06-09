@@ -15,11 +15,17 @@ const INIT_CODE: &str = include_str!("./evm-contracts/HeadTail.bin");
 #[test]
 fn test_ecrecover() {
     let (store, mut state, generator, creator_account_id) = setup();
+    let block_producer_script = build_eth_l2_script([0x99u8; 20]);
+    let block_producer_id = state
+        .create_account_from_script(block_producer_script)
+        .unwrap();
 
     let from_script = build_eth_l2_script([1u8; 20]);
+    let from_script_hash = from_script.hash();
+    let from_short_address = &from_script_hash[0..20];
     let from_id = state.create_account_from_script(from_script).unwrap();
     state
-        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, 200000)
+        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_short_address, 200000)
         .unwrap();
 
     // Deploy CreateContract
@@ -32,6 +38,7 @@ fn test_ecrecover() {
         INIT_CODE,
         122000,
         0,
+        block_producer_id,
         1,
     );
     // println!(
@@ -45,7 +52,7 @@ fn test_ecrecover() {
         .get_account_id_by_script_hash(&contract_account_script.hash().into())
         .unwrap()
         .unwrap();
-    assert_eq!(new_account_id, 4);
+    assert_eq!(new_account_id, 5);
 
     println!("\n==============================================\n");
     {
