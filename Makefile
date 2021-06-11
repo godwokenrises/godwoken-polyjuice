@@ -24,7 +24,7 @@ SECP256K1_SRC := $(SECP_DIR)/src/ecmult_static_pre_context.h
 
 MOLC := moleculec
 MOLC_VERSION := 0.6.1
-PROTOCOL_VERSION := 8fa14d4b5d20b29ac7f9c09b68c4f76341668571
+PROTOCOL_VERSION := 63a7125e429e48d63c9a8c47453ce56a19e2cbba
 PROTOCOL_SCHEMA_URL := https://raw.githubusercontent.com/thewawar/godwoken/${PROTOCOL_VERSION}/crates/types/schemas
 
 ALL_OBJS := build/evmone.o build/baseline.o build/analysis.o build/instruction_metrics.o build/instruction_names.o build/execution.o build/instructions.o build/instructions_calls.o \
