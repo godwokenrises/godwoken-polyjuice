@@ -106,8 +106,6 @@ struct evmc_host_context {
   uint32_t to_id;
   evmc_address sender;
   evmc_address destination;
-  // if to_id is EoA, to_script_hash may all zero
-  bool to_id_is_eoa;
   int error_code;
 };
 
@@ -838,7 +836,7 @@ int create_new_account(gw_context_t* ctx,
 int handle_transfer(gw_context_t* ctx,
                     const evmc_message* msg,
                     uint8_t tx_origin_addr[20],
-                    bool to_id_is_eoa) {
+                    bool transfer_only) {
   int ret;
   uint8_t value_u128_bytes[16];
   for (int i = 0; i < 16; i++) {
@@ -862,7 +860,7 @@ int handle_transfer(gw_context_t* ctx,
     return ret;
   }
 
-  if (msg->kind == EVMC_CALL && memcmp(msg->sender.bytes, tx_origin_addr, 20) == 0 && to_id_is_eoa) {
+  if (msg->kind == EVMC_CALL && memcmp(msg->sender.bytes, tx_origin_addr, 20) == 0 && transfer_only) {
     ckb_debug("transfer value from eoa to eoa");
     return -1;
   }
@@ -877,10 +875,8 @@ int execute_in_evmone(gw_context_t* ctx,
                       uint32_t to_id,
                       const uint8_t* code_data,
                       const size_t code_size,
-                      bool to_id_is_eoa,
+                      bool transfer_only,
                       struct evmc_result* res) {
-  bool transfer_only = !is_create(msg->kind) && msg->input_size == 0;
-  debug_print_int("to_id_is_eoa", to_id_is_eoa);
   debug_print_int("transfer_only", transfer_only);
   evmc_address sender = msg->sender;
   evmc_address destination = msg->destination;
@@ -889,7 +885,7 @@ int execute_in_evmone(gw_context_t* ctx,
   struct evmc_host_interface interface = {account_exists, get_storage,    set_storage,    get_balance,
                                           get_code_size,  get_code_hash,  copy_code,      selfdestruct,
                                           call,           get_tx_context, get_block_hash, emit_log};
-  if (!to_id_is_eoa && !transfer_only) {
+  if (!transfer_only) {
     /* Execute the code in EVM */
     debug_print_int("code size", code_size);
     debug_print_data("msg.input_data", msg->input_data, msg->input_size);
@@ -951,7 +947,7 @@ int handle_message(gw_context_t* ctx,
   int ret;
 
   /* to_id may still a contract account, but can be treated as EoA account */
-  bool to_id_is_eoa = false;
+  bool transfer_only = false;
   uint32_t to_id;
   uint32_t from_id;
   // TODO: passing this value from function argument
@@ -972,8 +968,8 @@ int handle_message(gw_context_t* ctx,
       }
     } else {
       // NOTE: Both to_id and to_script_hash are undefined (can't be used)
-      ckb_debug("to id is EoA");
-      to_id_is_eoa = true;
+      ckb_debug("to id will be treated as EoA");
+      transfer_only = true;
     }
   } else {
     static const evmc_address zero_address{0};
@@ -1014,7 +1010,7 @@ int handle_message(gw_context_t* ctx,
   }
 
   /* Check if target contract is destructed */
-  if (!is_create(msg.kind) && !to_id_is_eoa) {
+  if (!is_create(msg.kind) && !transfer_only) {
     ret = check_destructed(ctx, to_id);
     if (ret != 0) {
       return ret;
@@ -1076,13 +1072,13 @@ int handle_message(gw_context_t* ctx,
 
   /* Handle transfer logic.
      NOTE: MUST do this before vm.execute and after to_id finalized */
-  ret = handle_transfer(ctx, &msg, (uint8_t *)g_tx_origin.bytes, to_id_is_eoa);
+  ret = handle_transfer(ctx, &msg, (uint8_t *)g_tx_origin.bytes, transfer_only);
   if (ret != 0) {
     return ret;
   }
 
   /* NOTE: msg and res are updated */
-  ret = execute_in_evmone(ctx, &msg, parent_from_id, from_id, to_id, code_data, code_size, to_id_is_eoa, res);
+  ret = execute_in_evmone(ctx, &msg, parent_from_id, from_id, to_id, code_data, code_size, transfer_only, res);
   if (ret != 0) {
     return ret;
   }
