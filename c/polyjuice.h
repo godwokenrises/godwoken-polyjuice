@@ -840,31 +840,26 @@ int handle_transfer(gw_context_t* ctx,
                     uint8_t tx_origin_addr[20],
                     bool to_id_is_eoa) {
   int ret;
-  bool is_zero_value = true;
-  for (int i = 0; i < 32; i++) {
+  uint8_t value_u128_bytes[16];
+  for (int i = 0; i < 16; i++) {
     if (msg->value.bytes[i] != 0) {
-      is_zero_value = false;
-      break;
+      ckb_debug("transfer value can not larger than u128::max()");
+      return -1;
     }
+    value_u128_bytes[i] = msg->value.bytes[31 - i];
   }
-  if (!is_zero_value) {
-    uint8_t value_u128_bytes[16];
-    for (int i = 0; i < 16; i++) {
-      value_u128_bytes[i] = msg->value.bytes[31 - i];
-    }
-    uint128_t value_u128 = *(uint128_t*)value_u128_bytes;
-    debug_print_data("sender", msg->sender.bytes, 20);
-    debug_print_data("destination", msg->destination.bytes, 20);
-    debug_print_int("transfer value", value_u128);
-    ret = sudt_transfer(ctx, g_sudt_id,
-                        POLYJUICE_SHORT_ADDR_LEN,
-                        msg->sender.bytes,
-                        msg->destination.bytes,
-                        value_u128);
-    if (ret != 0) {
-      ckb_debug("transfer failed");
-      return ret;
-    }
+  uint128_t value_u128 = *(uint128_t*)value_u128_bytes;
+  debug_print_data("sender", msg->sender.bytes, 20);
+  debug_print_data("destination", msg->destination.bytes, 20);
+  debug_print_int("transfer value", value_u128);
+  ret = sudt_transfer(ctx, g_sudt_id,
+                      POLYJUICE_SHORT_ADDR_LEN,
+                      msg->sender.bytes,
+                      msg->destination.bytes,
+                      value_u128);
+  if (ret != 0) {
+    ckb_debug("transfer failed");
+    return ret;
   }
 
   if (msg->kind == EVMC_CALL && memcmp(msg->sender.bytes, tx_origin_addr, 20) == 0 && to_id_is_eoa) {
@@ -1216,15 +1211,10 @@ int run_polyjuice() {
   debug_print_int("gas left", res.gas_left);
   debug_print_int("gas price", gas_price);
   debug_print_int("fee", fee);
-  if (fee > 0) {
-    ret = sudt_pay_fee(&context, g_sudt_id, POLYJUICE_SHORT_ADDR_LEN, msg.sender.bytes, fee);
-    if (ret != 0) {
-      debug_print_int("pay fee to block_producer failed", ret);
-      return ret;
-    }
-  } else {
-    /* For support execute transaction without applying */
-    ckb_debug("zero fee");
+  ret = sudt_pay_fee(&context, g_sudt_id, POLYJUICE_SHORT_ADDR_LEN, msg.sender.bytes, fee);
+  if (ret != 0) {
+    debug_print_int("pay fee to block_producer failed", ret);
+    return ret;
   }
 
   ret = gw_finalize(&context);
