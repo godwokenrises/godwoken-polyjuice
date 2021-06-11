@@ -548,13 +548,6 @@ struct evmc_result call(struct evmc_host_context* context,
   res.release = release_result;
   gw_context_t* gw_ctx = context->gw_ctx;
 
-  if (msg->depth > (int32_t)UINT16_MAX) {
-    ckb_debug("depth too large");
-    context->error_code = -1;
-    res.status_code = EVMC_REVERT;
-    return res;
-  }
-
   precompiled_contract_gas_fn contract_gas;
   precompiled_contract_fn contract;
   if (match_precompiled_address(&msg->destination, &contract_gas, &contract)) {
