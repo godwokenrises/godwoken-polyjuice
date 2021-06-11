@@ -186,6 +186,11 @@ int parse_args(struct evmc_message* msg, uint128_t* gas_price,
   offset += 4;
   debug_print_int("[input_size]", input_size);
 
+  if (input_size > tx_ctx->args_len) {
+    /* If input size large enough may overflow `input_size + offset` */
+    ckb_debug("input_size too large");
+    return -1;
+  }
   if (tx_ctx->args_len != (input_size + offset)) {
     ckb_debug("invalid polyjuice transaction");
     return -1;
