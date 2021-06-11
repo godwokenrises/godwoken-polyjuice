@@ -680,7 +680,7 @@ int check_destructed(gw_context_t* ctx, uint32_t to_id) {
   }
   bool destructed = true;
   for (int i = 0; i < GW_VALUE_BYTES; i++) {
-    if (destructed_raw_value[0] == 0) {
+    if (destructed_raw_value[i] == 0) {
       destructed = false;
       break;
     }
