@@ -16,7 +16,7 @@ else
     git clone https://github.com/thewawar/godwoken.git $GODWOKEN_DIR
 fi
 cd $GODWOKEN_DIR
-git checkout 63a7125e429e48d63c9a8c47453ce56a19e2cbba
+git checkout c3165a6a2663c89cc81d821024fd71fe9cd0c49c
 git submodule update --init --recursive
 cd godwoken-scripts/c
 make all-via-docker
