@@ -92,3 +92,7 @@ short_address = blake2b(script.as_slice())[0..20]
 
 [rawl2tx-args]: https://github.com/nervosnetwork/godwoken/blob/26d15dbe42d15ad902593fcc89cf82b1ccc18d66/crates/types/schemas/godwoken.mol#L50
 [meta-contract]: https://github.com/nervosnetwork/godwoken-scripts/blob/32f98ac2ce1ab416cb4ffa143ec1f5ba3ddce51f/c/contracts/meta_contract.c
+
+## More docs
+* [EVM compatible](docs/EVM-compatible.md)
+* [Addition Features](docs/Addition-Features.md)
