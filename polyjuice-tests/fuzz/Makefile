@@ -35,7 +35,7 @@ CFLAGS_BN128 := -I$(DEPS)/bn128/include
 CFLAGS := -O2 -I../../c/ripemd160 $(CFLAGS_CKB_STD) $(CFLAGS_ETHASH) $(CFLAGS_EVMONE) $(CFLAGS_GODWOKEN) $(CFLAGS_SECP) $(CFLAGS_MBEDTLS) $(CFLAGS_CRYPTO_ALGORITHMS) $(CFLAGS_INTX) $(CFLAGS_BN128)
 CXXFLAGS := $(CFLAGS) -std=c++1z
 LDFLAGS := -Wl,--gc-sections
-FUZZER_FLAGS := -g -O1 -fsanitize=address,undefined -Wno-incompatible-pointer-types
+SANITIZER_FLAGS := -g -O1 -fsanitize=address,undefined -Wno-incompatible-pointer-types
 # TODO: fuzzer,
 # -I $(DEPS)/ckb-c-stdlib-simulator-only2
 
@@ -69,25 +69,25 @@ all: fuzzer coverage
 
 build/generator: ../../c/generator.c $(GENERATOR_DEPS)
 	cd $(SECP_DIR) && (git apply workaround-fix-g++-linking.patch || true) && cd - # apply patch
-	$(CXX) $(FUZZER_FLAGS) $(CFLAGS) $(LDFLAGS) -Ibuild -o $@ ../../c/generator.c $(ALL_OBJS) -DNO_DEBUG_LOG
+	$(CXX) $(SANITIZER_FLAGS) $(CFLAGS) $(LDFLAGS) -Ibuild -o $@ ../../c/generator.c $(ALL_OBJS) -DNO_DEBUG_LOG
 	$(OBJCOPY) --only-keep-debug $@ $@.debug
 	$(OBJCOPY) --strip-debug --strip-all $@
 	cd $(SECP_DIR) && (git apply -R workaround-fix-g++-linking.patch || true) && cd - # revert patch
 build/generator_log: ../../c/generator.c $(GENERATOR_DEPS)
 	cd $(SECP_DIR) && (git apply workaround-fix-g++-linking.patch || true) && cd - # apply patch
-	$(CXX) $(CFLAGS) $(LDFLAGS) $(FUZZER_FLAGS) -ferror-limit=1 -Ibuild -o $@ ../../c/generator.c $(ALL_OBJS)
+	$(CXX) $(CFLAGS) $(LDFLAGS) $(SANITIZER_FLAGS) -ferror-limit=1 -Ibuild -o $@ ../../c/generator.c $(ALL_OBJS)
 	$(OBJCOPY) --only-keep-debug $@ $@.debug
 	$(OBJCOPY) --strip-debug --strip-all $@
 	cd $(SECP_DIR) && (git apply -R workaround-fix-g++-linking.patch || true) && cd - # revert patch
 build/validator: ../../c/validator.c $(VALIDATOR_DEPS)
 	cd $(SECP_DIR) && (git apply workaround-fix-g++-linking.patch || true) && cd - # apply patch
-	$(CXX) $(FUZZER_FLAGS) $(CFLAGS) $(LDFLAGS) -Ibuild -o $@ ../../c/validator.c $(ALL_OBJS) -DNO_DEBUG_LOG
+	$(CXX) $(SANITIZER_FLAGS) $(CFLAGS) $(LDFLAGS) -Ibuild -o $@ ../../c/validator.c $(ALL_OBJS) -DNO_DEBUG_LOG
 	$(OBJCOPY) --only-keep-debug $@ $@.debug
 	$(OBJCOPY) --strip-debug --strip-all $@
 	cd $(SECP_DIR) && (git apply -R workaround-fix-g++-linking.patch || true) && cd - # revert patch
 build/validator_log: ../../c/validator.c $(VALIDATOR_DEPS)
 	cd $(SECP_DIR) && (git apply workaround-fix-g++-linking.patch || true) && cd - # apply patch
-	$(CXX) $(FUZZER_FLAGS) $(CFLAGS) $(LDFLAGS) -Ibuild -o $@ ../../c/validator.c $(ALL_OBJS)
+	$(CXX) $(SANITIZER_FLAGS) $(CFLAGS) $(LDFLAGS) -Ibuild -o $@ ../../c/validator.c $(ALL_OBJS)
 	$(OBJCOPY) --only-keep-debug $@ $@.debug
 	$(OBJCOPY) --strip-debug --strip-all $@
 	cd $(SECP_DIR) && (git apply -R workaround-fix-g++-linking.patch || true) && cd - # revert patch
@@ -103,12 +103,21 @@ build/validator_log: ../../c/validator.c $(VALIDATOR_DEPS)
 # -include ../../c/polyjuice.h
 # TODO: ALL_OBJS
 polyjuice_generator_fuzzer: build/generator_log
-	$(CXX) -fsanitize=fuzzer $(FUZZER_FLAGS) $(CFLAGS) $(LDFLAGS) -Ibuild -include ../../c/polyjuice.h -o $@ polyjuice_generator_fuzzer.c build/ckb_syscalls_simulator.o
+	$(CXX) -fsanitize=fuzzer $(SANITIZER_FLAGS) $(CFLAGS) $(LDFLAGS) -Ibuild -include ../../c/polyjuice.h -o $@ polyjuice_generator_fuzzer.c build/ckb_syscalls_simulator.o
 
 # TODO: test_contracts 
 build/test_contracts: ../../c/tests/test_contracts.c $(VALIDATOR_DEPS)
 	cd $(SECP_DIR) && (git apply workaround-fix-g++-linking.patch || true) && cd - # apply patch
 	${CXX} $(CFLAGS) $(LDFLAGS) $(SANITIZER_FLAGS) -Ibuild -o $@ ../../c/tests/test_contracts.c $(ALL_OBJS)
+	cd $(SECP_DIR) && (git apply -R workaround-fix-g++-linking.patch || true) && cd - # revert patch
+
+# test rlp_encode_sender_and_nonce
+# RLP (Recursive Length Prefix)
+build/test_rlp: ../../c/tests/test_rlp.c $(VALIDATOR_DEPS)
+	cd $(SECP_DIR) && (git apply workaround-fix-g++-linking.patch || true) && cd - # apply patch
+	$(CXX) $(CFLAGS) $(LDFLAGS) $(SANITIZER_FLAGS) -Ibuild -o $@ ../../c/tests/test_rlp.c $(ALL_OBJS)
+	$(OBJCOPY) --only-keep-debug $@ $@.debug
+	$(OBJCOPY) --strip-debug --strip-all $@
 	cd $(SECP_DIR) && (git apply -R workaround-fix-g++-linking.patch || true) && cd - # revert patch
 
 ###
@@ -121,7 +130,7 @@ report: $(COVERAGE_DIR)/fuzzer.profdata coverage $(EXTERNAL_HEADERS)
 	$(LLVM_COV) report --show-functions --instr-profile=$(COVERAGE_DIR)/fuzzer.profdata smt_coverage $(EXTERNAL_HEADERS)
 # TODO: fuzzer
 # fuzzer: $(EXTERNAL_HEADERS)
-# 	clang $(FUZZER_FLAGS) smt_fuzzer.c -o smt_fuzzer
+# 	clang $(SANITIZER_FLAGS) smt_fuzzer.c -o smt_fuzzer
 
 
 # evmone is a C++ implementation of the Ethereum Virtual Machine (EVM)
