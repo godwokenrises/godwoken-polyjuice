@@ -1,1 +1,0 @@
-[{"inputs":[{"internalType":"bytes32","name":"lock_code_hash","type":"bytes32"},{"internalType":"address","name":"eth_addr","type":"address"}],"name":"calcAddr","outputs":[{"internalType":"address","name":"","type":"address"}],"stateMutability":"nonpayable","type":"function"}]

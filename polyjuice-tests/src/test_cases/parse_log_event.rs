@@ -15,15 +15,23 @@ const INIT_CODE: &str = include_str!("./evm-contracts/LogEvents.bin");
 #[test]
 fn test_parse_log_event() {
     let (store, mut state, generator, creator_account_id) = setup();
+    let block_producer_script = build_eth_l2_script([0x99u8; 20]);
+    let block_producer_script_hash = block_producer_script.hash();
+    let block_producer_short_address = &block_producer_script_hash[0..20];
+    let block_producer_id = state
+        .create_account_from_script(block_producer_script)
+        .unwrap();
 
     let from_script = build_eth_l2_script([1u8; 20]);
+    let from_script_hash = from_script.hash();
+    let from_short_address = &from_script_hash[0..20];
     let from_id = state.create_account_from_script(from_script).unwrap();
     state
-        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, 200000)
+        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_short_address, 200000)
         .unwrap();
 
     let from_balance1 = state
-        .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, from_id)
+        .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, from_short_address)
         .unwrap();
     println!("balance of {} = {}", from_id, from_balance1);
 
@@ -38,10 +46,13 @@ fn test_parse_log_event() {
         INIT_CODE,
         50000,
         deploy_value,
+        block_producer_id,
         block_number,
     );
     let contract_account_script =
         new_account_script(&mut state, creator_account_id, from_id, false);
+    let new_script_hash = contract_account_script.hash();
+    let new_short_address = &new_script_hash[0..20];
     let new_account_id = state
         .get_account_id_by_script_hash(&contract_account_script.hash().into())
         .unwrap()
@@ -56,14 +67,14 @@ fn test_parse_log_event() {
         let log = parse_log(&log_item);
         println!("user log: {:?}", log);
         if let Log::SudtTransfer {
-            from_id: the_from_id,
-            to_id: the_to_id,
+            from_addr: the_from_addr,
+            to_addr: the_to_addr,
             amount,
             ..
         } = log
         {
-            assert_eq!(the_from_id, from_id);
-            assert_eq!(the_to_id, new_account_id);
+            assert_eq!(the_from_addr, from_short_address);
+            assert_eq!(the_to_addr, new_short_address);
             assert_eq!(amount, deploy_value);
         } else {
             panic!("unexpected polyjuice log");
@@ -111,10 +122,7 @@ fn test_parse_log_event() {
         } = log
         {
             assert_eq!(gas_used, cumulative_gas_used);
-            assert_eq!(
-                created_address,
-                contract_account_script.args().raw_data().as_ref()[36..]
-            );
+            assert_eq!(created_address, new_short_address);
             assert_eq!(status_code, 0);
         } else {
             panic!("unexpected polyjuice log");
@@ -128,15 +136,15 @@ fn test_parse_log_event() {
         let log = parse_log(&log_item);
         println!("user log: {:?}", log);
         if let Log::SudtPayFee {
-            from_id: the_from_id,
-            block_producer_id: the_to_id,
+            from_addr: the_from_addr,
+            block_producer_addr: the_to_addr,
             amount,
             ..
         } = log
         {
-            assert_eq!(the_from_id, from_id);
+            assert_eq!(the_from_addr, from_short_address);
             // The block producer id is `0`
-            assert_eq!(the_to_id, 0);
+            assert_eq!(the_to_addr, block_producer_short_address);
             assert_eq!(amount, 1814);
         } else {
             panic!("unexpected polyjuice log");

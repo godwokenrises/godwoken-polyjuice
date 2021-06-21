@@ -6,79 +6,76 @@
 #include "polyjuice_globals.h"
 
 /* Gas fee */
-#define ETH_TO_POLYJUICE_ADDR_GAS 200
+#define RECOVER_ACCOUNT_GAS 3600 /* more than ecrecover */
 
 /* Errors */
-#define ERROR_ETH_TO_POLYJUICE_ADDR -40
+#define ERROR_RECOVER_ACCOUNT -40
 
-int eth_to_polyjuice_address_gas(const uint8_t* input_src,
-                                    const size_t input_size,
-                                    uint64_t* gas) {
-  *gas = ETH_TO_POLYJUICE_ADDR_GAS;
+int recover_account_gas(const uint8_t* input_src,
+                        const size_t input_size,
+                        uint64_t* gas) {
+  *gas = RECOVER_ACCOUNT_GAS;
   return 0;
 }
 
 /*
-  Calculate polyjuice from ETH address.
+  Recover an EoA account script by signature
 
-  input:
+  input: (the input data is from abi.encode(mesage, signature, code_hash))
   ======
-    input[ 0..32] => EoA account lock code hash (assume hash type must `type`)
-    input[32..64] => ETH address
+    input[ 0..32]  => message
+    input[32..64]  => offset of signature part
+    input[64..96]  => code_hash
+    input[96..128] => length of signature data
+    input[128..]   => signature data
 
   output:
   =======
-    output[0..32] => polyjuice address (blake128 + account id)
+    output[0..32] => data length
+    output[..]    => account script data
  */
-int eth_to_polyjuice_address(gw_context_t* ctx,
-                             const uint8_t* code_data,
-                             const size_t code_size,
-                             bool is_static_call,
-                             const uint8_t* input_src,
-                             const size_t input_size,
-                             uint8_t** output, size_t* output_size) {
-
-  if (input_size != 64) {
-    debug_print_int("eth to polyjuice address: invalid input length", input_size);
-    return ERROR_ETH_TO_POLYJUICE_ADDR;
+int recover_account(gw_context_t* ctx,
+                    const uint8_t* code_data,
+                    const size_t code_size,
+                    bool is_static_call,
+                    const uint8_t* input_src,
+                    const size_t input_size,
+                    uint8_t** output, size_t* output_size) {
+  if (input_size < 128) {
+    return ERROR_RECOVER_ACCOUNT;
   }
-
   int ret;
-  uint8_t eoa_lock_code_hash[32] = {0};
-  memcpy(eoa_lock_code_hash, input_src, 32);
-
-  /* ScriptHashType::Type = 1 */
-  static const uint8_t script_hash_type = 1;
-  static const uint32_t script_args_len = 32 + 20;
-  uint8_t script_args[script_args_len] = {0};
-  memcpy(script_args, g_rollup_script_hash, 32);
-  memcpy(script_args + 32, input_src + 32 + 12, 20);
-  mol_seg_t new_script_seg;
-  ret = build_script(eoa_lock_code_hash, script_hash_type, script_args, script_args_len, &new_script_seg);
+  uint8_t *message = (uint8_t *)input_src;
+  uint8_t *code_hash = (uint8_t *)input_src + 64;
+  uint8_t *signature = (uint8_t *)input_src + 128;
+  uint64_t signature_len = 0;
+  ret = parse_u64(input_src + 96, &signature_len);
   if (ret != 0) {
-    debug_print_int("eth to polyjuice address: build script failed", ret);
-    return ERROR_ETH_TO_POLYJUICE_ADDR;
+    debug_print_int("parse signature length failed", ret);
+    return ERROR_RECOVER_ACCOUNT;
   }
-
-  uint8_t script_hash[32] = {0};
-  blake2b_hash(script_hash, new_script_seg.ptr, new_script_seg.size);
-  free(new_script_seg.ptr);
-  uint32_t account_id = 0;
-  ret = ctx->sys_get_account_id_by_script_hash(ctx, script_hash, &account_id);
+  if (signature_len + 128 > input_size) {
+    debug_print_int("invalid input_size", input_size);
+    return ERROR_RECOVER_ACCOUNT;
+  }
+  uint8_t script[GW_MAX_SCRIPT_SIZE];
+  uint64_t script_len = 0;
+  ret = ctx->sys_recover_account(ctx, message, signature, signature_len, code_hash, script, &script_len);
   if (ret != 0) {
-    debug_print_int("eth to polyjuice address: get account id failed", ret);
-    return ERROR_ETH_TO_POLYJUICE_ADDR;
+    debug_print_int("call sys_recover_account failed", ret);
+    return ERROR_RECOVER_ACCOUNT;
   }
-
-  *output = (uint8_t *)malloc(32);
+  debug_print_data("script", script, script_len);
+  debug_print_int("script length", script_len);
+  *output = (uint8_t *)malloc(32 + script_len);
   if (*output == NULL) {
-    ckb_debug("eth to polyjuice address: malloc output failed");
-    return ERROR_ETH_TO_POLYJUICE_ADDR;
+    ckb_debug("malloc failed");
+    return -1;
   }
-  memset(*output, 0, 12);
-  memcpy(*output + 12, script_hash, 16);
-  memcpy(*output + 12 + 16, (uint8_t *)(&account_id), 4);
-  *output_size = 32;
+  *output_size = 32 + script_len;
+  memset(*output, 0, 32);
+  put_u64(script_len, *output);
+  memcpy(*output + 32, script, script_len);
   return 0;
 }
 

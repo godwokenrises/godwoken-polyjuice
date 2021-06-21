@@ -92,6 +92,7 @@ int gw_increase_nonce(gw_context_t *ctx, uint32_t account_id, uint32_t *new_nonc
 int handle_message(gw_context_t* ctx,
                    uint32_t parent_from_id,
                    uint32_t parent_to_id,
+                   evmc_address *parent_destination,
                    const evmc_message* msg, struct evmc_result* res);
 typedef int (*stream_data_loader_fn)(gw_context_t* ctx, long data_id,
                                      uint32_t* len, uint32_t offset,
@@ -103,6 +104,10 @@ struct evmc_host_context {
   const size_t code_size;
   uint32_t from_id;
   uint32_t to_id;
+  evmc_address sender;
+  evmc_address destination;
+  // if to_id is EoA, to_script_hash may all zero
+  bool to_id_is_eoa;
   int error_code;
 };
 
@@ -197,12 +202,13 @@ int parse_args(struct evmc_message* msg, uint128_t* gas_price,
 
   int ret;
   evmc_address sender{0};
-  ret = account_id_to_address(ctx, tx_ctx->from_id, &sender);
+  uint8_t from_script_hash[32] = {0};
+  ret = ctx->sys_get_script_hash_by_account_id(ctx, tx_ctx->from_id, from_script_hash);
   if (ret != 0) {
+    debug_print_int("get from script hash failed", tx_ctx->from_id);
     return ret;
   }
-
-  g_tx_origin_id = tx_ctx->from_id;
+  memcpy(sender.bytes, from_script_hash, 20);
   memcpy(g_tx_origin.bytes, sender.bytes, 20);
 
   msg->kind = kind;
@@ -258,7 +264,7 @@ int load_account_code(gw_context_t* gw_ctx, uint32_t account_id,
   uint8_t key[32];
   uint8_t data_hash[32];
   polyjuice_build_contract_code_key(account_id, key);
-  ret = gw_ctx->sys_load(gw_ctx, account_id, key, data_hash);
+  ret = gw_ctx->sys_load(gw_ctx, account_id, key, GW_KEY_BYTES, data_hash);
   if (ret != 0) {
     ckb_debug("sys_load failed");
     return ret;
@@ -280,7 +286,10 @@ int load_account_code(gw_context_t* gw_ctx, uint32_t account_id,
 
   uint64_t old_code_size = *code_size;
   ret = gw_ctx->sys_load_data(gw_ctx, data_hash, code_size, offset, code);
-  debug_print_data("code data", code, *code_size);
+  debug_print_data("code data", code, *code_size > 100 ? 100 : *code_size);
+  if (*code_size > 100) {
+    ckb_debug("code data ......");
+  }
   if (ret != 0) {
     ckb_debug("sys_load_data failed");
     return ret;
@@ -300,12 +309,15 @@ struct evmc_tx_context get_tx_context(struct evmc_host_context* context) {
   /* gas price = 1 */
   ctx.tx_gas_price.bytes[31] = 0x01;
   memcpy(ctx.tx_origin.bytes, g_tx_origin.bytes, 20);
-  int ret = account_id_to_address(context->gw_ctx,
-                                  context->gw_ctx->block_info.block_producer_id,
-                                  &ctx.block_coinbase);
+  uint8_t coinbase_script_hash[32] = {0};
+  int ret = context->gw_ctx->sys_get_script_hash_by_account_id(context->gw_ctx,
+                                                               context->gw_ctx->block_info.block_producer_id,
+                                                               coinbase_script_hash);
   if (ret != 0) {
+    debug_print_int("get script hash by block producer id failed", context->gw_ctx->block_info.block_producer_id);
     context->error_code = ret;
   }
+  memcpy(ctx.block_coinbase.bytes, coinbase_script_hash, 20);
   ctx.block_number = context->gw_ctx->block_info.number;
   /*
     block_timestamp      => second
@@ -332,18 +344,12 @@ struct evmc_tx_context get_tx_context(struct evmc_host_context* context) {
 bool account_exists(struct evmc_host_context* context,
                     const evmc_address* address) {
   debug_print_data("BEGIN account_exists", address->bytes, 20);
-  int ret;
-  uint32_t account_id = 0;
-  ret = address_to_account_id(context->gw_ctx, address, &account_id);
+  uint8_t script_hash[32] = {0};
   bool exists = true;
+  int ret = context->gw_ctx->sys_get_script_hash_by_prefix(context->gw_ctx, (uint8_t *)address->bytes, 20, script_hash);
   if (ret != 0) {
-    ckb_debug("address to account id failed");
-    ret = get_contract_account_id(context->gw_ctx, g_script_code_hash, g_script_hash_type,
-                                  g_rollup_script_hash, g_creator_account_id, address->bytes, &account_id);
-    if (ret != 0) {
-      ckb_debug("get contract account id failed");
-      exists = false;
-    }
+    exists = false;
+    return ret;
   }
   debug_print_int("END account_exists", (int)exists);
   return exists;
@@ -354,7 +360,7 @@ evmc_bytes32 get_storage(struct evmc_host_context* context,
   ckb_debug("BEGIN get_storage");
   evmc_bytes32 value{};
   int ret = context->gw_ctx->sys_load(context->gw_ctx, context->to_id,
-                                      key->bytes, (uint8_t*)value.bytes);
+                                      key->bytes, GW_KEY_BYTES, (uint8_t*)value.bytes);
   if (ret != 0) {
     ckb_debug("sys_load failed");
     context->error_code = ret;
@@ -369,7 +375,7 @@ enum evmc_storage_status set_storage(struct evmc_host_context* context,
                                      const evmc_bytes32* value) {
   ckb_debug("BEGIN set_storage");
   int ret = context->gw_ctx->sys_store(context->gw_ctx, context->to_id,
-                                       key->bytes, value->bytes);
+                                       key->bytes, GW_KEY_BYTES, value->bytes);
   if (ret != 0) {
     ckb_debug("sys_store failed");
     context->error_code = ret;
@@ -384,8 +390,7 @@ size_t get_code_size(struct evmc_host_context* context,
   ckb_debug("BEGIN get_code_size");
   int ret;
   uint32_t account_id = 0;
-  ret = get_contract_account_id(context->gw_ctx, g_script_code_hash, g_script_hash_type,
-                                g_rollup_script_hash, g_creator_account_id, address->bytes, &account_id);
+  ret = address_to_account_id(context->gw_ctx, address->bytes, &account_id);
   if (ret != 0) {
     ckb_debug("get contract account id failed");
     context->error_code = ret;
@@ -409,8 +414,7 @@ evmc_bytes32 get_code_hash(struct evmc_host_context* context,
   evmc_bytes32 hash{};
   int ret;
   uint32_t account_id = 0;
-  ret = get_contract_account_id(context->gw_ctx, g_script_code_hash, g_script_hash_type,
-                                g_rollup_script_hash, g_creator_account_id, address->bytes, &account_id);
+  ret = address_to_account_id(context->gw_ctx, address->bytes, &account_id);
   if (ret != 0) {
     ckb_debug("get contract account id failed");
     context->error_code = ret;
@@ -437,8 +441,7 @@ size_t copy_code(struct evmc_host_context* context, const evmc_address* address,
   ckb_debug("BEGIN copy_code");
   int ret;
   uint32_t account_id = 0;
-  ret = get_contract_account_id(context->gw_ctx, g_script_code_hash, g_script_hash_type,
-                                g_rollup_script_hash, g_creator_account_id, address->bytes, &account_id);
+  ret = address_to_account_id(context->gw_ctx, address->bytes, &account_id);
   if (ret != 0) {
     ckb_debug("get contract account id failed");
     context->error_code = ret;
@@ -463,21 +466,8 @@ evmc_uint256be get_balance(struct evmc_host_context* context,
   ckb_debug("BEGIN get_balance");
   int ret;
   evmc_uint256be balance{};
-  uint32_t account_id = 0;
-  ret = address_to_account_id(context->gw_ctx, address, &account_id);
-  if (ret != 0) {
-    ckb_debug("address to account_id failed");
-    ret = get_contract_account_id(context->gw_ctx, g_script_code_hash, g_script_hash_type,
-                                  g_rollup_script_hash, g_creator_account_id, address->bytes, &account_id);
-    if (ret != 0) {
-      ckb_debug("get contract account_id failed");
-      context->error_code = ret;
-      return balance;
-    }
-  }
-
   uint128_t value_u128 = 0;
-  ret = sudt_get_balance(context->gw_ctx, g_sudt_id, account_id, &value_u128);
+  ret = sudt_get_balance(context->gw_ctx, g_sudt_id, POLYJUICE_SHORT_ADDR_LEN, address->bytes, &value_u128);
   if (ret != 0) {
     ckb_debug("sudt_get_balance failed");
     context->error_code = -1;
@@ -488,7 +478,7 @@ evmc_uint256be get_balance(struct evmc_host_context* context,
     balance.bytes[31 - i] = *(value_ptr + i);
   }
   ckb_debug("END get_balance");
-  debug_print_int("account_id", account_id);
+  debug_print_data("address", address->bytes, 20);
   debug_print_int("balance", value_u128);
   return balance;
 }
@@ -497,36 +487,25 @@ void selfdestruct(struct evmc_host_context* context,
                   const evmc_address* address,
                   const evmc_address* beneficiary) {
   int ret;
-  uint32_t beneficiary_account_id = 0;
-  ckb_debug("BEGIN selfdestruct");
-  ret = address_to_account_id(context->gw_ctx, beneficiary, &beneficiary_account_id);
-  if (ret != 0) {
-    ckb_debug("address to account_id failed");
-    ret = get_contract_account_id(context->gw_ctx, g_script_code_hash, g_script_hash_type,
-                                  g_rollup_script_hash, g_creator_account_id, beneficiary->bytes,
-                                  &beneficiary_account_id);
-    if (ret != 0) {
-      ckb_debug("get contract account_id failed");
-      context->error_code = ret;
-      return;
-    }
-  }
-  if (beneficiary_account_id == context->to_id) {
-    ckb_debug("invalid beneficiary account");
+  if (memcmp(beneficiary->bytes, context->destination.bytes, 20) == 20) {
+    debug_print_data("invalid beneficiary account", beneficiary->bytes, 20);
     context->error_code = -1;
     return;
   }
 
   uint128_t balance;
-  ret = sudt_get_balance(context->gw_ctx, g_sudt_id, context->to_id, &balance);
+  ret = sudt_get_balance(context->gw_ctx, g_sudt_id, POLYJUICE_SHORT_ADDR_LEN, context->destination.bytes, &balance);
   if (ret != 0) {
     ckb_debug("get balance failed");
     context->error_code = ret;
     return;
   }
   if (balance > 0) {
-    ret = sudt_transfer(context->gw_ctx, g_sudt_id, context->to_id,
-                        beneficiary_account_id, balance);
+    ret = sudt_transfer(context->gw_ctx, g_sudt_id,
+                        POLYJUICE_SHORT_ADDR_LEN,
+                        context->destination.bytes,
+                        beneficiary->bytes,
+                        balance);
     if (ret != 0) {
       ckb_debug("transfer beneficiary failed");
       context->error_code = ret;
@@ -554,11 +533,13 @@ void selfdestruct(struct evmc_host_context* context,
 struct evmc_result call(struct evmc_host_context* context,
                         const struct evmc_message* msg) {
   ckb_debug("BEGIN call");
+  debug_print_data("msg.input_data", msg->input_data, msg->input_size);
   debug_print_data("call.sender", msg->sender.bytes, 20);
   debug_print_data("call.destination", msg->destination.bytes, 20);
   int ret;
   struct evmc_result res;
   res.output_data = NULL;
+  res.output_size = 0;
   res.release = release_result;
   gw_context_t* gw_ctx = context->gw_ctx;
 
@@ -592,7 +573,7 @@ struct evmc_result call(struct evmc_host_context* context,
                    msg->input_data, msg->input_size,
                    (uint8_t**)&res.output_data, &res.output_size);
     if (ret != 0) {
-      ckb_debug("call pre-compiled contract failed");
+      debug_print_int("call pre-compiled contract failed", ret);
       context->error_code = ret;
       res.status_code = EVMC_REVERT;
       return res;
@@ -600,7 +581,7 @@ struct evmc_result call(struct evmc_host_context* context,
     res.status_code = EVMC_SUCCESS;
     debug_print_data("output data", res.output_data, res.output_size);
   } else {
-    ret = handle_message(gw_ctx, context->from_id, context->to_id, msg, &res);
+    ret = handle_message(gw_ctx, context->from_id, context->to_id, &context->destination, msg, &res);
     if (ret != 0) {
       ckb_debug("inner call failed (transfer/contract call contract)");
       context->error_code = ret;
@@ -776,8 +757,7 @@ int create_new_account(gw_context_t* ctx,
                        uint32_t from_id,
                        uint32_t* to_id,
                        uint8_t* code_data,
-                       size_t code_size,
-                       uint8_t create_address[20]) {
+                       size_t code_size) {
   static const uint32_t SCRIPT_ARGS_LEN = 32 + 4 + 20;
 
   int ret = 0;
@@ -797,6 +777,9 @@ int create_new_account(gw_context_t* ctx,
     if (ret != 0) {
       return ret;
     }
+    debug_print_data("sender", msg->sender.bytes, 20);
+    debug_print_int("from_id", from_id);
+    debug_print_int("nonce", *((uint32_t *)nonce_value));
     rlp_encode_sender_and_nonce(&msg->sender, *((uint32_t *)nonce_value), data, &data_len);
     debug_print_data("rlp data", data, data_len);
   } else if (msg->kind == EVMC_CREATE2) {
@@ -828,7 +811,6 @@ int create_new_account(gw_context_t* ctx,
   memcpy(script_args + 32, (uint8_t*)(&g_creator_account_id), 4);
   union ethash_hash256 data_hash_result = ethash::keccak256(data, data_len);
   memcpy(script_args + 32 + 4, data_hash_result.bytes + 12, 20);
-  memcpy(create_address, data_hash_result.bytes + 12, 20);
 
   mol_seg_t new_script_seg;
   uint32_t new_account_id;
@@ -837,13 +819,12 @@ int create_new_account(gw_context_t* ctx,
   if (ret != 0) {
     return ret;
   }
-  ret = ctx->sys_create(ctx, new_script_seg.ptr, new_script_seg.size,
-                        &new_account_id);
+  uint8_t script_hash[32];
+  blake2b_hash(script_hash, new_script_seg.ptr, new_script_seg.size);
+  ret = ctx->sys_create(ctx, new_script_seg.ptr, new_script_seg.size, &new_account_id);
   if (ret != 0) {
     debug_print_int("sys_create error", ret);
     ckb_debug("create account failed assume account already created by meta_contract");
-    uint8_t script_hash[32];
-    blake2b_hash(script_hash, new_script_seg.ptr, new_script_seg.size);
     ret = ctx->sys_get_account_id_by_script_hash(ctx, script_hash, &new_account_id);
     if (ret != 0) {
       return ret;
@@ -851,15 +832,14 @@ int create_new_account(gw_context_t* ctx,
   }
   free(new_script_seg.ptr);
   *to_id = new_account_id;
+  memcpy((uint8_t *)msg->destination.bytes, script_hash, 20);
   debug_print_int(">> new to id", *to_id);
   return 0;
 }
 
 int handle_transfer(gw_context_t* ctx,
                     const evmc_message* msg,
-                    uint32_t from_id,
-                    uint32_t to_id,
-                    uint32_t tx_origin_id,
+                    uint8_t tx_origin_addr[20],
                     bool to_id_is_eoa) {
   int ret;
   bool is_zero_value = true;
@@ -875,17 +855,21 @@ int handle_transfer(gw_context_t* ctx,
       value_u128_bytes[i] = msg->value.bytes[31 - i];
     }
     uint128_t value_u128 = *(uint128_t*)value_u128_bytes;
-    debug_print_int("from_id", from_id);
-    debug_print_int("to_id", to_id);
+    debug_print_data("sender", msg->sender.bytes, 20);
+    debug_print_data("destination", msg->destination.bytes, 20);
     debug_print_int("transfer value", value_u128);
-    ret = sudt_transfer(ctx, g_sudt_id, from_id, to_id, value_u128);
+    ret = sudt_transfer(ctx, g_sudt_id,
+                        POLYJUICE_SHORT_ADDR_LEN,
+                        msg->sender.bytes,
+                        msg->destination.bytes,
+                        value_u128);
     if (ret != 0) {
       ckb_debug("transfer failed");
       return ret;
     }
   }
 
-  if (msg->kind == EVMC_CALL && from_id == tx_origin_id && to_id_is_eoa) {
+  if (msg->kind == EVMC_CALL && memcmp(msg->sender.bytes, tx_origin_addr, 20) == 0 && to_id_is_eoa) {
     ckb_debug("transfer value from eoa to eoa");
     return -1;
   }
@@ -905,27 +889,18 @@ int execute_in_evmone(gw_context_t* ctx,
   bool transfer_only = !is_create(msg->kind) && msg->input_size == 0;
   debug_print_int("to_id_is_eoa", to_id_is_eoa);
   debug_print_int("transfer_only", transfer_only);
-  struct evmc_host_context context {ctx, code_data, code_size, from_id, to_id, 0};
+  evmc_address sender = msg->sender;
+  evmc_address destination = msg->destination;
+  struct evmc_host_context context {ctx, code_data, code_size, from_id, to_id, sender, destination, 0};
   struct evmc_vm* vm = evmc_create_evmone();
   struct evmc_host_interface interface = {account_exists, get_storage,    set_storage,    get_balance,
                                           get_code_size,  get_code_hash,  copy_code,      selfdestruct,
                                           call,           get_tx_context, get_block_hash, emit_log};
   if (!to_id_is_eoa && !transfer_only) {
     /* Execute the code in EVM */
-    int ret;
-    ret = account_id_to_address(ctx, from_id, &msg->sender);
-    if (ret != 0) {
-      return ret;
-    }
-    ret = account_id_to_address(ctx, to_id, &msg->destination);
-    if (ret != 0) {
-      return ret;
-    }
-
     debug_print_int("code size", code_size);
     debug_print_data("msg.input_data", msg->input_data, msg->input_size);
-    *res = vm->execute(vm, &interface, &context, EVMC_MAX_REVISION, msg,
-                       code_data, code_size);
+    *res = vm->execute(vm, &interface, &context, EVMC_MAX_REVISION, msg, code_data, code_size);
     if (context.error_code != 0) {
       debug_print_int("context.error_code", context.error_code);
       return context.error_code;
@@ -953,17 +928,13 @@ int store_contract_code(gw_context_t* ctx,
   polyjuice_build_contract_code_key(to_id, key);
   ckb_debug("BEGIN store data key");
   debug_print_data("data_hash", data_hash, 32);
-  ret = ctx->sys_store(ctx, to_id, key, data_hash);
+  ret = ctx->sys_store(ctx, to_id, key, GW_KEY_BYTES, data_hash);
   if (ret != 0) {
     return ret;
   }
   ckb_debug("BEGIN store data");
   ret = ctx->sys_store_data(ctx, res->output_size, (uint8_t*)res->output_data);
   ckb_debug("END store data");
-  if (ret != 0) {
-    return ret;
-  }
-  ret = account_id_to_address(ctx, to_id, &res->create_address);
   if (ret != 0) {
     return ret;
   }
@@ -978,6 +949,7 @@ int store_contract_code(gw_context_t* ctx,
 int handle_message(gw_context_t* ctx,
                    uint32_t parent_from_id,
                    uint32_t parent_to_id,
+                   evmc_address *parent_destination,
                    const evmc_message* msg_origin, struct evmc_result* res) {
   ckb_debug("BEGIN handle_message");
 
@@ -989,37 +961,54 @@ int handle_message(gw_context_t* ctx,
   bool to_id_is_eoa = false;
   uint32_t to_id;
   uint32_t from_id;
+  // TODO: passing this value from function argument
+  uint8_t from_script_hash[32] = {0};
+  uint8_t to_script_hash[32] = {0};
   if (msg.input_size == 0) {
-    ret = address_to_account_id(ctx, &(msg.destination), &to_id);
-    if (ret != 0) {
-      ckb_debug("EoA address to account id failed");
-      ret = get_contract_account_id(ctx, g_script_code_hash, g_script_hash_type,
-                                    g_rollup_script_hash, g_creator_account_id, msg.destination.bytes,
-                                    &to_id);
+    if (is_create(msg.kind)) {
+      ckb_debug("CREATE/CREATE2 must have input data");
+      return -1;
+    }
+
+    ret = ctx->sys_get_script_hash_by_prefix(ctx, msg.destination.bytes, 20, to_script_hash);
+    if (ret == 0) {
+      ret = ctx->sys_get_account_id_by_script_hash(ctx, to_script_hash, &to_id);
       if (ret != 0) {
-        ckb_debug("contract address to account id failed");
+        debug_print_data("get to account id by script hash failed", to_script_hash, 32);
         return -1;
-      } else {
-        to_id_is_eoa = true;
       }
+    } else {
+      // NOTE: Both to_id and to_script_hash are undefined (can't be used)
+      ckb_debug("to id is EoA");
+      to_id_is_eoa = true;
     }
   } else {
     static const evmc_address zero_address{0};
     if (memcmp(zero_address.bytes, msg.destination.bytes, 20) == 0) {
       to_id = 0;
     } else {
-      ret = get_contract_account_id(ctx, g_script_code_hash, g_script_hash_type,
-                                    g_rollup_script_hash, g_creator_account_id, msg.destination.bytes,
-                                    &to_id);
-      if (ret != 0) {
-        ckb_debug("contract address to account id failed");
+      ret = ctx->sys_get_script_hash_by_prefix(ctx, msg.destination.bytes, 20, to_script_hash);
+      if (ret == 0) {
+        ret = ctx->sys_get_account_id_by_script_hash(ctx, to_script_hash, &to_id);
+        if (ret != 0) {
+          debug_print_data("get to account id by script hash failed", from_script_hash, 32);
+          return -1;
+        }
+      } else {
+        debug_print_data("get destination script hash failed", msg.destination.bytes, 20);
         return -1;
       }
     }
   }
-  ret = address_to_account_id(ctx, &(msg.sender), &from_id);
-  if (ret != 0) {
-    ckb_debug("address to account id failed");
+  ret = ctx->sys_get_script_hash_by_prefix(ctx, msg.sender.bytes, 20, from_script_hash);
+  if (ret == 0) {
+    ret = ctx->sys_get_account_id_by_script_hash(ctx, from_script_hash, &from_id);
+    if (ret != 0) {
+      debug_print_data("get from account id by script hash failed", from_script_hash, 32);
+      return -1;
+    }
+  } else {
+    debug_print_data("get sender script hash failed", msg.sender.bytes, 20);
     return -1;
   }
 
@@ -1032,7 +1021,7 @@ int handle_message(gw_context_t* ctx,
   }
 
   /* Check if target contract is destructed */
-  if (!is_create(msg.kind)) {
+  if (!is_create(msg.kind) && !to_id_is_eoa) {
     ret = check_destructed(ctx, to_id);
     if (ret != 0) {
       return ret;
@@ -1070,13 +1059,17 @@ int handle_message(gw_context_t* ctx,
   if (is_special_call(msg.kind)) {
     /* This action must after load the contract code */
     to_id = parent_to_id;
+    if (parent_destination == NULL) {
+      ckb_debug("parent_destination is NULL");
+      return -1;
+    }
+    memcpy(msg.destination.bytes, parent_destination->bytes, 20);
   }
 
   /* Create new account by script */
-  uint8_t create_address[20] = {0};
   /* NOTE: to_id may be rewritten */
   if (is_create(msg.kind)) {
-    ret = create_new_account(ctx, &msg, from_id, &to_id, code_data, code_size, create_address);
+    ret = create_new_account(ctx, &msg, from_id, &to_id, code_data, code_size);
     if (ret != 0) {
       return ret;
     }
@@ -1084,13 +1077,13 @@ int handle_message(gw_context_t* ctx,
     /* It's a creation polyjuice transaction */
     if (parent_from_id == UINT32_MAX && parent_to_id == UINT32_MAX) {
       g_created_id = to_id;
-      memcpy(g_created_address, create_address, 20);
+      memcpy(g_created_address, msg.destination.bytes, 20);
     }
   }
 
   /* Handle transfer logic.
      NOTE: MUST do this before vm.execute and after to_id finalized */
-  ret = handle_transfer(ctx, &msg, from_id, to_id, g_tx_origin_id, to_id_is_eoa);
+  ret = handle_transfer(ctx, &msg, (uint8_t *)g_tx_origin.bytes, to_id_is_eoa);
   if (ret != 0) {
     return ret;
   }
@@ -1111,7 +1104,7 @@ int handle_message(gw_context_t* ctx,
 
   /* Rewrite create_address when call kind is CREATE/CREATE2 */
   if (is_create(msg.kind)) {
-    memcpy(res->create_address.bytes, create_address, 20);
+    memcpy(res->create_address.bytes, msg.destination.bytes, 20);
   }
 
   debug_print_data("output data", res->output_data, res->output_size);
@@ -1183,23 +1176,16 @@ int run_polyjuice() {
 
   /* Fill msg.destination after load globals */
   if (msg.kind != EVMC_CREATE) {
-    uint8_t buffer[GW_MAX_SCRIPT_SIZE];
-    mol_seg_t script_seg;
-    ret = load_account_script(&context, context.transaction_context.to_id, buffer, GW_MAX_SCRIPT_SIZE, &script_seg);
+    uint8_t script_hash[32] = {0};
+    ret = context.sys_get_script_hash_by_account_id(&context,context.transaction_context.to_id, script_hash);
     if (ret != 0) {
       return ret;
     }
-    mol_seg_t args_seg = MolReader_Script_get_args(&script_seg);
-    mol_seg_t raw_args_seg = MolReader_Bytes_raw_bytes(&args_seg);
-    if (raw_args_seg.size != CONTRACT_ACCOUNT_SCRIPT_ARGS_SIZE) {
-      debug_print_data("invalid to account script args", raw_args_seg.ptr, raw_args_seg.size);
-      return -1;
-    }
-    memcpy(msg.destination.bytes, raw_args_seg.ptr + 36, 20);
+    memcpy(msg.destination.bytes, script_hash, 20);
   }
 
   struct evmc_result res;
-  int ret_handle_message = handle_message(&context, UINT32_MAX, UINT32_MAX, &msg, &res);
+  int ret_handle_message = handle_message(&context, UINT32_MAX, UINT32_MAX, NULL, &msg, &res);
   uint64_t gas_used = (uint64_t)(msg.gas - res.gas_left);
   ret = emit_evm_result_log(&context, gas_used, res.status_code);
   if (ret != 0) {
@@ -1232,7 +1218,7 @@ int run_polyjuice() {
   debug_print_int("gas left", res.gas_left);
   debug_print_int("gas price", gas_price);
   debug_print_int("fee", fee);
-  ret = sudt_pay_fee(&context, g_sudt_id, context.transaction_context.from_id, fee);
+  ret = sudt_pay_fee(&context, g_sudt_id, POLYJUICE_SHORT_ADDR_LEN, msg.sender.bytes, fee);
   if (ret != 0) {
     debug_print_int("pay fee to block_producer failed", ret);
     return ret;

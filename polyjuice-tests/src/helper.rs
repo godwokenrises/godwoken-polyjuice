@@ -7,7 +7,7 @@ pub use gw_common::{
 use gw_config::BackendConfig;
 use gw_db::schema::{COLUMN_INDEX, COLUMN_META, META_TIP_BLOCK_HASH_KEY};
 pub use gw_generator::{
-    account_lock_manage::{always_success::AlwaysSuccess, AccountLockManage},
+    account_lock_manage::{always_success::AlwaysSuccess, secp256k1::Secp256k1, AccountLockManage},
     backend_manage::{Backend, BackendManage},
     dummy_state::DummyState,
     traits::StateExt,
@@ -47,6 +47,7 @@ pub const VALIDATOR_NAME: &str = "validator_log";
 
 pub const ROLLUP_SCRIPT_HASH: [u8; 32] = [0xa9u8; 32];
 pub const ETH_ACCOUNT_LOCK_CODE_HASH: [u8; 32] = [0xaau8; 32];
+pub const SECP_LOCK_CODE_HASH: [u8; 32] = [0xbbu8; 32];
 
 pub const GW_LOG_SUDT_TRANSFER: u8 = 0x0;
 pub const GW_LOG_SUDT_PAY_FEE: u8 = 0x1;
@@ -92,14 +93,14 @@ lazy_static::lazy_static! {
 pub enum Log {
     SudtTransfer {
         sudt_id: u32,
-        from_id: u32,
-        to_id: u32,
+        from_addr: [u8; 20],
+        to_addr: [u8; 20],
         amount: u128,
     },
     SudtPayFee {
         sudt_id: u32,
-        from_id: u32,
-        block_producer_id: u32,
+        from_addr: [u8; 20],
+        block_producer_addr: [u8; 20],
         amount: u128,
     },
     PolyjuiceSystem {
@@ -115,18 +116,17 @@ pub enum Log {
     },
 }
 
-fn parse_sudt_log_data(data: &[u8]) -> (u32, u32, u128) {
-    let mut u32_bytes = [0u8; 4];
-    u32_bytes.copy_from_slice(&data[0..4]);
-    let from_id = u32::from_le_bytes(u32_bytes);
-
-    u32_bytes.copy_from_slice(&data[4..8]);
-    let to_id = u32::from_le_bytes(u32_bytes);
+fn parse_sudt_log_data(data: &[u8]) -> ([u8; 20], [u8; 20], u128) {
+    assert_eq!(data[0], 20);
+    let mut from_addr = [0u8; 20];
+    from_addr.copy_from_slice(&data[1..21]);
+    let mut to_addr = [0u8; 20];
+    to_addr.copy_from_slice(&data[21..41]);
 
     let mut u128_bytes = [0u8; 16];
-    u128_bytes.copy_from_slice(&data[8..24]);
+    u128_bytes.copy_from_slice(&data[41..41 + 16]);
     let amount = u128::from_le_bytes(u128_bytes);
-    (from_id, to_id, amount)
+    (from_addr, to_addr, amount)
 }
 
 pub fn parse_log(item: &LogItem) -> Log {
@@ -136,27 +136,27 @@ pub fn parse_log(item: &LogItem) -> Log {
     match service_flag {
         GW_LOG_SUDT_TRANSFER => {
             let sudt_id: u32 = item.account_id().unpack();
-            if data.len() != (4 + 4 + 16) {
+            if data.len() != (1 + 20 + 20 + 16) {
                 panic!("Invalid data length: {}", data.len());
             }
-            let (from_id, to_id, amount) = parse_sudt_log_data(data);
+            let (from_addr, to_addr, amount) = parse_sudt_log_data(data);
             Log::SudtTransfer {
                 sudt_id,
-                from_id,
-                to_id,
+                from_addr,
+                to_addr,
                 amount,
             }
         }
         GW_LOG_SUDT_PAY_FEE => {
             let sudt_id: u32 = item.account_id().unpack();
-            if data.len() != (4 + 4 + 16) {
+            if data.len() != (1 + 20 + 20 + 16) {
                 panic!("Invalid data length: {}", data.len());
             }
-            let (from_id, block_producer_id, amount) = parse_sudt_log_data(data);
+            let (from_addr, block_producer_addr, amount) = parse_sudt_log_data(data);
             Log::SudtPayFee {
                 sudt_id,
-                from_id,
-                block_producer_id,
+                from_addr,
+                block_producer_addr,
                 amount,
             }
         }
@@ -240,8 +240,7 @@ pub fn account_id_to_eth_address(state: &DummyState, id: u32, ethabi: bool) -> V
     let offset = if ethabi { 12 } else { 0 };
     let mut data = vec![0u8; offset + 20];
     let account_script_hash = state.get_script_hash(id).unwrap();
-    data[offset..offset + 16].copy_from_slice(&account_script_hash.as_slice()[0..16]);
-    data[offset + 16..offset + 20].copy_from_slice(&id.to_le_bytes()[..]);
+    data[offset..offset + 20].copy_from_slice(&account_script_hash.as_slice()[0..20]);
     data
 }
 
@@ -254,20 +253,18 @@ pub fn eth_address_to_account_id(state: &DummyState, data: &[u8]) -> Result<u32,
         // Zero address is special case
         return Ok(0);
     }
-    let mut id_data = [0u8; 4];
-    id_data.copy_from_slice(&data[16..20]);
-    let account_id = u32::from_le_bytes(id_data);
     let account_script_hash = state
-        .get_script_hash(account_id)
-        .map_err(|err| err.to_string())?;
-    if data[0..16] != account_script_hash.as_slice()[0..16] {
-        return Err(format!(
-            "eth address first 16 bytes not match account script hash: expected={:?}, got={:?}",
-            &account_script_hash.as_slice()[0..16],
-            &data[0..16],
-        ));
-    }
-    Ok(account_id)
+        .get_script_hash_by_prefix(data)
+        .ok_or_else(|| format!("can not get script hash by prefix: {:?}", data))?;
+    state
+        .get_account_id_by_script_hash(&account_script_hash)
+        .map_err(|err| err.to_string())?
+        .ok_or_else(|| {
+            format!(
+                "can not get account id by script hash: {:?}",
+                account_script_hash
+            )
+        })
 }
 
 pub fn new_account_script_with_nonce(
@@ -310,7 +307,7 @@ pub fn new_account_script(
 pub fn contract_script_to_eth_address(script: &Script, ethabi: bool) -> Vec<u8> {
     let offset = if ethabi { 12 } else { 0 };
     let mut data = vec![0u8; offset + 20];
-    data[offset..].copy_from_slice(&script.args().raw_data().as_ref()[36..36 + 20]);
+    data[offset..].copy_from_slice(&script.hash()[0..20]);
     data
 }
 
@@ -424,7 +421,8 @@ pub fn setup() -> (Store, DummyState, Generator, u32) {
         validator_script_type_hash: PROGRAM_CODE_HASH.clone().into(),
     });
     let mut account_lock_manage = AccountLockManage::default();
-    account_lock_manage.register_lock_algorithm(H256::zero(), Box::new(AlwaysSuccess::default()));
+    account_lock_manage
+        .register_lock_algorithm(SECP_LOCK_CODE_HASH.into(), Box::new(Secp256k1::default()));
     let rollup_config = RollupConfig::new_builder()
         .l2_sudt_validator_script_type_hash(SUDT_VALIDATOR_SCRIPT_TYPE_HASH.pack())
         .allowed_contract_type_hashes(
@@ -472,9 +470,10 @@ pub fn deploy(
     init_code: &str,
     gas_limit: u64,
     value: u128,
+    block_producer_id: u32,
     block_number: u64,
 ) -> RunResult {
-    let block_info = new_block_info(0, block_number, block_number);
+    let block_info = new_block_info(block_producer_id, block_number, block_number);
     let input = hex::decode(init_code).unwrap();
     let args = PolyjuiceArgsBuilder::default()
         .do_create(true)

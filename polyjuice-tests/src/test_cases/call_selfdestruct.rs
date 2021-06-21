@@ -17,21 +17,29 @@ const INIT_CODE: &str = include_str!("./evm-contracts/CallSelfDestruct.bin");
 #[test]
 fn test_selfdestruct() {
     let (store, mut state, generator, creator_account_id) = setup();
+    let block_producer_script = build_eth_l2_script([0x99u8; 20]);
+    let block_producer_id = state
+        .create_account_from_script(block_producer_script)
+        .unwrap();
 
     let from_script = build_eth_l2_script([1u8; 20]);
+    let from_script_hash = from_script.hash();
+    let from_short_address = &from_script_hash[0..20];
     let from_id = state.create_account_from_script(from_script).unwrap();
     state
-        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, 400000)
+        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_short_address, 400000)
         .unwrap();
     let mut block_number = 1;
 
     let beneficiary_script = build_eth_l2_script([2u8; 20]);
+    let beneficiary_script_hash = beneficiary_script.hash();
+    let beneficiary_short_address = &beneficiary_script_hash[0..20];
     let beneficiary_id = state
         .create_account_from_script(beneficiary_script)
         .unwrap();
     assert_eq!(
         state
-            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, beneficiary_id)
+            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, beneficiary_short_address)
             .unwrap(),
         0
     );
@@ -50,23 +58,26 @@ fn test_selfdestruct() {
         input.as_str(),
         122000,
         200,
+        block_producer_id,
         block_number,
     );
     block_number += 1;
     let sd_account_script = new_account_script_with_nonce(&state, creator_account_id, from_id, 0);
+    let sd_script_hash = sd_account_script.hash();
+    let sd_short_address = &sd_script_hash[0..20];
     let sd_account_id = state
         .get_account_id_by_script_hash(&sd_account_script.hash().into())
         .unwrap()
         .unwrap();
     assert_eq!(
         state
-            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, sd_account_id)
+            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, sd_short_address)
             .unwrap(),
         200
     );
     assert_eq!(
         state
-            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, beneficiary_id)
+            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, beneficiary_short_address)
             .unwrap(),
         0
     );
@@ -80,6 +91,7 @@ fn test_selfdestruct() {
         INIT_CODE,
         122000,
         0,
+        block_producer_id,
         block_number,
     );
     block_number += 1;
@@ -130,13 +142,13 @@ fn test_selfdestruct() {
     assert_eq!(state.get_nonce(new_account_id).unwrap(), 0);
     assert_eq!(
         state
-            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, sd_account_id)
+            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, sd_short_address)
             .unwrap(),
         0
     );
     assert_eq!(
         state
-            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, beneficiary_id)
+            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, beneficiary_short_address)
             .unwrap(),
         200
     );

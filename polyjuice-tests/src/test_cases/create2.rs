@@ -17,11 +17,17 @@ const INIT_CODE: &str = include_str!("./evm-contracts/Create2Impl.bin");
 #[test]
 fn test_create2() {
     let (store, mut state, generator, creator_account_id) = setup();
+    let block_producer_script = build_eth_l2_script([0x99u8; 20]);
+    let block_producer_id = state
+        .create_account_from_script(block_producer_script)
+        .unwrap();
 
     let from_script = build_eth_l2_script([1u8; 20]);
+    let from_script_hash = from_script.hash();
+    let from_short_address = &from_script_hash[0..20];
     let from_id = state.create_account_from_script(from_script).unwrap();
     state
-        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_id, 2000000)
+        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_short_address, 2000000)
         .unwrap();
     let mut block_number = 1;
 
@@ -35,6 +41,7 @@ fn test_create2() {
         INIT_CODE,
         122000,
         0,
+        block_producer_id,
         block_number,
     );
     block_number += 1;
@@ -44,13 +51,15 @@ fn test_create2() {
     // );
     let contract_account_script =
         new_account_script(&mut state, creator_account_id, from_id, false);
+    let new_script_hash = contract_account_script.hash();
+    let new_short_address = &new_script_hash[0..20];
     let new_account_id = state
         .get_account_id_by_script_hash(&contract_account_script.hash().into())
         .unwrap()
         .unwrap();
 
     let new_account_balance = state
-        .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, new_account_id)
+        .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, new_short_address)
         .unwrap();
     assert_eq!(new_account_balance, 0);
 
@@ -101,18 +110,17 @@ fn test_create2() {
         &hex::decode(input_salt).unwrap()[..],
         &hex::decode(SS_INIT_CODE).unwrap()[..],
     );
+    let create2_script_hash = create2_script.hash();
+    let create2_short_address = &create2_script_hash[0..20];
     println!("create2_address: {}", hex::encode(&run_result.return_data));
-    assert_eq!(
-        &run_result.return_data[12..32],
-        &create2_script.args().raw_data().as_ref()[36..36 + 20]
-    );
+    assert_eq!(&run_result.return_data[12..32], create2_short_address,);
     let create2_account_id = state
         .get_account_id_by_script_hash(&create2_script.hash().into())
         .unwrap()
         .unwrap();
 
     let create2_account_balance = state
-        .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, create2_account_id)
+        .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, create2_short_address)
         .unwrap();
     assert_eq!(create2_account_balance, input_value_u128);
 
