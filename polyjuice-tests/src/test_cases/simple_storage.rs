@@ -144,4 +144,35 @@ fn test_simple_storage() {
         assert_eq!(run_result.return_data, expected_return_data);
         // println!("result {:?}", run_result);
     }
+
+    {
+        // SimpleStorage.get();
+        let block_info = new_block_info(0, 3, 0);
+        let input = hex::decode("6d4ce63c").unwrap();
+        let args = PolyjuiceArgsBuilder::default()
+            .gas_limit(21000)
+            .gas_price(0)
+            .value(0)
+            .input(&input)
+            .build();
+        let raw_tx = RawL2Transaction::new_builder()
+            .from_id(from_id.pack())
+            .to_id(new_account_id.pack())
+            .args(Bytes::from(args).pack())
+            .build();
+        let db = store.begin_transaction();
+        let tip_block_hash = store.get_tip_block_hash().unwrap();
+        let run_result = generator
+            .execute_transaction(
+                &ChainView::new(&db, tip_block_hash),
+                &state,
+                &block_info,
+                &raw_tx,
+            )
+            .expect("construct");
+        let mut expected_return_data = vec![0u8; 32];
+        expected_return_data[30] = 0x0d;
+        expected_return_data[31] = 0x10;
+        assert_eq!(run_result.return_data, expected_return_data);
+    }
 }
