@@ -32,60 +32,69 @@ int test_contract(const uint8_t n,
                   const uint64_t expected_gas,
                   const char *success_message) {
   debug_print_int("pre-compiled contract address", n);
-  int ret;
+
+  int ret = 0;
+  uint8_t *input_src = NULL;
+  size_t input_size = 0;
+  uint8_t *output = NULL;
+  size_t output_size = 0;
+  uint8_t *expected_output = NULL;
+  size_t expected_output_size = 0;
+
   evmc_address addr = build_pre_compiled_contract_address(n);
   precompiled_contract_gas_fn contract_gas = NULL;
   precompiled_contract_fn contract = NULL;
   if (!match_precompiled_address(&addr, &contract_gas, &contract)) {
     return -1;
   }
-  uint8_t *input_src = NULL;
-  size_t input_size = 0;
   hex2bin(input_hex, &input_src, &input_size);
 
   uint64_t gas = 0;
   if (contract_gas(input_src, input_size, &gas) != 0) {
     ckb_debug("calculate gas failed");
-    return -1;
+    ret = -1;
+    goto test_contract_cleanup;
   }
 
   gw_context_t ctx;
   ctx.sys_load_data = sys_load_data;
-  uint8_t *output = NULL;
-  size_t output_size = 0;
   ret = contract(&ctx, NULL, 0, true, input_src, input_size, &output, &output_size);
   if (ret != 0) {
     debug_print_int("run contract failed", ret);
-    return ret;
+    goto test_contract_cleanup;
   }
   ckb_debug("run contract success");
 
   if (gas != expected_gas) {
     ckb_debug("gas not matched");
     debug_print_int("got gas", gas);
-    return -1;
+    ret = -1;
+    goto test_contract_cleanup;
   }
   ckb_debug("gas matched");
 
-  uint8_t *expected_output = NULL;
-  size_t expected_output_size = 0;
   hex2bin(expected_output_hex, &expected_output, &expected_output_size);
   if (expected_output_size != output_size) {
     debug_print_int("expected output size", expected_output_size);
     debug_print_int("returned output size", output_size);
-    return -1;
+    ret = -1;
+    goto test_contract_cleanup;
   }
   if (memcmp(expected_output, output, output_size) != 0) {
     debug_print_data("expected output", expected_output, output_size);
     debug_print_data("returned output", output, output_size);
-    return -1;
+    ret = -1;
+    goto test_contract_cleanup;
   }
+  
+  ckb_debug(success_message);
+  ckb_debug("===============================================");
+
+ test_contract_cleanup:
   free(input_src);
   free(expected_output);
   free(output);
-  ckb_debug(success_message);
-  ckb_debug("===============================================");
-  return 0;
+  return ret;
 }
 
 int test_ecrecover() {
