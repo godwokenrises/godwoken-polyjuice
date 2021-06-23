@@ -65,6 +65,9 @@ int ecrecover_required_gas(const uint8_t* input, const size_t input_size,
 }
 
 /*
+ * ecrecover() is a useful Solidity function.
+ * It allows the smart contract to validate that incoming data is properly signed.
+
   The input data: (hash, v, r, s), each 32 bytes
   ===============
     input[0 ..32]  => hash
@@ -73,7 +76,7 @@ int ecrecover_required_gas(const uint8_t* input, const size_t input_size,
     input[64..128] => signature[0..64]
          [64..96 ] => r
          [96..128] => s
-*/
+ */
 int ecrecover(gw_context_t* ctx,
               const uint8_t* code_data,
               const size_t code_size,
@@ -291,7 +294,7 @@ uint128_t modexp_mult_complexity(uint128_t x) {
   }
 }
 
-/* eip2565: false */
+/* EIP-2565: Big integer modular exponentiation: false */
 int big_mod_exp_required_gas(const uint8_t* input, const size_t input_size,
                              uint64_t* target_gas) {
   int ret;
@@ -405,7 +408,7 @@ int big_mod_exp_required_gas(const uint8_t* input, const size_t input_size,
   return return_value;
 }
 
-/* eip2565: false */
+/* EIP-2565: Big integer modular exponentiation: false */
 int big_mod_exp(gw_context_t* ctx,
                 const uint8_t* code_data,
                 const size_t code_size,
@@ -700,6 +703,7 @@ void f_generic(uint64_t h[8], uint64_t m[16], uint64_t c0, uint64_t c1,
   h[7] ^= v7 ^ v15;
 }
 
+/* https://eips.ethereum.org/EIPS/eip-152 */
 int blake2f(gw_context_t* ctx,
             const uint8_t* code_data,
             const size_t code_size,
