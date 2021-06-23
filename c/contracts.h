@@ -401,6 +401,7 @@ int big_mod_exp_required_gas(const uint8_t* input, const size_t input_size,
   mbedtls_mpi_free(&exp_head);
   mbedtls_mpi_free(&adj_exp_len);
   mbedtls_mpi_free(&gas_big);
+  free(content);
   return return_value;
 }
 
@@ -507,6 +508,7 @@ int big_mod_exp(gw_context_t* ctx,
   mbedtls_mpi_free(&mod);
   mbedtls_mpi_free(&result);
 
+  free(content);
   return return_value;
 }
 
