@@ -31,8 +31,8 @@ CFLAGS_MBEDTLS := -I$(DEPS)/mbedtls/include
 CFLAGS_CRYPTO_ALGORITHMS := -I$(DEPS)/crypto-algorithms
 CFLAGS_INTX := -I$(DEPS)/intx/lib/intx -I$(DEPS)/intx/include
 CFLAGS_BN128 := -I$(DEPS)/bn128/include
-# FIXME: ckb-c-stdlib simulator -I ../../c
-CFLAGS := -O2 -I../../c/ripemd160 $(CFLAGS_CKB_STD) $(CFLAGS_ETHASH) $(CFLAGS_EVMONE) $(CFLAGS_GODWOKEN) $(CFLAGS_SECP) $(CFLAGS_MBEDTLS) $(CFLAGS_CRYPTO_ALGORITHMS) $(CFLAGS_INTX) $(CFLAGS_BN128)
+# FIXME: ckb-c-stdlib simulator ;;;; -Wall -g -fdata-sections -ffunction-sections
+CFLAGS := -Wall -O2 -I../../c -I../../c/ripemd160 $(CFLAGS_CKB_STD) $(CFLAGS_ETHASH) $(CFLAGS_EVMONE) $(CFLAGS_GODWOKEN) $(CFLAGS_SECP) $(CFLAGS_MBEDTLS) $(CFLAGS_CRYPTO_ALGORITHMS) $(CFLAGS_INTX) $(CFLAGS_BN128)
 CXXFLAGS := $(CFLAGS) -std=c++1z
 LDFLAGS := -Wl,--gc-sections
 SANITIZER_FLAGS := -g -O1 -fsanitize=address,undefined -Wno-incompatible-pointer-types
@@ -49,7 +49,6 @@ PROTOCOL_SCHEMA_URL := https://raw.githubusercontent.com/nervosnetwork/godwoken/
 ALL_OBJS := $(BUILD)/keccak.o $(BUILD)/keccakf800.o \
   $(BUILD)/evmone.o $(BUILD)/baseline.o $(BUILD)/analysis.o $(BUILD)/instruction_metrics.o $(BUILD)/instruction_names.o $(BUILD)/execution.o $(BUILD)/instructions.o $(BUILD)/instructions_calls.o \
   $(BUILD)/sha256.o $(BUILD)/memzero.o $(BUILD)/ripemd160.o $(BUILD)/bignum.o $(BUILD)/platform_util.o
-# FIXME: ckb_syscalls.c
 BIN_DEPS := ../../c/contracts.h ../../c/sudt_contracts.h ../../c/polyjuice.h ../../c/polyjuice_utils.h $(BUILD)/secp256k1_data_info.h $(ALL_OBJS)
 # FIXME:
 GENERATOR_DEPS := ../../c/generator/secp256k1_helper.h $(BIN_DEPS)
@@ -65,7 +64,8 @@ endif
 
 EXTERNAL_HEADERS := $(DEPS)/ckb-c-stdlib-simulator-only/ckb_consts.h
 
-all: fuzzer coverage
+#TODO: coverage
+all: fuzzer
 
 build/generator: ../../c/generator.c $(GENERATOR_DEPS)
 	cd $(SECP_DIR) && (git apply workaround-fix-g++-linking.patch || true) && cd - # apply patch
@@ -100,12 +100,10 @@ build/validator_log: ../../c/validator.c $(VALIDATOR_DEPS)
 # 	$(OBJCOPY) --strip-debug --strip-all $@
 # 	cd $(SECP_DIR) && (git apply -R workaround-fix-g++-linking.patch || true) && cd - # revert patch
 
-# -include ../../c/polyjuice.h
-# TODO: ALL_OBJS
+# TODO: ALL_OBJS or -include ../../c/polyjuice.h
 polyjuice_generator_fuzzer: build/generator_log
 	$(CXX) -fsanitize=fuzzer $(SANITIZER_FLAGS) $(CFLAGS) $(LDFLAGS) -Ibuild -include ../../c/polyjuice.h -o $@ polyjuice_generator_fuzzer.c build/ckb_syscalls_simulator.o
 
-# TODO: test_contracts 
 build/test_contracts: ../../c/tests/test_contracts.c $(VALIDATOR_DEPS)
 	cd $(SECP_DIR) && (git apply workaround-fix-g++-linking.patch || true) && cd - # apply patch
 	${CXX} $(CFLAGS) $(LDFLAGS) $(SANITIZER_FLAGS) -Ibuild -o $@ ../../c/tests/test_contracts.c $(ALL_OBJS)

@@ -14,7 +14,7 @@ int ckb_debug(const char* s) {
 }
 
 int ckb_exit(int8_t code) {
-  printf("ckb_exit\n");
+  printf("ckb_exit, code=%d\n", code);
   exit(0);
   return CKB_SUCCESS;
 }
@@ -105,5 +105,8 @@ static int inline __internal_syscall(long n, long _a0, long _a1, long _a2,
     return CKB_INVALID_DATA;
   }
 }
+#endif
 
+#ifdef GW_GENERATOR
+#include "mock_generator_utils.h"
 #endif

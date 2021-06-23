@@ -54,3 +54,7 @@ dkms.conf
 build/
 target/
 integration-test/
+
+/.vscode/launch.json
+/.vscode/settings.json
+/.vscode/*.log
