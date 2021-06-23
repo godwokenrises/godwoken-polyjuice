@@ -14,7 +14,6 @@
 
 #include "ckb_syscalls.h"
 #include "common.h"
-// #include "polyjuice_utils.h"
 
 #include "secp256k1_data_info.h"
 
@@ -188,6 +187,7 @@ int sys_load_data(gw_context_t *ctx, uint8_t data_hash[32], uint64_t *len,
   return ret;
 }
 
+//TODO: mock syscall
 int _sys_load_l2transaction(void *addr, uint64_t *len) {
   volatile uint64_t inner_len = *len;
   int ret = syscall(GW_SYS_LOAD_TRANSACTION, addr, &inner_len, 0, 0, 0, 0);
@@ -285,7 +285,7 @@ int gw_context_init(gw_context_t *ctx) {
   uint8_t tx_buf[GW_MAX_L2TX_SIZE] = {0};
   uint64_t len = GW_MAX_L2TX_SIZE;
   int ret = _sys_load_l2transaction(tx_buf, &len);
-  printf("ret of _sys_load_l2transaction: %d\n", ret);
+  dbg_print("ret of _sys_load_l2transaction: %d", ret);
   if (ret != 0) {
     return ret;
   }

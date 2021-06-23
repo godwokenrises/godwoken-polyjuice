@@ -8,10 +8,26 @@
 
 #include "ckb_consts.h"
 
-int ckb_debug(const char* s) {
-  printf("[debug] %s\n", s);
+int ckb_debug(const char* str) {
+  printf("[debug] %s\n", str);
   return 0;
 }
+
+static char debug_buf[64 * 1024];
+void dbg_print(const char* fmt, ...) {
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(debug_buf, sizeof(debug_buf), fmt, args);
+    va_end(args);
+    ckb_debug(debug_buf);
+}
+
+#ifdef NO_DEBUG_LOG
+#undef ckb_debug
+#undef debug_print
+#define ckb_debug(s) do {} while (0)
+#define debug_print(...) do {} while (0)
+#endif
 
 int ckb_exit(int8_t code) {
   printf("ckb_exit, code=%d\n", code);
