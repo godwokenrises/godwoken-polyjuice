@@ -8,6 +8,9 @@
 
 #include "ckb_consts.h"
 
+size_t s_INPUT_SIZE = 0;
+uint8_t* s_INPUT_DATA = NULL;
+
 int ckb_debug(const char* str) {
   printf("[debug] %s\n", str);
   return 0;
@@ -101,24 +104,23 @@ int ckb_checked_load_script(void* addr, uint64_t* len, size_t offset);
 
 static int inline __internal_syscall(long n, long _a0, long _a1, long _a2,
                                      long _a3, long _a4, long _a5) {
-  if (n == 4051) { // GW_SYS_LOAD_TRANSACTION = 4051
-    ckb_debug("GW_SYS_LOAD_TRANSACTION");
-    // if ((content_size <= memory_size) &&
-    //     (content_offset + content_size < s_INPUT_SIZE) &&
-    //     (content_offset <= content_offset + content_size)) {
-    //   memcpy(addr, s_INPUT_DATA + content_offset, content_size);
-    // }
-    // FIXME:
-    // *_a1 = (uint64_t)0;
-    // (uint64_t)*_a1 = 0;
-    return CKB_SUCCESS;
-  } else if (n == SYS_ckb_load_cell_data_as_code) {
-    ckb_debug("TODO: SYS_ckb_load_cell_data_as_code");
-    return CKB_INVALID_DATA;
-    // return ckb_load_cell_data_as_code((void*)_a0, (size_t)_a1, (size_t)_a2,
-    //                                   (size_t)_a3, (size_t)_a4, (size_t)_a5);
-  } else {
-    return CKB_INVALID_DATA;
+  const uint8_t account_2_key[] = {2, 0, 0, 0, 255, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  const uint8_t account_3_key[] = {3, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  const uint8_t account_4_key[] = {4, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+
+  switch (n) {
+    case 3102: // GW_SYS_LOAD = 3102
+      dbg_print("Mock __internal_syscall(GW_SYS_LOAD)");
+      if (0 == memcmp(account_2_key, (uint8_t*)_a0, sizeof(account_2_key))
+       || 0 == memcmp(account_3_key, (uint8_t*)_a0, sizeof(account_3_key))
+       || 0 == memcmp(account_4_key, (uint8_t*)_a0, sizeof(account_3_key))
+      ) {
+        memset((uint8_t*)_a1, 0, 32);
+        return CKB_SUCCESS;
+      }
+      return CKB_INVALID_DATA;
+    default:
+      return CKB_INVALID_DATA;
   }
 }
 #endif

@@ -6,6 +6,10 @@
 
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
 {
+  // s_INPUT_SIZE = size;
+  // dbg_print("s_INPUT_SIZE = %d", s_INPUT_SIZE);
+
+
   //TODO: test a simplest contract
 
   /* Layer 2 contract generator
@@ -18,10 +22,14 @@ extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size)
      * and should be able to use the states to construct a transaction that satifies
      * the validator.
      */
-  run_polyjuice();
-  ckb_debug("===============================================");
-
-  if (size >= 0)
+  if (run_polyjuice() != 0) {
+    // TODO: error log
+    dbg_print("run_polyjuice failed, input: ...");
     __builtin_trap();
-  return 0;
+  }
+  ckb_debug("=========================== run polyjuice finished ===========================");
+
+  // if (size >= 0)
+  //   __builtin_trap();
+  // return 0;
 }
