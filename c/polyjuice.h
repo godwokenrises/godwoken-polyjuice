@@ -1200,6 +1200,11 @@ int run_polyjuice() {
     debug_print_int("pay fee to block_producer failed", ret);
     return ret;
   }
+  ret = sys_pay_fee(&context, msg.sender.bytes, POLYJUICE_SHORT_ADDR_LEN, g_sudt_id, fee);
+  if (ret != 0) {
+    debug_print_int("Record fee payment failed", ret);
+    return ret;
+  }
 
   ret = gw_finalize(&context);
   if (ret != 0) {
