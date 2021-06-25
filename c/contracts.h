@@ -723,14 +723,14 @@ int blake2f(gw_context_t* ctx,
   uint64_t t[2];
   for (size_t i = 0; i < 8; i++) {
     size_t offset = 4 + i * 8;
-    h[i] = *(uint64_t*)(input_src + offset);
+    memcpy(&h[i], input_src + offset, sizeof(uint64_t));
   }
   for (size_t i = 0; i < 16; i++) {
     size_t offset = 68 + i * 8;
-    m[i] = *(uint64_t*)(input_src + offset);
+    memcpy(&m[i], input_src + offset, sizeof(uint64_t));
   }
-  t[0] = *(uint64_t*)(input_src + 196);
-  t[1] = *(uint64_t*)(input_src + 204);
+  memcpy(&t[0], input_src + 196, sizeof(uint64_t));
+  memcpy(&t[1], input_src + 204, sizeof(uint64_t));
 
   uint64_t flag = final ? 0xFFFFFFFFFFFFFFFF : 0;
   /* TODO: maybe improve performance */
