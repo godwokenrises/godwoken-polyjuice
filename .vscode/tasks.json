@@ -1,4 +1,4 @@
-`{
+{
   // See https://go.microsoft.com/fwlink/?LinkId=733558
   // for the documentation about the tasks.json format
   "version": "2.0.0",
@@ -6,26 +6,25 @@
     {
       "label": "build polyjuice_generator_fuzzer",
       "type": "shell",
-      "command": "mv build/polyjuice_generator_fuzzer ./ & make build/polyjuice_generator_fuzzer",
+      "command": "mv build/polyjuice_generator_fuzzer ./ & make build/polyjuice_generator_fuzzer && ./build/polyjuice_generator_fuzzer",
       "options": {
         "cwd": "${cwd}/polyjuice-tests/fuzz"
       },
       "group": {
         "kind": "build",
         "isDefault": true
-      }
+      },
+      "problemMatcher": []
     },
     {
       "label": "build test_contracts",
       "type": "shell",
-      "command": "mv build/test_contracts ./ & make -C ./ build/test_contracts",
+      "command": "mv build/test_contracts ./ & make -C ./ build/test_contracts && ./build/test_contracts",
       "options": {
         "cwd": "${cwd}/polyjuice-tests/fuzz"
       },
-      "group": {
-        "kind": "build",
-      }
+      "group": "build",
+      "problemMatcher": []
     }
   ]
 }
-`
