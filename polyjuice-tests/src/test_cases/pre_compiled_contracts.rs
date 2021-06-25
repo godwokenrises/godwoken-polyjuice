@@ -12,6 +12,7 @@ use std::collections::HashMap;
 
 const BINARY: &[u8] = include_bytes!("../../../build/test_contracts");
 const SUCCESS: u8 = 0;
+const SYS_LOAD_DATA: u64 = 3302;
 const DEBUG_PRINT_SYSCALL_NUMBER: u64 = 2177;
 
 pub struct L2Syscalls {
@@ -41,7 +42,7 @@ impl<Mac: SupportMachine> Syscalls<Mac> for L2Syscalls {
             println!("code: {}", code);
         }
         match code {
-            4057 => {
+            SYS_LOAD_DATA => {
                 let data_hash_addr = machine.registers()[A3].to_u64();
                 let data_hash = load_data_h256(machine, data_hash_addr)?;
                 println!("data_hash: {:?}", data_hash);
