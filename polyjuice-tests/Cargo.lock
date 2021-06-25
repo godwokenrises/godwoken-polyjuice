@@ -631,6 +631,7 @@ dependencies = [
  "gw-store",
  "gw-traits",
  "gw-types",
+ "hex",
  "lazy_static",
  "log",
  "rlp",

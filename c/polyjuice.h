@@ -58,22 +58,17 @@ void polyjuice_build_destructed_key(uint32_t id, uint8_t key[GW_KEY_BYTES]) {
 }
 
 int gw_increase_nonce(gw_context_t *ctx, uint32_t account_id, uint32_t *new_nonce) {
-  uint8_t old_nonce_value[GW_VALUE_BYTES];
-  int ret = ctx->sys_load_nonce(ctx, account_id, old_nonce_value);
+  uint32_t old_nonce;
+  int ret = ctx->sys_get_account_nonce(ctx, account_id, &old_nonce);
   if (ret != 0) {
     return ret;
   }
-  for (size_t i = 4; i < GW_VALUE_BYTES; i++) {
-    if(old_nonce_value[i] != 0){
-      return GW_ERROR_INVALID_DATA;
-    }
-  }
-  uint32_t next_nonce = *((uint32_t *)old_nonce_value) + 1;
+  uint32_t next_nonce = old_nonce + 1;
 
   uint8_t nonce_key[GW_KEY_BYTES];
   uint8_t nonce_value[GW_VALUE_BYTES];
   memset(nonce_value, 0, GW_VALUE_BYTES);
-  gw_build_nonce_key(account_id, nonce_key);
+  gw_build_account_field_key(account_id, GW_ACCOUNT_NONCE, nonce_key);
   memcpy(nonce_value, (uint8_t *)(&next_nonce), 4);
 #ifdef GW_GENERATOR
   ret = syscall(GW_SYS_STORE, nonce_key, nonce_value, 0, 0, 0, 0);
@@ -769,15 +764,15 @@ int create_new_account(gw_context_t* ctx,
 
        Above data will be RLP encoded.
     */
-    uint8_t nonce_value[32] = {0};
-    ret = ctx->sys_load_nonce(ctx, from_id, nonce_value);
+    uint32_t nonce;
+    ret = ctx->sys_get_account_nonce(ctx, from_id, &nonce);
     if (ret != 0) {
       return ret;
     }
     debug_print_data("sender", msg->sender.bytes, 20);
     debug_print_int("from_id", from_id);
-    debug_print_int("nonce", *((uint32_t *)nonce_value));
-    rlp_encode_sender_and_nonce(&msg->sender, *((uint32_t *)nonce_value), data, &data_len);
+    debug_print_int("nonce", nonce);
+    rlp_encode_sender_and_nonce(&msg->sender, nonce, data, &data_len);
     debug_print_data("rlp data", data, data_len);
   } else if (msg->kind == EVMC_CREATE2) {
     /* CREATE2 contract account script.args[36..36+20] content before hash
@@ -1203,6 +1198,11 @@ int run_polyjuice() {
   ret = sudt_pay_fee(&context, g_sudt_id, POLYJUICE_SHORT_ADDR_LEN, msg.sender.bytes, fee);
   if (ret != 0) {
     debug_print_int("pay fee to block_producer failed", ret);
+    return ret;
+  }
+  ret = sys_pay_fee(&context, msg.sender.bytes, POLYJUICE_SHORT_ADDR_LEN, g_sudt_id, fee);
+  if (ret != 0) {
+    debug_print_int("Record fee payment failed", ret);
     return ret;
   }
 
