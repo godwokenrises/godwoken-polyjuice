@@ -162,12 +162,13 @@ int parse_args(struct evmc_message* msg, uint128_t* gas_price,
   debug_print_int("[kind]", kind);
 
   /* args[8..16] gas limit  */
-  int64_t gas_limit = (int64_t) (*(uint64_t*)(args + offset));
+  int64_t gas_limit;
+  memcpy(&gas_limit, args + offset, sizeof(int64_t));
   offset += 8;
   debug_print_int("[gas_limit]", gas_limit);
 
   /* args[16..32] gas price */
-  *gas_price = *((uint128_t*)(args + offset));
+  memcpy(gas_price, args + offset, sizeof(uint128_t));
   offset += 16;
   debug_print_int("[gas_price]", (int64_t)(*gas_price));
 
@@ -742,7 +743,7 @@ int load_globals(gw_context_t* ctx, uint32_t to_id, evmc_call_kind call_kind) {
   }
 
   memcpy(g_rollup_script_hash, creator_raw_args_seg_ptr->ptr, 32);
-  g_sudt_id = *(uint32_t *)(creator_raw_args_seg_ptr->ptr + 32);
+  memcpy(&g_sudt_id, creator_raw_args_seg_ptr->ptr + 32, sizeof(uint32_t));
   debug_print_data("rollup_script_hash", g_rollup_script_hash, 32);
   debug_print_int("sudt id", g_sudt_id);
   return 0;
