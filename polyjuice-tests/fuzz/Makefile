@@ -59,9 +59,9 @@ endif
 EXTERNAL_HEADERS := $(DEPS)/ckb-c-stdlib-simulator-only/ckb_consts.h
 
 #TODO: coverage
-all: build/polyjuice_generator_fuzzer
+all: generate-protocol build/polyjuice_generator_fuzzer
 
-build/polyjuice_generator_fuzzer: build/generator_log $(GENERATOR_DEPS)
+build/polyjuice_generator_fuzzer: generate-protocol $(GENERATOR_DEPS)
 	$(CXX) $(CFLAGS) $(LDFLAGS) $(SANITIZER_FLAGS) -fsanitize=fuzzer -Ibuild -o $@ polyjuice_generator_fuzzer.cc $(ALL_OBJS)
 
 ###
@@ -177,6 +177,7 @@ $(SECP256K1_SRC):
 	./configure --with-bignum=no --enable-ecmult-static-precomputation --enable-endomorphism --enable-module-recovery && \
 	make src/ecmult_static_pre_context.h src/ecmult_static_context.h
 
+generate-protocol: check-moleculec-version build/blockchain.h build/godwoken.h
 check-moleculec-version:
 	test "$$(${MOLC} --version | awk '{ print $$2 }' | tr -d ' ')" = ${MOLC_VERSION}
 build/blockchain.h: build/blockchain.mol

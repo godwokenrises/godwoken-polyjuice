@@ -18,23 +18,28 @@
 #include "secp256k1_data_info.h"
 
 /* syscalls */
-#define GW_SYS_STORE 3051
-#define GW_SYS_LOAD 3052
-#define GW_SYS_SET_RETURN_DATA 3061
-#define GW_SYS_CREATE 3071
-/* internal syscall only for generator */
-#define GW_SYS_LOAD_TRANSACTION 4051
-#define GW_SYS_LOAD_BLOCKINFO 4052
-#define GW_SYS_LOAD_SCRIPT_HASH_BY_ACCOUNT_ID 4053
-#define GW_SYS_LOAD_ACCOUNT_ID_BY_SCRIPT_HASH 4054
-#define GW_SYS_LOAD_ACCOUNT_SCRIPT 4055
-#define GW_SYS_STORE_DATA 4056
-#define GW_SYS_LOAD_DATA 4057
-#define GW_SYS_GET_BLOCK_HASH 4058
-#define GW_SYS_GET_SCRIPT_HASH_BY_PREFIX 4059
-#define GW_SYS_RECOVER_ACCOUNT 4060
-#define GW_SYS_LOG 4061
-#define GW_SYS_LOAD_ROLLUP_CONFIG 4062
+/* Syscall account store / load / create */
+#define GW_SYS_CREATE 3100
+#define GW_SYS_STORE 3101
+#define GW_SYS_LOAD 3102
+#define GW_SYS_LOAD_SCRIPT_HASH_BY_ACCOUNT_ID 3103
+#define GW_SYS_LOAD_ACCOUNT_ID_BY_SCRIPT_HASH 3104
+#define GW_SYS_LOAD_ACCOUNT_SCRIPT 3105
+#define GW_SYS_GET_SCRIPT_HASH_BY_SHORT_ADDRESS 3106
+/* Syscall call / return */
+#define GW_SYS_SET_RETURN_DATA 3201
+/* Syscall data store / load */
+#define GW_SYS_STORE_DATA 3301
+#define GW_SYS_LOAD_DATA 3302
+/* Syscall load metadata structures */
+#define GW_SYS_LOAD_ROLLUP_CONFIG 3401
+#define GW_SYS_LOAD_TRANSACTION 3402
+#define GW_SYS_LOAD_BLOCKINFO 3403
+#define GW_SYS_GET_BLOCK_HASH 3404
+/* Syscall builtins */
+#define GW_SYS_PAY_FEE 3501
+#define GW_SYS_LOG 3502
+#define GW_SYS_RECOVER_ACCOUNT 3503
 
 /* Godwoken Service Flag */
 // #define GW_LOG_SUDT_TRANSFER    0
@@ -62,13 +67,12 @@ typedef struct gw_context_t {
   uint64_t rollup_config_size;
   /* layer2 syscalls */
   gw_load_fn sys_load;
-  gw_load_nonce_fn sys_load_nonce;
+  gw_get_account_nonce_fn sys_get_account_nonce;
   gw_store_fn sys_store;
   gw_set_program_return_data_fn sys_set_program_return_data;
   gw_create_fn sys_create;
   gw_get_account_id_by_script_hash_fn sys_get_account_id_by_script_hash;
   gw_get_script_hash_by_account_id_fn sys_get_script_hash_by_account_id;
-  gw_get_account_nonce_fn sys_get_account_nonce;
   gw_get_account_script_fn sys_get_account_script;
   gw_load_data_fn sys_load_data;
   gw_store_data_fn sys_store_data;
@@ -76,6 +80,7 @@ typedef struct gw_context_t {
   gw_get_script_hash_by_prefix_fn sys_get_script_hash_by_prefix;
   gw_recover_account_fn sys_recover_account;
   gw_log_fn sys_log;
+  gw_pay_fee_fn sys_pay_fee;
 } gw_context_t;
 
 int _ensure_account_exists(gw_context_t *ctx, uint32_t account_id) {
@@ -116,6 +121,7 @@ int sys_load(gw_context_t *ctx, uint32_t account_id,
   gw_build_account_key(account_id, key, key_len, raw_key);
   return syscall(GW_SYS_LOAD, raw_key, value, 0, 0, 0, 0);
 }
+
 int sys_store(gw_context_t *ctx, uint32_t account_id,
               const uint8_t *key,
               const uint64_t key_len,
@@ -143,8 +149,8 @@ int sys_store(gw_context_t *ctx, uint32_t account_id,
   return syscall(GW_SYS_STORE, raw_key, value, 0, 0, 0, 0);
 }
 
-int sys_load_nonce(gw_context_t *ctx, uint32_t account_id,
-                   uint8_t value[GW_VALUE_BYTES]) {
+int sys_get_account_nonce(gw_context_t *ctx, uint32_t account_id,
+                   uint32_t *nonce) {
   if (ctx == NULL) {
     return GW_ERROR_INVALID_CONTEXT;
   }
@@ -153,8 +159,10 @@ int sys_load_nonce(gw_context_t *ctx, uint32_t account_id,
     return ret;
   }
 
+  // uint8_t key[32];
+  // gw_build_nonce_key(account_id, key);
+  // return syscall(GW_SYS_LOAD, key, value, 0, 0, 0, 0);
   uint8_t key[32] = {0};
-  dbg_print("sys_get_account_nonce => account_id = %d => key:", account_id);
   gw_build_account_field_key(account_id, GW_ACCOUNT_NONCE, key);
   uint8_t value[32] = {0};
   ret = syscall(GW_SYS_LOAD, key, value, 0, 0, 0, 0);
@@ -162,7 +170,7 @@ int sys_load_nonce(gw_context_t *ctx, uint32_t account_id,
     return ret;
   }
   memcpy(nonce, value, sizeof(uint32_t));
-  return MOCK_SUCCESS;
+  return 0;
 }
 
 /**
@@ -172,6 +180,9 @@ int sys_load_nonce(gw_context_t *ctx, uint32_t account_id,
 int sys_set_program_return_data(gw_context_t *ctx,
                                 uint8_t *data,
                                 uint64_t len) {
+  if (ctx == NULL) {
+    return GW_ERROR_INVALID_CONTEXT;
+  }
   // TODO: print data?
   return MOCK_SUCCESS;
 }
@@ -183,14 +194,18 @@ int sys_set_program_return_data(gw_context_t *ctx,
 int sys_get_account_id_by_script_hash(gw_context_t *ctx,
                                       uint8_t script_hash[32],
                                       uint32_t *account_id) {
- // TODO refactor test_script_hash
- for (size_t i = 0; i < sizeof(test_script_hash) / 32; i++) {
-   if (0 == memcmp(script_hash, test_script_hash[i], 32)) {
-     *account_id = i;
-     return MOCK_SUCCESS;
-   }
- }
- return ERROR_NOT_FOUND;
+  if (ctx == NULL) {
+    return GW_ERROR_INVALID_CONTEXT;
+  }
+
+  // TODO refactor test_script_hash
+  for (size_t i = 0; i < sizeof(test_script_hash) / 32; i++) {
+    if (0 == memcmp(script_hash, test_script_hash[i], 32)) {
+      *account_id = i;
+      return MOCK_SUCCESS;
+    }
+  }
+  return ERROR_NOT_FOUND;
 }
 
 /**
@@ -200,6 +215,10 @@ int sys_get_account_id_by_script_hash(gw_context_t *ctx,
 int sys_get_script_hash_by_account_id(gw_context_t *ctx,
                                       uint32_t account_id,
                                       uint8_t script_hash[32]) {
+  if (ctx == NULL) {
+    return GW_ERROR_INVALID_CONTEXT;
+  }
+
   //TODO: get script_hash from rocketdb
   memcpy(script_hash, test_script_hash[account_id], 32);
   return MOCK_SUCCESS;
@@ -211,6 +230,10 @@ int sys_get_script_hash_by_account_id(gw_context_t *ctx,
  */
 int sys_get_account_script(gw_context_t *ctx, uint32_t account_id,
                            uint64_t *len, uint64_t offset, uint8_t *script) {
+  if (ctx == NULL) {
+    return GW_ERROR_INVALID_CONTEXT;
+  }
+
   int ret = MOCK_SUCCESS;
   static const uint8_t account1_scripts[] = {117, 0, 0, 0, 16, 0, 0, 0, 48, 0, 0, 0, 49, 0, 0, 0, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 1, 64, 0, 0, 0, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
   static const uint8_t account2_scripts[] = {89, 0, 0, 0, 16, 0, 0, 0, 48, 0, 0, 0, 49, 0, 0, 0, 5, 108, 171, 165, 10, 111, 194, 87, 79, 38, 74, 23, 199, 7, 250, 53, 120, 75, 230, 229, 154, 244, 114, 163, 65, 119, 108, 251, 137, 16, 190, 229, 1, 36, 0, 0, 0, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 1, 0, 0, 0};
@@ -244,6 +267,10 @@ int sys_get_account_script(gw_context_t *ctx, uint32_t account_id,
  * Mock syscall(GW_SYS_STORE_DATA, data_len, data, 0, 0, 0, 0)
  */
 int sys_store_data(gw_context_t *ctx, uint64_t data_len, uint8_t *data) {
+  if (ctx == NULL) {
+    return GW_ERROR_INVALID_CONTEXT;
+  }
+
   //TODO: data hash = new_blake2b().update(data)
   return MOCK_SUCCESS;
 }
@@ -251,6 +278,10 @@ int sys_store_data(gw_context_t *ctx, uint64_t data_len, uint8_t *data) {
 /* Load data by data hash */
 int sys_load_data(gw_context_t *ctx, uint8_t data_hash[32], uint64_t *len,
                   uint64_t offset, uint8_t *data) {
+  if (ctx == NULL) {
+    return GW_ERROR_INVALID_CONTEXT;
+  }
+
   ckb_debug("mock sys_load_data->GW_SYS_LOAD_DATA");
   int ret = 0;
 
@@ -313,15 +344,27 @@ int _sys_load_block_info(void *addr, uint64_t *len) {
 
 int sys_get_block_hash(gw_context_t *ctx, uint64_t number,
                        uint8_t block_hash[32]) {
+  if (ctx == NULL) {
+    return GW_ERROR_INVALID_CONTEXT;
+  }
+
   return syscall(GW_SYS_GET_BLOCK_HASH, block_hash, number, 0, 0, 0, 0);
 }
 
 /** 
- * Mock syscall(GW_SYS_GET_SCRIPT_HASH_BY_PREFIX, script_hash, prefix, prefix_len, 0, 0, 0)
+ * Mock syscall(GW_SYS_GET_SCRIPT_HASH_BY_SHORT_ADDRESS, script_hash, prefix, prefix_len, 0, 0, 0)
  * FIXME: check syscall args A3, A4 in godwoken/crates/generator/src/syscalls/mod.rs
  */ 
 int sys_get_script_hash_by_prefix(gw_context_t *ctx, uint8_t *prefix, uint64_t prefix_len,
                                   uint8_t script_hash[32]) {
+  if (ctx == NULL) {
+    return GW_ERROR_INVALID_CONTEXT;
+  }
+
+  if (prefix_len == 0 || prefix_len > 32) {
+    return GW_ERROR_INVALID_DATA;
+  }
+
   //TODO: refactor test_script_hash
   for (size_t i = 0; i < sizeof(test_script_hash) / 32; i++) {
     if (0 == memcmp(prefix, test_script_hash[i], 20)) {
@@ -329,7 +372,7 @@ int sys_get_script_hash_by_prefix(gw_context_t *ctx, uint8_t *prefix, uint64_t p
       return MOCK_SUCCESS;
     }
   }
-  return ERROR_NOT_FOUND;
+  return syscall(GW_SYS_GET_SCRIPT_HASH_BY_SHORT_ADDRESS, script_hash, prefix, prefix_len, 0, 0, 0);
 }
 
 /**
@@ -337,6 +380,10 @@ int sys_get_script_hash_by_prefix(gw_context_t *ctx, uint8_t *prefix, uint64_t p
  */
 int sys_create(gw_context_t *ctx, uint8_t *script, uint64_t script_len,
                uint32_t *account_id) {
+  if (ctx == NULL) {
+    return GW_ERROR_INVALID_CONTEXT;
+  }
+
   //TODO: Mock SYS_CREATE syscall
   *account_id = 4;
   return MOCK_SUCCESS;
@@ -349,6 +396,10 @@ int sys_recover_account(struct gw_context_t *ctx,
                         uint8_t code_hash[32],
                         uint8_t *script,
                         uint64_t *script_len) {
+  if (ctx == NULL) {
+    return GW_ERROR_INVALID_CONTEXT;
+  }
+
   volatile uint64_t inner_script_len = 0;
   int ret = syscall(GW_SYS_RECOVER_ACCOUNT, script, &inner_script_len,
                     message, signature, signature_len, code_hash);
@@ -370,6 +421,19 @@ int sys_log(gw_context_t *ctx, uint32_t account_id, uint8_t service_flag,
 
   dbg_print("GW_LOG_FLAG_%d...", service_flag);
   return MOCK_SUCCESS;
+}
+
+int sys_pay_fee(gw_context_t *ctx, const uint8_t *payer_addr,
+                const uint64_t short_addr_len, uint32_t sudt_id, uint128_t amount) {
+  if (ctx == NULL) {
+    return GW_ERROR_INVALID_CONTEXT;
+  }
+  int ret = _ensure_account_exists(ctx, sudt_id);
+  if (ret != 0) {
+    return ret;
+  }
+
+  return syscall(GW_SYS_PAY_FEE, payer_addr, short_addr_len, sudt_id, &amount, 0, 0);
 }
 
 /**
@@ -418,18 +482,19 @@ int _sys_load_rollup_config(uint8_t *addr, uint64_t *len) {
 int gw_context_init(gw_context_t *ctx) {
   /* setup syscalls */
   ctx->sys_load = sys_load;
-  ctx->sys_load_nonce = sys_load_nonce;
   ctx->sys_store = sys_store;
   ctx->sys_set_program_return_data = sys_set_program_return_data;
   ctx->sys_create = sys_create;
   ctx->sys_get_account_id_by_script_hash = sys_get_account_id_by_script_hash;
   ctx->sys_get_script_hash_by_account_id = sys_get_script_hash_by_account_id;
+  ctx->sys_get_account_nonce = sys_get_account_nonce;
   ctx->sys_get_account_script = sys_get_account_script;
   ctx->sys_store_data = sys_store_data;
   ctx->sys_load_data = sys_load_data;
   ctx->sys_get_block_hash = sys_get_block_hash;
   ctx->sys_get_script_hash_by_prefix = sys_get_script_hash_by_prefix;
   ctx->sys_recover_account = sys_recover_account;
+  ctx->sys_pay_fee = sys_pay_fee;
   ctx->sys_log = sys_log;
 
   /* initialize context */
