@@ -710,7 +710,7 @@ int load_globals(gw_context_t* ctx, uint32_t to_id, evmc_call_kind call_kind) {
     creator_raw_args_seg_ptr = &raw_args_seg;
   } else if (raw_args_seg.size == CONTRACT_ACCOUNT_SCRIPT_ARGS_SIZE) {
     /* read creator account and then read sudt id from it */
-    g_creator_account_id = *(uint32_t *)(raw_args_seg.ptr + 32);
+    memcpy(&g_creator_account_id, raw_args_seg.ptr + 32, sizeof(uint32_t));
     int ret = load_account_script(ctx,
                                   g_creator_account_id,
                                   creator_script_buffer,
