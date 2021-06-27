@@ -16,6 +16,7 @@
 #include "common.h"
 
 #include "secp256k1_data_info.h"
+#include "mock_godwoken.hpp"
 
 /* syscalls */
 /* Syscall account store / load / create */
@@ -51,13 +52,14 @@
 #define MOCK_SUCCESS 0
 #define MOCK_SECP256K1_ERROR_LOADING_DATA -101
 
-static const uint8_t test_script_hash[5][32] = { // FIXME
+// FIXME read script_hash from mock State+CodeStore
+static const uint8_t test_script_hash[6][32] = {
   {231, 196, 69, 164, 212, 229, 83, 6, 137, 240, 237, 105, 234, 223, 101, 133, 197, 66, 85, 214, 112, 85, 87, 71, 17, 170, 138, 126, 128, 173, 186, 76},
   {50, 15, 9, 23, 166, 82, 42, 69, 226, 148, 203, 184, 168, 8, 210, 62, 226, 187, 187, 21, 122, 141, 152, 55, 88, 230, 63, 204, 23, 3, 166, 102},
   {221, 60, 233, 16, 227, 19, 49, 118, 137, 43, 193, 160, 145, 21, 141, 6, 43, 206, 191, 210, 105, 160, 112, 23, 155, 184, 101, 113, 47, 247, 216, 122},
   {48, 160, 141, 250, 92, 214, 34, 124, 231, 78, 106, 179, 173, 80, 61, 55, 161, 156, 45, 114, 214, 222, 9, 77, 4, 104, 52, 44, 30, 149, 27, 36},
-  {103, 167, 175, 25, 71, 242, 5, 31, 102, 236, 38, 188, 223, 212, 241, 99, 13, 4, 40, 150, 151, 55, 40, 147, 64, 29, 108, 50, 37, 159, 55, 137}};
-
+  {103, 167, 175, 25, 71, 242, 5, 31, 102, 236, 38, 188, 223, 212, 241, 99, 13, 4, 40, 150, 151, 55, 40, 147, 64, 29, 108, 50, 37, 159, 55, 137},
+  {125, 181, 86, 185, 69, 172, 188, 175, 36, 25, 118, 119, 114, 72, 199, 183, 204, 25, 147, 120, 109, 220, 192, 171, 10, 235, 47, 230, 42, 210, 169, 223}};
 
 typedef struct gw_context_t {
   /* verification context */
@@ -134,19 +136,20 @@ int sys_store(gw_context_t *ctx, uint32_t account_id,
     return ret;
   }
 
-  if (1 == *(uint32_t*)key) { // SUDT_KEY_FLAG_BALANCE = 1
-    // mock _sudt_set_balance success
-    return MOCK_SUCCESS;
-  }
-  const uint8_t POLYJUICE_SYSTEM_PREFIX = 0xFF;
-  if (0 == memcmp(&POLYJUICE_SYSTEM_PREFIX, key + 4, sizeof(uint8_t))) {
-    //FIXME mock store_contract_code
-    return MOCK_SUCCESS;
-  }
+  // if (1 == *(uint32_t*)key) { // SUDT_KEY_FLAG_BALANCE = 1
+  //   // mock _sudt_set_balance success
+  //   return MOCK_SUCCESS;
+  // }
+  // const uint8_t POLYJUICE_SYSTEM_PREFIX = 0xFF;
+  // if (0 == memcmp(&POLYJUICE_SYSTEM_PREFIX, key + 4, sizeof(uint8_t))) {
+  //   return MOCK_SUCCESS;
+  // }
 
   uint8_t raw_key[GW_KEY_BYTES];
   gw_build_account_key(account_id, key, key_len, raw_key);
-  return syscall(GW_SYS_STORE, raw_key, value, 0, 0, 0, 0);
+
+  // mock syscall(GW_SYS_STORE, raw_key, value, 0, 0, 0, 0)
+  return gw_update_raw(raw_key, value);
 }
 
 int sys_get_account_nonce(gw_context_t *ctx, uint32_t account_id,
@@ -220,6 +223,7 @@ int sys_get_script_hash_by_account_id(gw_context_t *ctx,
   }
 
   //TODO: get script_hash from rocketdb
+  dbg_print("sys_get_script_hash_by_account_id %d", account_id);
   memcpy(script_hash, test_script_hash[account_id], 32);
   return MOCK_SUCCESS;
 }
@@ -282,7 +286,7 @@ int sys_load_data(gw_context_t *ctx, uint8_t data_hash[32], uint64_t *len,
     return GW_ERROR_INVALID_CONTEXT;
   }
 
-  ckb_debug("mock sys_load_data->GW_SYS_LOAD_DATA");
+  ckb_debug("mock sys_load_data");
   int ret = 0;
 
   if (0 == memcmp(data_hash, ckb_secp256k1_data_hash, 32)) {
@@ -299,6 +303,8 @@ int sys_load_data(gw_context_t *ctx, uint8_t data_hash[32], uint64_t *len,
   }
   
   volatile uint64_t inner_len = *len;
+  dbg_print("syscall(GW_SYS_LOAD_DATA, data, &inner_len, offset, data_hash, 0, 0)");
+  dbg_print_h256(data_hash);
   ret = syscall(GW_SYS_LOAD_DATA, data, &inner_len, offset, data_hash, 0, 0);
   *len = inner_len;
   return ret;
@@ -311,12 +317,12 @@ int sys_load_data(gw_context_t *ctx, uint8_t data_hash[32], uint64_t *len,
 int _sys_load_l2transaction(void *addr, uint64_t *len) {
   // TODO：raw tx data from fuzzInput
 
-  static uint8_t get_chain_id_tx[] = {92, 0, 0, 0, 20, 0, 0, 0, 24, 0, 0, 0, 28, 0, 0, 0, 32, 0, 0, 0, 4, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 56, 0, 0, 0, 255, 255, 255, 80, 79, 76, 89, 0, 8, 82, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 109, 76, 230, 60};
-  // version@20210625: {92, 0, 0, 0, 20, 0, 0, 0, 24, 0, 0, 0, 28, 0, 0, 0, 32, 0, 0, 0, 3, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 56, 0, 0, 0, 255, 255, 255, 80, 79, 76, 89, 0, 8, 82, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 109, 76, 230, 60};
-  *len = sizeof(get_chain_id_tx);
-  dbg_print("length of get_chain_id_tx: %ld", *len);
-  memcpy(addr, get_chain_id_tx, *len);
-  return MOCK_SUCCESS;
+  // static uint8_t get_chain_id_tx[] = {92, 0, 0, 0, 20, 0, 0, 0, 24, 0, 0, 0, 28, 0, 0, 0, 32, 0, 0, 0, 4, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 56, 0, 0, 0, 255, 255, 255, 80, 79, 76, 89, 0, 8, 82, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 109, 76, 230, 60};
+  // // version@20210625: {92, 0, 0, 0, 20, 0, 0, 0, 24, 0, 0, 0, 28, 0, 0, 0, 32, 0, 0, 0, 3, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 56, 0, 0, 0, 255, 255, 255, 80, 79, 76, 89, 0, 8, 82, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 109, 76, 230, 60};
+  // *len = sizeof(get_chain_id_tx);
+  // dbg_print("length of get_chain_id_tx: %ld", *len);
+  // memcpy(addr, get_chain_id_tx, *len);
+  // return MOCK_SUCCESS;
 
   // create account and deploy getChainId contract
   static uint8_t deploy_get_chain_id_contract[] = {73, 1, 0, 0, 20, 0, 0, 0, 24, 0, 0, 0, 28, 0, 0, 0, 32, 0, 0, 0, 4, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 37, 1, 0, 0, 255, 255, 255, 80, 79, 76, 89, 3, 240, 85, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 241, 0, 0, 0, 96, 128, 96, 64, 82, 52, 128, 21, 97, 0, 17, 87, 96, 0, 96, 0, 253, 91, 80, 97, 0, 23, 86, 91, 96, 204, 128, 97, 0, 37, 96, 0, 57, 96, 0, 243, 254, 96, 128, 96, 64, 82, 52, 128, 21, 96, 16, 87, 96, 0, 96, 0, 253, 91, 80, 96, 4, 54, 16, 96, 44, 87, 96, 0, 53, 96, 224, 28, 128, 99, 109, 76, 230, 60, 20, 96, 50, 87, 96, 44, 86, 91, 96, 0, 96, 0, 253, 91, 96, 56, 96, 76, 86, 91, 96, 64, 81, 96, 67, 145, 144, 96, 112, 86, 91, 96, 64, 81, 128, 145, 3, 144, 243, 91, 96, 0, 96, 0, 70, 144, 80, 128, 145, 80, 80, 96, 92, 86, 80, 91, 144, 86, 96, 149, 86, 91, 96, 105, 129, 96, 138, 86, 91, 130, 82, 91, 80, 80, 86, 91, 96, 0, 96, 32, 130, 1, 144, 80, 96, 131, 96, 0, 131, 1, 132, 96, 98, 86, 91, 91, 146, 145, 80, 80, 86, 91, 96, 0, 129, 144, 80, 91, 145, 144, 80, 86, 91, 254, 162, 100, 105, 112, 102, 115, 88, 34, 18, 32, 3, 36, 140, 112, 116, 35, 57, 185, 199, 86, 232, 210, 111, 220, 122, 33, 250, 178, 163, 13, 127, 44, 169, 160, 247, 149, 71, 178, 184, 168, 61, 64, 100, 115, 111, 108, 99, 67, 0, 8, 2, 0, 51};
