@@ -254,7 +254,8 @@ int load_account_code(gw_context_t* gw_ctx, uint32_t account_id,
       /* compare rollup_script_hash */
       || memcmp(raw_args_seg.ptr, g_rollup_script_hash, 32) != 0
       /* compare creator account id */
-      || g_creator_account_id != *(uint32_t *)(raw_args_seg.ptr + 32)) {
+      || memcmp(&g_creator_account_id, raw_args_seg.ptr + 32, sizeof(uint32_t)) != 0
+  ) {
     debug_print_int("creator account id not match for account", account_id);
     return -1;
   }
