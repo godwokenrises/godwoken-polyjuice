@@ -1,10 +1,8 @@
 {
-  // See https://go.microsoft.com/fwlink/?LinkId=733558
-  // for the documentation about the tasks.json format
   "version": "2.0.0",
   "tasks": [
     {
-      "label": "build polyjuice_generator_fuzzer",
+      "label": "build and run polyjuice_generator_fuzzer",
       "type": "shell",
       "command": "mv build/polyjuice_generator_fuzzer ./ & make build/polyjuice_generator_fuzzer && ./build/polyjuice_generator_fuzzer",
       "options": {
@@ -25,6 +23,28 @@
       },
       "group": "build",
       "problemMatcher": []
+    },
+    {
+      "type": "cppbuild",
+      "label": "==build active file==",
+      "command": "/usr/local/bin/clang++",
+      "args": [
+        "-I${workspaceFolder}/deps/evmone/evmc/include",
+        "-I${workspaceFolder}/deps/godwoken-scripts/c",
+        "-I${workspaceFolder}/deps/godwoken-scripts/c/deps/ckb-c-stdlib",
+        "-g",
+        "${file}",
+        "-o",
+        "${fileDirname}/${fileBasenameNoExtension}"
+      ],
+      "options": {
+        "cwd": "${fileDirname}"
+      },
+      "problemMatcher": [
+        "$gcc"
+      ],
+      "group": "build",
+      "detail": "compiler: /usr/local/bin/clang++"
     }
   ]
 }
