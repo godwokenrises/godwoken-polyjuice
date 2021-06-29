@@ -139,6 +139,10 @@ static int inline __internal_syscall(long n, long _a0, long _a1, long _a2,
     case GW_SYS_GET_SCRIPT_HASH_BY_SHORT_ADDRESS:
       return gw_sys_get_script_hash_by_short_address((uint8_t *)_a0, (uint8_t *)_a1, _a2);
 
+    // mock syscall(GW_SYS_LOAD_ROLLUP_CONFIG, addr, &inner_len, 0, 0, 0, 0)
+    case GW_SYS_LOAD_ROLLUP_CONFIG:
+      return gw_sys_load_rollup_config((uint8_t *)_a0, (uint64_t *)_a1);
+
     default:
       return GW_ERROR_NOT_FOUND;
   }
