@@ -103,7 +103,9 @@ void print_state() {
 extern "C" int gw_sys_load(const uint8_t k[32], uint8_t v[32]) {
   auto search = gw_host->state.find(u256_to_bytes32(k));
   if (search == gw_host->state.end()) {
-    dbg_print("gw_sys_load failed, all the state as following:");
+    dbg_print("gw_sys_load failed, missing key:");
+    dbg_print_h256(k);
+    dbg_print("all the state as following:");
     print_state();
     return GW_ERROR_NOT_FOUND;
   }
@@ -131,7 +133,8 @@ extern "C" void gw_sys_get_block_hash(uint8_t block_hash[32], uint64_t number) {
 }
 
 extern "C" int gw_sys_load_blockinfo(uint8_t* bi_addr, uint64_t* len_ptr) {
-  /**
+  /** 
+   * TODO: block_info fuzzInput
    * struct BlockInfo {
    *  block_producer_id: Uint32,
    *  number: Uint64,
@@ -141,6 +144,87 @@ extern "C" int gw_sys_load_blockinfo(uint8_t* bi_addr, uint64_t* len_ptr) {
   *len_ptr = sizeof(mock_new_block_info);
   memcpy((uint8_t*)bi_addr, mock_new_block_info, *len_ptr);
   return 0;
+}
+
+extern "C" int gw_sys_load_script_hash_by_account_id(const uint32_t account_id, uint8_t script_hash[32]) {
+  dbg_print("sys_get_script_hash_by_account_id account_id = %d", account_id);
+
+  uint8_t key[32] = {0};
+  gw_build_account_field_key(account_id, GW_ACCOUNT_SCRIPT_HASH, key);
+  return gw_sys_load(key, script_hash);
+
+  // FIXME read script_hash from mock State+CodeStore
+  // static const uint8_t test_script_hash[6][32] = {
+  //   {231, 196, 69, 164, 212, 229, 83, 6, 137, 240, 237, 105, 234, 223, 101, 133, 197, 66, 85, 214, 112, 85, 87, 71, 17, 170, 138, 126, 128, 173, 186, 76},
+  //   {50, 15, 9, 23, 166, 82, 42, 69, 226, 148, 203, 184, 168, 8, 210, 62, 226, 187, 187, 21, 122, 141, 152, 55, 88, 230, 63, 204, 23, 3, 166, 102},
+  //   {221, 60, 233, 16, 227, 19, 49, 118, 137, 43, 193, 160, 145, 21, 141, 6, 43, 206, 191, 210, 105, 160, 112, 23, 155, 184, 101, 113, 47, 247, 216, 122},
+  //   {48, 160, 141, 250, 92, 214, 34, 124, 231, 78, 106, 179, 173, 80, 61, 55, 161, 156, 45, 114, 214, 222, 9, 77, 4, 104, 52, 44, 30, 149, 27, 36},
+  //   {103, 167, 175, 25, 71, 242, 5, 31, 102, 236, 38, 188, 223, 212, 241, 99, 13, 4, 40, 150, 151, 55, 40, 147, 64, 29, 108, 50, 37, 159, 55, 137},
+  //   {125, 181, 86, 185, 69, 172, 188, 175, 36, 25, 118, 119, 114, 72, 199, 183, 204, 25, 147, 120, 109, 220, 192, 171, 10, 235, 47, 230, 42, 210, 169, 223}};
+}
+
+extern "C" int gw_sys_get_script_hash_by_short_address(uint8_t *script_hash_addr,
+                                                       uint8_t *prefix_addr,
+                                                       uint64_t prefix_len) {
+  for (auto pair : gw_host->code_store) {
+    if (0 == memcmp(pair.first.bytes, prefix_addr, prefix_len)) {
+      memcpy(script_hash_addr, pair.first.bytes, sizeof(pair.first.bytes));
+      return 0;
+    }
+  }
+  
+  dbg_print("gw_sys_get_script_hash_by_short_address failed");
+  return GW_ERROR_NOT_FOUND;
+}
+
+extern "C" int gw_sys_load_account_id_by_script_hash(uint8_t *script_hash,
+                                                     uint32_t *account_id_ptr) {
+  uint8_t raw_id_key[32];
+  gw_build_script_hash_to_account_id_key(script_hash, raw_id_key);
+  uint8_t result_addr[32];
+  int ret = gw_sys_load(raw_id_key, result_addr);
+  if (ret != 0) return ret;
+  *account_id_ptr = *((uint32_t *)result_addr);
+  return 0;
+}
+
+extern "C" int gw_sys_load_account_script(uint8_t *script_addr,
+                                          uint64_t *len_ptr,
+                                          const uint64_t offset,
+                                          const uint32_t account_id) {
+  uint8_t script_hash[32];
+  int ret = gw_sys_load_script_hash_by_account_id(account_id, script_hash);
+  if (ret != 0) {
+    return ret;
+  }
+  return gw_sys_load_data(script_addr, len_ptr, offset, script_hash);
+
+  // int ret = MOCK_SUCCESS;
+  // static const uint8_t account1_scripts[] = {117, 0, 0, 0, 16, 0, 0, 0, 48, 0, 0, 0, 49, 0, 0, 0, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 1, 64, 0, 0, 0, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  // static const uint8_t account2_scripts[] = {89, 0, 0, 0, 16, 0, 0, 0, 48, 0, 0, 0, 49, 0, 0, 0, 5, 108, 171, 165, 10, 111, 194, 87, 79, 38, 74, 23, 199, 7, 250, 53, 120, 75, 230, 229, 154, 244, 114, 163, 65, 119, 108, 251, 137, 16, 190, 229, 1, 36, 0, 0, 0, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 1, 0, 0, 0};
+  // static const uint8_t account4_scripts[] = {97, 0, 0, 0, 16, 0, 0, 0, 48, 0, 0, 0, 49, 0, 0, 0, 61, 131, 245, 41, 45, 5, 161, 161, 151, 161, 101, 38, 160, 60, 251, 86, 103, 65, 171, 189, 194, 72, 182, 31, 188, 159, 136, 253, 36, 110, 14, 98, 1, 44, 0, 0, 0, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 2, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0};
+  // static const uint8_t account5_scripts[] = {109, 0, 0, 0, 16, 0, 0, 0, 48, 0, 0, 0, 49, 0, 0, 0, 5, 108, 171, 165, 10, 111, 194, 87, 79, 38, 74, 23, 199, 7, 250, 53, 120, 75, 230, 229, 154, 244, 114, 163, 65, 119, 108, 251, 137, 16, 190, 229, 1, 56, 0, 0, 0, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 2, 0, 0, 0, 127, 206, 210, 20, 115, 27, 194, 169, 199, 79, 204, 192, 210, 154, 137, 78, 143, 170, 217, 240};
+  // switch (account_id) {
+  //   case 1:
+  //     *len = sizeof(account1_scripts);
+  //     memcpy(script, account1_scripts + offset, *len - offset);
+  //     break;
+  //   case 2:
+  //     *len = sizeof(account2_scripts);
+  //     memcpy(script, account2_scripts + offset, *len - offset);
+  //     break;
+  //   case 4:
+  //     *len = sizeof(account4_scripts);
+  //     memcpy(script, account4_scripts + offset, *len - offset);
+  //     break;
+  //   // case 5:
+  //   //   *len = sizeof(account5_scripts);
+  //   //   memcpy(script, account5_scripts + offset, *len - offset);
+  //   //   break;
+  //   default:
+  //     ret = GW_ERROR_NOT_FOUND;
+  // }
+  // return ret;
 }
 
 int init() {

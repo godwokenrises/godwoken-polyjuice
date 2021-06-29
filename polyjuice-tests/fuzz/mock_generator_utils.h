@@ -51,15 +51,6 @@
 #define MOCK_SUCCESS 0
 #define MOCK_SECP256K1_ERROR_LOADING_DATA -101
 
-// FIXME read script_hash from mock State+CodeStore
-static const uint8_t test_script_hash[6][32] = {
-  {231, 196, 69, 164, 212, 229, 83, 6, 137, 240, 237, 105, 234, 223, 101, 133, 197, 66, 85, 214, 112, 85, 87, 71, 17, 170, 138, 126, 128, 173, 186, 76},
-  {50, 15, 9, 23, 166, 82, 42, 69, 226, 148, 203, 184, 168, 8, 210, 62, 226, 187, 187, 21, 122, 141, 152, 55, 88, 230, 63, 204, 23, 3, 166, 102},
-  {221, 60, 233, 16, 227, 19, 49, 118, 137, 43, 193, 160, 145, 21, 141, 6, 43, 206, 191, 210, 105, 160, 112, 23, 155, 184, 101, 113, 47, 247, 216, 122},
-  {48, 160, 141, 250, 92, 214, 34, 124, 231, 78, 106, 179, 173, 80, 61, 55, 161, 156, 45, 114, 214, 222, 9, 77, 4, 104, 52, 44, 30, 149, 27, 36},
-  {103, 167, 175, 25, 71, 242, 5, 31, 102, 236, 38, 188, 223, 212, 241, 99, 13, 4, 40, 150, 151, 55, 40, 147, 64, 29, 108, 50, 37, 159, 55, 137},
-  {125, 181, 86, 185, 69, 172, 188, 175, 36, 25, 118, 119, 114, 72, 199, 183, 204, 25, 147, 120, 109, 220, 192, 171, 10, 235, 47, 230, 42, 210, 169, 223}};
-
 typedef struct gw_context_t {
   /* verification context */
   gw_transaction_context_t transaction_context;
@@ -192,80 +183,39 @@ int sys_set_program_return_data(gw_context_t *ctx,
   return syscall(GW_SYS_SET_RETURN_DATA, data, len, 0, 0, 0, 0);
 }
 
-/**
- * Get account id by account script_hash
- * Mock syscall(GW_SYS_LOAD_ACCOUNT_ID_BY_SCRIPT_HASH, script_hash, account_id, 0, 0, 0, 0)
- */
+/* Get account id by account script_hash */
 int sys_get_account_id_by_script_hash(gw_context_t *ctx,
                                       uint8_t script_hash[32],
                                       uint32_t *account_id) {
   if (ctx == NULL) {
     return GW_ERROR_INVALID_CONTEXT;
   }
-
-  // TODO refactor test_script_hash
-  for (size_t i = 0; i < sizeof(test_script_hash) / 32; i++) {
-    if (0 == memcmp(script_hash, test_script_hash[i], 32)) {
-      *account_id = i;
-      return MOCK_SUCCESS;
-    }
-  }
-  return GW_ERROR_NOT_FOUND;
+  return syscall(GW_SYS_LOAD_ACCOUNT_ID_BY_SCRIPT_HASH, script_hash, account_id,
+                 0, 0, 0, 0);
 }
 
-/**
- * Get account script_hash by account_id
- * Mock syscall(GW_SYS_LOAD_SCRIPT_HASH_BY_ACCOUNT_ID, account_id, script_hash, 0, 0, 0, 0)
- */
+/* Get account script_hash by account id */
 int sys_get_script_hash_by_account_id(gw_context_t *ctx,
                                       uint32_t account_id,
                                       uint8_t script_hash[32]) {
   if (ctx == NULL) {
     return GW_ERROR_INVALID_CONTEXT;
   }
-
-  //TODO: get script_hash from rocketdb
-  // dbg_print("sys_get_script_hash_by_account_id %d", account_id);
-  memcpy(script_hash, test_script_hash[account_id], 32);
-  return MOCK_SUCCESS;
+  return syscall(GW_SYS_LOAD_SCRIPT_HASH_BY_ACCOUNT_ID, account_id, script_hash,
+                 0, 0, 0, 0);
 }
 
 /**
  * Get account script by account id
- * Mock syscall(GW_SYS_LOAD_ACCOUNT_SCRIPT, script, &inner_len, offset, account_id, 0, 0)
  */
 int sys_get_account_script(gw_context_t *ctx, uint32_t account_id,
                            uint64_t *len, uint64_t offset, uint8_t *script) {
   if (ctx == NULL) {
     return GW_ERROR_INVALID_CONTEXT;
   }
-
-  int ret = MOCK_SUCCESS;
-  // TODO: load 
-  static const uint8_t account1_scripts[] = {117, 0, 0, 0, 16, 0, 0, 0, 48, 0, 0, 0, 49, 0, 0, 0, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 1, 64, 0, 0, 0, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-  static const uint8_t account2_scripts[] = {89, 0, 0, 0, 16, 0, 0, 0, 48, 0, 0, 0, 49, 0, 0, 0, 5, 108, 171, 165, 10, 111, 194, 87, 79, 38, 74, 23, 199, 7, 250, 53, 120, 75, 230, 229, 154, 244, 114, 163, 65, 119, 108, 251, 137, 16, 190, 229, 1, 36, 0, 0, 0, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 1, 0, 0, 0};
-  static const uint8_t account4_scripts[] = {97, 0, 0, 0, 16, 0, 0, 0, 48, 0, 0, 0, 49, 0, 0, 0, 61, 131, 245, 41, 45, 5, 161, 161, 151, 161, 101, 38, 160, 60, 251, 86, 103, 65, 171, 189, 194, 72, 182, 31, 188, 159, 136, 253, 36, 110, 14, 98, 1, 44, 0, 0, 0, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 2, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0};
-  // static const uint8_t account5_scripts[] = {109, 0, 0, 0, 16, 0, 0, 0, 48, 0, 0, 0, 49, 0, 0, 0, 5, 108, 171, 165, 10, 111, 194, 87, 79, 38, 74, 23, 199, 7, 250, 53, 120, 75, 230, 229, 154, 244, 114, 163, 65, 119, 108, 251, 137, 16, 190, 229, 1, 56, 0, 0, 0, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 2, 0, 0, 0, 127, 206, 210, 20, 115, 27, 194, 169, 199, 79, 204, 192, 210, 154, 137, 78, 143, 170, 217, 240};
-  switch (account_id) {
-    case 1:
-      *len = sizeof(account1_scripts);
-      memcpy(script, account1_scripts + offset, *len - offset);
-      break;
-    case 2:
-      *len = sizeof(account2_scripts);
-      memcpy(script, account2_scripts + offset, *len - offset);
-      break;
-    case 4:
-      *len = sizeof(account4_scripts);
-      memcpy(script, account4_scripts + offset, *len - offset);
-      break;
-    // case 5:
-    //   *len = sizeof(account5_scripts);
-    //   memcpy(script, account5_scripts + offset, *len - offset);
-    //   break;
-    default:
-      ret = GW_ERROR_NOT_FOUND;
-  }
+  volatile uint64_t inner_len = *len;
+  int ret = syscall(GW_SYS_LOAD_ACCOUNT_SCRIPT, script, &inner_len, offset, account_id, 0, 0);
+  *len = inner_len;
   return ret;
 }
 
@@ -276,8 +226,9 @@ int sys_store_data(gw_context_t *ctx, uint64_t data_len, uint8_t *data) {
   if (ctx == NULL) {
     return GW_ERROR_INVALID_CONTEXT;
   }
-
+  
   // mock syscall(GW_SYS_STORE_DATA, data_len, data, 0, 0, 0, 0)
+  // TODO: move to mock syscall.h
   return gw_store_data(data_len, data);
 }
 
@@ -301,12 +252,13 @@ int sys_load_data(gw_context_t *ctx, uint8_t data_hash[32], uint64_t *len,
       return MOCK_SECP256K1_ERROR_LOADING_DATA;
     }
     *len = CKB_SECP256K1_DATA_SIZE;
-    return ret;
+    return MOCK_SUCCESS;
   }
   
   dbg_print("syscall(GW_SYS_LOAD_DATA, data, &inner_len, offset, data_hash, 0, 0)");
   dbg_print_h256(data_hash);
   // mock syscall(GW_SYS_LOAD_DATA, data, &inner_len, offset, data_hash, 0, 0)
+  // TODO: move to mock syscall.h
   ret = gw_sys_load_data(data, len, offset, data_hash);
   return ret;
 }
@@ -317,6 +269,7 @@ int sys_load_data(gw_context_t *ctx, uint8_t data_hash[32], uint64_t *len,
  */
 int _sys_load_l2transaction(uint8_t* addr, uint64_t* len) {
   // load raw tx data from fuzzInput.raw_tx
+  // TODO: move to mock syscall.h
   gw_load_transaction_from_raw_tx(addr, len);
   return MOCK_SUCCESS;
 }
@@ -337,10 +290,6 @@ int sys_get_block_hash(gw_context_t *ctx, uint64_t number,
   return syscall(GW_SYS_GET_BLOCK_HASH, block_hash, number, 0, 0, 0, 0);
 }
 
-/** 
- * Mock syscall(GW_SYS_GET_SCRIPT_HASH_BY_SHORT_ADDRESS, script_hash, prefix, prefix_len, 0, 0, 0)
- * FIXME: check syscall args A3, A4 in godwoken/crates/generator/src/syscalls/mod.rs
- */ 
 int sys_get_script_hash_by_prefix(gw_context_t *ctx, uint8_t *prefix, uint64_t prefix_len,
                                   uint8_t script_hash[32]) {
   if (ctx == NULL) {
@@ -349,14 +298,6 @@ int sys_get_script_hash_by_prefix(gw_context_t *ctx, uint8_t *prefix, uint64_t p
 
   if (prefix_len == 0 || prefix_len > 32) {
     return GW_ERROR_INVALID_DATA;
-  }
-
-  //TODO: refactor test_script_hash
-  for (size_t i = 0; i < sizeof(test_script_hash) / 32; i++) {
-    if (0 == memcmp(prefix, test_script_hash[i], 20)) {
-      memcpy(script_hash, test_script_hash[i], 32);
-      return MOCK_SUCCESS;
-    }
   }
   return syscall(GW_SYS_GET_SCRIPT_HASH_BY_SHORT_ADDRESS, script_hash, prefix, prefix_len, 0, 0, 0);
 }
@@ -370,7 +311,7 @@ int sys_create(gw_context_t *ctx, uint8_t *script, uint64_t script_len,
     return GW_ERROR_INVALID_CONTEXT;
   }
 
-  //TODO: Mock SYS_CREATE syscall
+  //FIXME: Mock SYS_CREATE syscall
   *account_id = 4;
   return MOCK_SUCCESS;
 }
@@ -393,6 +334,7 @@ int sys_recover_account(struct gw_context_t *ctx,
   return ret;
 }
 /**
+ * TODO:
  * Mock syscall(GW_SYS_LOG, account_id, service_flag, data_length, data, 0, 0)
  */
 int sys_log(gw_context_t *ctx, uint32_t account_id, uint8_t service_flag,
@@ -423,6 +365,7 @@ int sys_pay_fee(gw_context_t *ctx, const uint8_t *payer_addr,
 }
 
 /**
+ * TODO:
  * Mock syscall(GW_SYS_PAY_FEE, payer_addr, short_addr_len, sudt_id, &amount, 0, 0)
  */
 int sys_pay_fee(gw_context_t *ctx, const uint8_t *payer_addr,
@@ -441,15 +384,10 @@ int sys_pay_fee(gw_context_t *ctx, const uint8_t *payer_addr,
   return MOCK_SUCCESS;
 }
 
-/**
- * Mock syscall(GW_SYS_LOAD_ROLLUP_CONFIG, addr, &inner_len, 0, 0, 0, 0)
- * and verify the RollupConfig
- */
 int _sys_load_rollup_config(uint8_t *addr, uint64_t *len) {
-  // FIXME: load rollup_config from godwoken lib
-  static const uint8_t rollup_config[] = {189, 1, 0, 0, 60, 0, 0, 0, 92, 0, 0, 0, 124, 0, 0, 0, 156, 0, 0, 0, 188, 0, 0, 0, 220, 0, 0, 0, 252, 0, 0, 0, 28, 1, 0, 0, 60, 1, 0, 0, 68, 1, 0, 0, 76, 1, 0, 0, 84, 1, 0, 0, 85, 1, 0, 0, 89, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 5, 108, 171, 165, 10, 111, 194, 87, 79, 38, 74, 23, 199, 7, 250, 53, 120, 75, 230, 229, 154, 244, 114, 163, 65, 119, 108, 251, 137, 16, 190, 229};
-  *len = sizeof(rollup_config);
-  memcpy(addr, rollup_config, *len);
+  volatile uint64_t inner_len = *len;
+  int ret = syscall(GW_SYS_LOAD_ROLLUP_CONFIG, addr, &inner_len, 0, 0, 0, 0);
+  *len = inner_len;
 
   if (*len > GW_MAX_ROLLUP_CONFIG_SIZE) {
     ckb_debug("length too long");
@@ -462,7 +400,8 @@ int _sys_load_rollup_config(uint8_t *addr, uint64_t *len) {
     ckb_debug("rollup config cell data is not RollupConfig format");
     return GW_ERROR_INVALID_DATA;
   }
-  return MOCK_SUCCESS;
+
+  return ret;
 }
 
 int gw_context_init(gw_context_t *ctx) {

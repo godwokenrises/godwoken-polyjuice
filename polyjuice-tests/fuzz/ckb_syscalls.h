@@ -99,29 +99,45 @@ static int inline __internal_syscall(long n, long _a0, long _a1, long _a2,
       //   memset((uint8_t*)_a1, 0, 32);
       //   return MOCK_SUCCESS;
       // }
-
-      return gw_sys_load((uint8_t*)_a0, (uint8_t*)_a1);
+      return gw_sys_load((uint8_t *)_a0, (uint8_t *)_a1);
 
     // mock syscall(GW_SYS_SET_RETURN_DATA, *data, len, 0, 0, 0, 0)
     case GW_SYS_SET_RETURN_DATA:
       dbg_print("mock syscall(GW_SYS_SET_RETURN_DATA)");
-      gw_sys_set_return_data((uint8_t*)_a0, _a1);
+      gw_sys_set_return_data((uint8_t *)_a0, _a1);
       return MOCK_SUCCESS;
 
     // mock syscall(GW_SYS_GET_BLOCK_HASH, block_hash, number, 0, 0, 0, 0)
     case GW_SYS_GET_BLOCK_HASH:
       dbg_print("mock syscall(GW_SYS_GET_BLOCK_HASH");
-      gw_sys_get_block_hash((uint8_t*)_a0, _a1);
+      gw_sys_get_block_hash((uint8_t *)_a0, _a1);
       return MOCK_SUCCESS;
 
     // mock syscall(GW_SYS_STORE, raw_key, value, 0, 0, 0, 0)
     case GW_SYS_STORE:
-      gw_update_raw((uint8_t*)_a0, (uint8_t*)_a1);
+      gw_update_raw((uint8_t *)_a0, (uint8_t *)_a1);
       return MOCK_SUCCESS;
 
     // mock syscall(GW_SYS_LOAD_BLOCKINFO, addr, &inner_len, 0, 0, 0, 0)
     case GW_SYS_LOAD_BLOCKINFO:
-      return gw_sys_load_blockinfo((uint8_t*)_a0, (uint64_t*)_a1);
+      return gw_sys_load_blockinfo((uint8_t *)_a0, (uint64_t *)_a1);
+
+    // mock syscall(GW_SYS_LOAD_ACCOUNT_SCRIPT, script, &inner_len, offset, account_id, 0, 0)
+    case GW_SYS_LOAD_ACCOUNT_SCRIPT:
+      return gw_sys_load_account_script((uint8_t *)_a0, (uint64_t *)_a1, _a2, _a3);
+
+    // mock syscall(GW_SYS_LOAD_SCRIPT_HASH_BY_ACCOUNT_ID, account_id, script_hash, 0, 0, 0, 0)
+    case GW_SYS_LOAD_SCRIPT_HASH_BY_ACCOUNT_ID:
+      return gw_sys_load_script_hash_by_account_id(_a0, (uint8_t *)_a1);
+
+    // mock syscall(GW_SYS_LOAD_ACCOUNT_ID_BY_SCRIPT_HASH, script_hash, account_id, 0, 0, 0, 0)
+    case GW_SYS_LOAD_ACCOUNT_ID_BY_SCRIPT_HASH:
+    // TODO:
+    return gw_sys_load_account_id_by_script_hash((uint8_t *)_a0, (uint32_t *)_a1);
+
+    // mock syscall(GW_SYS_GET_SCRIPT_HASH_BY_SHORT_ADDRESS, script_hash, prefix, prefix_len, 0, 0, 0)
+    case GW_SYS_GET_SCRIPT_HASH_BY_SHORT_ADDRESS:
+      return gw_sys_get_script_hash_by_short_address((uint8_t *)_a0, (uint8_t *)_a1, _a2);
 
     default:
       return GW_ERROR_NOT_FOUND;
