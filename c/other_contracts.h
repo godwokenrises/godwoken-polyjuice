@@ -19,20 +19,19 @@ int recover_account_gas(const uint8_t* input_src,
 }
 
 /*
-  Recover an EoA account script by signature
+  Recover an EoA account script hash by signature
 
   input: (the input data is from abi.encode(mesage, signature, code_hash))
   ======
     input[ 0..32]  => message
     input[32..64]  => offset of signature part
-    input[64..96]  => code_hash
+    input[64..96]  => code_hash (EoA lock hash)
     input[96..128] => length of signature data
     input[128..]   => signature data
 
-  output:
+  output (32 bytes):
   =======
-    output[0..32] => data length
-    output[..]    => account script data
+    output[12..32] => godwoken short address
  */
 int recover_account(gw_context_t* ctx,
                     const uint8_t* code_data,
@@ -66,16 +65,13 @@ int recover_account(gw_context_t* ctx,
     return ERROR_RECOVER_ACCOUNT;
   }
   debug_print_data("script", script, script_len);
-  debug_print_int("script length", script_len);
-  *output = (uint8_t *)malloc(32 + script_len);
+  *output = (uint8_t *)malloc(32);
   if (*output == NULL) {
     ckb_debug("malloc failed");
     return -1;
   }
-  *output_size = 32 + script_len;
-  memset(*output, 0, 32);
-  put_u64(script_len, *output);
-  memcpy(*output + 32, script, script_len);
+  *output_size = 32;
+  blake2b_hash(*output, script, script_len);
   return 0;
 }
 
