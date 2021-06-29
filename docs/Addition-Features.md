@@ -20,7 +20,7 @@
 
   output (32 bytes):
   =======
-    output[12..32] => godwoken short address
+    output[0..32] => account script hash
 ```
 
 ### `balance_of_any_sudt` Spec
