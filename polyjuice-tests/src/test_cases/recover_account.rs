@@ -96,17 +96,12 @@ fn test_recover_account() {
         let mut script_args = vec![0u8; 32 + 20];
         script_args[0..32].copy_from_slice(&ROLLUP_SCRIPT_HASH);
         script_args[32..32 + 20].copy_from_slice(&hex::decode(lock_args_hex).unwrap());
-        let script = Script::new_builder()
+        let script_hash = Script::new_builder()
             .code_hash(SECP_LOCK_CODE_HASH.pack())
             .hash_type(ScriptHashType::Type.into())
             .args(Bytes::from(script_args).pack())
-            .build();
-        let script_len = script.as_slice().len();
-        assert_eq!(run_result.return_data[31], 32);
-        assert_eq!(run_result.return_data[63] as usize, script_len);
-        assert_eq!(
-            &run_result.return_data[64..64 + script_len],
-            script.as_slice()
-        );
+            .build()
+            .hash();
+        assert_eq!(run_result.return_data, script_hash);
     }
 }

@@ -8,20 +8,19 @@
 ### `recover_account` Spec
 
 ```
-  Recover an EoA account script by signature
+  Recover an EoA account script hash by signature
 
   input: (the input data is from abi.encode(mesage, signature, code_hash))
   ======
     input[ 0..32]  => message
     input[32..64]  => offset of signature part
-    input[64..96]  => code_hash
+    input[64..96]  => code_hash (EoA lock hash)
     input[96..128] => length of signature data
     input[128..]   => signature data
 
-  output:
+  output (32 bytes):
   =======
-    output[0..32] => data length
-    output[..]    => account script data
+    output[12..32] => godwoken short address
 ```
 
 ### `balance_of_any_sudt` Spec
