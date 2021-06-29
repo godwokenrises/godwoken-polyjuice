@@ -119,6 +119,10 @@ static int inline __internal_syscall(long n, long _a0, long _a1, long _a2,
       gw_update_raw((uint8_t*)_a0, (uint8_t*)_a1);
       return MOCK_SUCCESS;
 
+    // mock syscall(GW_SYS_LOAD_BLOCKINFO, addr, &inner_len, 0, 0, 0, 0)
+    case GW_SYS_LOAD_BLOCKINFO:
+      return gw_sys_load_blockinfo((uint8_t*)_a0, (uint64_t*)_a1);
+
     default:
       return GW_ERROR_NOT_FOUND;
   }

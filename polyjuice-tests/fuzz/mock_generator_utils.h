@@ -117,9 +117,9 @@ int sys_load(gw_context_t *ctx, uint32_t account_id,
 
   // TODO: get mock balance from gw_mock_host.accounts
   if (1 == *(uint32_t*)key) { // SUDT_KEY_FLAG_BALANCE = 1
-    dbg_print("mock balance = 20000");
-    value[0] = 32;
-    value[1] = 78;
+    dbg_print("mock balance = 40000");
+    value[0] = 64;
+    value[1] = 156;
     return MOCK_SUCCESS;
   }
 
@@ -321,19 +321,11 @@ int _sys_load_l2transaction(uint8_t* addr, uint64_t* len) {
   return MOCK_SUCCESS;
 }
 
-/**
- * Mock syscall(GW_SYS_LOAD_BLOCKINFO, addr, &inner_len, 0, 0, 0, 0)
- * struct BlockInfo {
-    block_producer_id: Uint32,
-    number: Uint64,
-    timestamp: Uint64}
- */
 int _sys_load_block_info(void *addr, uint64_t *len) {
-  // TODO：
-  static uint8_t mock_new_block_info[] = {0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-  *len = sizeof(mock_new_block_info);
-  memcpy(addr, mock_new_block_info, *len);
-  return MOCK_SUCCESS;
+  volatile uint64_t inner_len = *len;
+  int ret = syscall(GW_SYS_LOAD_BLOCKINFO, addr, &inner_len, 0, 0, 0, 0);
+  *len = inner_len;
+  return ret;
 }
 
 int sys_get_block_hash(gw_context_t *ctx, uint64_t number,

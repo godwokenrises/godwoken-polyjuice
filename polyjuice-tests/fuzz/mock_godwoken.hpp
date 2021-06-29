@@ -130,6 +130,19 @@ extern "C" void gw_sys_get_block_hash(uint8_t block_hash[32], uint64_t number) {
   memcpy(block_hash, gw_host->get_block_hash(number).bytes, 32);
 }
 
+extern "C" int gw_sys_load_blockinfo(uint8_t* bi_addr, uint64_t* len_ptr) {
+  /**
+   * struct BlockInfo {
+   *  block_producer_id: Uint32,
+   *  number: Uint64,
+   *  timestamp: Uint64}
+   */
+  const uint8_t mock_new_block_info[] = {0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  *len_ptr = sizeof(mock_new_block_info);
+  memcpy((uint8_t*)bi_addr, mock_new_block_info, *len_ptr);
+  return 0;
+}
+
 int init() {
   // init block_hash
   gw_host->block_hash = bytes32({7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7});
