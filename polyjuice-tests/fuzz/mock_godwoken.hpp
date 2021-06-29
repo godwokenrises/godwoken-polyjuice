@@ -30,7 +30,10 @@ struct fuzz_input {
   explicit operator bool() const noexcept { return msg.gas != -1; }
 };
 auto in = fuzz_input{};
+MockedGodwoken* gw_host = &in.mock_gw;
 
+
+// TODO
 // mock_godwoken.set_storage(
 //   bytes32({202, 21, 28, 70, 21, 107, 178, 94, 20, 217, 66, 198, 87, 129, 250, 203, 109, 201, 220, 50, 224, 74, 196, 60, 29, 131, 235, 115, 74, 147, 160, 21}),
 //   bytes32({202, 21, 28, 70, 21, 107, 178, 94, 20, 217, 66, 198, 87, 129, 250, 203, 109, 201, 220, 50, 224, 74, 196, 60, 29, 131, 235, 115, 74, 147, 160, 21}),
@@ -56,12 +59,9 @@ bytes32 u256_to_bytes32(const uint8_t u8[32]) {
   return ret;
 }
 
-void print_bytes32(bytes32& b32) {
-  cout << b32;
-}
-
-extern "C" int init();
-extern "C" int gw_update_raw(const uint8_t k[32], const uint8_t v[32]);
+// void dbg_print_bytes32(bytes32& b32) {
+//   dbg_print(<< b32);
+// }
 
 extern "C" int gw_store_data(const uint64_t len, uint8_t *data);
 /* store code or script */
@@ -93,15 +93,28 @@ extern "C" int gw_sys_load_data(uint8_t* addr, uint64_t* len_ptr, uint64_t offse
   return 0;
 }
 
-int gw_update_raw(const uint8_t k[32], const uint8_t v[32]) {
-  cout << "\tgw_update_raw..." << endl;
-  in.mock_gw.state[u256_to_bytes32(k)] = u256_to_bytes32(v);
-  
-  // for (auto kv : in.mock_gw.state) {
-  //   cout << "\tkey:\t" << kv.first << endl << "\tvalue:\t" << kv.second << endl;
-  // }
+void print_state() {
+  for (auto kv : gw_host->state) {
+    cout << "\t key:\t" << kv.first << endl << "\t value:\t" << kv.second << endl;
+  }
+}
 
+// sys_load from state
+extern "C" int gw_sys_load(const uint8_t k[32], uint8_t v[32]) {
+  auto search = gw_host->state.find(u256_to_bytes32(k));
+  if (search == gw_host->state.end()) {
+    dbg_print("gw_sys_load failed, all the state as following:");
+    print_state();
+    return GW_ERROR_NOT_FOUND;
+  }
+  memcpy(v, search->second.bytes, 32);
   return 0;
+}
+
+extern "C" void gw_update_raw(const uint8_t k[32], const uint8_t v[32]){
+  in.mock_gw.state[u256_to_bytes32(k)] = u256_to_bytes32(v);
+
+  // print_state();
 }
 
 extern "C" void gw_load_transaction_from_raw_tx(uint8_t* addr, uint64_t* len) {
@@ -109,10 +122,28 @@ extern "C" void gw_load_transaction_from_raw_tx(uint8_t* addr, uint64_t* len) {
   in.raw_tx.copy(addr, *len);
 }
 
-int init() {
-  // in.mock_gw.gw_account[0] = bytes32({202, 21, 28, 70, 21, 107, 178, 94, 20, 217, 66, 198, 87, 129, 250, 203, 109, 201, 220, 50, 224, 74, 196, 60, 29, 131, 235, 115, 74, 147, 160, 21});
+extern "C" void gw_sys_set_return_data(uint8_t* addr, uint64_t len) {
+  in.mock_gw.call_result = make_result(evmc_status_code{}, 0, addr, len);
+}
 
-  // in.raw_tx = 
+extern "C" void gw_sys_get_block_hash(uint8_t block_hash[32], uint64_t number) {
+  memcpy(block_hash, gw_host->get_block_hash(number).bytes, 32);
+}
+
+int init() {
+  // init block_hash
+  gw_host->block_hash = bytes32({7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7});
+  
+  // init account nonce
+  const uint8_t zero_nonce[32] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  
+  const uint8_t account_4_key[32] = {4, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  const uint8_t poly_destructed_key[32] = {5, 0, 0, 0, 255, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  
+  gw_update_raw(account_4_key, zero_nonce);
+  gw_update_raw(poly_destructed_key, zero_nonce);
+  
+  // in.mock_gw.gw_account[0] = bytes32({202, 21, 28, 70, 21, 107, 178, 94, 20, 217, 66, 198, 87, 129, 250, 203, 109, 201, 220, 50, 224, 74, 196, 60, 29, 131, 235, 115, 74, 147, 160, 21});
 
   // static uint8_t get_chain_id_tx[] = {92, 0, 0, 0, 20, 0, 0, 0, 24, 0, 0, 0, 28, 0, 0, 0, 32, 0, 0, 0, 4, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 56, 0, 0, 0, 255, 255, 255, 80, 79, 76, 89, 0, 8, 82, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 109, 76, 230, 60};
   // // version@20210625: {92, 0, 0, 0, 20, 0, 0, 0, 24, 0, 0, 0, 28, 0, 0, 0, 32, 0, 0, 0, 3, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 56, 0, 0, 0, 255, 255, 255, 80, 79, 76, 89, 0, 8, 82, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 109, 76, 230, 60};
@@ -125,5 +156,6 @@ int init() {
   // *len = sizeof(deploy_get_chain_id_contract);
   // memcpy(addr, deploy_get_chain_id_contract, *len);
 
+  // TODO: construct mock godwoken context => gw_context_init in run_polyjuice()
   return 0;
 }

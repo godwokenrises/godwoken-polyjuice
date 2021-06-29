@@ -24,7 +24,7 @@ SECP256K1_SRC := $(SECP_DIR)/src/ecmult_static_pre_context.h
 CFLAGS_SECP := -isystem $(SECP_DIR)/src -isystem $(SECP_DIR)
 CFLAGS_CKB_STD := -I./ -I$(DEPS)/godwoken-scripts/c/deps/ckb-c-stdlib/simulator -I$(DEPS)/godwoken-scripts/c/deps/ckb-c-stdlib/ -I$(DEPS)/ckb-c-stdlib/molecule
 CFLAGS_ETHASH := -I$(DEPS)/ethash/include -I$(DEPS)/ethash/lib/ethash -I$(DEPS)/ethash/lib/keccak -I$(DEPS)/ethash/lib/support
-CFLAGS_EVMONE := -I$(DEPS)/evmone/lib/evmone -I$(DEPS)/evmone/include -I$(DEPS)/evmone/evmc/include
+CFLAGS_EVMONE := -I$(DEPS)/evmone/lib/evmone -I$(DEPS)/evmone/include -I$(DEPS)/evmone/evmc/include -I$(DEPS)/evmone/evmc/tools/
 CFLAGS_GODWOKEN := -I$(DEPS)/godwoken-scripts/c
 CFLAGS_MBEDTLS := -I$(DEPS)/mbedtls/include
 CFLAGS_CRYPTO_ALGORITHMS := -I$(DEPS)/crypto-algorithms
@@ -42,7 +42,7 @@ PROTOCOL_VERSION := 72c2e901078ad0d2b3f7270722e46e5b1cdab67a
 PROTOCOL_SCHEMA_URL := https://raw.githubusercontent.com/nervosnetwork/godwoken/${PROTOCOL_VERSION}/crates/types/schemas
 
 ALL_OBJS := $(BUILD)/keccak.o $(BUILD)/keccakf800.o \
-  $(BUILD)/evmone.o $(BUILD)/baseline.o $(BUILD)/analysis.o $(BUILD)/instruction_metrics.o $(BUILD)/instruction_names.o $(BUILD)/execution.o $(BUILD)/instructions.o $(BUILD)/instructions_calls.o \
+  $(BUILD)/evmone.o $(BUILD)/evmc_utils.o $(BUILD)/baseline.o $(BUILD)/analysis.o $(BUILD)/instruction_metrics.o $(BUILD)/instruction_names.o $(BUILD)/execution.o $(BUILD)/instructions.o $(BUILD)/instructions_calls.o \
   $(BUILD)/sha256.o $(BUILD)/memzero.o $(BUILD)/ripemd160.o $(BUILD)/bignum.o $(BUILD)/platform_util.o
 BIN_DEPS := ../../c/contracts.h ../../c/sudt_contracts.h ../../c/other_contracts.h ../../c/polyjuice.h ../../c/polyjuice_utils.h $(BUILD)/secp256k1_data_info.h $(ALL_OBJS)
 GENERATOR_DEPS := ../../c/generator/secp256k1_helper.h $(BIN_DEPS)
@@ -141,6 +141,8 @@ build/instruction_metrics.o: $(DEPS)/evmone/evmc/lib/instructions/instruction_me
 build/instruction_names.o: $(DEPS)/evmone/evmc/lib/instructions/instruction_names.c
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -c -o $@ $<
 build/instructions_calls.o: $(DEPS)/evmone/lib/evmone/instructions_calls.cpp
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -c -o $@ $<
+build/evmc_utils.o: $(DEPS)/evmone/evmc/tools/evmc/utils.cpp
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -c -o $@ $<
 
 # new SHA-3 encryption standard - Keccak algorithm

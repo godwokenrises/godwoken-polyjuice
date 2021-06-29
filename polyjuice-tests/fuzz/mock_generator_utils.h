@@ -103,6 +103,10 @@ int sys_load(gw_context_t *ctx, uint32_t account_id,
              const uint8_t *key,
              const uint64_t key_len,
              uint8_t value[GW_VALUE_BYTES]) {
+  dbg_print("mock sys_load, account_id = %d", account_id);
+  dbg_print("key_len = %ld, key:", key_len);
+  dbg_print_h256((uint8_t*)key);
+
   if (ctx == NULL) {
     return GW_ERROR_INVALID_CONTEXT;
   }
@@ -111,8 +115,9 @@ int sys_load(gw_context_t *ctx, uint32_t account_id,
     return ret;
   }
 
+  // TODO: get mock balance from gw_mock_host.accounts
   if (1 == *(uint32_t*)key) { // SUDT_KEY_FLAG_BALANCE = 1
-    // mock balance = 20000
+    dbg_print("mock balance = 20000");
     value[0] = 32;
     value[1] = 78;
     return MOCK_SUCCESS;
@@ -127,6 +132,10 @@ int sys_store(gw_context_t *ctx, uint32_t account_id,
               const uint8_t *key,
               const uint64_t key_len,
               const uint8_t value[GW_VALUE_BYTES]) {
+  dbg_print("mock sys_store, account_id = %d, ", account_id);
+  dbg_print("key_len = %ld, key:", key_len);
+  dbg_print_h256((uint8_t*)key);
+
   if (ctx == NULL) {
     return GW_ERROR_INVALID_CONTEXT;
   }
@@ -135,20 +144,15 @@ int sys_store(gw_context_t *ctx, uint32_t account_id,
     return ret;
   }
 
-  // if (1 == *(uint32_t*)key) { // SUDT_KEY_FLAG_BALANCE = 1
-  //   // mock _sudt_set_balance success
-  //   return MOCK_SUCCESS;
-  // }
-  // const uint8_t POLYJUICE_SYSTEM_PREFIX = 0xFF;
-  // if (0 == memcmp(&POLYJUICE_SYSTEM_PREFIX, key + 4, sizeof(uint8_t))) {
-  //   return MOCK_SUCCESS;
-  // }
-
   uint8_t raw_key[GW_KEY_BYTES];
   gw_build_account_key(account_id, key, key_len, raw_key);
 
-  // mock syscall(GW_SYS_STORE, raw_key, value, 0, 0, 0, 0)
-  return gw_update_raw(raw_key, value);
+  dbg_print("\t raw_key:");
+  dbg_print_h256(raw_key);
+  dbg_print("\t value");
+  dbg_print_h256(value);
+
+  return syscall(GW_SYS_STORE, raw_key, value, 0, 0, 0, 0);
 }
 
 int sys_get_account_nonce(gw_context_t *ctx, uint32_t account_id,
@@ -166,6 +170,9 @@ int sys_get_account_nonce(gw_context_t *ctx, uint32_t account_id,
   // return syscall(GW_SYS_LOAD, key, value, 0, 0, 0, 0);
   uint8_t key[32] = {0};
   gw_build_account_field_key(account_id, GW_ACCOUNT_NONCE, key);
+  dbg_print("sys_get_account_nonce, account_id = %d", account_id);
+  dbg_print("\t key:");
+  dbg_print_h256(key);
   uint8_t value[32] = {0};
   ret = syscall(GW_SYS_LOAD, key, value, 0, 0, 0, 0);
   if (ret != 0) {
@@ -175,18 +182,14 @@ int sys_get_account_nonce(gw_context_t *ctx, uint32_t account_id,
   return 0;
 }
 
-/**
- * set call return data
- * Mock syscall(GW_SYS_SET_RETURN_DATA, data, len, 0, 0, 0, 0)
- */
+/* set call return data */
 int sys_set_program_return_data(gw_context_t *ctx,
                                 uint8_t *data,
                                 uint64_t len) {
   if (ctx == NULL) {
     return GW_ERROR_INVALID_CONTEXT;
   }
-  // TODO: print data?
-  return MOCK_SUCCESS;
+  return syscall(GW_SYS_SET_RETURN_DATA, data, len, 0, 0, 0, 0);
 }
 
 /**
@@ -222,7 +225,7 @@ int sys_get_script_hash_by_account_id(gw_context_t *ctx,
   }
 
   //TODO: get script_hash from rocketdb
-  dbg_print("sys_get_script_hash_by_account_id %d", account_id);
+  // dbg_print("sys_get_script_hash_by_account_id %d", account_id);
   memcpy(script_hash, test_script_hash[account_id], 32);
   return MOCK_SUCCESS;
 }
@@ -242,7 +245,7 @@ int sys_get_account_script(gw_context_t *ctx, uint32_t account_id,
   static const uint8_t account1_scripts[] = {117, 0, 0, 0, 16, 0, 0, 0, 48, 0, 0, 0, 49, 0, 0, 0, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 1, 64, 0, 0, 0, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
   static const uint8_t account2_scripts[] = {89, 0, 0, 0, 16, 0, 0, 0, 48, 0, 0, 0, 49, 0, 0, 0, 5, 108, 171, 165, 10, 111, 194, 87, 79, 38, 74, 23, 199, 7, 250, 53, 120, 75, 230, 229, 154, 244, 114, 163, 65, 119, 108, 251, 137, 16, 190, 229, 1, 36, 0, 0, 0, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 1, 0, 0, 0};
   static const uint8_t account4_scripts[] = {97, 0, 0, 0, 16, 0, 0, 0, 48, 0, 0, 0, 49, 0, 0, 0, 61, 131, 245, 41, 45, 5, 161, 161, 151, 161, 101, 38, 160, 60, 251, 86, 103, 65, 171, 189, 194, 72, 182, 31, 188, 159, 136, 253, 36, 110, 14, 98, 1, 44, 0, 0, 0, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 2, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0};
-  static const uint8_t account5_scripts[] = {109, 0, 0, 0, 16, 0, 0, 0, 48, 0, 0, 0, 49, 0, 0, 0, 5, 108, 171, 165, 10, 111, 194, 87, 79, 38, 74, 23, 199, 7, 250, 53, 120, 75, 230, 229, 154, 244, 114, 163, 65, 119, 108, 251, 137, 16, 190, 229, 1, 56, 0, 0, 0, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 2, 0, 0, 0, 127, 206, 210, 20, 115, 27, 194, 169, 199, 79, 204, 192, 210, 154, 137, 78, 143, 170, 217, 240};
+  // static const uint8_t account5_scripts[] = {109, 0, 0, 0, 16, 0, 0, 0, 48, 0, 0, 0, 49, 0, 0, 0, 5, 108, 171, 165, 10, 111, 194, 87, 79, 38, 74, 23, 199, 7, 250, 53, 120, 75, 230, 229, 154, 244, 114, 163, 65, 119, 108, 251, 137, 16, 190, 229, 1, 56, 0, 0, 0, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 2, 0, 0, 0, 127, 206, 210, 20, 115, 27, 194, 169, 199, 79, 204, 192, 210, 154, 137, 78, 143, 170, 217, 240};
   switch (account_id) {
     case 1:
       *len = sizeof(account1_scripts);
@@ -256,10 +259,10 @@ int sys_get_account_script(gw_context_t *ctx, uint32_t account_id,
       *len = sizeof(account4_scripts);
       memcpy(script, account4_scripts + offset, *len - offset);
       break;
-    case 5:
-      *len = sizeof(account5_scripts);
-      memcpy(script, account5_scripts + offset, *len - offset);
-      break;
+    // case 5:
+    //   *len = sizeof(account5_scripts);
+    //   memcpy(script, account5_scripts + offset, *len - offset);
+    //   break;
     default:
       ret = GW_ERROR_NOT_FOUND;
   }
