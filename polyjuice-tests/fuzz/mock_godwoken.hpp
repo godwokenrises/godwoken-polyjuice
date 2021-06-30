@@ -87,8 +87,8 @@ extern "C" int gw_store_data(const uint64_t len, uint8_t *data) {
 }
 
 extern "C" int gw_sys_load_data(uint8_t* addr, uint64_t* len_ptr, uint64_t offset, uint8_t data_hash[32]) {
-  auto search = in.mock_gw.code_store.find(u256_to_bytes32(data_hash));
-  if (search == in.mock_gw.code_store.end()) {
+  auto search = gw_host->code_store.find(u256_to_bytes32(data_hash));
+  if (search == gw_host->code_store.end()) {
     return GW_ERROR_NOT_FOUND;
   }
   *len_ptr = search->second.size();
@@ -201,33 +201,6 @@ extern "C" int gw_sys_load_account_script(uint8_t *script_addr,
     return ret;
   }
   return gw_sys_load_data(script_addr, len_ptr, offset, script_hash);
-
-  // int ret = MOCK_SUCCESS;
-  // static const uint8_t account1_scripts[] = {117, 0, 0, 0, 16, 0, 0, 0, 48, 0, 0, 0, 49, 0, 0, 0, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 1, 64, 0, 0, 0, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-  // static const uint8_t account2_scripts[] = {89, 0, 0, 0, 16, 0, 0, 0, 48, 0, 0, 0, 49, 0, 0, 0, 5, 108, 171, 165, 10, 111, 194, 87, 79, 38, 74, 23, 199, 7, 250, 53, 120, 75, 230, 229, 154, 244, 114, 163, 65, 119, 108, 251, 137, 16, 190, 229, 1, 36, 0, 0, 0, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 1, 0, 0, 0};
-  // static const uint8_t account4_scripts[] = {97, 0, 0, 0, 16, 0, 0, 0, 48, 0, 0, 0, 49, 0, 0, 0, 61, 131, 245, 41, 45, 5, 161, 161, 151, 161, 101, 38, 160, 60, 251, 86, 103, 65, 171, 189, 194, 72, 182, 31, 188, 159, 136, 253, 36, 110, 14, 98, 1, 44, 0, 0, 0, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 2, 0, 0, 0, 3, 0, 0, 0, 0, 0, 0, 0};
-  // static const uint8_t account5_scripts[] = {109, 0, 0, 0, 16, 0, 0, 0, 48, 0, 0, 0, 49, 0, 0, 0, 5, 108, 171, 165, 10, 111, 194, 87, 79, 38, 74, 23, 199, 7, 250, 53, 120, 75, 230, 229, 154, 244, 114, 163, 65, 119, 108, 251, 137, 16, 190, 229, 1, 56, 0, 0, 0, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 169, 2, 0, 0, 0, 127, 206, 210, 20, 115, 27, 194, 169, 199, 79, 204, 192, 210, 154, 137, 78, 143, 170, 217, 240};
-  // switch (account_id) {
-  //   case 1:
-  //     *len = sizeof(account1_scripts);
-  //     memcpy(script, account1_scripts + offset, *len - offset);
-  //     break;
-  //   case 2:
-  //     *len = sizeof(account2_scripts);
-  //     memcpy(script, account2_scripts + offset, *len - offset);
-  //     break;
-  //   case 4:
-  //     *len = sizeof(account4_scripts);
-  //     memcpy(script, account4_scripts + offset, *len - offset);
-  //     break;
-  //   // case 5:
-  //   //   *len = sizeof(account5_scripts);
-  //   //   memcpy(script, account5_scripts + offset, *len - offset);
-  //   //   break;
-  //   default:
-  //     ret = GW_ERROR_NOT_FOUND;
-  // }
-  // return ret;
 }
 
 extern "C" int gw_sys_load_rollup_config(uint8_t *addr,
@@ -321,6 +294,7 @@ extern "C" int gw_sys_create(uint8_t *script, uint64_t script_len, uint32_t *acc
   }
 #pragma pop_macro("errno")
 
+  //TODO: use create_account_from_script fn
   /* Same logic from State::create_account() */
   uint32_t id = gw_host->account_count; // tmp
   const uint8_t zero_nonce[GW_VALUE_BYTES] = {0};
@@ -352,12 +326,14 @@ extern "C" int gw_sys_create(uint8_t *script, uint64_t script_len, uint32_t *acc
   // return id
   *account_id_ptr = id;
 
+  dbg_print("new account id = %d was created.", id);
   return 0;
 }
 
 // void create_account(uint8_t script_hash[GW_KEY_BYTES], uint32_t id) {
   //TODO: load account script
 // }
+
 // create account by script and return the new account id
 uint32_t create_account_from_script(uint8_t *script, uint64_t script_len) {
   uint8_t script_hash_type;
@@ -395,6 +371,7 @@ uint32_t create_account_from_script(uint8_t *script, uint64_t script_len) {
   gw_update_raw(script_hash_to_id_key, script_hash_to_id_value);
 
   // account_count++
+  dbg_print("new account id = %d was created.", id);
   return gw_host->account_count++;
 }
 
@@ -420,30 +397,38 @@ int init() {
     = from_hex("35000000100000003000000031000000a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a10100000000");
   new_id = create_account_from_script((uint8_t *)reserved_account_script.data(),
                                       reserved_account_script.size());
-  dbg_print("new account id = %d was created.", new_id);
+  // dbg_print("new account id = %d was created.", new_id);
   // id = 1
   bytes ckb_account_script
     = from_hex("75000000100000003000000031000000a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a20140000000a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a90000000000000000000000000000000000000000000000000000000000000000");
   new_id = create_account_from_script((uint8_t *)ckb_account_script.data(),
                                       ckb_account_script.size());
-  dbg_print("new account id = %d was created.", new_id);
+  // dbg_print("new account id = %d was created.", new_id);
   // id = 2
   bytes meta_account_script
      = from_hex("590000001000000030000000310000006cdd38bc8fdb80584518dd163213ba0061e08391a372b8c0ff7a67abc86a43de0124000000a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a901000000");
   new_id = create_account_from_script((uint8_t *)meta_account_script.data(),
                                       meta_account_script.size());
-  dbg_print("new account id = %d was created.", new_id);
+  // dbg_print("new account id = %d was created.", new_id);
   // id = 3
   bytes block_producer_script = from_hex("69000000100000003000000031000000aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0134000000a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a99999999999999999999999999999999999999999");
   // new_id = create_account_from_script((uint8_t *)block_producer_script.data(),
                                               //  block_producer_script.size());
   new_id = create_account_from_script((uint8_t *)block_producer_script.data(), block_producer_script.size());
-  dbg_print("new account id = %d was created.", new_id);
+  // dbg_print("new account id = %d was created.", new_id);
   // id = 4
   bytes build_eth_l2_script = from_hex("69000000100000003000000031000000aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0134000000a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a90101010101010101010101010101010101010101");
   new_id = create_account_from_script((uint8_t *)build_eth_l2_script.data(),
                                       build_eth_l2_script.size());
-  dbg_print("new account id = %d was created.", new_id);
+  // dbg_print("new account id = %d was created.", new_id);
+  
+  
+  // init destructed key
+  const uint8_t zero_nonce[32] = {0};
+  const uint8_t poly_destructed_key[32] = {5, 0, 0, 0, 255, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
+  // FIXME:
+  gw_update_raw(poly_destructed_key, zero_nonce);
+
   print_state();
 
   return 0;

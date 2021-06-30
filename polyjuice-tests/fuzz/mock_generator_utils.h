@@ -1,6 +1,5 @@
 #ifndef GW_GENERATOR_H_
 #define GW_GENERATOR_H_
-
 /* Layer2 contract generator
  *
  * The generator supposed to be run off-chain.
@@ -41,12 +40,6 @@
 #define GW_SYS_PAY_FEE 3501
 #define GW_SYS_LOG 3502
 #define GW_SYS_RECOVER_ACCOUNT 3503
-
-/* Godwoken Service Flag */
-// #define GW_LOG_SUDT_TRANSFER    0
-// #define GW_LOG_SUDT_PAY_FEE     1
-// #define GW_LOG_POLYJUICE_SYSTEM 2
-// #define GW_LOG_POLYJUICE_USER   3
 
 #define MOCK_SUCCESS 0
 #define MOCK_SECP256K1_ERROR_LOADING_DATA -101
@@ -94,10 +87,6 @@ int sys_load(gw_context_t *ctx, uint32_t account_id,
              const uint8_t *key,
              const uint64_t key_len,
              uint8_t value[GW_VALUE_BYTES]) {
-  dbg_print("mock sys_load, account_id = %d", account_id);
-  dbg_print("key_len = %ld, key:", key_len);
-  dbg_print_h256((uint8_t*)key);
-
   if (ctx == NULL) {
     return GW_ERROR_INVALID_CONTEXT;
   }
@@ -108,7 +97,7 @@ int sys_load(gw_context_t *ctx, uint32_t account_id,
 
   // TODO: get mock balance from gw_mock_host.accounts
   if (1 == *(uint32_t*)key) { // SUDT_KEY_FLAG_BALANCE = 1
-    dbg_print("mock balance = 40000");
+    dbg_print("mock ID(%d) balance = 40000", account_id);
     value[0] = 64;
     value[1] = 156;
     return MOCK_SUCCESS;
@@ -118,15 +107,10 @@ int sys_load(gw_context_t *ctx, uint32_t account_id,
   gw_build_account_key(account_id, key, key_len, raw_key);
   return syscall(GW_SYS_LOAD, raw_key, value, 0, 0, 0, 0);
 }
-
 int sys_store(gw_context_t *ctx, uint32_t account_id,
               const uint8_t *key,
               const uint64_t key_len,
               const uint8_t value[GW_VALUE_BYTES]) {
-  dbg_print("mock sys_store, account_id = %d, ", account_id);
-  dbg_print("key_len = %ld, key:", key_len);
-  dbg_print_h256((uint8_t*)key);
-
   if (ctx == NULL) {
     return GW_ERROR_INVALID_CONTEXT;
   }
@@ -137,12 +121,6 @@ int sys_store(gw_context_t *ctx, uint32_t account_id,
 
   uint8_t raw_key[GW_KEY_BYTES];
   gw_build_account_key(account_id, key, key_len, raw_key);
-
-  dbg_print("\t raw_key:");
-  dbg_print_h256(raw_key);
-  dbg_print("\t value");
-  dbg_print_h256(value);
-
   return syscall(GW_SYS_STORE, raw_key, value, 0, 0, 0, 0);
 }
 
@@ -161,9 +139,6 @@ int sys_get_account_nonce(gw_context_t *ctx, uint32_t account_id,
   // return syscall(GW_SYS_LOAD, key, value, 0, 0, 0, 0);
   uint8_t key[32] = {0};
   gw_build_account_field_key(account_id, GW_ACCOUNT_NONCE, key);
-  dbg_print("sys_get_account_nonce, account_id = %d", account_id);
-  dbg_print("\t key:");
-  dbg_print_h256(key);
   uint8_t value[32] = {0};
   ret = syscall(GW_SYS_LOAD, key, value, 0, 0, 0, 0);
   if (ret != 0) {
@@ -205,9 +180,7 @@ int sys_get_script_hash_by_account_id(gw_context_t *ctx,
                  0, 0, 0, 0);
 }
 
-/**
- * Get account script by account id
- */
+/* Get account script by account id */
 int sys_get_account_script(gw_context_t *ctx, uint32_t account_id,
                            uint64_t *len, uint64_t offset, uint8_t *script) {
   if (ctx == NULL) {
@@ -286,7 +259,6 @@ int sys_get_block_hash(gw_context_t *ctx, uint64_t number,
   if (ctx == NULL) {
     return GW_ERROR_INVALID_CONTEXT;
   }
-
   return syscall(GW_SYS_GET_BLOCK_HASH, block_hash, number, 0, 0, 0, 0);
 }
 
@@ -320,7 +292,6 @@ int sys_recover_account(struct gw_context_t *ctx,
   if (ctx == NULL) {
     return GW_ERROR_INVALID_CONTEXT;
   }
-
   volatile uint64_t inner_script_len = 0;
   int ret = syscall(GW_SYS_RECOVER_ACCOUNT, script, &inner_script_len,
                     message, signature, signature_len, code_hash);
@@ -387,10 +358,10 @@ int _sys_load_rollup_config(uint8_t *addr, uint64_t *len) {
     ckb_debug("length too long");
     return GW_ERROR_INVALID_DATA;
   }
-  mol_seg_t rollup_config_seg;
-  rollup_config_seg.ptr = addr;
-  rollup_config_seg.size = *len;
-  if (MolReader_RollupConfig_verify(&rollup_config_seg, false) != MOL_OK) {
+  mol_seg_t config_seg;
+  config_seg.ptr = addr;
+  config_seg.size = *len;
+  if (MolReader_RollupConfig_verify(&config_seg, false) != MOL_OK) {
     ckb_debug("rollup config cell data is not RollupConfig format");
     return GW_ERROR_INVALID_DATA;
   }
@@ -423,7 +394,7 @@ int gw_context_init(gw_context_t *ctx) {
   if (ret != 0) {
     return ret;
   }
-  dbg_print("[gw_context_init] l2tx size: %d", len);
+  // dbg_print("[gw_context_init] l2tx size: %d", len);
   if (len > GW_MAX_L2TX_SIZE) {
     return GW_ERROR_INVALID_DATA;
   }
@@ -433,7 +404,7 @@ int gw_context_init(gw_context_t *ctx) {
   l2transaction_seg.size = len;
   ret = gw_parse_transaction_context(&ctx->transaction_context,
                                      &l2transaction_seg);
-  dbg_print("[gw_context_init] ret of gw_parse_transaction_context: %d", ret);
+  // dbg_print("[gw_context_init] ret of gw_parse_transaction_context: %d", ret);
   if (ret != 0) {
     return ret;
   }
@@ -441,7 +412,7 @@ int gw_context_init(gw_context_t *ctx) {
   uint8_t block_info_buf[sizeof(MolDefault_BlockInfo)] = {0};
   len = sizeof(block_info_buf);
   ret = _sys_load_block_info(block_info_buf, &len);
-  dbg_print("[gw_context_init] ret of _sys_load_block_info: %d", ret);
+  // dbg_print("[gw_context_init] ret of _sys_load_block_info: %d", ret);
   if (ret != 0) {
     return ret;
   }
@@ -450,14 +421,14 @@ int gw_context_init(gw_context_t *ctx) {
   block_info_seg.ptr = block_info_buf;
   block_info_seg.size = len;
   ret = gw_parse_block_info(&ctx->block_info, &block_info_seg);
-  dbg_print("[gw_context_init] ret of gw_parse_block_info: %d", ret);
+  // dbg_print("[gw_context_init] ret of gw_parse_block_info: %d", ret);
   if (ret != 0) {
     return ret;
   }
 
   ctx->rollup_config_size = GW_MAX_ROLLUP_CONFIG_SIZE;
   ret = _sys_load_rollup_config(ctx->rollup_config, &ctx->rollup_config_size);
-  dbg_print("[gw_context_init] ret of _sys_load_rollup_config: %d", ret);
+  // dbg_print("[gw_context_init] ret of _sys_load_rollup_config: %d", ret);
   if (ret != 0) {
     return ret;
   }
