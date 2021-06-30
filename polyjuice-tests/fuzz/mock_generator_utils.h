@@ -14,8 +14,8 @@
 
 #include "ckb_syscalls.h"
 #include "common.h"
-
 #include "secp256k1_data_info.h"
+
 #include "mock_godwoken.hpp"
 
 /* syscalls */
@@ -302,18 +302,12 @@ int sys_get_script_hash_by_prefix(gw_context_t *ctx, uint8_t *prefix, uint64_t p
   return syscall(GW_SYS_GET_SCRIPT_HASH_BY_SHORT_ADDRESS, script_hash, prefix, prefix_len, 0, 0, 0);
 }
 
-/**
- * Mock syscall(GW_SYS_CREATE, script, script_len, account_id, 0, 0, 0)
- */
 int sys_create(gw_context_t *ctx, uint8_t *script, uint64_t script_len,
                uint32_t *account_id) {
   if (ctx == NULL) {
     return GW_ERROR_INVALID_CONTEXT;
   }
-
-  //FIXME: Mock SYS_CREATE syscall
-  *account_id = 4;
-  return MOCK_SUCCESS;
+  return syscall(GW_SYS_CREATE, script, script_len, account_id, 0, 0, 0);
 }
 
 int sys_recover_account(struct gw_context_t *ctx,
@@ -393,10 +387,10 @@ int _sys_load_rollup_config(uint8_t *addr, uint64_t *len) {
     ckb_debug("length too long");
     return GW_ERROR_INVALID_DATA;
   }
-  mol_seg_t config_seg;
-  config_seg.ptr = addr;
-  config_seg.size = *len;
-  if (MolReader_RollupConfig_verify(&config_seg, false) != MOL_OK) {
+  mol_seg_t rollup_config_seg;
+  rollup_config_seg.ptr = addr;
+  rollup_config_seg.size = *len;
+  if (MolReader_RollupConfig_verify(&rollup_config_seg, false) != MOL_OK) {
     ckb_debug("rollup config cell data is not RollupConfig format");
     return GW_ERROR_INVALID_DATA;
   }

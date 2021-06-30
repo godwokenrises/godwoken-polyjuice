@@ -2,15 +2,17 @@
 #include <evmc/evmc.hpp>
 #include <evmc/mocked_host.hpp>
 #include <common.h>
+#include <polyjuice_globals.h>
 
 using namespace std;
 using namespace evmc;
 
 class MockedGodwoken : public MockedHost {
 public:
-  std::unordered_map<uint32_t, bytes32> gw_account;
+  uint8_t account_count = 5;
   unordered_map<bytes32, bytes32> state;
   unordered_map<bytes32, bytes> code_store;
+  mol_seg_t rollup_config_seg;
 
   result call(const evmc_message& msg) noexcept override {
     auto result = MockedHost::call(msg);
@@ -63,9 +65,8 @@ bytes32 u256_to_bytes32(const uint8_t u8[32]) {
 //   dbg_print(<< b32);
 // }
 
-extern "C" int gw_store_data(const uint64_t len, uint8_t *data);
 /* store code or script */
-int gw_store_data(const uint64_t len, uint8_t *data) {
+extern "C" int gw_store_data(const uint64_t len, uint8_t *data) {
   uint8_t script_hash[32];
   blake2b_hash(script_hash, data, len);
 
@@ -79,7 +80,7 @@ int gw_store_data(const uint64_t len, uint8_t *data) {
   for (size_t i = 0; i < len; i++) {
     cout << (uint16_t)*(data + i) << ' ';
   }
-  in.mock_gw.code_store[u256_to_bytes32(script_hash)] = bs;
+  gw_host->code_store[u256_to_bytes32(script_hash)] = bs;
   return 0;
 }
 
@@ -233,7 +234,125 @@ extern "C" int gw_sys_load_rollup_config(uint8_t *addr,
   const uint8_t rollup_config[] = {189, 1, 0, 0, 60, 0, 0, 0, 92, 0, 0, 0, 124, 0, 0, 0, 156, 0, 0, 0, 188, 0, 0, 0, 220, 0, 0, 0, 252, 0, 0, 0, 28, 1, 0, 0, 60, 1, 0, 0, 68, 1, 0, 0, 76, 1, 0, 0, 84, 1, 0, 0, 85, 1, 0, 0, 89, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 108, 221, 56, 188, 143, 219, 128, 88, 69, 24, 221, 22, 50, 19, 186, 0, 97, 224, 131, 145, 163, 114, 184, 192, 255, 122, 103, 171, 200, 106, 67, 222};
   *len_ptr = sizeof(rollup_config);
   memcpy(addr, rollup_config, *len_ptr);
+  gw_host->rollup_config_seg.ptr = addr;
+  gw_host->rollup_config_seg.size = *len_ptr;
   return 0;
+}
+
+extern "C" int gw_sys_create(uint8_t *script, uint64_t script_len, uint32_t *account_id_ptr) {
+  // Return error if script_hash is exists
+  uint8_t script_hash[GW_KEY_BYTES];
+  blake2b_hash(script_hash, script, script_len);
+  if (0 == gw_sys_load_account_id_by_script_hash(script_hash, account_id_ptr)) {
+    dbg_print("script_hash is exists");
+    return GW_ERROR_DUPLICATED_SCRIPT_HASH;
+  }
+
+  // check script hash type
+  mol_seg_t script_seg;
+  script_seg.ptr = script;
+  script_seg.size = script_len;
+  mol_seg_t hash_type_seg = MolReader_Script_get_hash_type(&script_seg);
+  const uint8_t SCRIPT_HASH_TYPE_TYPE = 1;
+  if ((*(uint8_t *)hash_type_seg.ptr) != SCRIPT_HASH_TYPE_TYPE) {
+    return GW_ERROR_UNKNOWN_SCRIPT_CODE_HASH;
+  }
+
+#pragma push_macro("errno")
+#undef errno
+  // Check script validity
+  mol_seg_t code_hash_seg = MolReader_Script_get_code_hash(&script_seg);
+  if (code_hash_seg.size != 32) {
+    return GW_ERROR_INVALID_DATA;
+  }
+  /* check allowed EOA list */
+  mol_seg_t eoa_list_seg =
+      MolReader_RollupConfig_get_allowed_eoa_type_hashes(&gw_host->rollup_config_seg);
+  uint32_t len = MolReader_Byte32Vec_length(&eoa_list_seg);
+  bool is_eos_account = false;
+  for (uint32_t i = 0; i < len; i++) {
+    mol_seg_res_t allowed_code_hash_res = MolReader_Byte32Vec_get(&eoa_list_seg, i);
+    if (memcmp(allowed_code_hash_res.seg.ptr, hash_type_seg.ptr, code_hash_seg.size) != 0) {
+      continue;
+    }
+    if (allowed_code_hash_res.errno != MOL_OK ||
+        allowed_code_hash_res.seg.size != code_hash_seg.size) {
+      ckb_debug("disallow script because eoa code_hash is invalid");
+      return GW_ERROR_INVALID_DATA;
+    } else {
+      is_eos_account = true;
+      break;
+    }
+  }
+  if (!is_eos_account) {
+    /* check allowed contract list */
+    mol_seg_t contract_list_seg =
+      MolReader_RollupConfig_get_allowed_contract_type_hashes(&gw_host->rollup_config_seg);
+    len = MolReader_Byte32Vec_length(&contract_list_seg);
+
+    for (uint32_t i = 0; i < len; i++) {
+      mol_seg_res_t allowed_code_hash_res = MolReader_Byte32Vec_get(&contract_list_seg, i);
+      if (memcmp(allowed_code_hash_res.seg.ptr, code_hash_seg.ptr,
+        code_hash_seg.size) != 0) continue;
+      if (allowed_code_hash_res.errno != MOL_OK ||
+          allowed_code_hash_res.seg.size != code_hash_seg.size) {
+        ckb_debug("disallow script because contract code_hash is invalid");
+        return GW_ERROR_INVALID_DATA;
+      } else {
+        // check that contract'script must start with a 32 bytes rollup_script_hash
+        mol_seg_t args_seg = MolReader_Script_get_args(&script_seg);
+        mol_seg_t raw_args_seg = MolReader_Bytes_raw_bytes(&args_seg);
+        if (raw_args_seg.size < 32) {
+          ckb_debug("disallow contract script because args is less than 32 bytes");
+          return GW_ERROR_INVALID_CONTRACT_SCRIPT;
+        }
+        // check contract script short length
+        if (memcmp(g_rollup_script_hash, raw_args_seg.ptr, 32) != 0) {
+          ckb_debug("disallow contract script because args is not start with "
+                    "rollup_script_hash");
+          return GW_ERROR_INVALID_CONTRACT_SCRIPT;
+        }
+      }
+    }
+  }
+#pragma pop_macro("errno")
+
+  /* Same logic from State::create_account() */
+  uint32_t id = gw_host->account_count; // tmp
+  const uint8_t zero_nonce[GW_VALUE_BYTES] = {0};
+
+  // store(account_nonce_key -> zero_nonce)
+  uint8_t account_nonce_key[GW_KEY_BYTES];
+  gw_build_account_field_key(id, GW_ACCOUNT_NONCE, account_nonce_key);
+  gw_update_raw(account_nonce_key, zero_nonce);
+  
+  // store(script_hash_key -> script_hash)
+  uint8_t account_script_hash_key[GW_KEY_BYTES];
+  gw_build_account_field_key(id, GW_ACCOUNT_SCRIPT_HASH, account_script_hash_key);
+  gw_update_raw(account_script_hash_key, script_hash);
+
+  // store(script_hash -> account_id)
+  uint8_t script_hash_to_id_key[GW_KEY_BYTES];
+  uint8_t script_hash_to_id_value[GW_VALUE_BYTES] = {0};
+  gw_build_script_hash_to_account_id_key(script_hash, script_hash_to_id_key);
+  // TODO: id may be more than 256
+  memcpy(script_hash_to_id_value, (uint8_t *)(&id), 4);
+  gw_update_raw(script_hash_to_id_key, script_hash_to_id_value);
+
+  // store_data(script_hash -> script)
+  gw_host->code_store[u256_to_bytes32(script_hash)] = bytes(script, script_len);
+
+  // account_count++
+  gw_host->account_count++;
+
+  // return id
+  *account_id_ptr = id;
+
+  return 0;
+}
+
+void create_account() {
+
 }
 
 int init() {
@@ -246,11 +365,11 @@ int init() {
   const uint8_t account_4_key[32] = {4, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
   const uint8_t poly_destructed_key[32] = {5, 0, 0, 0, 255, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
   
+  // init account 4
   gw_update_raw(account_4_key, zero_nonce);
+
   gw_update_raw(poly_destructed_key, zero_nonce);
   
-  // in.mock_gw.gw_account[0] = bytes32({202, 21, 28, 70, 21, 107, 178, 94, 20, 217, 66, 198, 87, 129, 250, 203, 109, 201, 220, 50, 224, 74, 196, 60, 29, 131, 235, 115, 74, 147, 160, 21});
-
   // static uint8_t get_chain_id_tx[] = {92, 0, 0, 0, 20, 0, 0, 0, 24, 0, 0, 0, 28, 0, 0, 0, 32, 0, 0, 0, 4, 0, 0, 0, 5, 0, 0, 0, 0, 0, 0, 0, 56, 0, 0, 0, 255, 255, 255, 80, 79, 76, 89, 0, 8, 82, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 109, 76, 230, 60};
   // // version@20210625: {92, 0, 0, 0, 20, 0, 0, 0, 24, 0, 0, 0, 28, 0, 0, 0, 32, 0, 0, 0, 3, 0, 0, 0, 4, 0, 0, 0, 0, 0, 0, 0, 56, 0, 0, 0, 255, 255, 255, 80, 79, 76, 89, 0, 8, 82, 0, 0, 0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 4, 0, 0, 0, 109, 76, 230, 60};
   // *len = sizeof(get_chain_id_tx);

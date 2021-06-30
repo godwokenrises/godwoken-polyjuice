@@ -132,8 +132,8 @@ static int inline __internal_syscall(long n, long _a0, long _a1, long _a2,
 
     // mock syscall(GW_SYS_LOAD_ACCOUNT_ID_BY_SCRIPT_HASH, script_hash, account_id, 0, 0, 0, 0)
     case GW_SYS_LOAD_ACCOUNT_ID_BY_SCRIPT_HASH:
-    // TODO:
-    return gw_sys_load_account_id_by_script_hash((uint8_t *)_a0, (uint32_t *)_a1);
+      // TODO: test this 
+      return gw_sys_load_account_id_by_script_hash((uint8_t *)_a0, (uint32_t *)_a1);
 
     // mock syscall(GW_SYS_GET_SCRIPT_HASH_BY_SHORT_ADDRESS, script_hash, prefix, prefix_len, 0, 0, 0)
     case GW_SYS_GET_SCRIPT_HASH_BY_SHORT_ADDRESS:
@@ -142,6 +142,11 @@ static int inline __internal_syscall(long n, long _a0, long _a1, long _a2,
     // mock syscall(GW_SYS_LOAD_ROLLUP_CONFIG, addr, &inner_len, 0, 0, 0, 0)
     case GW_SYS_LOAD_ROLLUP_CONFIG:
       return gw_sys_load_rollup_config((uint8_t *)_a0, (uint64_t *)_a1);
+
+    // mock syscall(GW_SYS_CREATE, script, script_len, account_id, 0, 0, 0)
+    case GW_SYS_CREATE:
+      return gw_sys_create((uint8_t *)_a0, _a1, (uint32_t *)_a2);
+
 
     default:
       return GW_ERROR_NOT_FOUND;
