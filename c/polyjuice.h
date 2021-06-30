@@ -254,7 +254,8 @@ int load_account_code(gw_context_t* gw_ctx, uint32_t account_id,
       /* compare rollup_script_hash */
       || memcmp(raw_args_seg.ptr, g_rollup_script_hash, 32) != 0
       /* compare creator account id */
-      || g_creator_account_id != *(uint32_t *)(raw_args_seg.ptr + 32)) {
+      || memcmp(&g_creator_account_id, raw_args_seg.ptr + 32, sizeof(uint32_t)) != 0
+  ) {
     debug_print_int("creator account id not match for account", account_id);
     return -1;
   }
@@ -703,14 +704,14 @@ int load_globals(gw_context_t* ctx, uint32_t to_id, evmc_call_kind call_kind) {
 
   uint8_t creator_script_buffer[GW_MAX_SCRIPT_SIZE];
   mol_seg_t creator_script_seg;
-  mol_seg_t *creator_raw_args_seg_ptr = NULL;
+  mol_seg_t creator_raw_args_seg;
   if (raw_args_seg.size == 36) {
     /* polyjuice creator account */
     g_creator_account_id = to_id;
-    creator_raw_args_seg_ptr = &raw_args_seg;
+    creator_raw_args_seg = raw_args_seg;
   } else if (raw_args_seg.size == CONTRACT_ACCOUNT_SCRIPT_ARGS_SIZE) {
     /* read creator account and then read sudt id from it */
-    g_creator_account_id = *(uint32_t *)(raw_args_seg.ptr + 32);
+    memcpy(&g_creator_account_id, raw_args_seg.ptr + 32, sizeof(uint32_t));
     int ret = load_account_script(ctx,
                                   g_creator_account_id,
                                   creator_script_buffer,
@@ -722,7 +723,7 @@ int load_globals(gw_context_t* ctx, uint32_t to_id, evmc_call_kind call_kind) {
     mol_seg_t creator_code_hash_seg = MolReader_Script_get_code_hash(&creator_script_seg);
     mol_seg_t creator_hash_type_seg = MolReader_Script_get_hash_type(&creator_script_seg);
     mol_seg_t creator_args_seg = MolReader_Script_get_args(&creator_script_seg);
-    mol_seg_t creator_raw_args_seg = MolReader_Bytes_raw_bytes(&creator_args_seg);
+    creator_raw_args_seg = MolReader_Bytes_raw_bytes(&creator_args_seg);
     if (memcmp(creator_code_hash_seg.ptr, code_hash_seg.ptr, 32) != 0
         || *creator_hash_type_seg.ptr != *hash_type_seg.ptr
         /* compare rollup_script_hash */
@@ -731,14 +732,13 @@ int load_globals(gw_context_t* ctx, uint32_t to_id, evmc_call_kind call_kind) {
       debug_print_int("invalid creator account id in normal contract account script args", g_creator_account_id);
       return -1;
     }
-    creator_raw_args_seg_ptr = &creator_raw_args_seg;
   } else {
     debug_print_data("invalid to account script args", raw_args_seg.ptr, raw_args_seg.size);
     return -1;
   }
 
-  memcpy(g_rollup_script_hash, creator_raw_args_seg_ptr->ptr, 32);
-  memcpy(&g_sudt_id, creator_raw_args_seg_ptr->ptr + 32, sizeof(uint32_t));
+  memcpy(g_rollup_script_hash, creator_raw_args_seg.ptr, 32);
+  memcpy(&g_sudt_id, creator_raw_args_seg.ptr + 32, sizeof(uint32_t));
   debug_print_data("rollup_script_hash", g_rollup_script_hash, 32);
   debug_print_int("sudt id", g_sudt_id);
   return 0;
