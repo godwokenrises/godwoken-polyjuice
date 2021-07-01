@@ -1130,6 +1130,11 @@ int emit_evm_result_log(gw_context_t* ctx, const uint64_t gas_used, const int st
   return 0;
 }
 
+int clean_evmc_result_and_return(evmc_result *res, int code) {
+  if (res->release) res->release(res);
+  return code;
+}
+
 int run_polyjuice() {
   int ret;
 
@@ -1172,28 +1177,28 @@ int run_polyjuice() {
   ret = emit_evm_result_log(&context, gas_used, res.status_code);
   if (ret != 0) {
     ckb_debug("emit_evm_result_log failed");
-    return ret;
+    return clean_evmc_result_and_return(&res, ret);
   }
   if (ret_handle_message != 0) {
     ckb_debug("handle message failed");
-    return ret_handle_message;
+    return clean_evmc_result_and_return(&res, ret_handle_message);
   }
 
   ret = context.sys_set_program_return_data(&context, (uint8_t*)res.output_data,
                                             res.output_size);
   if (ret != 0) {
     ckb_debug("set return data failed");
-    return ret;
+    return clean_evmc_result_and_return(&res, ret);
   }
 
   /* Handle transaction fee */
   if (res.gas_left < 0) {
     ckb_debug("gas not enough");
-    return -1;
+    return clean_evmc_result_and_return(&res, -1);
   }
   if (msg.gas < res.gas_left) {
     ckb_debug("unreachable!");
-    return -1;
+    return clean_evmc_result_and_return(&res, -1);
   }
   uint128_t fee = gas_price * (uint128_t)gas_used;
   debug_print_int("gas limit", msg.gas);
@@ -1203,17 +1208,17 @@ int run_polyjuice() {
   ret = sudt_pay_fee(&context, g_sudt_id, POLYJUICE_SHORT_ADDR_LEN, msg.sender.bytes, fee);
   if (ret != 0) {
     debug_print_int("pay fee to block_producer failed", ret);
-    return ret;
+    return clean_evmc_result_and_return(&res, ret);
   }
   ret = sys_pay_fee(&context, msg.sender.bytes, POLYJUICE_SHORT_ADDR_LEN, g_sudt_id, fee);
   if (ret != 0) {
     debug_print_int("Record fee payment failed", ret);
-    return ret;
+    return clean_evmc_result_and_return(&res, ret);
   }
 
   ret = gw_finalize(&context);
   if (ret != 0) {
-    return ret;
+    return clean_evmc_result_and_return(&res, ret);
   }
-  return 0;
+  return clean_evmc_result_and_return(&res, 0);
 }
