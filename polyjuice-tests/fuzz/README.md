@@ -1,13 +1,18 @@
 # Polyjuice Fuzz Test
 
+These three file were created to simulate `gw_syscalls`:
+- polyjuice-tests/fuzz/ckb_syscalls.h
+- polyjuice-tests/fuzz/mock_generator_utils.h _(will be deprecated and follow the newest update in `godwoken-scripts`)_
+- polyjuice-tests/fuzz/mock_godwoken.hpp
 
 ## Polyjuice Generator Fuzzer
 ```bash
 make build/polyjuice_generator_fuzzer
-./build/polyjuice_generator_fuzzer
-```
+./build/polyjuice_generator_fuzzer corpus -max_total_time=6
 
-```log
+# or fuzzing in debug mode
+make build/polyjuice_generator_fuzzer_log
+./build/polyjuice_generator_fuzzer_log corpus -max_total_time=2
 ```
 
 ### General Algorithm
