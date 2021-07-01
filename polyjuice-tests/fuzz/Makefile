@@ -73,15 +73,15 @@ show: $(COVERAGE_DIR)/fuzzer.profdata
 # TODO: report
 report: $(COVERAGE_DIR)/fuzzer.profdata coverage $(EXTERNAL_HEADERS)
 	$(LLVM_COV) report --show-functions --instr-profile=$(COVERAGE_DIR)/fuzzer.profdata smt_coverage $(EXTERNAL_HEADERS)
-
+# TODO:
 coverage: $(EXTERNAL_HEADERS)
 	clang $(COVERAGE_FLAGS) smt_coverage.c smt_fuzzer.c -o smt_coverage
 
-start-fuzzer: fuzzer
-	./smt_fuzzer -max_len=800000 -workers=$(NPROC) -jobs=$(NPROC) corpus
+# start-fuzzer: fuzzer
+# 	./smt_fuzzer -max_len=800000 -workers=$(NPROC) -jobs=$(NPROC) corpus
 
-start-fuzzer2: fuzzer
-	./smt_fuzzer -max_len=800000 corpus
+# start-fuzzer2: fuzzer
+# 	./smt_fuzzer -max_len=800000 corpus
 
 clean:
 	rm -rf $(BUILD)/*
@@ -120,7 +120,7 @@ build/test_contracts: generate-protocol ../../c/tests/test_contracts.c $(VALIDAT
 
 # test rlp_encode_sender_and_nonce
 # RLP (Recursive Length Prefix)
-build/test_rlp: ../../c/tests/test_rlp.c $(VALIDATOR_DEPS)
+build/test_rlp: generate-protocol ../../c/tests/test_rlp.c $(VALIDATOR_DEPS)
 	cd $(SECP_DIR) && (git apply workaround-fix-g++-linking.patch || true) && cd - # apply patch
 	$(CXX) $(CFLAGS) $(LDFLAGS) $(SANITIZER_FLAGS) -Ibuild -o $@ ../../c/tests/test_rlp.c $(ALL_OBJS)
 	$(OBJCOPY) --only-keep-debug $@ $@.debug

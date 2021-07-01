@@ -1,6 +1,11 @@
 name: MainCI
 
-on: [push, pull_request]
+on:
+  push:
+    branches-ignore:
+    - fuzz*
+    - mock*
+  pull_request:
 
 jobs:
   build:
