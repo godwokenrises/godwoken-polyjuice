@@ -14,7 +14,6 @@
 #include "ckb_syscalls.h"
 #include "common.h"
 #include "secp256k1_data_info.h"
-
 #include "mock_godwoken.hpp"
 
 /* syscalls */
@@ -134,9 +133,6 @@ int sys_get_account_nonce(gw_context_t *ctx, uint32_t account_id,
     return ret;
   }
 
-  // uint8_t key[32];
-  // gw_build_nonce_key(account_id, key);
-  // return syscall(GW_SYS_LOAD, key, value, 0, 0, 0, 0);
   uint8_t key[32] = {0};
   gw_build_account_field_key(account_id, GW_ACCOUNT_NONCE, key);
   uint8_t value[32] = {0};
@@ -191,60 +187,31 @@ int sys_get_account_script(gw_context_t *ctx, uint32_t account_id,
   *len = inner_len;
   return ret;
 }
-
-/**
- * Store data by data hash
- */
+/* Store data by data hash */
 int sys_store_data(gw_context_t *ctx, uint64_t data_len, uint8_t *data) {
   if (ctx == NULL) {
     return GW_ERROR_INVALID_CONTEXT;
   }
-  
-  // mock syscall(GW_SYS_STORE_DATA, data_len, data, 0, 0, 0, 0)
-  // TODO: move to mock syscall.h
-  return gw_store_data(data_len, data);
+  return syscall(GW_SYS_STORE_DATA, data_len, data, 0, 0, 0, 0);
 }
-
 /* Load data by data hash */
 int sys_load_data(gw_context_t *ctx, uint8_t data_hash[32], uint64_t *len,
                   uint64_t offset, uint8_t *data) {
   if (ctx == NULL) {
     return GW_ERROR_INVALID_CONTEXT;
   }
-
-  ckb_debug("mock sys_load_data");
-  int ret = MOCK_SUCCESS;
-
-  if (0 == memcmp(data_hash, ckb_secp256k1_data_hash, 32)) {
-    /* match ckb_secp256k1_data_hash, load secp256k1_data */
-    FILE* stream = fopen("./build/secp256k1_data", "rb");
-    ret = fread(data, CKB_SECP256K1_DATA_SIZE, 1, stream);
-    fclose(stream);
-    stream = NULL;
-    if (ret != 1) { // ret = The total number of elements successfully read
-      return MOCK_SECP256K1_ERROR_LOADING_DATA;
-    }
-    *len = CKB_SECP256K1_DATA_SIZE;
-    return MOCK_SUCCESS;
-  }
-  
-  dbg_print("syscall(GW_SYS_LOAD_DATA, data, &inner_len, offset, data_hash, 0, 0)");
-  dbg_print_h256(data_hash);
-  // mock syscall(GW_SYS_LOAD_DATA, data, &inner_len, offset, data_hash, 0, 0)
-  // TODO: move to mock syscall.h
-  ret = gw_sys_load_data(data, len, offset, data_hash);
+  volatile uint64_t inner_len = *len;
+  int ret = syscall(GW_SYS_LOAD_DATA, data, &inner_len, offset, data_hash, 0, 0);
+  *len = inner_len;
   return ret;
 }
 
-/**
- * Load Layer2 Transaction
- * Mock syscall(GW_SYS_LOAD_TRANSACTION, addr, &inner_len, 0, 0, 0, 0)
- */
-int _sys_load_l2transaction(uint8_t* addr, uint64_t* len) {
-  // load raw tx data from fuzzInput.raw_tx
-  // TODO: move to mock syscall.h
-  gw_load_transaction_from_raw_tx(addr, len);
-  return MOCK_SUCCESS;
+// Load Layer2 Transaction
+int _sys_load_l2transaction(void *addr, uint64_t *len) {
+  volatile uint64_t inner_len = *len;
+  int ret = syscall(GW_SYS_LOAD_TRANSACTION, addr, &inner_len, 0, 0, 0, 0);
+  *len = inner_len;
+  return ret;
 }
 
 int _sys_load_block_info(void *addr, uint64_t *len) {
@@ -298,10 +265,7 @@ int sys_recover_account(struct gw_context_t *ctx,
   *script_len = inner_script_len;
   return ret;
 }
-/**
- * TODO:
- * Mock syscall(GW_SYS_LOG, account_id, service_flag, data_length, data, 0, 0)
- */
+
 int sys_log(gw_context_t *ctx, uint32_t account_id, uint8_t service_flag,
             uint64_t data_length, const uint8_t *data) {
   if (ctx == NULL) {
@@ -312,8 +276,7 @@ int sys_log(gw_context_t *ctx, uint32_t account_id, uint8_t service_flag,
     return ret;
   }
 
-  dbg_print("GW_LOG_FLAG_%d...", service_flag);
-  return MOCK_SUCCESS;
+  return syscall(GW_SYS_LOG, account_id, service_flag, data_length, data, 0, 0);
 }
 
 int sys_pay_fee(gw_context_t *ctx, const uint8_t *payer_addr,
@@ -327,26 +290,6 @@ int sys_pay_fee(gw_context_t *ctx, const uint8_t *payer_addr,
   }
 
   return syscall(GW_SYS_PAY_FEE, payer_addr, short_addr_len, sudt_id, &amount, 0, 0);
-}
-
-/**
- * TODO:
- * Mock syscall(GW_SYS_PAY_FEE, payer_addr, short_addr_len, sudt_id, &amount, 0, 0)
- */
-int sys_pay_fee(gw_context_t *ctx, const uint8_t *payer_addr,
-                const uint64_t short_addr_len, uint32_t sudt_id, uint128_t amount) {
-  if (ctx == NULL) {
-    return GW_ERROR_INVALID_CONTEXT;
-  }
-  int ret = _ensure_account_exists(ctx, sudt_id);
-  if (ret != 0) {
-    return ret;
-  }
-
-  // payer: payer_addr[short_addr_len]
-  dbg_print("[mock contract syscall: SYS_PAY_FEE] sudt_id: %d, amount: %ld",
-            sudt_id, amount);
-  return MOCK_SUCCESS;
 }
 
 int _sys_load_rollup_config(uint8_t *addr, uint64_t *len) {

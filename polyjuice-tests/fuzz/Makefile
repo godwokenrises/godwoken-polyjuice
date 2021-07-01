@@ -62,6 +62,8 @@ EXTERNAL_HEADERS := $(DEPS)/ckb-c-stdlib-simulator-only/ckb_consts.h
 all: generate-protocol build/polyjuice_generator_fuzzer
 
 build/polyjuice_generator_fuzzer: generate-protocol $(GENERATOR_DEPS)
+	$(CXX) $(CFLAGS) $(LDFLAGS) $(SANITIZER_FLAGS) $(LIMIT_ERROR) -fsanitize=fuzzer -Ibuild -o $@ polyjuice_generator_fuzzer.cc $(ALL_OBJS) -DNO_DEBUG_LOG
+build/polyjuice_generator_fuzzer_log: generate-protocol $(GENERATOR_DEPS)
 	$(CXX) $(CFLAGS) $(LDFLAGS) $(SANITIZER_FLAGS) $(LIMIT_ERROR) -fsanitize=fuzzer -Ibuild -o $@ polyjuice_generator_fuzzer.cc $(ALL_OBJS)
 
 ###

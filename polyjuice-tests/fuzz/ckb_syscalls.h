@@ -71,12 +71,37 @@ static int inline __internal_syscall(long n, long _a0, long _a1, long _a2,
 static int inline __internal_syscall(long n, long _a0, long _a1, long _a2,
                                      long _a3, long _a4, long _a5) {
   switch (n) {
+    // mock syscall(GW_SYS_LOAD_TRANSACTION, addr, &inner_len, 0, 0, 0, 0)
+    case GW_SYS_LOAD_TRANSACTION:
+      return gw_load_transaction_from_raw_tx((uint8_t *)_a0, (uint64_t *)_a1);
+
     // mock syscall(GW_SYS_LOAD, raw_key, value, 0, 0, 0, 0)
     case GW_SYS_LOAD:
       dbg_print("====== mock syscall(GW_SYS_LOAD) ======");
       dbg_print("raw_key:");
       dbg_print_h256((uint8_t*)_a0);
       return gw_sys_load((uint8_t *)_a0, (uint8_t *)_a1);
+
+    // mock syscall(GW_SYS_LOAD_DATA, data, &inner_len, offset, data_hash, 0, 0)
+    case GW_SYS_LOAD_DATA:
+      /* match ckb_secp256k1_data_hash, load secp256k1_data */
+      // TODO: move this to fuzz_init() step
+      if (0 == memcmp((uint8_t *)_a3, ckb_secp256k1_data_hash, 32)) {
+        FILE* stream = fopen("./build/secp256k1_data", "rb");
+        int ret = fread((uint8_t *)_a0, CKB_SECP256K1_DATA_SIZE, 1, stream);
+        fclose(stream);
+        stream = NULL;
+        if (ret != 1) { // ret = The total number of elements successfully read
+          return MOCK_SECP256K1_ERROR_LOADING_DATA;
+        }
+        *(uint64_t *)_a1 = CKB_SECP256K1_DATA_SIZE;
+        return MOCK_SUCCESS;
+      }
+      return gw_sys_load_data((uint8_t *)_a0, (uint64_t *)_a1, _a2, (uint8_t *)_a3);
+
+    // mock syscall(GW_SYS_STORE_DATA, data_len, data, 0, 0, 0, 0)
+    case GW_SYS_STORE_DATA:
+      return gw_store_data(_a0, (uint8_t *)_a1);
 
     // mock syscall(GW_SYS_SET_RETURN_DATA, *data, len, 0, 0, 0, 0)
     case GW_SYS_SET_RETURN_DATA:
@@ -124,6 +149,19 @@ static int inline __internal_syscall(long n, long _a0, long _a1, long _a2,
     case GW_SYS_CREATE:
       return gw_sys_create((uint8_t *)_a0, _a1, (uint32_t *)_a2);
 
+    // mock syscall(GW_SYS_LOG, account_id, service_flag, data_length, data, 0, 0)
+    case GW_SYS_LOG: // TODO: @see emit_evm_result_log
+      dbg_print("[GW_SYS_LOG] service_flag[%d] account[%d] ", (uint8_t)_a1, _a1);
+      // TODO: debug_print_data("GW_SYS_LOG", (uint32_t)_a3, (uint8_t *)_a2);
+      return 0;
+
+    // mock syscall(GW_SYS_PAY_FEE, payer_addr, short_addr_len, sudt_id, &amount, 0, 0)
+    case GW_SYS_PAY_FEE:
+      // TODO: payer: payer_addr[short_addr_len]
+      dbg_print("[mock SYS_PAY_FEE] sudt_id: %d, amount: %ld",
+                (uint32_t)_a2, *(uint128_t *)_a3);
+      return 0;
+  
 
     default:
       return GW_ERROR_NOT_FOUND;

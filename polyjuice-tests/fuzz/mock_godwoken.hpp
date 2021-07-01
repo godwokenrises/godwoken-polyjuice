@@ -1,9 +1,11 @@
 #include <iostream>
+
 #include <evmc/evmc.hpp>
 #include <evmc/mocked_host.hpp>
+#include <evmc/utils.hpp>
+
 #include <common.h>
 #include <polyjuice_globals.h>
-#include <evmc/utils.hpp>
 
 using namespace std;
 using namespace evmc;
@@ -37,13 +39,6 @@ auto in = fuzz_input{};
 MockedGodwoken* gw_host = &in.mock_gw;
 
 
-// TODO
-// mock_godwoken.set_storage(
-//   bytes32({202, 21, 28, 70, 21, 107, 178, 94, 20, 217, 66, 198, 87, 129, 250, 203, 109, 201, 220, 50, 224, 74, 196, 60, 29, 131, 235, 115, 74, 147, 160, 21}),
-//   bytes32({202, 21, 28, 70, 21, 107, 178, 94, 20, 217, 66, 198, 87, 129, 250, 203, 109, 201, 220, 50, 224, 74, 196, 60, 29, 131, 235, 115, 74, 147, 160, 21}),
-//   bytes32({202, 21, 28, 70, 21, 107, 178, 94, 20, 217, 66, 198, 87, 129, 250, 203, 109, 201, 220, 50, 224, 74, 196, 60, 29, 131, 235, 115, 74, 147, 160, 21})
-// );
-
 inline ostream& operator<<(ostream& stream, const bytes32& b32) {
   stream << "H256[";
   for (size_t i = 0; i < 31; i++)
@@ -69,7 +64,7 @@ bytes32 u256_to_bytes32(const uint8_t u8[32]) {
 
 /* store code or script */
 extern "C" int gw_store_data(const uint64_t len, uint8_t *data) {
-  uint8_t script_hash[32];
+  uint8_t script_hash[GW_KEY_BYTES];
   blake2b_hash(script_hash, data, len);
 
   dbg_print("gw_store_data blake2b_hash: ");
@@ -78,15 +73,14 @@ extern "C" int gw_store_data(const uint64_t len, uint8_t *data) {
   bytes bs((uint8_t*)data, len);
   // debug_print
   cout << "\tbytes: " << bs << endl;
-  cout << "\tdata: ";
-  for (size_t i = 0; i < len; i++) {
-    cout << (uint16_t)*(data + i) << ' ';
-  }
   gw_host->code_store[u256_to_bytes32(script_hash)] = bs;
   return 0;
 }
 
-extern "C" int gw_sys_load_data(uint8_t* addr, uint64_t* len_ptr, uint64_t offset, uint8_t data_hash[32]) {
+extern "C" int gw_sys_load_data(uint8_t *addr,
+                                uint64_t *len_ptr,
+                                uint64_t offset,
+                                uint8_t data_hash[GW_KEY_BYTES]) {
   auto search = gw_host->code_store.find(u256_to_bytes32(data_hash));
   if (search == gw_host->code_store.end()) {
     return GW_ERROR_NOT_FOUND;
@@ -103,7 +97,7 @@ void print_state() {
 }
 
 // sys_load from state
-extern "C" int gw_sys_load(const uint8_t k[32], uint8_t v[32]) {
+extern "C" int gw_sys_load(const uint8_t k[GW_KEY_BYTES], uint8_t v[GW_KEY_BYTES]) {
   auto search = gw_host->state.find(u256_to_bytes32(k));
   if (search == gw_host->state.end()) {
     dbg_print("gw_sys_load failed, missing key:");
@@ -112,27 +106,31 @@ extern "C" int gw_sys_load(const uint8_t k[32], uint8_t v[32]) {
     print_state();
     return GW_ERROR_NOT_FOUND;
   }
-  memcpy(v, search->second.bytes, 32);
+  memcpy(v, search->second.bytes, GW_KEY_BYTES);
   return 0;
 }
 
-extern "C" void gw_update_raw(const uint8_t k[32], const uint8_t v[32]){
+extern "C" void gw_update_raw(const uint8_t k[GW_KEY_BYTES], const uint8_t v[GW_KEY_BYTES]){
   in.mock_gw.state[u256_to_bytes32(k)] = u256_to_bytes32(v);
-
   // print_state();
 }
 
-extern "C" void gw_load_transaction_from_raw_tx(uint8_t* addr, uint64_t* len) {
+// load raw layer2 transaction data from fuzzInput.raw_tx
+extern "C" int gw_load_transaction_from_raw_tx(uint8_t* addr, uint64_t* len) {
   *len = in.raw_tx.size();
   in.raw_tx.copy(addr, *len);
+  return 0;
 }
 
 extern "C" void gw_sys_set_return_data(uint8_t* addr, uint64_t len) {
-  in.mock_gw.call_result = make_result(evmc_status_code{}, 0, addr, len);
+  // should not make a new result
+  // in.mock_gw.call_result = make_result(evmc_status_code{}, 0, addr, len);
+  dbg_print("gw_sys_set_return_data:");
+  cout << bytes(addr, len) << endl;
 }
 
-extern "C" void gw_sys_get_block_hash(uint8_t block_hash[32], uint64_t number) {
-  memcpy(block_hash, gw_host->get_block_hash(number).bytes, 32);
+extern "C" void gw_sys_get_block_hash(uint8_t block_hash[GW_KEY_BYTES], uint64_t number) {
+  memcpy(block_hash, gw_host->get_block_hash(number).bytes, GW_KEY_BYTES);
 }
 
 extern "C" int gw_sys_load_blockinfo(uint8_t* bi_addr, uint64_t* len_ptr) {
@@ -145,11 +143,13 @@ extern "C" int gw_sys_load_blockinfo(uint8_t* bi_addr, uint64_t* len_ptr) {
    */
   const uint8_t mock_new_block_info[] = {0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
   *len_ptr = sizeof(mock_new_block_info);
+  dbg_print("mock_new_block_info to "
+            "{0, 0, 0, 0, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0}");
   memcpy((uint8_t*)bi_addr, mock_new_block_info, *len_ptr);
   return 0;
 }
 
-extern "C" int gw_sys_load_script_hash_by_account_id(const uint32_t account_id, uint8_t script_hash[32]) {
+extern "C" int gw_sys_load_script_hash_by_account_id(const uint32_t account_id, uint8_t script_hash[GW_KEY_BYTES]) {
   // dbg_print("sys_get_script_hash_by_account_id account_id = %d", account_id);
 
   uint8_t key[32] = {0};
@@ -182,9 +182,9 @@ extern "C" int gw_sys_get_script_hash_by_short_address(uint8_t *script_hash_addr
 
 extern "C" int gw_sys_load_account_id_by_script_hash(uint8_t *script_hash,
                                                      uint32_t *account_id_ptr) {
-  uint8_t raw_id_key[32];
+  uint8_t raw_id_key[GW_KEY_BYTES];
   gw_build_script_hash_to_account_id_key(script_hash, raw_id_key);
-  uint8_t result_addr[32];
+  uint8_t result_addr[GW_KEY_BYTES];
   int ret = gw_sys_load(raw_id_key, result_addr);
   if (ret != 0) return ret;
   *account_id_ptr = *((uint32_t *)result_addr);
@@ -195,7 +195,7 @@ extern "C" int gw_sys_load_account_script(uint8_t *script_addr,
                                           uint64_t *len_ptr,
                                           const uint64_t offset,
                                           const uint32_t account_id) {
-  uint8_t script_hash[32];
+  uint8_t script_hash[GW_KEY_BYTES];
   int ret = gw_sys_load_script_hash_by_account_id(account_id, script_hash);
   if (ret != 0) {
     return ret;
@@ -205,8 +205,6 @@ extern "C" int gw_sys_load_account_script(uint8_t *script_addr,
 
 extern "C" int gw_sys_load_rollup_config(uint8_t *addr,
                                          uint64_t *len_ptr) {
-  // TODO: build RollupConfig, @see polyjuice-tests/src/helper.rs
-  
   *len_ptr = gw_host->rollup_config_size;
   memcpy(addr, gw_host->rollup_config, *len_ptr);
   return 0;
@@ -237,8 +235,7 @@ extern "C" int gw_sys_create(uint8_t *script, uint64_t script_len, uint32_t *acc
   // Check script validity
   mol_seg_t code_hash_seg = MolReader_Script_get_code_hash(&script_seg);
   if (code_hash_seg.size != 32) {
-    //TODO: check  MolReader_Script_get_code_hash
-    dbg_print("TODO: check  MolReader_Script_get_code_hash");
+    dbg_print("[GW_ERROR_INVALID_DATA] MolReader_Script_get_code_hash");
     return GW_ERROR_INVALID_DATA;
   }
   /* check allowed EOA list */
@@ -313,9 +310,12 @@ extern "C" int gw_sys_create(uint8_t *script, uint64_t script_len, uint32_t *acc
   uint8_t script_hash_to_id_key[GW_KEY_BYTES];
   uint8_t script_hash_to_id_value[GW_VALUE_BYTES] = {0};
   gw_build_script_hash_to_account_id_key(script_hash, script_hash_to_id_key);
-  // TODO: id may be more than 256
   memcpy(script_hash_to_id_value, (uint8_t *)(&id), 4);
   gw_update_raw(script_hash_to_id_key, script_hash_to_id_value);
+  // dbg_print("\t script_hash_to_id_key");
+  // dbg_print_h256(script_hash_to_id_key);
+  // dbg_print("\t script_hash_to_id_value");
+  // dbg_print_h256(script_hash_to_id_value);
 
   // store_data(script_hash -> script)
   gw_host->code_store[u256_to_bytes32(script_hash)] = bytes(script, script_len);
@@ -331,18 +331,17 @@ extern "C" int gw_sys_create(uint8_t *script, uint64_t script_len, uint32_t *acc
 }
 
 // void create_account(uint8_t script_hash[GW_KEY_BYTES], uint32_t id) {
-  //TODO: load account script
 // }
 
 // create account by script and return the new account id
 uint32_t create_account_from_script(uint8_t *script, uint64_t script_len) {
-  uint8_t script_hash_type;
-  memcpy(&script_hash_type, script + 8, sizeof(uint8_t));
-  dbg_print("script_hash_type = %d", script_hash_type);
-
-  if (script_hash_type != 1) { //TODO:
-    dbg_print("AccountError::UnknownScript");
-  }
+  // uint8_t script_hash_type;
+  // memcpy(&script_hash_type, script + 8, sizeof(uint8_t));
+  // dbg_print("script_hash_type = %d", script_hash_type);
+  // TODO:
+  // if (script_hash_type != 1) { //TODO:
+  //   dbg_print("AccountError::UnknownScript");
+  // }
   
   // store_data(script_hash -> script)
   uint8_t script_hash[GW_KEY_BYTES];
@@ -352,6 +351,7 @@ uint32_t create_account_from_script(uint8_t *script, uint64_t script_len) {
   // create account with script_hash
   uint32_t id = gw_host->account_count;
   const uint8_t zero_nonce[GW_VALUE_BYTES] = {0};
+
   // store(account_nonce_key -> zero_nonce)
   uint8_t account_nonce_key[GW_KEY_BYTES];
   gw_build_account_field_key(id, GW_ACCOUNT_NONCE, account_nonce_key);
@@ -379,48 +379,41 @@ int init() {
   // init block_hash
   gw_host->block_hash = bytes32({7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7, 7});
 
-  // TODO: build rollup config
+  // TODO: build RollupConfig, @see polyjuice-tests/src/helper.rs
   // init rollup_config
   const uint8_t rollup_config[] = {189, 1, 0, 0, 60, 0, 0, 0, 92, 0, 0, 0, 124, 0, 0, 0, 156, 0, 0, 0, 188, 0, 0, 0, 220, 0, 0, 0, 252, 0, 0, 0, 28, 1, 0, 0, 60, 1, 0, 0, 68, 1, 0, 0, 76, 1, 0, 0, 84, 1, 0, 0, 85, 1, 0, 0, 89, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 108, 221, 56, 188, 143, 219, 128, 88, 69, 24, 221, 22, 50, 19, 186, 0, 97, 224, 131, 145, 163, 114, 184, 192, 255, 122, 103, 171, 200, 106, 67, 222};
   gw_host->rollup_config_size = sizeof(rollup_config);
   memcpy(gw_host->rollup_config, rollup_config, gw_host->rollup_config_size);
   
   
-  //FIXME: const uint8_t poly_destructed_key[32] = {5, 0, 0, 0, 255, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-  
 // TODO: build_script()
-// build_script(g_script_code_hash, g_script_hash_type, script_args,
-//   SCRIPT_ARGS_LEN, &new_script_seg);
+// build_script(g_script_code_hash, g_script_hash_type, script_args, SCRIPT_ARGS_LEN, &new_script_seg);
+
+
   uint32_t new_id = -1;
   // id = 0
   bytes reserved_account_script
     = from_hex("35000000100000003000000031000000a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a1a10100000000");
   new_id = create_account_from_script((uint8_t *)reserved_account_script.data(),
                                       reserved_account_script.size());
-  // dbg_print("new account id = %d was created.", new_id);
   // id = 1
   bytes ckb_account_script
     = from_hex("75000000100000003000000031000000a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a2a20140000000a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a90000000000000000000000000000000000000000000000000000000000000000");
   new_id = create_account_from_script((uint8_t *)ckb_account_script.data(),
                                       ckb_account_script.size());
-  // dbg_print("new account id = %d was created.", new_id);
   // id = 2
   bytes meta_account_script
      = from_hex("590000001000000030000000310000006cdd38bc8fdb80584518dd163213ba0061e08391a372b8c0ff7a67abc86a43de0124000000a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a901000000");
   new_id = create_account_from_script((uint8_t *)meta_account_script.data(),
                                       meta_account_script.size());
-  // dbg_print("new account id = %d was created.", new_id);
   // id = 3
   bytes block_producer_script = from_hex("69000000100000003000000031000000aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0134000000a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a99999999999999999999999999999999999999999");
-  // new_id = create_account_from_script((uint8_t *)block_producer_script.data(),
-                                              //  block_producer_script.size());
-  new_id = create_account_from_script((uint8_t *)block_producer_script.data(), block_producer_script.size());
-  // dbg_print("new account id = %d was created.", new_id);
+  new_id = create_account_from_script((uint8_t *)block_producer_script.data(),
+                                      block_producer_script.size());
   // id = 4
   bytes build_eth_l2_script = from_hex("69000000100000003000000031000000aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0134000000a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a90101010101010101010101010101010101010101");
   new_id = create_account_from_script((uint8_t *)build_eth_l2_script.data(),
                                       build_eth_l2_script.size());
-  // dbg_print("new account id = %d was created.", new_id);
   
   
   // init destructed key
