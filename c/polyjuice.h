@@ -266,7 +266,7 @@ int load_account_code(gw_context_t* gw_ctx, uint32_t account_id,
   polyjuice_build_contract_code_key(account_id, key);
   ret = gw_ctx->sys_load(gw_ctx, account_id, key, GW_KEY_BYTES, data_hash);
   if (ret != 0) {
-    ckb_debug("sys_load failed");
+    ckb_debug("load_account_code, sys_load failed");
     return ret;
   }
   debug_print_data("data_hash", data_hash, 32);
@@ -362,7 +362,7 @@ evmc_bytes32 get_storage(struct evmc_host_context* context,
   int ret = context->gw_ctx->sys_load(context->gw_ctx, context->to_id,
                                       key->bytes, GW_KEY_BYTES, (uint8_t*)value.bytes);
   if (ret != 0) {
-    ckb_debug("sys_load failed");
+    ckb_debug("get_storage, sys_load failed");
     context->error_code = ret;
   }
   ckb_debug("END get_storage");
@@ -872,6 +872,7 @@ int execute_in_evmone(gw_context_t* ctx,
                       const uint8_t* code_data,
                       const size_t code_size,
                       struct evmc_result* res) {
+  int ret = 0;
   evmc_address sender = msg->sender;
   evmc_address destination = msg->destination;
   struct evmc_host_context context {ctx, code_data, code_size, from_id, to_id, sender, destination, 0};
@@ -879,20 +880,24 @@ int execute_in_evmone(gw_context_t* ctx,
   struct evmc_host_interface interface = {account_exists, get_storage,    set_storage,    get_balance,
                                           get_code_size,  get_code_hash,  copy_code,      selfdestruct,
                                           call,           get_tx_context, get_block_hash, emit_log};
-    /* Execute the code in EVM */
+  /* Execute the code in EVM */
   debug_print_int("code size", code_size);
   debug_print_data("msg.input_data", msg->input_data, msg->input_size);
   *res = vm->execute(vm, &interface, &context, EVMC_MAX_REVISION, msg, code_data, code_size);
   if (context.error_code != 0) {
     debug_print_int("context.error_code", context.error_code);
-    return context.error_code;
+    ret = context.error_code;
+    goto evmc_vm_cleanup;
   }
   if (res->gas_left < 0) {
     ckb_debug("gas not enough");
-    return EVMC_OUT_OF_GAS;
+    ret = EVMC_OUT_OF_GAS;
+    goto evmc_vm_cleanup;
   }
 
-  return 0;
+evmc_vm_cleanup:
+  evmc_destroy(vm); // destroy the VM instance
+  return ret;
 }
 
 int store_contract_code(gw_context_t* ctx,
