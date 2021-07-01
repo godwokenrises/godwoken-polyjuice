@@ -105,16 +105,16 @@ bool execute_predefined_transactions() {
     }
     dbg_print("====================== pre_defined_test_cases[%d] finished ======================", ++raw_tx_idx);
   }
+
+  if (!all_good) {
+    dbg_print("warn: execute_predefined_transactions failed");
+    // __builtin_trap();
+  }
   return all_good;
 }
 
+static bool predefined_test_passed = execute_predefined_transactions();
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-  static bool predefined_test_passed = execute_predefined_transactions();
-  if (!predefined_test_passed) {
-    dbg_print("warn: execute_predefined_transactions failed");
-    __builtin_trap();
-  }
-
   // TODO: load RawL2Transaction from corpus
   // TODO: msg = pupulate_input(data, size), and fill the msg into LOAD_TRANSACTION SYSCALL
   in.raw_tx = bytes(data, size);
