@@ -852,7 +852,7 @@ int handle_transfer(gw_context_t* ctx,
                       msg->destination.bytes,
                       value_u128);
   if (ret != 0) {
-    ckb_debug("transfer failed");
+    ckb_debug("sudt_transfer failed");
     return ret;
   }
 
@@ -1172,6 +1172,7 @@ int run_polyjuice() {
   }
 
   struct evmc_result res;
+  res.release = NULL;
   int ret_handle_message = handle_message(&context, UINT32_MAX, UINT32_MAX, NULL, &msg, &res);
   uint64_t gas_used = (uint64_t)(msg.gas - res.gas_left);
   ret = emit_evm_result_log(&context, gas_used, res.status_code);
