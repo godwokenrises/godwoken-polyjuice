@@ -1,5 +1,7 @@
 # Polyjuice Fuzz Test
 
+[![FuzzTest](https://github.com/Flouse/godwoken-polyjuice/actions/workflows/fuzz.yml/badge.svg?branch=fuzz-v2)](https://github.com/Flouse/godwoken-polyjuice/actions/workflows/fuzz.yml)
+
 These three file were created to simulate `gw_syscalls`:
 - polyjuice-tests/fuzz/ckb_syscalls.h
 - polyjuice-tests/fuzz/mock_generator_utils.h _(will be deprecated and follow the newest update in `godwoken-scripts`)_
