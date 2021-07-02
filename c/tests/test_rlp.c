@@ -54,6 +54,10 @@ void test(const char *sender_hex, uint32_t nonce, const char *expected_rlp, cons
     ckb_exit(-5);
   }
   debug_print_int("success", nonce);
+  // free bin data from hex2bin function
+  free(sender_data);
+  free(expected_rlp_data);
+  free(expected_addr_data);
 }
 
 int main() {

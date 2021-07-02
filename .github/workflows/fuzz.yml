@@ -1,0 +1,50 @@
+name: FuzzTest
+
+on: [push, pull_request]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v2
+      with:
+        submodules: 'recursive'
+    # - name: Install Rust components
+    #   run: rustup component add rustfmt && rustup component add clippy
+    - name: Cache Rust - Cargo
+      uses: actions/cache@v2
+      with:
+        path: |
+          ~/.cargo/bin/
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
+    - name: Install moleculec
+      run: |
+        test "$(moleculec --version)" = "Moleculec 0.6.1" \
+        || CARGO_TARGET_DIR=target/ cargo install moleculec --version 0.6.1
+    - name: Cache LLVM and Clang
+      id: cache-llvm
+      uses: actions/cache@v2
+      with:
+        path: ./llvm
+        key: clang-11
+    - name: Install LLVM and Clang
+      uses: KyleMayes/install-llvm-action@v1
+      with:
+        version: "11.0"
+        cached: ${{ steps.cache-llvm.outputs.cache-hit }}
+    - name: test_rlp on x86 with sanitizers
+      working-directory: ./polyjuice-tests/fuzz
+      run: make build/test_rlp && ./build/test_rlp
+    - name: test_contracts on x86 with sanitizers
+      working-directory: ./polyjuice-tests/fuzz
+      run: make build/test_contracts && ./build/test_contracts
+    - name: Fuzzing Polyjuice Generator 360 seconds
+      working-directory: polyjuice-tests/fuzz
+      run: make build/polyjuice_generator_fuzzer && ./build/polyjuice_generator_fuzzer corpus -max_total_time=360
+
+    # - name: Run Fuzz Test
+      # rustup component add llvm-tools-preview

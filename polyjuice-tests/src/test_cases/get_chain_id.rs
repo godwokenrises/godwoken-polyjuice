@@ -33,7 +33,7 @@ fn test_get_chain_id() {
         .unwrap();
     println!("balance of {} = {}", from_id, from_balance1);
     {
-        // Deploy SimpleStorage
+        // Deploy GetChainId contract
         let block_info = new_block_info(0, 1, 0);
         let input = hex::decode(INIT_CODE).unwrap();
         let args = PolyjuiceArgsBuilder::default()
@@ -76,7 +76,7 @@ fn test_get_chain_id() {
 
     let chain_id: u32 = creator_account_id;
     {
-        // SimpleStorage.get();
+        // call GetChainId.get()
         let block_info = new_block_info(0, 3, 0);
         let input = hex::decode("6d4ce63c").unwrap();
         let args = PolyjuiceArgsBuilder::default()
