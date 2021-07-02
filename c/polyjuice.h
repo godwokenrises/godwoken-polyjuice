@@ -266,7 +266,7 @@ int load_account_code(gw_context_t* gw_ctx, uint32_t account_id,
   polyjuice_build_contract_code_key(account_id, key);
   ret = gw_ctx->sys_load(gw_ctx, account_id, key, GW_KEY_BYTES, data_hash);
   if (ret != 0) {
-    ckb_debug("sys_load failed");
+    ckb_debug("load_account_code, sys_load failed");
     return ret;
   }
   debug_print_data("data_hash", data_hash, 32);
@@ -362,7 +362,7 @@ evmc_bytes32 get_storage(struct evmc_host_context* context,
   int ret = context->gw_ctx->sys_load(context->gw_ctx, context->to_id,
                                       key->bytes, GW_KEY_BYTES, (uint8_t*)value.bytes);
   if (ret != 0) {
-    ckb_debug("sys_load failed");
+    ckb_debug("get_storage, sys_load failed");
     context->error_code = ret;
   }
   ckb_debug("END get_storage");
@@ -872,6 +872,7 @@ int execute_in_evmone(gw_context_t* ctx,
                       const uint8_t* code_data,
                       const size_t code_size,
                       struct evmc_result* res) {
+  int ret = 0;
   evmc_address sender = msg->sender;
   evmc_address destination = msg->destination;
   struct evmc_host_context context {ctx, code_data, code_size, from_id, to_id, sender, destination, 0};
@@ -879,20 +880,24 @@ int execute_in_evmone(gw_context_t* ctx,
   struct evmc_host_interface interface = {account_exists, get_storage,    set_storage,    get_balance,
                                           get_code_size,  get_code_hash,  copy_code,      selfdestruct,
                                           call,           get_tx_context, get_block_hash, emit_log};
-    /* Execute the code in EVM */
+  /* Execute the code in EVM */
   debug_print_int("code size", code_size);
   debug_print_data("msg.input_data", msg->input_data, msg->input_size);
   *res = vm->execute(vm, &interface, &context, EVMC_MAX_REVISION, msg, code_data, code_size);
   if (context.error_code != 0) {
     debug_print_int("context.error_code", context.error_code);
-    return context.error_code;
+    ret = context.error_code;
+    goto evmc_vm_cleanup;
   }
   if (res->gas_left < 0) {
     ckb_debug("gas not enough");
-    return EVMC_OUT_OF_GAS;
+    ret = EVMC_OUT_OF_GAS;
+    goto evmc_vm_cleanup;
   }
 
-  return 0;
+evmc_vm_cleanup:
+  evmc_destroy(vm); // destroy the VM instance
+  return ret;
 }
 
 int store_contract_code(gw_context_t* ctx,
@@ -1125,6 +1130,11 @@ int emit_evm_result_log(gw_context_t* ctx, const uint64_t gas_used, const int st
   return 0;
 }
 
+int clean_evmc_result_and_return(evmc_result *res, int code) {
+  if (res->release) res->release(res);
+  return code;
+}
+
 int run_polyjuice() {
   int ret;
 
@@ -1167,28 +1177,28 @@ int run_polyjuice() {
   ret = emit_evm_result_log(&context, gas_used, res.status_code);
   if (ret != 0) {
     ckb_debug("emit_evm_result_log failed");
-    return ret;
+    return clean_evmc_result_and_return(&res, ret);
   }
   if (ret_handle_message != 0) {
     ckb_debug("handle message failed");
-    return ret_handle_message;
+    return clean_evmc_result_and_return(&res, ret_handle_message);
   }
 
   ret = context.sys_set_program_return_data(&context, (uint8_t*)res.output_data,
                                             res.output_size);
   if (ret != 0) {
     ckb_debug("set return data failed");
-    return ret;
+    return clean_evmc_result_and_return(&res, ret);
   }
 
   /* Handle transaction fee */
   if (res.gas_left < 0) {
     ckb_debug("gas not enough");
-    return -1;
+    return clean_evmc_result_and_return(&res, -1);
   }
   if (msg.gas < res.gas_left) {
     ckb_debug("unreachable!");
-    return -1;
+    return clean_evmc_result_and_return(&res, -1);
   }
   uint128_t fee = gas_price * (uint128_t)gas_used;
   debug_print_int("gas limit", msg.gas);
@@ -1198,17 +1208,17 @@ int run_polyjuice() {
   ret = sudt_pay_fee(&context, g_sudt_id, POLYJUICE_SHORT_ADDR_LEN, msg.sender.bytes, fee);
   if (ret != 0) {
     debug_print_int("pay fee to block_producer failed", ret);
-    return ret;
+    return clean_evmc_result_and_return(&res, ret);
   }
   ret = sys_pay_fee(&context, msg.sender.bytes, POLYJUICE_SHORT_ADDR_LEN, g_sudt_id, fee);
   if (ret != 0) {
     debug_print_int("Record fee payment failed", ret);
-    return ret;
+    return clean_evmc_result_and_return(&res, ret);
   }
 
   ret = gw_finalize(&context);
   if (ret != 0) {
-    return ret;
+    return clean_evmc_result_and_return(&res, ret);
   }
-  return 0;
+  return clean_evmc_result_and_return(&res, 0);
 }
