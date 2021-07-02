@@ -8,11 +8,23 @@
       "options": {
         "cwd": "${cwd}/polyjuice-tests/fuzz"
       },
+      "group": "build",
+      "problemMatcher": []
+    },
+    {
+      "label": "build and run polyjuice_generator_fuzzer",
+      "type": "shell",
+      "command": "mv build/polyjuice_generator_fuzzer ./ & make build/polyjuice_generator_fuzzer && ./build/polyjuice_generator_fuzzer corpus -max_total_time=2",
+      "options": {
+        "cwd": "${cwd}/polyjuice-tests/fuzz"
+      },
       "group": {
         "kind": "build",
         "isDefault": true
       },
-      "problemMatcher": []
+      "problemMatcher": [
+        "$gcc"
+      ]
     },
     {
       "label": "build test_contracts",

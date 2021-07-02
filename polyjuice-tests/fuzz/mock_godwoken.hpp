@@ -72,7 +72,7 @@ extern "C" int gw_store_data(const uint64_t len, uint8_t *data) {
 
   bytes bs((uint8_t*)data, len);
   // debug_print
-  cout << "\tbytes: " << bs << endl;
+  // cout << "\tbytes: " << bs << endl;
   gw_host->code_store[u256_to_bytes32(script_hash)] = bs;
   return 0;
 }
@@ -103,7 +103,7 @@ extern "C" int gw_sys_load(const uint8_t k[GW_KEY_BYTES], uint8_t v[GW_KEY_BYTES
     dbg_print("gw_sys_load failed, missing key:");
     dbg_print_h256(k);
     dbg_print("all the state as following:");
-    print_state();
+    // print_state();
     return GW_ERROR_NOT_FOUND;
   }
   memcpy(v, search->second.bytes, GW_KEY_BYTES);
@@ -126,7 +126,7 @@ extern "C" void gw_sys_set_return_data(uint8_t* addr, uint64_t len) {
   // should not make a new result
   // in.mock_gw.call_result = make_result(evmc_status_code{}, 0, addr, len);
   dbg_print("gw_sys_set_return_data:");
-  cout << bytes(addr, len) << endl;
+  // cout << bytes(addr, len) << endl;
 }
 
 extern "C" void gw_sys_get_block_hash(uint8_t block_hash[GW_KEY_BYTES], uint64_t number) {

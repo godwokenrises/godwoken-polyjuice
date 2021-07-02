@@ -21,8 +21,6 @@ struct test_case {
   bytes expected_result{};
 };
 
-static uint raw_tx_idx = 0;
-
 bool execute_predefined_transactions() {
   static int ret = init();
   // TODO: ASSERT_EQ(0, ret)
@@ -87,6 +85,7 @@ bool execute_predefined_transactions() {
   };
 
   for (auto &&tc : pre_defined_test_cases) {
+    static uint raw_tx_idx = 0;
     in.raw_tx = tc.raw_tx; // load_l2_transaction from pre_defined_test_cases
     
     ret = run_polyjuice();
@@ -97,13 +96,12 @@ bool execute_predefined_transactions() {
     }
     //TODO: print RunResult as evmc_result and assert the result is expected
     if (tc.expected_result.size() > 0) {
-
       // TODO:
       // ASSERT_EQ(bytes_view(tc.expected_result,)
-
       // )
     }
-    dbg_print("====================== pre_defined_test_cases[%d] finished ======================", ++raw_tx_idx);
+    ++raw_tx_idx;
+    dbg_print("====================== pre_defined_test_cases[%d] finished ======================", raw_tx_idx);
   }
 
   if (!all_good) {
@@ -113,7 +111,7 @@ bool execute_predefined_transactions() {
   return all_good;
 }
 
-static bool predefined_test_passed = execute_predefined_transactions();
+bool is_predefined_test_passed = execute_predefined_transactions();
 extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
   // TODO: load RawL2Transaction from corpus
   // TODO: msg = pupulate_input(data, size), and fill the msg into LOAD_TRANSACTION SYSCALL
