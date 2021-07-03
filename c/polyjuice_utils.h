@@ -16,8 +16,13 @@
 #define debug_print_data(prefix, data, data_len) {}
 #else  /* #ifdef NO_DEBUG_LOG */
 static char debug_buffer[64 * 1024];
-void debug_print_data(const char* prefix, const uint8_t* data,
-                             uint32_t data_len) {
+void debug_print_data(const char *prefix, const uint8_t *data,
+                      uint32_t data_len) {
+  if (data_len > 32 * 1024 - 2) {
+    ckb_debug("warning: print_data is too large");
+    return;
+  }
+
   int offset = 0;
   offset += sprintf(debug_buffer, "%s 0x", prefix);
   for (size_t i = 0; i < data_len; i++) {
