@@ -3,9 +3,8 @@ name: FuzzTest
 on: [push, pull_request]
 
 jobs:
-  build:
+  build-and-run-tests:
     runs-on: ubuntu-latest
-
     steps:
     - uses: actions/checkout@v2
       with:

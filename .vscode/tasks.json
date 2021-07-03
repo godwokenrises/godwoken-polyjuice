@@ -8,20 +8,20 @@
       "options": {
         "cwd": "${cwd}/polyjuice-tests/fuzz"
       },
-      "group": "build",
+      "group": {
+        "kind": "build",
+        "isDefault": true
+      },
       "problemMatcher": []
     },
     {
       "label": "build and run polyjuice_generator_fuzzer",
       "type": "shell",
-      "command": "mv build/polyjuice_generator_fuzzer ./ & make build/polyjuice_generator_fuzzer && ./build/polyjuice_generator_fuzzer corpus -max_total_time=2",
+      "command": "mv build/polyjuice_generator_fuzzer ./ & make build/polyjuice_generator_fuzzer && ./build/polyjuice_generator_fuzzer corpus -jobs=2",
       "options": {
         "cwd": "${cwd}/polyjuice-tests/fuzz"
       },
-      "group": {
-        "kind": "build",
-        "isDefault": true
-      },
+      "group": "build",
       "problemMatcher": [
         "$gcc"
       ]

@@ -67,10 +67,17 @@ extern "C" int gw_store_data(const uint64_t len, uint8_t *data) {
   uint8_t script_hash[GW_KEY_BYTES];
   blake2b_hash(script_hash, data, len);
 
-  dbg_print("gw_store_data blake2b_hash: ");
+  dbg_print("gw_store_data[%ld] blake2b_hash:", len);
   dbg_print_h256(script_hash);
 
-  bytes bs((uint8_t*)data, len);
+  static const uint64_t MAX_DATA_SIZE = 24576;
+  if (len <= 0 || len > MAX_DATA_SIZE) {
+    // FIXME:
+    dbg_print("[gw_store_data] !!!!!! warning: data_len = %ld !!!!!!", len);
+    return GW_ERROR_BUFFER_OVERFLOW;
+  }
+
+  bytes bs((uint8_t *)data, len);
   // debug_print
   // cout << "\tbytes: " << bs << endl;
   gw_host->code_store[u256_to_bytes32(script_hash)] = bs;

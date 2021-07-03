@@ -4,4 +4,5 @@ target/
 artifacts/
 
 coverage/
-CMakeFiles/
+/corpus/*
+!/corpus/regression/

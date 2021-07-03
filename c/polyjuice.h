@@ -1078,6 +1078,7 @@ int handle_message(gw_context_t* ctx,
 
   /* Store contract code though syscall */
   if (is_create(msg.kind)) {
+    // TODO: check code length < MAX_DATA_SIZE
     ret = store_contract_code(ctx, to_id, res);
     if (ret != 0) {
       return ret;
