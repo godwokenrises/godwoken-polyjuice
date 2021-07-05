@@ -1172,7 +1172,9 @@ int run_polyjuice() {
   }
 
   struct evmc_result res;
-  res.release = NULL;
+  memset(&res, 0, sizeof(evmc_result));
+  res.status_code = EVMC_FAILURE; // Generic execution failure
+
   int ret_handle_message = handle_message(&context, UINT32_MAX, UINT32_MAX, NULL, &msg, &res);
   uint64_t gas_used = (uint64_t)(msg.gas - res.gas_left);
   ret = emit_evm_result_log(&context, gas_used, res.status_code);
