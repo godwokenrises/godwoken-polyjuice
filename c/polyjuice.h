@@ -152,9 +152,13 @@ int parse_args(struct evmc_message* msg, uint128_t* gas_price,
     debug_print_data("invalid polyjuice args header", args, 7);
     return -1;
   }
+  debug_print_int("[call_kind]", args[7]);
+  if (args[7] != EVMC_CALL && args[7] != EVMC_CREATE) {
+    ckb_debug("invalid call kind");
+    return -1;
+  }
   evmc_call_kind kind = (evmc_call_kind)args[7];
   offset += 8;
-  debug_print_int("[kind]", kind);
 
   /* args[8..16] gas limit  */
   int64_t gas_limit;
@@ -193,11 +197,6 @@ int parse_args(struct evmc_message* msg, uint128_t* gas_price,
   /* args[52..52+input_size] */
   uint8_t* input_data = args + offset;
   debug_print_data("[input_data]", input_data, input_size);
-
-  if (kind != EVMC_CALL && kind != EVMC_CREATE) {
-    ckb_debug("invalid call kind");
-    return -1;
-  }
 
   int ret;
   evmc_address sender{0};
@@ -1173,7 +1172,9 @@ int run_polyjuice() {
   }
 
   struct evmc_result res;
-  res.release = NULL;
+  memset(&res, 0, sizeof(evmc_result));
+  res.status_code = EVMC_FAILURE; // Generic execution failure
+
   int ret_handle_message = handle_message(&context, UINT32_MAX, UINT32_MAX, NULL, &msg, &res);
   uint64_t gas_used = (uint64_t)(msg.gas - res.gas_left);
   ret = emit_evm_result_log(&context, gas_used, res.status_code);
