@@ -13,7 +13,7 @@ use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
 
 const INIT_CODE: &str = include_str!("../../../solidity/erc20/SudtERC20Proxy.bin");
 
-fn _test_sudt_erc20_proxy(
+fn test_sudt_erc20_proxy_inner(
     generator: &Generator,
     store: &Store,
     state: &mut DummyState,
@@ -137,6 +137,25 @@ fn _test_sudt_erc20_proxy(
             ),
             "0000000000000000000000000000000000000000000000000000000000000001",
         ),
+        //// === Transfer to self ====
+        // transfer("eoa1", 0x0)
+        (
+            from_id1,
+            format!(
+                "a9059cbb{}0000000000000000000000000000000000000000000000000000000000000000",
+                eoa1_hex
+            ),
+            "0000000000000000000000000000000000000000000000000000000000000001",
+        ),
+        // transfer("eoa1", 0x219)
+        (
+            from_id1,
+            format!(
+                "a9059cbb{}0000000000000000000000000000000000000000000000000000000000000219",
+                eoa1_hex
+            ),
+            "0000000000000000000000000000000000000000000000000000000000000001",
+        ),
         // balanceOf(eoa2)
         (
             from_id1,
@@ -211,10 +230,74 @@ fn _test_sudt_erc20_proxy(
             run_result.return_data,
             hex::decode(return_data_str).unwrap()
         );
-        // println!(
-        //     "result {}",
-        //     serde_json::to_string_pretty(&RunResult::from(run_result)).unwrap()
-        // );
+    }
+
+    // from_id1 transfer to from_id2, invalid amount value
+    {
+        let args_str = format!(
+            "a9059cbb{}000000000000000000000000fff00000ffffffffffffffffffffffffffffffff",
+            eoa2_hex
+        );
+        let block_number = 80;
+        let block_info = new_block_info(block_producer_id, block_number, block_number);
+        println!(">> [input]: {}", args_str);
+        let input = hex::decode(args_str).unwrap();
+        let args = PolyjuiceArgsBuilder::default()
+            .gas_limit(80000)
+            .gas_price(1)
+            .value(0)
+            .input(&input)
+            .build();
+        let raw_tx = RawL2Transaction::new_builder()
+            .from_id(from_id1.pack())
+            .to_id(new_account_id.pack())
+            .args(Bytes::from(args).pack())
+            .build();
+        let db = store.begin_transaction();
+        let tip_block_hash = store.get_tip_block_hash().unwrap();
+        let err = generator
+            .execute_transaction(
+                &ChainView::new(&db, tip_block_hash),
+                state,
+                &block_info,
+                &raw_tx,
+            )
+            .expect_err("err");
+        assert_eq!(err, TransactionError::InvalidExitCode(-31));
+    }
+
+    // transfer to self insufficient balance
+    {
+        let args_str = format!(
+            "a9059cbb{}00000000000000000000000000000000ffffffffffffffffffffffffffffffff",
+            eoa1_hex
+        );
+        let block_number = 80;
+        let block_info = new_block_info(block_producer_id, block_number, block_number);
+        println!(">> [input]: {}", args_str);
+        let input = hex::decode(args_str).unwrap();
+        let args = PolyjuiceArgsBuilder::default()
+            .gas_limit(80000)
+            .gas_price(1)
+            .value(0)
+            .input(&input)
+            .build();
+        let raw_tx = RawL2Transaction::new_builder()
+            .from_id(from_id1.pack())
+            .to_id(new_account_id.pack())
+            .args(Bytes::from(args).pack())
+            .build();
+        let db = store.begin_transaction();
+        let tip_block_hash = store.get_tip_block_hash().unwrap();
+        let err = generator
+            .execute_transaction(
+                &ChainView::new(&db, tip_block_hash),
+                state,
+                &block_info,
+                &raw_tx,
+            )
+            .expect_err("err");
+        assert_eq!(err, TransactionError::InvalidExitCode(12));
     }
     Ok(())
 }
@@ -233,7 +316,7 @@ fn test_sudt_erc20_proxy() {
     assert_eq!(CKB_SUDT_ACCOUNT_ID, 1);
 
     assert_eq!(
-        _test_sudt_erc20_proxy(
+        test_sudt_erc20_proxy_inner(
             &generator,
             &store,
             &mut state,
@@ -260,7 +343,7 @@ fn test_error_sudt_id_sudt_erc20_proxy() {
 
     assert_eq!(CKB_SUDT_ACCOUNT_ID, 1);
     assert_eq!(
-        _test_sudt_erc20_proxy(
+        test_sudt_erc20_proxy_inner(
             &generator,
             &store,
             &mut state,
