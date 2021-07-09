@@ -246,7 +246,9 @@ int load_account_code(gw_context_t* gw_ctx, uint32_t account_id,
   if (raw_args_seg.size != CONTRACT_ACCOUNT_SCRIPT_ARGS_SIZE) {
     debug_print_int("invalid account script", account_id);
     debug_print_int("raw_args_seg.size", raw_args_seg.size);
-    return -1;
+    // This is an EoA or other kind of account
+    *code_size = 0;
+    return 0;
   }
   if (memcmp(code_hash_seg.ptr, g_script_code_hash, 32) != 0
       || *hash_type_seg.ptr != g_script_hash_type
@@ -256,7 +258,9 @@ int load_account_code(gw_context_t* gw_ctx, uint32_t account_id,
       || memcmp(&g_creator_account_id, raw_args_seg.ptr + 32, sizeof(uint32_t)) != 0
   ) {
     debug_print_int("creator account id not match for account", account_id);
-    return -1;
+    // This is an EoA or other kind of account
+    *code_size = 0;
+    return 0;
   }
 
   debug_print_int("load_account_code, account_id:", account_id);
@@ -294,7 +298,7 @@ int load_account_code(gw_context_t* gw_ctx, uint32_t account_id,
     return ret;
   }
   if (*code_size > old_code_size) {
-    ckb_debug("code can't be larger than MAX_DATA_SIZE");
+    debug_print_int("code can't be larger than", MAX_DATA_SIZE);
     return -1;
   }
   return 0;
@@ -392,7 +396,6 @@ size_t get_code_size(struct evmc_host_context* context,
   ret = address_to_account_id(context->gw_ctx, address->bytes, &account_id);
   if (ret != 0) {
     ckb_debug("get contract account id failed");
-    context->error_code = ret;
     return 0;
   }
   uint8_t code[MAX_DATA_SIZE];
@@ -751,6 +754,11 @@ int create_new_account(gw_context_t* ctx,
                        size_t code_size) {
   static const uint32_t SCRIPT_ARGS_LEN = 32 + 4 + 20;
 
+  if (code_size == 0) {
+    ckb_debug("can't create new account by empty code data");
+    return -1;
+  }
+
   int ret = 0;
   uint8_t script_args[SCRIPT_ARGS_LEN];
   uint8_t data[128] = {0};
@@ -831,7 +839,7 @@ int create_new_account(gw_context_t* ctx,
 int handle_transfer(gw_context_t* ctx,
                     const evmc_message* msg,
                     uint8_t tx_origin_addr[20],
-                    bool transfer_only) {
+                    bool to_address_is_eoa) {
   int ret;
   uint8_t value_u128_bytes[16];
   for (int i = 0; i < 16; i++) {
@@ -855,7 +863,7 @@ int handle_transfer(gw_context_t* ctx,
     return ret;
   }
 
-  if (msg->kind == EVMC_CALL && memcmp(msg->sender.bytes, tx_origin_addr, 20) == 0 && transfer_only) {
+  if (msg->kind == EVMC_CALL && memcmp(msg->sender.bytes, tx_origin_addr, 20) == 0 && to_address_is_eoa) {
     ckb_debug("transfer value from eoa to eoa");
     return -1;
   }
@@ -932,55 +940,39 @@ int handle_message(gw_context_t* ctx,
                    uint32_t parent_to_id,
                    evmc_address *parent_destination,
                    const evmc_message* msg_origin, struct evmc_result* res) {
+  static const evmc_address zero_address{0};
+
   ckb_debug("BEGIN handle_message");
-
   evmc_message msg = *msg_origin;
-
   int ret;
 
-  /* to_id may still a contract account, but can be treated as EoA account */
-  bool transfer_only = false;
-  uint32_t to_id;
+  bool to_address_exists = false;
+  bool to_address_is_zero = false;
+  if (memcmp(zero_address.bytes, msg.destination.bytes, 20) == 0) {
+    if (!is_create(msg.kind)) {
+      debug_print_int("call zero address with invalid call kind", msg.kind);
+      return -1;
+    }
+    to_address_is_zero = true;
+  }
+
+  uint32_t to_id = 0;
   uint32_t from_id;
   // TODO: passing this value from function argument
   uint8_t from_script_hash[32] = {0};
   uint8_t to_script_hash[32] = {0};
-  if (msg.input_size == 0) {
-    if (is_create(msg.kind)) {
-      ckb_debug("CREATE/CREATE2 must have input data");
-      return -1;
-    }
-
+  if (!to_address_is_zero) {
     ret = ctx->sys_get_script_hash_by_prefix(ctx, msg.destination.bytes, 20, to_script_hash);
     if (ret == 0) {
+      to_address_exists = true;
       ret = ctx->sys_get_account_id_by_script_hash(ctx, to_script_hash, &to_id);
       if (ret != 0) {
         debug_print_data("get to account id by script hash failed", to_script_hash, 32);
         return -1;
       }
-    } else {
-      // NOTE: Both to_id and to_script_hash are undefined (can't be used)
-      ckb_debug("to id will be treated as EoA");
-      transfer_only = true;
-    }
-  } else {
-    static const evmc_address zero_address{0};
-    if (memcmp(zero_address.bytes, msg.destination.bytes, 20) == 0) {
-      to_id = 0;
-    } else {
-      ret = ctx->sys_get_script_hash_by_prefix(ctx, msg.destination.bytes, 20, to_script_hash);
-      if (ret == 0) {
-        ret = ctx->sys_get_account_id_by_script_hash(ctx, to_script_hash, &to_id);
-        if (ret != 0) {
-          debug_print_data("get to account id by script hash failed", from_script_hash, 32);
-          return -1;
-        }
-      } else {
-        debug_print_data("get destination script hash failed", msg.destination.bytes, 20);
-        return -1;
-      }
     }
   }
+
   ret = ctx->sys_get_script_hash_by_prefix(ctx, msg.sender.bytes, 20, from_script_hash);
   if (ret == 0) {
     ret = ctx->sys_get_account_id_by_script_hash(ctx, from_script_hash, &from_id);
@@ -1002,7 +994,7 @@ int handle_message(gw_context_t* ctx,
   }
 
   /* Check if target contract is destructed */
-  if (!is_create(msg.kind) && !transfer_only) {
+  if (!is_create(msg.kind) && to_address_exists) {
     ret = check_destructed(ctx, to_id);
     if (ret != 0) {
       return ret;
@@ -1020,20 +1012,21 @@ int handle_message(gw_context_t* ctx,
     code_size = msg.input_size;
     msg.input_data = NULL;
     msg.input_size = 0;
-  } else {
+  } else if (to_address_exists) {
     /* call kind: CALL/CALLCODE/DELEGATECALL */
-    if (msg.input_size > 0) {
-      ret = load_account_code(ctx, to_id, &code_size_u32, 0, code_data_buffer);
-      if (ret != 0) {
-        return ret;
-      }
-      if (code_size_u32 == 0) {
-        debug_print_int("empty contract code for account", to_id);
-        return -1;
-      }
-      code_data = code_data_buffer;
-      code_size = (size_t)code_size_u32;
+    ret = load_account_code(ctx, to_id, &code_size_u32, 0, code_data_buffer);
+    if (ret != 0) {
+      return ret;
     }
+    if (code_size_u32 == 0) {
+      debug_print_int("empty contract code for account (EoA account)", to_id);
+      code_data = NULL;
+    } else {
+      code_data = code_data_buffer;
+    }
+    code_size = (size_t)code_size_u32;
+  } else {
+    // Call non-exists address
   }
 
   /* Handle special call: CALLCODE/DELEGATECALL */
@@ -1054,6 +1047,7 @@ int handle_message(gw_context_t* ctx,
     if (ret != 0) {
       return ret;
     }
+    to_address_exists = true;
 
     /* It's a creation polyjuice transaction */
     if (parent_from_id == UINT32_MAX && parent_to_id == UINT32_MAX) {
@@ -1064,15 +1058,24 @@ int handle_message(gw_context_t* ctx,
 
   /* Handle transfer logic.
      NOTE: MUST do this before vm.execute and after to_id finalized */
-  ret = handle_transfer(ctx, &msg, (uint8_t *)g_tx_origin.bytes, transfer_only);
+  bool to_address_is_eoa = !to_address_exists || (to_address_exists && code_size == 0);
+  ret = handle_transfer(ctx, &msg, (uint8_t *)g_tx_origin.bytes, to_address_is_eoa);
   if (ret != 0) {
     return ret;
   }
 
   /* NOTE: msg and res are updated */
-  ret = execute_in_evmone(ctx, &msg, parent_from_id, from_id, to_id, code_data, code_size, res);
-  if (ret != 0) {
-    return ret;
+  if (to_address_exists && code_size > 0 && (is_create(msg.kind) || msg.input_size > 0)) {
+    ret = execute_in_evmone(ctx, &msg, parent_from_id, from_id, to_id, code_data, code_size, res);
+    if (ret != 0) {
+      return ret;
+    }
+  } else {
+    ckb_debug("Don't run evm and return empty data");
+    res->output_data = NULL;
+    res->output_size = 0;
+    res->gas_left = msg.gas;
+    res->status_code = EVMC_SUCCESS;
   }
 
   /* Store contract code though syscall */
@@ -1091,6 +1094,7 @@ int handle_message(gw_context_t* ctx,
 
   debug_print_data("output data", res->output_data, res->output_size);
   debug_print_int("output size", res->output_size);
+  debug_print_int("gas left", res->gas_left);
   debug_print_int("status_code", res->status_code);
   ckb_debug("END handle_message");
   return (int)res->status_code;
@@ -1200,6 +1204,8 @@ int run_polyjuice() {
     return clean_evmc_result_and_return(&res, -1);
   }
   if (msg.gas < res.gas_left) {
+    debug_print_int("msg.gas", msg.gas);
+    debug_print_int("res.gas_left", res.gas_left);
     ckb_debug("unreachable!");
     return clean_evmc_result_and_return(&res, -1);
   }
