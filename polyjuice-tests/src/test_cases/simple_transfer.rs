@@ -128,6 +128,9 @@ fn test_simple_transfer() {
     {
         // > transfer to EoA
         // SimpleTransfer.transferTo();
+        let old_balance = state
+            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, new_short_address)
+            .unwrap();
         let block_info = new_block_info(block_producer_id, block_number, block_number);
         let input = hex::decode(format!(
             "a03fa7e3{}",
@@ -160,16 +163,65 @@ fn test_simple_transfer() {
         let new_balance = state
             .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, new_short_address)
             .unwrap();
-        assert_eq!(new_balance, deploy_value - 1);
+        assert_eq!(new_balance, old_balance - 1);
         let target_balance = state
             .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, target_short_address)
             .unwrap();
         assert_eq!(target_balance, 1);
     }
 
+    {
+        // > transfer to zero address
+        // SimpleTransfer.transferTo(address{0});
+        let old_balance = state
+            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, new_short_address)
+            .unwrap();
+        let block_info = new_block_info(block_producer_id, block_number, block_number);
+        let input = hex::decode(format!(
+            "a03fa7e30000000000000000000000000000000000000000000000000000000000000000",
+        ))
+        .unwrap();
+
+        let args = PolyjuiceArgsBuilder::default()
+            .gas_limit(40000)
+            .gas_price(1)
+            .value(0)
+            .input(&input)
+            .build();
+        let raw_tx = RawL2Transaction::new_builder()
+            .from_id(from_id.pack())
+            .to_id(new_account_id.pack())
+            .args(Bytes::from(args).pack())
+            .build();
+        let db = store.begin_transaction();
+        let tip_block_hash = store.get_tip_block_hash().unwrap();
+        let run_result = generator
+            .execute_transaction(
+                &ChainView::new(&db, tip_block_hash),
+                &state,
+                &block_info,
+                &raw_tx,
+            )
+            .expect("construct");
+        state.apply_run_result(&run_result).expect("update state");
+
+        let new_balance = state
+            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, new_short_address)
+            .unwrap();
+        assert_eq!(new_balance, old_balance - 1);
+
+        let zero_account_balance = state
+            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &[0u8; 20][..])
+            .unwrap();
+        assert_eq!(zero_account_balance, 1);
+    }
+
     println!("================");
     {
         // SimpleTransfer.transferToSimpleStorage1();
+        let old_balance = state
+            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, new_short_address)
+            .unwrap();
         let block_info = new_block_info(0, block_number, block_number);
         let input = hex::decode(format!(
             "f10c7360{}",
@@ -202,7 +254,7 @@ fn test_simple_transfer() {
         let new_balance = state
             .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, new_short_address)
             .unwrap();
-        assert_eq!(new_balance, deploy_value - 2);
+        assert_eq!(new_balance, old_balance - 1);
         let ss_balance = state
             .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, ss_short_address)
             .unwrap();
@@ -226,6 +278,9 @@ fn test_simple_transfer() {
     println!("================");
     {
         // SimpleTransfer.transferToSimpleStorage2();
+        let old_balance = state
+            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, new_short_address)
+            .unwrap();
         let block_info = new_block_info(0, block_number, block_number);
         let input = hex::decode(format!(
             "2a5eb963{}",
@@ -258,7 +313,7 @@ fn test_simple_transfer() {
         let new_balance = state
             .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, new_short_address)
             .unwrap();
-        assert_eq!(new_balance, deploy_value - 3);
+        assert_eq!(new_balance, old_balance - 1);
         let ss_balance = state
             .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, ss_short_address)
             .unwrap();

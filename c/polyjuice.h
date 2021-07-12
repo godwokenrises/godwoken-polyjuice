@@ -947,21 +947,12 @@ int handle_message(gw_context_t* ctx,
   int ret;
 
   bool to_address_exists = false;
-  bool to_address_is_zero = false;
-  if (memcmp(zero_address.bytes, msg.destination.bytes, 20) == 0) {
-    if (!is_create(msg.kind)) {
-      debug_print_int("call zero address with invalid call kind", msg.kind);
-      return -1;
-    }
-    to_address_is_zero = true;
-  }
-
   uint32_t to_id = 0;
   uint32_t from_id;
   // TODO: passing this value from function argument
   uint8_t from_script_hash[32] = {0};
   uint8_t to_script_hash[32] = {0};
-  if (!to_address_is_zero) {
+  if (memcmp(zero_address.bytes, msg.destination.bytes, 20) != 0) {
     ret = ctx->sys_get_script_hash_by_prefix(ctx, msg.destination.bytes, 20, to_script_hash);
     if (ret == 0) {
       to_address_exists = true;
@@ -971,6 +962,11 @@ int handle_message(gw_context_t* ctx,
         return -1;
       }
     }
+  } else {
+    /* When msg.destination is zero
+        1. if is_create(msg.kind) == true, we will run msg.input_data as code in EVM
+        2. if is_create(msg.kind) == false, code_size must be zero, so it's simply a transfer action
+    */
   }
 
   ret = ctx->sys_get_script_hash_by_prefix(ctx, msg.sender.bytes, 20, from_script_hash);
