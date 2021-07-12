@@ -13,6 +13,7 @@ use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
 
 const SS_INIT_CODE: &str = include_str!("./evm-contracts/SimpleStorage.bin");
 const INIT_CODE: &str = include_str!("./evm-contracts/CallContract.bin");
+const CALL_NON_EXISTS_INIT_CODE: &str = include_str!("./evm-contracts/CallNonExistsContract.bin");
 
 #[test]
 fn test_contract_call_contract() {
@@ -140,4 +141,79 @@ fn test_contract_call_contract() {
     assert_eq!(state.get_nonce(from_id).unwrap(), 3);
     assert_eq!(state.get_nonce(ss_account_id).unwrap(), 0);
     assert_eq!(state.get_nonce(new_account_id).unwrap(), 0);
+}
+
+#[test]
+fn test_contract_call_non_exists_contract() {
+    let (store, mut state, generator, creator_account_id) = setup();
+    let block_producer_script = build_eth_l2_script([0x99u8; 20]);
+    let block_producer_id = state
+        .create_account_from_script(block_producer_script)
+        .unwrap();
+
+    let from_script = build_eth_l2_script([1u8; 20]);
+    let from_script_hash = from_script.hash();
+    let from_short_address = &from_script_hash[0..20];
+    let from_id = state.create_account_from_script(from_script).unwrap();
+    state
+        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_short_address, 200000)
+        .unwrap();
+    let block_number = 1;
+
+    // Deploy CallNonExistsContract
+    let _run_result = deploy(
+        &generator,
+        &store,
+        &mut state,
+        creator_account_id,
+        from_id,
+        CALL_NON_EXISTS_INIT_CODE,
+        122000,
+        0,
+        block_producer_id,
+        block_number,
+    );
+
+    let contract_account_script =
+        new_account_script(&mut state, creator_account_id, from_id, false);
+    let new_account_id = state
+        .get_account_id_by_script_hash(&contract_account_script.hash().into())
+        .unwrap()
+        .unwrap();
+    {
+        // Call CallNonExistsContract.rawCall(addr)
+        let block_info = new_block_info(0, block_number, block_number);
+        let input =
+            hex::decode("56c94e70000000000000000000000000000000000fffffffffffffffffffffffffffffff")
+                .unwrap();
+        let args = PolyjuiceArgsBuilder::default()
+            .gas_limit(51000)
+            .gas_price(1)
+            .value(0)
+            .input(&input)
+            .build();
+        let raw_tx = RawL2Transaction::new_builder()
+            .from_id(from_id.pack())
+            .to_id(new_account_id.pack())
+            .args(Bytes::from(args).pack())
+            .build();
+        let db = store.begin_transaction();
+        let tip_block_hash = store.get_tip_block_hash().unwrap();
+        let run_result = generator
+            .execute_transaction(
+                &ChainView::new(&db, tip_block_hash),
+                &state,
+                &block_info,
+                &raw_tx,
+            )
+            .expect("construct");
+        assert_eq!(
+            run_result.return_data,
+            vec![
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0
+            ]
+        );
+    }
 }
