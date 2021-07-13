@@ -263,7 +263,8 @@ fn test_sudt_erc20_proxy_inner(
                 &raw_tx,
             )
             .expect_err("err");
-        assert_eq!(err, TransactionError::InvalidExitCode(-31));
+        // by: `revert(0, 0)`
+        assert_eq!(err, TransactionError::InvalidExitCode(2));
     }
 
     // transfer to self insufficient balance
@@ -297,7 +298,8 @@ fn test_sudt_erc20_proxy_inner(
                 &raw_tx,
             )
             .expect_err("err");
-        assert_eq!(err, TransactionError::InvalidExitCode(12));
+        // by: `revert(0, 0)`
+        assert_eq!(err, TransactionError::InvalidExitCode(2));
     }
     Ok(())
 }
@@ -351,6 +353,6 @@ fn test_error_sudt_id_sudt_erc20_proxy() {
             error_new_sudt_id,
             block_producer_id,
         ),
-        Err(TransactionError::InvalidExitCode(-30))
+        Err(TransactionError::InvalidExitCode(105))
     );
 }

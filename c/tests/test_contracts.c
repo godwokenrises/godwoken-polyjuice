@@ -86,7 +86,7 @@ int test_contract(const uint8_t n,
     ret = -1;
     goto test_contract_cleanup;
   }
-  
+
   ckb_debug(success_message);
   ckb_debug("===============================================");
 
@@ -102,7 +102,7 @@ int test_ecrecover() {
                     "a8b53bdf3306a35a7103ab5504a0c9b492295564b6202b1942a84ef300107281000000000000000000000000000000000000000000000000000000000000001b307835653165303366353363653138623737326363623030393366663731663366353366356337356237346463623331613835616138623838393262346538621122334455667788991011121314151617181920212223242526272829303132",
                     "",
                     3000,
-                    "ecrecover CallEcrecoverUnrecoverableKey ok") != -77) {
+                    "ecrecover CallEcrecoverUnrecoverableKey ok") != 0) {
     return -1;
   }
   // success case
@@ -117,21 +117,21 @@ int test_ecrecover() {
                     "18c547e4f7b0f325ad1e56f57e26c745b09a3e503d86e00e5255ff7f715d3d1c100000000000000000000000000000000000000000000000000000000000001c73b1693892219d736caba55bdb67216e485557ea6b6af75f37096c9aa6a5a75feeb940b1d03b21e36b0e47e79769f095fe2ab855bd91e3a38756b7d75a9c4549",
                     "",
                     3000,
-                    "ecrecover InvalidHighV-bits-1 ok") != -75) {
+                    "ecrecover InvalidHighV-bits-1 ok") != 0) {
     return -1;
   }
   if (test_contract(1,
                     "18c547e4f7b0f325ad1e56f57e26c745b09a3e503d86e00e5255ff7f715d3d1c000000000000000000000000000000000000001000000000000000000000001c73b1693892219d736caba55bdb67216e485557ea6b6af75f37096c9aa6a5a75feeb940b1d03b21e36b0e47e79769f095fe2ab855bd91e3a38756b7d75a9c4549",
                     "",
                     3000,
-                    "ecrecover InvalidHighV-bits-2 ok") != -75) {
+                    "ecrecover InvalidHighV-bits-2 ok") != 0) {
     return -1;
   }
   if (test_contract(1,
                     "18c547e4f7b0f325ad1e56f57e26c745b09a3e503d86e00e5255ff7f715d3d1c000000000000000000000000000000000000001000000000000000000000011c73b1693892219d736caba55bdb67216e485557ea6b6af75f37096c9aa6a5a75feeb940b1d03b21e36b0e47e79769f095fe2ab855bd91e3a38756b7d75a9c4549",
                     "",
                     3000,
-                    "ecrecover InvalidHighV-bits-3 ok") != -75) {
+                    "ecrecover InvalidHighV-bits-3 ok") != 0) {
     return -1;
   }
   return 0;

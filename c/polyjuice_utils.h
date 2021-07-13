@@ -174,4 +174,13 @@ void put_u128(uint128_t value, uint8_t *output) {
   }
 }
 
+/* If it is a fatal error, terminate the whole process.
+ * ====
+ *   - gw_errors.h           GW_FATAIL_xxx               100~122
+ *   - polyjuice_globals.h   FATAL_PRECOMPILED_CONTRACTS 199
+ */
+bool is_fatal_error(int error_code) {
+  return error_code >= 100 && error_code < 200;
+}
+
 #endif // POLYJUICE_UTILS_H

@@ -20,6 +20,7 @@ int recover_account_gas(const uint8_t* input_src,
 
 /*
   Recover an EoA account script hash by signature
+  When input data is wrong we just return empty output with 0 return code.
 
   input: (the input data is from abi.encode(mesage, signature, code_hash))
   ======
@@ -41,7 +42,8 @@ int recover_account(gw_context_t* ctx,
                     const size_t input_size,
                     uint8_t** output, size_t* output_size) {
   if (input_size < 128) {
-    return ERROR_RECOVER_ACCOUNT;
+    debug_print_int("input size too small", input_size);
+    return 0;
   }
   int ret;
   uint8_t *message = (uint8_t *)input_src;
@@ -51,24 +53,24 @@ int recover_account(gw_context_t* ctx,
   ret = parse_u64(input_src + 96, &signature_len);
   if (ret != 0) {
     debug_print_int("parse signature length failed", ret);
-    return ERROR_RECOVER_ACCOUNT;
+    return 0;
   }
   if (signature_len + 128 > input_size) {
     debug_print_int("invalid input_size", input_size);
-    return ERROR_RECOVER_ACCOUNT;
+    return 0;
   }
   uint8_t script[GW_MAX_SCRIPT_SIZE];
   uint64_t script_len = 0;
   ret = ctx->sys_recover_account(ctx, message, signature, signature_len, code_hash, script, &script_len);
   if (ret != 0) {
     debug_print_int("call sys_recover_account failed", ret);
-    return ERROR_RECOVER_ACCOUNT;
+    return 0;
   }
   debug_print_data("script", script, script_len);
   *output = (uint8_t *)malloc(32);
   if (*output == NULL) {
     ckb_debug("malloc failed");
-    return -1;
+    return FATAL_PRECOMPILED_CONTRACTS;
   }
   *output_size = 32;
   blake2b_hash(*output, script, script_len);

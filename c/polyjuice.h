@@ -236,6 +236,12 @@ int load_account_code(gw_context_t* gw_ctx, uint32_t account_id,
   uint8_t buffer[GW_MAX_SCRIPT_SIZE];
   mol_seg_t script_seg;
   ret = load_account_script(gw_ctx, account_id, buffer, GW_MAX_SCRIPT_SIZE, &script_seg);
+  if (ret == GW_ERROR_NOT_FOUND) {
+    // This is an EoA or other kind of account, and not yet created
+    debug_print_int("account not found", account_id);
+    *code_size = 0;
+    return 0;
+  }
   if (ret != 0) {
     return ret;
   }
@@ -470,6 +476,7 @@ evmc_uint256be get_balance(struct evmc_host_context* context,
   evmc_uint256be balance{};
   uint128_t value_u128 = 0;
   ret = sudt_get_balance(context->gw_ctx, g_sudt_id, POLYJUICE_SHORT_ADDR_LEN, address->bytes, &value_u128);
+  /* g_sudt_id account must exists */
   if (ret != 0) {
     ckb_debug("sudt_get_balance failed");
     context->error_code = -1;
@@ -497,6 +504,7 @@ void selfdestruct(struct evmc_host_context* context,
 
   uint128_t balance;
   ret = sudt_get_balance(context->gw_ctx, g_sudt_id, POLYJUICE_SHORT_ADDR_LEN, context->destination.bytes, &balance);
+  /* g_sudt_id account must exists */
   if (ret != 0) {
     ckb_debug("get balance failed");
     context->error_code = ret;
@@ -550,10 +558,12 @@ struct evmc_result call(struct evmc_host_context* context,
   if (match_precompiled_address(&msg->destination, &contract_gas, &contract)) {
     uint64_t gas_cost = 0;
     ret = contract_gas(msg->input_data, msg->input_size, &gas_cost);
+    if (is_fatal_error(ret)) {
+      context->error_code = ret;
+    }
     if (ret != 0) {
       ckb_debug("call pre-compiled contract gas failed");
-      context->error_code = ret;
-      res.status_code = EVMC_REVERT;
+      res.status_code = EVMC_INTERNAL_ERROR;
       return res;
     }
     if ((uint64_t)msg->gas < gas_cost) {
@@ -567,20 +577,24 @@ struct evmc_result call(struct evmc_host_context* context,
                    msg->flags == EVMC_STATIC,
                    msg->input_data, msg->input_size,
                    (uint8_t**)&res.output_data, &res.output_size);
+    if (is_fatal_error(ret)) {
+      context->error_code = ret;
+    }
     if (ret != 0) {
       debug_print_int("call pre-compiled contract failed", ret);
-      context->error_code = ret;
-      res.status_code = EVMC_REVERT;
+      res.status_code = EVMC_INTERNAL_ERROR;
       return res;
     }
     res.status_code = EVMC_SUCCESS;
     debug_print_data("output data", res.output_data, res.output_size);
   } else {
     ret = handle_message(gw_ctx, context->from_id, context->to_id, &context->destination, msg, &res);
+    if (is_fatal_error(ret)) {
+      context->error_code = ret;
+    }
     if (ret != 0) {
       ckb_debug("inner call failed (transfer/contract call contract)");
-      context->error_code = ret;
-      res.status_code = EVMC_REVERT;
+      res.status_code = EVMC_INTERNAL_ERROR;
       return res;
     }
   }
@@ -591,7 +605,7 @@ struct evmc_result call(struct evmc_host_context* context,
     if (ret != 0) {
       ckb_debug("increase nonce failed");
       context->error_code = ret;
-      res.status_code = EVMC_REVERT;
+      res.status_code = EVMC_INTERNAL_ERROR;
       return res;
     }
   }
@@ -891,6 +905,10 @@ int execute_in_evmone(gw_context_t* ctx,
   debug_print_int("code size", code_size);
   debug_print_data("msg.input_data", msg->input_data, msg->input_size);
   *res = vm->execute(vm, &interface, &context, EVMC_MAX_REVISION, msg, code_data, code_size);
+  if (res->status_code != EVMC_SUCCESS && res->status_code != EVMC_REVERT) {
+    res->output_data = NULL;
+    res->output_size = 0;
+  }
   if (context.error_code != 0) {
     debug_print_int("context.error_code", context.error_code);
     ret = context.error_code;

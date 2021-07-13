@@ -49,20 +49,25 @@ int balance_of_any_sudt(gw_context_t* ctx,
     return ERROR_BALANCE_OF_ANY_SUDT;
   }
 
-  evmc_address address = *((evmc_address *)(input_src + 32 + 12));
-  uint128_t balance;
-  ret = sudt_get_balance(ctx, sudt_id, POLYJUICE_SHORT_ADDR_LEN, address.bytes, &balance);
-  if (ret != 0) {
-    ckb_debug("sudt_get_balance failed");
-    return ERROR_BALANCE_OF_ANY_SUDT;
-  }
+  // Default return zero balance
   *output = (uint8_t *)malloc(32);
   if (*output == NULL) {
     ckb_debug("malloc failed");
-    return -1;
+    return FATAL_PRECOMPILED_CONTRACTS;
   }
   *output_size = 32;
   memset(*output, 0, 32);
+
+  evmc_address address = *((evmc_address *)(input_src + 32 + 12));
+  uint128_t balance;
+  ret = sudt_get_balance(ctx, sudt_id, POLYJUICE_SHORT_ADDR_LEN, address.bytes, &balance);
+  if (ret == GW_ERROR_NOT_FOUND) {
+    debug_print_int("sudt account not found", sudt_id);
+    return 0;
+  } else if (ret != 0) {
+    ckb_debug("sudt_get_balance failed");
+    return ret;
+  }
   put_u128(balance, *output);
   return 0;
 }
