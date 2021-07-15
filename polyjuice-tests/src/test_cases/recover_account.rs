@@ -1,5 +1,5 @@
-//! Test EthToPolyjuiceAddress
-//!   See ./evm-contracts/EthToPolyjuiceAddress.sol
+//! Test RecoverAccount
+//!   See ./evm-contracts/RecoverAccount.sol
 
 use crate::helper::{
     build_eth_l2_script, deploy, new_account_script, new_block_info, setup, simple_storage_get,
