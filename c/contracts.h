@@ -35,15 +35,6 @@
 #define BLAKE2F_FINAL_BLOCK_BYTES 0x1
 #define BLAKE2F_NON_FINAL_BLOCK_BYTES 0x0
 
-#define ERROR_MOD_EXP -23
-#define ERROR_BLAKE2F_INVALID_INPUT_LENGTH -24
-#define ERROR_BLAKE2F_INVALID_FINAL_FLAG -25
-#define ERROR_BN256_ADD -26
-#define ERROR_BN256_SCALAR_MUL -27
-#define ERROR_BN256_PAIRING -28
-#define ERROR_BN256_INVALID_POINT -29
-
-
 /* pre-compiled Ethereum contracts */
 
 typedef int (*precompiled_contract_gas_fn)(const uint8_t* input_src,

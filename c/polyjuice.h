@@ -119,7 +119,7 @@ int load_account_script(gw_context_t* gw_ctx, uint32_t account_id,
   script_seg->size = len;
   if (MolReader_Script_verify(script_seg, false) != MOL_OK) {
     ckb_debug("load account script: invalid script");
-    return -1;
+    return FATAL_POLYJUICE;
   }
   return 0;
 }
@@ -590,23 +590,16 @@ struct evmc_result call(struct evmc_host_context* context,
   } else {
     ret = handle_message(gw_ctx, context->from_id, context->to_id, &context->destination, msg, &res);
     if (is_fatal_error(ret)) {
+      /* stop as soon as possible */
       context->error_code = ret;
     }
     if (ret != 0) {
-      ckb_debug("inner call failed (transfer/contract call contract)");
-      res.status_code = EVMC_INTERNAL_ERROR;
-      return res;
-    }
-  }
-
-  /* Increase context->to_id's nonce */
-  if (is_create(msg->kind)) {
-    ret = gw_increase_nonce(context->gw_ctx, context->to_id, NULL);
-    if (ret != 0) {
-      ckb_debug("increase nonce failed");
-      context->error_code = ret;
-      res.status_code = EVMC_INTERNAL_ERROR;
-      return res;
+      debug_print_int("inner call failed (transfer/contract call contract)", ret);
+      if (is_evmc_error(ret)) {
+        res.status_code = (evmc_status_code)ret;
+      } else {
+        res.status_code = EVMC_INTERNAL_ERROR;
+      }
     }
   }
   debug_print_int("call.res.status_code", res.status_code);
@@ -686,8 +679,8 @@ int check_destructed(gw_context_t* ctx, uint32_t to_id) {
   ret = syscall(GW_SYS_LOAD, destructed_raw_key, destructed_raw_value, 0, 0, 0, 0);
 #endif
   if (ret != 0) {
-    ckb_debug("load destructed key failed");
-    return -1;
+    debug_print_int("load destructed key failed", ret);
+    return ret;
   }
   bool destructed = true;
   for (int i = 0; i < GW_VALUE_BYTES; i++) {
@@ -698,7 +691,7 @@ int check_destructed(gw_context_t* ctx, uint32_t to_id) {
   }
   if (destructed) {
     ckb_debug("call a contract that was already destructed");
-    return -1;
+    return FATAL_POLYJUICE;
   }
   return 0;
 }
@@ -746,11 +739,11 @@ int load_globals(gw_context_t* ctx, uint32_t to_id, evmc_call_kind call_kind) {
         || memcmp(creator_raw_args_seg.ptr, raw_args_seg.ptr, 32) != 0
         || creator_raw_args_seg.size != 36) {
       debug_print_int("invalid creator account id in normal contract account script args", g_creator_account_id);
-      return -1;
+      return FATAL_POLYJUICE;
     }
   } else {
     debug_print_data("invalid to account script args", raw_args_seg.ptr, raw_args_seg.size);
-    return -1;
+    return FATAL_POLYJUICE;
   }
 
   memcpy(g_rollup_script_hash, creator_raw_args_seg.ptr, 32);
@@ -770,7 +763,7 @@ int create_new_account(gw_context_t* ctx,
 
   if (code_size == 0) {
     ckb_debug("can't create new account by empty code data");
-    return -1;
+    return FATAL_POLYJUICE;
   }
 
   int ret = 0;
@@ -811,7 +804,7 @@ int create_new_account(gw_context_t* ctx,
     data_len = 1 + 20 + 32 + 32;
   } else {
     ckb_debug("unreachable");
-    return -1;
+    return FATAL_POLYJUICE;
   }
 
   /* contract account script.args
@@ -859,7 +852,7 @@ int handle_transfer(gw_context_t* ctx,
   for (int i = 0; i < 16; i++) {
     if (msg->value.bytes[i] != 0) {
       ckb_debug("transfer value can not larger than u128::max()");
-      return -1;
+      return FATAL_POLYJUICE;
     }
     value_u128_bytes[i] = msg->value.bytes[31 - i];
   }
@@ -879,7 +872,7 @@ int handle_transfer(gw_context_t* ctx,
 
   if (msg->kind == EVMC_CALL && memcmp(msg->sender.bytes, tx_origin_addr, 20) == 0 && to_address_is_eoa) {
     ckb_debug("transfer value from eoa to eoa");
-    return -1;
+    return FATAL_POLYJUICE;
   }
 
   return 0;
@@ -977,7 +970,7 @@ int handle_message(gw_context_t* ctx,
       ret = ctx->sys_get_account_id_by_script_hash(ctx, to_script_hash, &to_id);
       if (ret != 0) {
         debug_print_data("get to account id by script hash failed", to_script_hash, 32);
-        return -1;
+        return ret;
       }
     }
   } else {
@@ -992,11 +985,11 @@ int handle_message(gw_context_t* ctx,
     ret = ctx->sys_get_account_id_by_script_hash(ctx, from_script_hash, &from_id);
     if (ret != 0) {
       debug_print_data("get from account id by script hash failed", from_script_hash, 32);
-      return -1;
+      return ret;
     }
   } else {
     debug_print_data("get sender script hash failed", msg.sender.bytes, 20);
-    return -1;
+    return ret;
   }
 
   /* an assert */
@@ -1004,7 +997,7 @@ int handle_message(gw_context_t* ctx,
     debug_print_int("from_id", from_id);
     debug_print_int("parent_from_id", parent_from_id);
     ckb_debug("from id != parent from id");
-    return -1;
+    return FATAL_POLYJUICE;
   }
 
   /* Check if target contract is destructed */
@@ -1049,7 +1042,7 @@ int handle_message(gw_context_t* ctx,
     to_id = parent_to_id;
     if (parent_destination == NULL) {
       ckb_debug("parent_destination is NULL");
-      return -1;
+      return FATAL_POLYJUICE;
     }
     memcpy(msg.destination.bytes, parent_destination->bytes, 20);
   }
@@ -1067,6 +1060,13 @@ int handle_message(gw_context_t* ctx,
     if (parent_from_id == UINT32_MAX && parent_to_id == UINT32_MAX) {
       g_created_id = to_id;
       memcpy(g_created_address, msg.destination.bytes, 20);
+    }
+
+    /* Increase from_id's nonce */
+    ret = gw_increase_nonce(ctx, from_id, NULL);
+    if (ret != 0) {
+      debug_print_int("increase nonce failed", ret);
+      return ret;
     }
   }
 
@@ -1142,8 +1142,8 @@ int emit_evm_result_log(gw_context_t* ctx, const uint64_t gas_used, const int st
   uint32_t to_id = g_created_id == UINT32_MAX ? ctx->transaction_context.to_id : g_created_id;
   int ret = ctx->sys_log(ctx, to_id, GW_LOG_POLYJUICE_SYSTEM, data_size, data);
   if (ret != 0) {
-    ckb_debug("sys_log evm result failed");
-    return -1;
+    debug_print_int("sys_log evm result failed", ret);
+    return ret;
   }
   return 0;
 }

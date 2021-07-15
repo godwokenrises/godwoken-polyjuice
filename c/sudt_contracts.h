@@ -8,9 +8,6 @@
 #define BALANCE_OF_ANY_SUDT_GAS 150
 #define TRANSFER_TO_ANY_SUDT_GAS 300
 
-#define ERROR_BALANCE_OF_ANY_SUDT -30
-#define ERROR_TRANSFER_TO_ANY_SUDT -31
-
 
 int balance_of_any_sudt_gas(const uint8_t* input_src,
                             const size_t input_size,

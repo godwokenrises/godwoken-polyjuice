@@ -8,9 +8,6 @@
 /* Gas fee */
 #define RECOVER_ACCOUNT_GAS 3600 /* more than ecrecover */
 
-/* Errors */
-#define ERROR_RECOVER_ACCOUNT -40
-
 int recover_account_gas(const uint8_t* input_src,
                         const size_t input_size,
                         uint64_t* gas) {

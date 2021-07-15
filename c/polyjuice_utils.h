@@ -177,10 +177,16 @@ void put_u128(uint128_t value, uint8_t *output) {
 /* If it is a fatal error, terminate the whole process.
  * ====
  *   - gw_errors.h           GW_FATAIL_xxx               100~122
- *   - polyjuice_globals.h   FATAL_PRECOMPILED_CONTRACTS 199
+ *   - polyjuice_globals.h   FATAL_POLYJUICE             -100
+ *   - polyjuice_globals.h   FATAL_PRECOMPILED_CONTRACTS -101
  */
 bool is_fatal_error(int error_code) {
-  return error_code >= 100 && error_code < 200;
+  return (error_code >= 100 && error_code < 127) || (error_code > -110 && error_code <= -100);
+}
+
+/* See evmc.h evmc_status_code */
+bool is_evmc_error(int error_code) {
+  return error_code >= 1 && error_code <= 16;
 }
 
 #endif // POLYJUICE_UTILS_H
