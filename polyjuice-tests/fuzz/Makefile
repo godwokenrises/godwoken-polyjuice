@@ -135,7 +135,7 @@ build/baseline.o: $(DEPS)/evmone/lib/evmone/baseline.cpp
 build/analysis.o: $(DEPS)/evmone/lib/evmone/analysis.cpp
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -c -o $@ $<
 build/execution.o: $(DEPS)/evmone/lib/evmone/execution.cpp
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) -c -o $@ $<
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -g -c -o $@ $<
 build/instructions.o: $(DEPS)/evmone/lib/evmone/instructions.cpp
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -c -o $@ $<
 build/instruction_metrics.o: $(DEPS)/evmone/evmc/lib/instructions/instruction_metrics.c
