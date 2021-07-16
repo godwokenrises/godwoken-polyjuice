@@ -104,4 +104,80 @@ fn test_recover_account() {
             .hash();
         assert_eq!(run_result.return_data, script_hash);
     }
+
+    // Wrong signature
+    let message_hex = "ffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff";
+    let signature_hex = "22222222222222222222222222225f4fb5e3023920f62124d309f5bdf70d95045a934f278cec717300a5417313d1cdc390e761e37c0964b940c0a6f07b7361ed01";
+    {
+        // RecoverAccount.recover(message, signature, code_hash);
+        let block_info = new_block_info(0, 2, 0);
+        let input = hex::decode(format!(
+            "7d7b0255{}0000000000000000000000000000000000000000000000000000000000000060{}0000000000000000000000000000000000000000000000000000000000000041{}00000000000000000000000000000000000000000000000000000000000000",
+            message_hex,
+            hex::encode(&SECP_LOCK_CODE_HASH),
+            signature_hex,
+        ))
+        .unwrap();
+        let args = PolyjuiceArgsBuilder::default()
+            .gas_limit(21000)
+            .gas_price(1)
+            .value(0)
+            .input(&input)
+            .build();
+        let raw_tx = RawL2Transaction::new_builder()
+            .from_id(from_id.pack())
+            .to_id(new_account_id.pack())
+            .args(Bytes::from(args).pack())
+            .build();
+        let db = store.begin_transaction();
+        let tip_block_hash = store.get_tip_block_hash().unwrap();
+        let run_result = generator
+            .execute_transaction(
+                &ChainView::new(&db, tip_block_hash),
+                &state,
+                &block_info,
+                &raw_tx,
+            )
+            .expect("construct");
+        state.apply_run_result(&run_result).expect("update state");
+        assert_eq!(run_result.return_data, [0u8; 32]);
+    }
+
+    // Wrong code_hash
+    let message_hex = "1cdeae55a5768fe14b628001c6247ae84c70310a7ddcfdc73ac68494251e46ec";
+    let signature_hex = "28aa0c394487edf2211f445c47fb5f4fb5e3023920f62124d309f5bdf70d95045a934f278cec717300a5417313d1cdc390e761e37c0964b940c0a6f07b7361ed01";
+    {
+        // RecoverAccount.recover(message, signature, code_hash);
+        let block_info = new_block_info(0, 2, 0);
+        let input = hex::decode(format!(
+            "7d7b0255{}0000000000000000000000000000000000000000000000000000000000000060{}0000000000000000000000000000000000000000000000000000000000000041{}00000000000000000000000000000000000000000000000000000000000000",
+            message_hex,
+            hex::encode(&[1u8; 32]),
+            signature_hex,
+        ))
+        .unwrap();
+        let args = PolyjuiceArgsBuilder::default()
+            .gas_limit(21000)
+            .gas_price(1)
+            .value(0)
+            .input(&input)
+            .build();
+        let raw_tx = RawL2Transaction::new_builder()
+            .from_id(from_id.pack())
+            .to_id(new_account_id.pack())
+            .args(Bytes::from(args).pack())
+            .build();
+        let db = store.begin_transaction();
+        let tip_block_hash = store.get_tip_block_hash().unwrap();
+        let run_result = generator
+            .execute_transaction(
+                &ChainView::new(&db, tip_block_hash),
+                &state,
+                &block_info,
+                &raw_tx,
+            )
+            .expect("construct");
+        state.apply_run_result(&run_result).expect("update state");
+        assert_eq!(run_result.return_data, [0u8; 32]);
+    }
 }
