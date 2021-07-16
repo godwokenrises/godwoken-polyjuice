@@ -12,16 +12,17 @@
 #include <evmc/evmc.hpp>
 #include <evmone/evmone.h>
 
-#include "common.h"
-
 /* https://stackoverflow.com/a/1545079 */
 #pragma push_macro("errno")
 #undef errno
 #include "gw_syscalls.h"
 #pragma pop_macro("errno")
 
+#include "common.h"
+
 #include "sudt_utils.h"
 #include "polyjuice_globals.h"
+#include "polyjuice_errors.h"
 #include "polyjuice_utils.h"
 
 #ifdef GW_GENERATOR
@@ -1062,7 +1063,10 @@ int handle_message(gw_context_t* ctx,
       memcpy(g_created_address, msg.destination.bytes, 20);
     }
 
-    /* Increase from_id's nonce */
+    /* Increase from_id's nonce:
+         1. Must increase nonce after new address created and before run vm
+         2. Only increase contract account's nonce when it create contract (https://github.com/ethereum/EIPs/blob/master/EIPS/eip-161.md)
+     */
     ret = gw_increase_nonce(ctx, from_id, NULL);
     if (ret != 0) {
       debug_print_int("increase nonce failed", ret);

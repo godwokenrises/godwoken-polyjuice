@@ -353,6 +353,6 @@ fn test_error_sudt_id_sudt_erc20_proxy() {
             error_new_sudt_id,
             block_producer_id,
         ),
-        Err(TransactionError::InvalidExitCode(105))
+        Err(TransactionError::InvalidExitCode(55))
     );
 }
