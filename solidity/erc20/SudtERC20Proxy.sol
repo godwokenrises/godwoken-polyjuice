@@ -328,18 +328,16 @@ contract ERC20 is Context, IERC20 {
 
         _beforeTokenTransfer(_msgSender(), recipient, amount);
 
-        if (sender != recipient) {
-            uint256[4] memory input;
-            input[0] = _sudtId;
-            input[1] = uint256(uint160(address(sender)));
-            input[2] = uint256(uint160(address(recipient)));
-            input[3] = amount;
-            uint256[1] memory output;
-            /* transfer_to_any_sudt */
-            assembly {
-                if iszero(call(not(0), 0xf1, 0x0, input, 0x80, output, 0x20)) {
-                    revert(0x0, 0x0)
-                }
+        uint256[4] memory input;
+        input[0] = _sudtId;
+        input[1] = uint256(uint160(address(sender)));
+        input[2] = uint256(uint160(address(recipient)));
+        input[3] = amount;
+        uint256[1] memory output;
+        /* transfer_to_any_sudt */
+        assembly {
+            if iszero(call(not(0), 0xf1, 0x0, input, 0x80, output, 0x20)) {
+                revert(0x0, 0x0)
             }
         }
 
