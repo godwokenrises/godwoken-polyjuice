@@ -641,8 +641,10 @@ void emit_log(struct evmc_host_context* context, const evmc_address* address,
   output_current += 20;
   memcpy(output_current, (uint8_t*)(&data_size_u32), 4);
   output_current += 4;
-  memcpy(output_current, data, data_size);
-  output_current += data_size;
+  if (data_size > 0) {
+    memcpy(output_current, data, data_size);
+    output_current += data_size;
+  }
   memcpy(output_current, (uint8_t*)(&topics_count_u32), 4);
   output_current += 4;
   for (size_t i = 0; i < topics_count; i++) {
