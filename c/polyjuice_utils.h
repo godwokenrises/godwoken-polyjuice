@@ -18,7 +18,7 @@
 static char debug_buffer[64 * 1024];
 void debug_print_data(const char *prefix, const uint8_t *data,
                       uint32_t data_len) {
-  if (data_len > 32 * 1024 - 2) {
+  if (data_len > 31 * 1024) {
     ckb_debug("warning: print_data is too large");
     return;
   }
