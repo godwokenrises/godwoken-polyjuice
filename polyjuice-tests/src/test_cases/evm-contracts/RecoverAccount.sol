@@ -7,7 +7,6 @@ contract RecoverAccount {
         assembly {
             let len := mload(input)
             if iszero(call(not(0), 0xf2, 0x0, add(input, 0x20), len, output, 288)) {
-                revert(0x0, 0x0)
             }
         }
         return output[0];

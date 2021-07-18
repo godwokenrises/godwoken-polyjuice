@@ -25,12 +25,13 @@ CFLAGS_SECP := -isystem $(SECP_DIR)/src -isystem $(SECP_DIR)
 CFLAGS_CKB_STD := -I./ -I$(DEPS)/godwoken-scripts/c/deps/ckb-c-stdlib/simulator -I$(DEPS)/godwoken-scripts/c/deps/ckb-c-stdlib/ -I$(DEPS)/ckb-c-stdlib/molecule
 CFLAGS_ETHASH := -I$(DEPS)/ethash/include -I$(DEPS)/ethash/lib/ethash -I$(DEPS)/ethash/lib/keccak -I$(DEPS)/ethash/lib/support
 CFLAGS_EVMONE := -I$(DEPS)/evmone/lib/evmone -I$(DEPS)/evmone/include -I$(DEPS)/evmone/evmc/include -I$(DEPS)/evmone/evmc/tools/
+CFLAGS_SMT := -I$(DEPS)/ckb-smt/c
 CFLAGS_GODWOKEN := -I$(DEPS)/godwoken-scripts/c
 CFLAGS_MBEDTLS := -I$(DEPS)/mbedtls/include
 CFLAGS_CRYPTO_ALGORITHMS := -I$(DEPS)/crypto-algorithms
 CFLAGS_INTX := -I$(DEPS)/intx/lib/intx -I$(DEPS)/intx/include
 CFLAGS_BN128 := -I$(DEPS)/bn128/include
-CFLAGS := -Wall -O2 -I../../c -I../../c/ripemd160 $(CFLAGS_CKB_STD) $(CFLAGS_ETHASH) $(CFLAGS_EVMONE) $(CFLAGS_GODWOKEN) $(CFLAGS_SECP) $(CFLAGS_MBEDTLS) $(CFLAGS_CRYPTO_ALGORITHMS) $(CFLAGS_INTX) $(CFLAGS_BN128)
+CFLAGS := -Wall -O2 -I../../c -I../../c/ripemd160 $(CFLAGS_CKB_STD) $(CFLAGS_ETHASH) $(CFLAGS_EVMONE) $(CFLAGS_SMT) $(CFLAGS_GODWOKEN) $(CFLAGS_SECP) $(CFLAGS_MBEDTLS) $(CFLAGS_CRYPTO_ALGORITHMS) $(CFLAGS_INTX) $(CFLAGS_BN128)
 CXXFLAGS := $(CFLAGS) -std=c++1z
 LDFLAGS := -Wl,--gc-sections
 SANITIZER_FLAGS := -g -O1 -fsanitize=address,undefined -Wno-incompatible-pointer-types
@@ -38,7 +39,7 @@ LIMIT_ERROR := -ferror-limit=1
 
 MOLC := moleculec
 MOLC_VERSION := 0.6.1
-PROTOCOL_VERSION := 72c2e901078ad0d2b3f7270722e46e5b1cdab67a
+PROTOCOL_VERSION := 2221efdfcf06351fa1884ea0f2df1604790c3378
 PROTOCOL_SCHEMA_URL := https://raw.githubusercontent.com/nervosnetwork/godwoken/${PROTOCOL_VERSION}/crates/types/schemas
 
 ALL_OBJS := $(BUILD)/keccak.o $(BUILD)/keccakf800.o \

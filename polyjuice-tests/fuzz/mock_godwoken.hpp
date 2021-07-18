@@ -74,7 +74,7 @@ extern "C" int gw_store_data(const uint64_t len, uint8_t *data) {
   if (len <= 0 || len > MAX_DATA_SIZE) {
     // FIXME:
     dbg_print("[gw_store_data] !!!!!! warning: data_len = %ld !!!!!!", len);
-    return GW_ERROR_BUFFER_OVERFLOW;
+    return GW_FATAL_BUFFER_OVERFLOW;
   }
 
   bytes bs((uint8_t *)data, len);
@@ -243,8 +243,8 @@ extern "C" int gw_sys_create(uint8_t *script, uint64_t script_len, uint32_t *acc
   // Check script validity
   mol_seg_t code_hash_seg = MolReader_Script_get_code_hash(&script_seg);
   if (code_hash_seg.size != 32) {
-    dbg_print("[GW_ERROR_INVALID_DATA] MolReader_Script_get_code_hash");
-    return GW_ERROR_INVALID_DATA;
+    dbg_print("[GW_FATAL_INVALID_DATA] MolReader_Script_get_code_hash");
+    return GW_FATAL_INVALID_DATA;
   }
   /* check allowed EOA list */
   mol_seg_t rollup_config_seg = {gw_host->rollup_config, gw_host->rollup_config_size};
@@ -260,7 +260,7 @@ extern "C" int gw_sys_create(uint8_t *script, uint64_t script_len, uint32_t *acc
     if (allowed_code_hash_res.errno != MOL_OK ||
         allowed_code_hash_res.seg.size != code_hash_seg.size) {
       ckb_debug("disallow script because eoa code_hash is invalid");
-      return GW_ERROR_INVALID_DATA;
+      return GW_FATAL_INVALID_DATA;
     } else {
       is_eos_account = true;
       break;
@@ -279,7 +279,7 @@ extern "C" int gw_sys_create(uint8_t *script, uint64_t script_len, uint32_t *acc
       if (allowed_code_hash_res.errno != MOL_OK ||
           allowed_code_hash_res.seg.size != code_hash_seg.size) {
         ckb_debug("disallow script because contract code_hash is invalid");
-        return GW_ERROR_INVALID_DATA;
+        return GW_FATAL_INVALID_DATA;
       } else {
         // check that contract'script must start with a 32 bytes rollup_script_hash
         mol_seg_t args_seg = MolReader_Script_get_args(&script_seg);
