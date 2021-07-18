@@ -257,8 +257,8 @@ int load_account_code(gw_context_t* gw_ctx, uint32_t account_id,
   mol_seg_t args_seg = MolReader_Script_get_args(&script_seg);
   mol_seg_t raw_args_seg = MolReader_Bytes_raw_bytes(&args_seg);
   if (raw_args_seg.size != CONTRACT_ACCOUNT_SCRIPT_ARGS_SIZE) {
-    debug_print_int("invalid account script", account_id);
-    debug_print_int("raw_args_seg.size", raw_args_seg.size);
+    debug_print_int("[load_account_code] invalid account script", account_id);
+    debug_print_int("[load_account_code] raw_args_seg.size", raw_args_seg.size);
     // This is an EoA or other kind of account
     *code_size = 0;
     return 0;
@@ -270,22 +270,22 @@ int load_account_code(gw_context_t* gw_ctx, uint32_t account_id,
       /* compare creator account id */
       || memcmp(&g_creator_account_id, raw_args_seg.ptr + 32, sizeof(uint32_t)) != 0
   ) {
-    debug_print_int("creator account id not match for account", account_id);
+    debug_print_int("[load_account_code] creator account id not match for account", account_id);
     // This is an EoA or other kind of account
     *code_size = 0;
     return 0;
   }
 
-  debug_print_int("load_account_code, account_id:", account_id);
+  debug_print_int("[load_account_code] account_id:", account_id);
   uint8_t key[32];
   uint8_t data_hash[32];
   polyjuice_build_contract_code_key(account_id, key);
   ret = gw_ctx->sys_load(gw_ctx, account_id, key, GW_KEY_BYTES, data_hash);
   if (ret != 0) {
-    debug_print_int("load_account_code, sys_load failed", ret);
+    debug_print_int("[load_account_code] sys_load failed", ret);
     return ret;
   }
-  debug_print_data("data_hash", data_hash, 32);
+  debug_print_data("[load_account_code] data_hash", data_hash, 32);
 
   bool is_data_hash_zero = true;
   for (size_t i = 0; i < 32; i++) {
@@ -295,7 +295,7 @@ int load_account_code(gw_context_t* gw_ctx, uint32_t account_id,
     }
   }
   if (is_data_hash_zero) {
-    ckb_debug("data hash all zero");
+    ckb_debug("[load_account_code] data hash all zero");
     *code_size = 0;
     return 0;
   }
@@ -304,14 +304,15 @@ int load_account_code(gw_context_t* gw_ctx, uint32_t account_id,
   ret = gw_ctx->sys_load_data(gw_ctx, data_hash, code_size, offset, code);
   debug_print_data("code data", code, *code_size > 100 ? 100 : *code_size);
   if (*code_size > 100) {
-    ckb_debug("code data ......");
+    ckb_debug("...data...");
+    debug_print_int("[load_account_code] code_size", *code_size);
   }
   if (ret != 0) {
-    ckb_debug("sys_load_data failed");
+    ckb_debug("[load_account_code] sys_load_data failed");
     return ret;
   }
   if (*code_size > old_code_size) {
-    debug_print_int("code can't be larger than", MAX_DATA_SIZE);
+    debug_print_int("[load_account_code] code can't be larger than", MAX_DATA_SIZE);
     return -1;
   }
   return 0;
@@ -654,8 +655,10 @@ void emit_log(struct evmc_host_context* context, const evmc_address* address,
   output_current += 20;
   memcpy(output_current, (uint8_t*)(&data_size_u32), 4);
   output_current += 4;
-  memcpy(output_current, data, data_size);
-  output_current += data_size;
+  if (data_size > 0) {
+    memcpy(output_current, data, data_size);
+    output_current += data_size;
+  }
   memcpy(output_current, (uint8_t*)(&topics_count_u32), 4);
   output_current += 4;
   for (size_t i = 0; i < topics_count; i++) {
@@ -898,20 +901,21 @@ int execute_in_evmone(gw_context_t* ctx,
                                           get_code_size,  get_code_hash,  copy_code,      selfdestruct,
                                           call,           get_tx_context, get_block_hash, emit_log};
   /* Execute the code in EVM */
-  debug_print_int("code size", code_size);
-  debug_print_data("msg.input_data", msg->input_data, msg->input_size);
+  debug_print_int("[execute_in_evmone] code size", code_size);
+  debug_print_int("[execute_in_evmone] input_size", msg->input_size);
+  debug_print_data("[execute_in_evmone] msg.input_data", msg->input_data, msg->input_size);
   *res = vm->execute(vm, &interface, &context, EVMC_MAX_REVISION, msg, code_data, code_size);
   if (res->status_code != EVMC_SUCCESS && res->status_code != EVMC_REVERT) {
     res->output_data = NULL;
     res->output_size = 0;
   }
   if (context.error_code != 0) {
-    debug_print_int("context.error_code", context.error_code);
+    debug_print_int("[execute_in_evmone] context.error_code", context.error_code);
     ret = context.error_code;
     goto evmc_vm_cleanup;
   }
   if (res->gas_left < 0) {
-    ckb_debug("gas not enough");
+    ckb_debug("[execute_in_evmone] gas not enough");
     ret = EVMC_OUT_OF_GAS;
     goto evmc_vm_cleanup;
   }
@@ -957,7 +961,7 @@ int handle_message(gw_context_t* ctx,
                    const evmc_message* msg_origin, struct evmc_result* res) {
   static const evmc_address zero_address{0};
 
-  ckb_debug("BEGIN handle_message");
+  ckb_debug("[handle_message] BEGIN handle_message");
   evmc_message msg = *msg_origin;
   int ret;
 
@@ -973,7 +977,7 @@ int handle_message(gw_context_t* ctx,
       to_address_exists = true;
       ret = ctx->sys_get_account_id_by_script_hash(ctx, to_script_hash, &to_id);
       if (ret != 0) {
-        debug_print_data("get to account id by script hash failed", to_script_hash, 32);
+        debug_print_data("[handle_message] get to account id by script hash failed", to_script_hash, 32);
         return ret;
       }
     }
@@ -988,19 +992,19 @@ int handle_message(gw_context_t* ctx,
   if (ret == 0) {
     ret = ctx->sys_get_account_id_by_script_hash(ctx, from_script_hash, &from_id);
     if (ret != 0) {
-      debug_print_data("get from account id by script hash failed", from_script_hash, 32);
+      debug_print_data("[handle_message] get from account id by script hash failed", from_script_hash, 32);
       return ret;
     }
   } else {
-    debug_print_data("get sender script hash failed", msg.sender.bytes, 20);
+    debug_print_data("[handle_message] get sender script hash failed", msg.sender.bytes, 20);
     return ret;
   }
 
   /* an assert */
   if (msg.kind == EVMC_DELEGATECALL && from_id != parent_from_id) {
-    debug_print_int("from_id", from_id);
-    debug_print_int("parent_from_id", parent_from_id);
-    ckb_debug("from id != parent from id");
+    debug_print_int("[handle_message] from_id", from_id);
+    debug_print_int("[handle_message] parent_from_id", parent_from_id);
+    ckb_debug("[handle_message] from id != parent from id");
     return FATAL_POLYJUICE;
   }
 
@@ -1030,7 +1034,7 @@ int handle_message(gw_context_t* ctx,
       return ret;
     }
     if (code_size_u32 == 0) {
-      debug_print_int("empty contract code for account (EoA account)", to_id);
+      debug_print_int("[handle_message] empty contract code for account (EoA account)", to_id);
       code_data = NULL;
     } else {
       code_data = code_data_buffer;
@@ -1045,7 +1049,7 @@ int handle_message(gw_context_t* ctx,
     /* This action must after load the contract code */
     to_id = parent_to_id;
     if (parent_destination == NULL) {
-      ckb_debug("parent_destination is NULL");
+      ckb_debug("[handle_message] parent_destination is NULL");
       return FATAL_POLYJUICE;
     }
     memcpy(msg.destination.bytes, parent_destination->bytes, 20);
@@ -1085,6 +1089,7 @@ int handle_message(gw_context_t* ctx,
     return ret;
   }
 
+  debug_print_int("[handle_message] msg.kind", msg.kind);
   /* NOTE: msg and res are updated */
   if (to_address_exists && code_size > 0 && (is_create(msg.kind) || msg.input_size > 0)) {
     ret = execute_in_evmone(ctx, &msg, parent_from_id, from_id, to_id, code_data, code_size, res);
@@ -1092,7 +1097,7 @@ int handle_message(gw_context_t* ctx,
       return ret;
     }
   } else {
-    ckb_debug("Don't run evm and return empty data");
+    ckb_debug("[handle_message] Don't run evm and return empty data");
     res->output_data = NULL;
     res->output_size = 0;
     res->gas_left = msg.gas;
@@ -1113,11 +1118,11 @@ int handle_message(gw_context_t* ctx,
     memcpy(res->create_address.bytes, msg.destination.bytes, 20);
   }
 
-  debug_print_data("output data", res->output_data, res->output_size);
-  debug_print_int("output size", res->output_size);
-  debug_print_int("gas left", res->gas_left);
-  debug_print_int("status_code", res->status_code);
-  ckb_debug("END handle_message");
+  debug_print_data("[handle_message] output data", res->output_data, res->output_size);
+  debug_print_int("[handle_message] output size", res->output_size);
+  debug_print_int("[handle_message] gas left", res->gas_left);
+  debug_print_int("[handle_message] status_code", res->status_code);
+  ckb_debug("[handle_message] END handle_message");
   return (int)res->status_code;
 }
 

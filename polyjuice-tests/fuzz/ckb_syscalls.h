@@ -1,12 +1,13 @@
 /* note, this macro should be same as in ckb_syscall.h */
 #ifndef CKB_C_STDLIB_CKB_SYSCALLS_H_
 #define CKB_C_STDLIB_CKB_SYSCALLS_H_
+
 #include <stddef.h>
 #include <stdint.h>
-#include <stdio.h>
 #include <stdlib.h>
 
 #include "ckb_consts.h"
+#include "secp256k1_data_info.h"
 
 size_t s_INPUT_SIZE = 0;
 uint8_t* s_INPUT_DATA = NULL;
@@ -161,7 +162,6 @@ static int inline __internal_syscall(long n, long _a0, long _a1, long _a2,
       dbg_print("[mock SYS_PAY_FEE] sudt_id: %d, amount: %ld",
                 (uint32_t)_a2, *(uint128_t *)_a3);
       return 0;
-  
 
     default:
       return GW_ERROR_NOT_FOUND;

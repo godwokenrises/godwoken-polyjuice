@@ -4,7 +4,6 @@
 #include <evmc/mocked_host.hpp>
 #include <evmc/utils.hpp>
 
-#include <common.h>
 #include <polyjuice_globals.h>
 
 using namespace std;
