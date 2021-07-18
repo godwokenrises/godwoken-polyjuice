@@ -15,9 +15,7 @@ int recover_account_gas(const uint8_t* input_src,
   return 0;
 }
 
-/*
-  Recover an EoA account script hash by signature
-  When input data is wrong we just return empty output with 0 return code.
+/* Recover an EoA account script hash by signature
 
   input: (the input data is from abi.encode(mesage, signature, code_hash))
   ======
@@ -29,7 +27,7 @@ int recover_account_gas(const uint8_t* input_src,
 
   output (32 bytes):
   =======
-    output[12..32] => godwoken short address
+    output[0..32] => account script hash
  */
 int recover_account(gw_context_t* ctx,
                     const uint8_t* code_data,
@@ -50,18 +48,23 @@ int recover_account(gw_context_t* ctx,
   ret = parse_u64(input_src + 96, &signature_len);
   if (ret != 0) {
     debug_print_int("parse signature length failed", ret);
-    return 0;
+    return ERROR_RECOVER_ACCOUNT;
   }
   if (signature_len + 128 > input_size) {
     debug_print_int("invalid input_size", input_size);
-    return 0;
+    return ERROR_RECOVER_ACCOUNT;
   }
   uint8_t script[GW_MAX_SCRIPT_SIZE];
   uint64_t script_len = 0;
   ret = ctx->sys_recover_account(ctx, message, signature, signature_len, code_hash, script, &script_len);
   if (ret != 0) {
     debug_print_int("call sys_recover_account failed", ret);
-    return 0;
+    /* wrong code_hash is fatal, so we return the error code here */
+    if (is_fatal_error(ret)) {
+      return FATAL_PRECOMPILED_CONTRACTS;
+    } else {
+      return ERROR_RECOVER_ACCOUNT;
+    }
   }
   debug_print_data("script", script, script_len);
   *output = (uint8_t *)malloc(32);

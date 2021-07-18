@@ -12,6 +12,15 @@
 #include <evmc/evmc.hpp>
 #include <evmone/evmone.h>
 
+#ifdef NO_DEBUG_LOG
+int printf(const char *format, ...) { return 0; }
+#else
+int printf(const char *format, ...) {
+  ckb_debug(format);
+  return 0;
+}
+#endif
+
 /* https://stackoverflow.com/a/1545079 */
 #pragma push_macro("errno")
 #undef errno
@@ -58,6 +67,7 @@ void polyjuice_build_destructed_key(uint32_t id, uint8_t key[GW_KEY_BYTES]) {
   polyjuice_build_system_key(id, POLYJUICE_DESTRUCTED, key);
 }
 
+/* assume `account_id` already exists */
 int gw_increase_nonce(gw_context_t *ctx, uint32_t account_id, uint32_t *new_nonce) {
   uint32_t old_nonce;
   int ret = ctx->sys_get_account_nonce(ctx, account_id, &old_nonce);
@@ -74,7 +84,7 @@ int gw_increase_nonce(gw_context_t *ctx, uint32_t account_id, uint32_t *new_nonc
 #ifdef GW_GENERATOR
   ret = syscall(GW_SYS_STORE, nonce_key, nonce_value, 0, 0, 0, 0);
 #else
-  ret = gw_state_insert(&ctx->kv_state, nonce_key, nonce_value);
+  ret = smt_state_insert(&ctx->kv_state, nonce_key, nonce_value);
 #endif
   if (ret != 0) {
     return ret;
@@ -237,7 +247,7 @@ int load_account_code(gw_context_t* gw_ctx, uint32_t account_id,
   uint8_t buffer[GW_MAX_SCRIPT_SIZE];
   mol_seg_t script_seg;
   ret = load_account_script(gw_ctx, account_id, buffer, GW_MAX_SCRIPT_SIZE, &script_seg);
-  if (ret == GW_ERROR_NOT_FOUND) {
+  if (ret == GW_ERROR_ACCOUNT_NOT_EXISTS) {
     // This is an EoA or other kind of account, and not yet created
     debug_print_int("account not found", account_id);
     *code_size = 0;
@@ -276,7 +286,7 @@ int load_account_code(gw_context_t* gw_ctx, uint32_t account_id,
   polyjuice_build_contract_code_key(account_id, key);
   ret = gw_ctx->sys_load(gw_ctx, account_id, key, GW_KEY_BYTES, data_hash);
   if (ret != 0) {
-    ckb_debug("load_account_code, sys_load failed");
+    debug_print_int("load_account_code, sys_load failed", ret);
     return ret;
   }
   debug_print_data("data_hash", data_hash, 32);
@@ -368,12 +378,14 @@ bool account_exists(struct evmc_host_context* context,
 evmc_bytes32 get_storage(struct evmc_host_context* context,
                          const evmc_address* address, const evmc_bytes32* key) {
   ckb_debug("BEGIN get_storage");
-  evmc_bytes32 value{};
+  evmc_bytes32 value{0};
   int ret = context->gw_ctx->sys_load(context->gw_ctx, context->to_id,
                                       key->bytes, GW_KEY_BYTES, (uint8_t*)value.bytes);
   if (ret != 0) {
-    ckb_debug("get_storage, sys_load failed");
-    context->error_code = ret;
+    debug_print_int("get_storage, sys_load failed", ret);
+    if (is_fatal_error(ret)) {
+      context->error_code = ret;
+    }
   }
   ckb_debug("END get_storage");
   return value;
@@ -384,15 +396,19 @@ enum evmc_storage_status set_storage(struct evmc_host_context* context,
                                      const evmc_bytes32* key,
                                      const evmc_bytes32* value) {
   ckb_debug("BEGIN set_storage");
+  evmc_storage_status status = EVMC_STORAGE_ADDED;
   int ret = context->gw_ctx->sys_store(context->gw_ctx, context->to_id,
                                        key->bytes, GW_KEY_BYTES, value->bytes);
   if (ret != 0) {
-    ckb_debug("sys_store failed");
-    context->error_code = ret;
+    debug_print_int("sys_store failed", ret);
+    if (is_fatal_error(ret)) {
+      context->error_code = ret;
+    }
+    status = EVMC_STORAGE_UNCHANGED;
   }
   /* TODO: more rich evmc_storage_status */
   ckb_debug("END set_storage");
-  return EVMC_STORAGE_ADDED;
+  return status;
 }
 
 size_t get_code_size(struct evmc_host_context* context,
@@ -420,7 +436,7 @@ size_t get_code_size(struct evmc_host_context* context,
 evmc_bytes32 get_code_hash(struct evmc_host_context* context,
                            const evmc_address* address) {
   ckb_debug("BEGIN get_code_hash");
-  evmc_bytes32 hash{};
+  evmc_bytes32 hash{0};
   int ret;
   uint32_t account_id = 0;
   ret = address_to_account_id(context->gw_ctx, address->bytes, &account_id);
@@ -439,8 +455,10 @@ evmc_bytes32 get_code_hash(struct evmc_host_context* context,
     return hash;
   }
 
-  union ethash_hash256 hash_result = ethash::keccak256(code, code_size);
-  memcpy(hash.bytes, hash_result.bytes, 32);
+  if (code_size > 0) {
+    union ethash_hash256 hash_result = ethash::keccak256(code, code_size);
+    memcpy(hash.bytes, hash_result.bytes, 32);
+  }
   ckb_debug("END get_code_hash");
   return hash;
 }
@@ -480,7 +498,7 @@ evmc_uint256be get_balance(struct evmc_host_context* context,
   /* g_sudt_id account must exists */
   if (ret != 0) {
     ckb_debug("sudt_get_balance failed");
-    context->error_code = -1;
+    context->error_code = FATAL_POLYJUICE;
     return balance;
   }
   uint8_t* value_ptr = (uint8_t*)(&value_u128);
@@ -499,7 +517,7 @@ void selfdestruct(struct evmc_host_context* context,
   int ret;
   if (memcmp(beneficiary->bytes, context->destination.bytes, 20) == 20) {
     debug_print_data("invalid beneficiary account", beneficiary->bytes, 20);
-    context->error_code = -1;
+    context->error_code = FATAL_POLYJUICE;
     return;
   }
 
@@ -529,7 +547,7 @@ void selfdestruct(struct evmc_host_context* context,
   polyjuice_build_destructed_key(context->to_id, raw_key);
   memset(value, 1, GW_VALUE_BYTES);
 #ifdef GW_VALIDATOR
-  ret = gw_state_insert(&context->gw_ctx->kv_state, raw_key, value);
+  ret = smt_state_insert(&context->gw_ctx->kv_state, raw_key, value);
 #else
   ret = syscall(GW_SYS_STORE, raw_key, value, 0, 0, 0, 0);
 #endif
@@ -545,6 +563,7 @@ struct evmc_result call(struct evmc_host_context* context,
                         const struct evmc_message* msg) {
   ckb_debug("BEGIN call");
   debug_print_data("msg.input_data", msg->input_data, msg->input_size);
+  debug_print_int("msg.kind", msg->kind);
   debug_print_data("call.sender", msg->sender.bytes, 20);
   debug_print_data("call.destination", msg->destination.bytes, 20);
   int ret;
@@ -675,7 +694,7 @@ int check_destructed(gw_context_t* ctx, uint32_t to_id) {
   uint8_t destructed_raw_value[GW_VALUE_BYTES] = {0};
   polyjuice_build_destructed_key(to_id, destructed_raw_key);
 #ifdef GW_VALIDATOR
-  ret = gw_state_fetch(&ctx->kv_state, destructed_raw_key, destructed_raw_value);
+  ret = smt_state_fetch(&ctx->kv_state, destructed_raw_key, destructed_raw_value);
 #else
   ret = syscall(GW_SYS_LOAD, destructed_raw_key, destructed_raw_value, 0, 0, 0, 0);
 #endif
@@ -780,6 +799,7 @@ int create_new_account(gw_context_t* ctx,
        Above data will be RLP encoded.
     */
     uint32_t nonce;
+    /* from_id must already exists */
     ret = ctx->sys_get_account_nonce(ctx, from_id, &nonce);
     if (ret != 0) {
       return ret;
@@ -929,6 +949,7 @@ int store_contract_code(gw_context_t* ctx,
   polyjuice_build_contract_code_key(to_id, key);
   ckb_debug("BEGIN store data key");
   debug_print_data("data_hash", data_hash, 32);
+  /* to_id must exists here */
   ret = ctx->sys_store(ctx, to_id, key, GW_KEY_BYTES, data_hash);
   if (ret != 0) {
     return ret;
@@ -1144,6 +1165,7 @@ int emit_evm_result_log(gw_context_t* ctx, const uint64_t gas_used, const int st
 
   /* NOTE: if create account failed the `to_id` will also be `context->to_id` */
   uint32_t to_id = g_created_id == UINT32_MAX ? ctx->transaction_context.to_id : g_created_id;
+  /* to_id must already exists here */
   int ret = ctx->sys_log(ctx, to_id, GW_LOG_POLYJUICE_SYSTEM, data_size, data);
   if (ret != 0) {
     debug_print_int("sys_log evm result failed", ret);
@@ -1232,6 +1254,7 @@ int run_polyjuice() {
   debug_print_int("gas left", res.gas_left);
   debug_print_int("gas price", gas_price);
   debug_print_int("fee", fee);
+  /* g_sudt_id must already exists */
   ret = sudt_pay_fee(&context, g_sudt_id, POLYJUICE_SHORT_ADDR_LEN, msg.sender.bytes, fee);
   if (ret != 0) {
     debug_print_int("pay fee to block_producer failed", ret);
@@ -1243,6 +1266,7 @@ int run_polyjuice() {
     return clean_evmc_result_and_return(&res, ret);
   }
 
+  ckb_debug("finalize");
   ret = gw_finalize(&context);
   if (ret != 0) {
     return clean_evmc_result_and_return(&res, ret);

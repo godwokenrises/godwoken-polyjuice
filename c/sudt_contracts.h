@@ -62,8 +62,12 @@ int balance_of_any_sudt(gw_context_t* ctx,
     debug_print_int("sudt account not found", sudt_id);
     return 0;
   } else if (ret != 0) {
-    ckb_debug("sudt_get_balance failed");
-    return ret;
+    debug_print_int("sudt_get_balance failed", ret);
+    if (is_fatal_error(ret)) {
+      return FATAL_PRECOMPILED_CONTRACTS;
+    } else {
+      return ERROR_BALANCE_OF_ANY_SUDT;
+    }
   }
   put_u128(balance, *output);
   return 0;
@@ -145,7 +149,11 @@ int transfer_to_any_sudt(gw_context_t* ctx,
   ret = sudt_transfer(ctx, sudt_id, POLYJUICE_SHORT_ADDR_LEN, from_address.bytes, to_address.bytes, amount);
   if (ret != 0) {
     ckb_debug("transfer failed");
-    return ret;
+    if (is_fatal_error(ret)) {
+      return FATAL_PRECOMPILED_CONTRACTS;
+    } else {
+      return ERROR_TRANSFER_TO_ANY_SUDT;
+    }
   }
   *output = NULL;
   *output_size = 0;

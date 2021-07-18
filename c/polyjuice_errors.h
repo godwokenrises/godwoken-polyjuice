@@ -16,5 +16,6 @@
 #define ERROR_BN256_INVALID_POINT          -86
 #define ERROR_BALANCE_OF_ANY_SUDT          -87
 #define ERROR_TRANSFER_TO_ANY_SUDT         -88
+#define ERROR_RECOVER_ACCOUNT              -89
 
 #endif // POLYJUICE_ERRORS_H

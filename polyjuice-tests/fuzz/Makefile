@@ -38,7 +38,7 @@ LIMIT_ERROR := -ferror-limit=1
 
 MOLC := moleculec
 MOLC_VERSION := 0.6.1
-PROTOCOL_VERSION := 26f9050aa1044346422f127a7e505f92bcfe4a56
+PROTOCOL_VERSION := 2221efdfcf06351fa1884ea0f2df1604790c3378
 PROTOCOL_SCHEMA_URL := https://raw.githubusercontent.com/nervosnetwork/godwoken/${PROTOCOL_VERSION}/crates/types/schemas
 
 ALL_OBJS := $(BUILD)/keccak.o $(BUILD)/keccakf800.o \

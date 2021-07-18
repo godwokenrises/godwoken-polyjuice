@@ -3,10 +3,11 @@
 
 use crate::helper::{
     build_eth_l2_script, deploy, new_account_script, new_block_info, setup, simple_storage_get,
-    PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, ROLLUP_SCRIPT_HASH, SECP_LOCK_CODE_HASH,
+    PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, FATAL_PRECOMPILED_CONTRACTS, ROLLUP_SCRIPT_HASH,
+    SECP_LOCK_CODE_HASH,
 };
 use gw_common::state::State;
-use gw_generator::traits::StateExt;
+use gw_generator::{error::TransactionError, traits::StateExt};
 use gw_store::chain_view::ChainView;
 use gw_types::{
     bytes::Bytes,
@@ -169,15 +170,17 @@ fn test_recover_account() {
             .build();
         let db = store.begin_transaction();
         let tip_block_hash = store.get_tip_block_hash().unwrap();
-        let run_result = generator
+        let err = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
                 &state,
                 &block_info,
                 &raw_tx,
             )
-            .expect("construct");
-        state.apply_run_result(&run_result).expect("update state");
-        assert_eq!(run_result.return_data, [0u8; 32]);
+            .expect_err("construct");
+        assert_eq!(
+            err,
+            TransactionError::InvalidExitCode(FATAL_PRECOMPILED_CONTRACTS)
+        );
     }
 }

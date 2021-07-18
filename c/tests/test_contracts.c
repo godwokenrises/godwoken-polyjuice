@@ -9,6 +9,15 @@
 
 #include "ckb_syscalls.h"
 
+#ifdef NO_DEBUG_LOG
+int printf(const char *format, ...) { return 0; }
+#else
+int printf(const char *format, ...) {
+  ckb_debug(format);
+  return 0;
+}
+#endif
+
 #include <ethash/keccak.hpp>
 #include <evmc/evmc.h>
 
@@ -58,6 +67,8 @@ int test_contract(const uint8_t n,
 
   gw_context_t ctx;
   ctx.sys_load_data = sys_load_data;
+  ctx.sys_load = sys_load;
+  ctx._internal_load_raw = _internal_load_raw;
   ret = contract(&ctx, NULL, 0, true, input_src, input_size, &output, &output_size);
   if (ret != 0) {
     debug_print_int("run contract failed", ret);

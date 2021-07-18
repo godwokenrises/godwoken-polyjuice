@@ -2,21 +2,23 @@ use crate::helper::{SECP_DATA, SECP_DATA_HASH};
 use ckb_vm::{
     machine::asm::{AsmCoreMachine, AsmMachine},
     memory::Memory,
-    registers::{A0, A3, A7},
+    registers::{A0, A1, A3, A7},
     DefaultMachineBuilder, Error as VMError, Register, SupportMachine, Syscalls,
 };
-use gw_common::H256;
+use gw_common::{h256_ext::H256Ext, state::build_data_hash_key, H256};
 use gw_generator::syscalls::store_data;
 use gw_types::bytes::Bytes;
 use std::collections::HashMap;
 
 const BINARY: &[u8] = include_bytes!("../../../build/test_contracts");
 const SUCCESS: u8 = 0;
+const SYS_LOAD: u64 = 3102;
 const SYS_LOAD_DATA: u64 = 3302;
 const DEBUG_PRINT_SYSCALL_NUMBER: u64 = 2177;
 
 pub struct L2Syscalls {
     data: HashMap<H256, Bytes>,
+    tree: HashMap<H256, H256>,
 }
 
 fn load_data_h256<Mac: SupportMachine>(machine: &mut Mac, addr: u64) -> Result<H256, VMError> {
@@ -42,6 +44,20 @@ impl<Mac: SupportMachine> Syscalls<Mac> for L2Syscalls {
             println!("code: {}", code);
         }
         match code {
+            SYS_LOAD => {
+                let key_addr = machine.registers()[A0].to_u64();
+                let key = load_data_h256(machine, key_addr)?;
+                let value_addr = machine.registers()[A1].to_u64();
+                let value = self.tree.get(&key).ok_or_else(|| {
+                    println!("can not found key: {:?}", key);
+                    VMError::Unexpected
+                })?;
+                machine
+                    .memory_mut()
+                    .store_bytes(value_addr, &value.as_slice())?;
+                machine.set_register(A0, Mac::REG::from_u8(SUCCESS));
+                Ok(true)
+            }
             SYS_LOAD_DATA => {
                 let data_hash_addr = machine.registers()[A3].to_u64();
                 let data_hash = load_data_h256(machine, data_hash_addr)?;
@@ -93,10 +109,12 @@ fn test_contracts() {
     );
     let mut data = HashMap::default();
     data.insert(SECP_DATA_HASH.clone(), Bytes::from(SECP_DATA.to_vec()));
+    let mut tree = HashMap::default();
+    tree.insert(build_data_hash_key(SECP_DATA_HASH.as_slice()), H256::one());
 
     let core_machine = Box::<AsmCoreMachine>::default();
     let machine_builder =
-        DefaultMachineBuilder::new(core_machine).syscall(Box::new(L2Syscalls { data }));
+        DefaultMachineBuilder::new(core_machine).syscall(Box::new(L2Syscalls { data, tree }));
     let mut machine = AsmMachine::new(machine_builder.build(), None);
     machine.load_program(&binary, &[]).unwrap();
     let code = machine.run().unwrap();

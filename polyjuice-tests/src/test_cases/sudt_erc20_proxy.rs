@@ -4,6 +4,7 @@
 use crate::helper::{
     account_id_to_eth_address, build_eth_l2_script, build_l2_sudt_script, deploy,
     new_account_script, new_block_info, setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
+    FATAL_PRECOMPILED_CONTRACTS,
 };
 use gw_common::state::State;
 use gw_generator::{dummy_state::DummyState, error::TransactionError, traits::StateExt, Generator};
@@ -353,6 +354,8 @@ fn test_error_sudt_id_sudt_erc20_proxy() {
             error_new_sudt_id,
             block_producer_id,
         ),
-        Err(TransactionError::InvalidExitCode(55))
+        Err(TransactionError::InvalidExitCode(
+            FATAL_PRECOMPILED_CONTRACTS
+        ))
     );
 }
