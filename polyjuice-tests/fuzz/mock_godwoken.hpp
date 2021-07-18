@@ -4,7 +4,6 @@
 #include <evmc/mocked_host.hpp>
 #include <evmc/utils.hpp>
 
-#include <common.h>
 #include <polyjuice_globals.h>
 
 using namespace std;
@@ -176,7 +175,6 @@ extern "C" int gw_sys_load_script_hash_by_account_id(const uint32_t account_id, 
 extern "C" int gw_sys_get_script_hash_by_short_address(uint8_t *script_hash_addr,
                                                        uint8_t *prefix_addr,
                                                        uint64_t prefix_len) {
-  // TODO: refactor
   for (auto pair : gw_host->code_store) {
     if (0 == memcmp(pair.first.bytes, prefix_addr, prefix_len)) {
       memcpy(script_hash_addr, pair.first.bytes, sizeof(pair.first.bytes));

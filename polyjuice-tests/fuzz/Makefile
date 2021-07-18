@@ -22,7 +22,7 @@ SECP_DIR := $(DEPS)/secp256k1-fix
 SECP256K1_SRC := $(SECP_DIR)/src/ecmult_static_pre_context.h
 
 CFLAGS_SECP := -isystem $(SECP_DIR)/src -isystem $(SECP_DIR)
-CFLAGS_CKB_STD := -I./ -I$(DEPS)/godwoken-scripts/c/deps/ckb-c-stdlib/simulator -I$(DEPS)/godwoken-scripts/c/deps/ckb-c-stdlib/ -I$(DEPS)/ckb-c-stdlib/molecule
+CFLAGS_CKB_STD = -I./ -I$(DEPS)/ckb-c-stdlib -I$(DEPS)/ckb-c-stdlib/molecule
 CFLAGS_ETHASH := -I$(DEPS)/ethash/include -I$(DEPS)/ethash/lib/ethash -I$(DEPS)/ethash/lib/keccak -I$(DEPS)/ethash/lib/support
 CFLAGS_EVMONE := -I$(DEPS)/evmone/lib/evmone -I$(DEPS)/evmone/include -I$(DEPS)/evmone/evmc/include -I$(DEPS)/evmone/evmc/tools/
 CFLAGS_SMT := -I$(DEPS)/ckb-smt/c
