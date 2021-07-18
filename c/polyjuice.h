@@ -81,11 +81,7 @@ int gw_increase_nonce(gw_context_t *ctx, uint32_t account_id, uint32_t *new_nonc
   memset(nonce_value, 0, GW_VALUE_BYTES);
   gw_build_account_field_key(account_id, GW_ACCOUNT_NONCE, nonce_key);
   memcpy(nonce_value, (uint8_t *)(&next_nonce), 4);
-#ifdef GW_GENERATOR
-  ret = syscall(GW_SYS_STORE, nonce_key, nonce_value, 0, 0, 0, 0);
-#else
-  ret = smt_state_insert(&ctx->kv_state, nonce_key, nonce_value);
-#endif
+  ret = ctx->_internal_store_raw(ctx, nonce_key, nonce_value);
   if (ret != 0) {
     return ret;
   }
@@ -515,12 +511,6 @@ void selfdestruct(struct evmc_host_context* context,
                   const evmc_address* address,
                   const evmc_address* beneficiary) {
   int ret;
-  if (memcmp(beneficiary->bytes, context->destination.bytes, 20) == 20) {
-    debug_print_data("invalid beneficiary account", beneficiary->bytes, 20);
-    context->error_code = FATAL_POLYJUICE;
-    return;
-  }
-
   uint128_t balance;
   ret = sudt_get_balance(context->gw_ctx, g_sudt_id, POLYJUICE_SHORT_ADDR_LEN, context->destination.bytes, &balance);
   /* g_sudt_id account must exists */
@@ -546,11 +536,7 @@ void selfdestruct(struct evmc_host_context* context,
   uint8_t value[GW_VALUE_BYTES];
   polyjuice_build_destructed_key(context->to_id, raw_key);
   memset(value, 1, GW_VALUE_BYTES);
-#ifdef GW_VALIDATOR
-  ret = smt_state_insert(&context->gw_ctx->kv_state, raw_key, value);
-#else
-  ret = syscall(GW_SYS_STORE, raw_key, value, 0, 0, 0, 0);
-#endif
+  ret = context->gw_ctx->_internal_store_raw(context->gw_ctx, raw_key, value);
   if (ret != 0) {
     ckb_debug("update selfdestruct special key failed");
     context->error_code = ret;
@@ -693,11 +679,7 @@ int check_destructed(gw_context_t* ctx, uint32_t to_id) {
   uint8_t destructed_raw_key[GW_KEY_BYTES];
   uint8_t destructed_raw_value[GW_VALUE_BYTES] = {0};
   polyjuice_build_destructed_key(to_id, destructed_raw_key);
-#ifdef GW_VALIDATOR
-  ret = smt_state_fetch(&ctx->kv_state, destructed_raw_key, destructed_raw_value);
-#else
-  ret = syscall(GW_SYS_LOAD, destructed_raw_key, destructed_raw_value, 0, 0, 0, 0);
-#endif
+  ret = ctx->_internal_load_raw(ctx, destructed_raw_key, destructed_raw_value);
   if (ret != 0) {
     debug_print_int("load destructed key failed", ret);
     return ret;
