@@ -55,6 +55,12 @@ int balance_of_any_sudt(gw_context_t* ctx,
   *output_size = 32;
   memset(*output, 0, 32);
 
+  for (int i = 0; i < 12; i++) {
+    if (input_src[32 + i] != 0) {
+      ckb_debug("invalid ethereum address");
+      return ERROR_BALANCE_OF_ANY_SUDT;
+    }
+  }
   evmc_address address = *((evmc_address *)(input_src + 32 + 12));
   uint128_t balance;
   ret = sudt_get_balance(ctx, sudt_id, POLYJUICE_SHORT_ADDR_LEN, address.bytes, &balance);

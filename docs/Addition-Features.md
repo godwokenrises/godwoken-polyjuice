@@ -4,6 +4,7 @@
   - Add `recover_account` for recover any supported signature
   - Add `balance_of_any_sudt` for query the balance of any sudt_id account
   - Add `transfer_to_any_sudt` for transfer value by sudt_id (Must collaborate with SudtErc20Proxy.sol contract)
+  - Add `eth_to_godwoken_addr` for convert ETH address to polyjuice contract address (godwoken short address)
 
 ### `recover_account` Spec
 
@@ -23,6 +24,8 @@
     output[0..32] => account script hash
 ```
 
+See: [Example](polyjuice-tests/src/test_cases/evm-contracts/RecoverAccount.sol)
+
 ### `balance_of_any_sudt` Spec
 
 ```
@@ -37,6 +40,8 @@
    =======
      output[0..32] => amount
 ```
+
+See: [Example](solidity/erc20/SudtERC20Proxy.sol)
 
 ### `transfer_to_any_sudt` Spec
 
@@ -55,3 +60,20 @@
 
    output: []
 ```
+
+See: [Example](solidity/erc20/SudtERC20Proxy.sol)
+
+### `eth_to_godwoken_addr` Spec
+
+```
+ Calculate godwoken short address of an contract account by it's corresponding ETH address
+
+ input:
+ ======
+   input[12..32] => ETH address
+
+ output:
+   output[12..32] => godwoken short address
+```
+
+See: [Example](polyjuice-tests/src/test_cases/evm-contracts/EthToGodwokenAddr.sol)

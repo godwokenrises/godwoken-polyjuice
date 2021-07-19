@@ -2,6 +2,8 @@
 #define POLYJUICE_GLOBALS_H
 
 #define POLYJUICE_SHORT_ADDR_LEN 20
+/* 32 + 4 + 20 */
+#define SCRIPT_ARGS_LEN 56
 
 static uint8_t g_rollup_script_hash[32] = {0};
 static uint32_t g_sudt_id = UINT32_MAX;

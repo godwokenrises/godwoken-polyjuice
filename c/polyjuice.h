@@ -764,8 +764,6 @@ int create_new_account(gw_context_t* ctx,
                        uint32_t* to_id,
                        uint8_t* code_data,
                        size_t code_size) {
-  static const uint32_t SCRIPT_ARGS_LEN = 32 + 4 + 20;
-
   if (code_size == 0) {
     ckb_debug("can't create new account by empty code data");
     return FATAL_POLYJUICE;

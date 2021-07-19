@@ -17,5 +17,6 @@
 #define ERROR_BALANCE_OF_ANY_SUDT          -87
 #define ERROR_TRANSFER_TO_ANY_SUDT         -88
 #define ERROR_RECOVER_ACCOUNT              -89
+#define ERROR_ETH_TO_GODWOKEN_ADDR         -90
 
 #endif // POLYJUICE_ERRORS_H
