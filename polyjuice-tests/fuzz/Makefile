@@ -43,7 +43,7 @@ PROTOCOL_VERSION := 2221efdfcf06351fa1884ea0f2df1604790c3378
 PROTOCOL_SCHEMA_URL := https://raw.githubusercontent.com/nervosnetwork/godwoken/${PROTOCOL_VERSION}/crates/types/schemas
 
 ALL_OBJS := $(BUILD)/keccak.o $(BUILD)/keccakf800.o \
-  $(BUILD)/evmone.o $(BUILD)/evmc_utils.o $(BUILD)/baseline.o $(BUILD)/analysis.o $(BUILD)/instruction_metrics.o $(BUILD)/instruction_names.o $(BUILD)/execution.o $(BUILD)/instructions.o $(BUILD)/instructions_calls.o \
+  $(BUILD)/evmone.o $(BUILD)/evmc_hex.o $(BUILD)/baseline.o $(BUILD)/analysis.o $(BUILD)/instruction_metrics.o $(BUILD)/instruction_names.o $(BUILD)/execution.o $(BUILD)/instructions.o $(BUILD)/instructions_calls.o \
   $(BUILD)/sha256.o $(BUILD)/memzero.o $(BUILD)/ripemd160.o $(BUILD)/bignum.o $(BUILD)/platform_util.o
 BIN_DEPS := ../../c/contracts.h ../../c/sudt_contracts.h ../../c/other_contracts.h ../../c/polyjuice.h ../../c/polyjuice_utils.h $(BUILD)/secp256k1_data_info.h $(ALL_OBJS)
 GENERATOR_DEPS := ../../c/generator/secp256k1_helper.h $(BIN_DEPS)
@@ -145,7 +145,7 @@ build/instruction_names.o: $(DEPS)/evmone/evmc/lib/instructions/instruction_name
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -c -o $@ $<
 build/instructions_calls.o: $(DEPS)/evmone/lib/evmone/instructions_calls.cpp
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -c -o $@ $<
-build/evmc_utils.o: $(DEPS)/evmone/evmc/tools/evmc/utils.cpp
+build/evmc_hex.o: $(DEPS)/evmone/evmc/lib/hex/hex.cpp
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -c -o $@ $<
 
 # new SHA-3 encryption standard - Keccak algorithm

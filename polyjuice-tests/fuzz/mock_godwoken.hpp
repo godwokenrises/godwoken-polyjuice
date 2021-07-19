@@ -2,7 +2,7 @@
 
 #include <evmc/evmc.hpp>
 #include <evmc/mocked_host.hpp>
-#include <evmc/utils.hpp>
+#include <evmc/hex.hpp>
 
 #include <polyjuice_globals.h>
 
