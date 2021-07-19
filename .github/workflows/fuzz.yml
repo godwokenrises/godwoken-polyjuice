@@ -3,7 +3,7 @@ name: FuzzTest
 on: [push, pull_request]
 
 jobs:
-  build-and-run-tests:
+  build-and-run-fuzzing:
     runs-on: ubuntu-latest
     steps:
     - uses: actions/checkout@v2
