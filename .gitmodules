@@ -1,6 +1,6 @@
 [submodule "deps/ckb-c-stdlib"]
 	path = deps/ckb-c-stdlib
-	url = https://github.com/thewawar/ckb-c-stdlib.git
+	url = https://github.com/TheWaWaR/ckb-c-stdlib.git
 [submodule "deps/ethash"]
 	path = deps/ethash
 	url = https://github.com/TheWaWaR/ethash
@@ -28,3 +28,6 @@
 [submodule "deps/godwoken-scripts"]
 	path = deps/godwoken-scripts
 	url = https://github.com/nervosnetwork/godwoken-scripts.git
+[submodule "deps/ckb-smt"]
+	path = deps/ckb-smt
+	url = https://github.com/nervosnetwork/sparse-merkle-tree.git

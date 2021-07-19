@@ -7,6 +7,7 @@
 
 #include <evmc/evmc.h>
 #include "ckb_syscalls.h"
+#include "polyjuice_errors.h"
 
 #ifdef NO_DEBUG_LOG
 #undef ckb_debug
@@ -18,7 +19,7 @@
 static char debug_buffer[64 * 1024];
 void debug_print_data(const char *prefix, const uint8_t *data,
                       uint32_t data_len) {
-  if (data_len > 32 * 1024 - 2) {
+  if (data_len > 31 * 1024) {
     ckb_debug("warning: print_data is too large");
     return;
   }
@@ -48,7 +49,7 @@ int build_script(const uint8_t code_hash[32], const uint8_t hash_type,
   args_seg.size = 4 + args_len;
   args_seg.ptr = (uint8_t*)malloc(args_seg.size);
   if (args_seg.ptr == NULL) {
-    return -1;
+    return FATAL_POLYJUICE;
   }
   memcpy(args_seg.ptr, (uint8_t*)(&args_len), 4);
   memcpy(args_seg.ptr + 4, args, args_len);
@@ -69,7 +70,7 @@ int build_script(const uint8_t code_hash[32], const uint8_t hash_type,
 #undef errno
   if (script_res.errno != MOL_OK) {
     ckb_debug("molecule build script failed");
-    return -1;
+    return FATAL_POLYJUICE;
   }
 #pragma pop_macro("errno")
 
@@ -78,7 +79,7 @@ int build_script(const uint8_t code_hash[32], const uint8_t hash_type,
   debug_print_data("script ", script_seg->ptr, script_seg->size);
   if (MolReader_Script_verify(script_seg, false) != MOL_OK) {
     ckb_debug("built an invalid script");
-    return -1;
+    return FATAL_POLYJUICE;
   }
   return 0;
 }
@@ -172,6 +173,21 @@ void put_u128(uint128_t value, uint8_t *output) {
   for (size_t i = 0; i < 16; i++) {
     *(output + 31 - i) = *(value_le + i);
   }
+}
+
+/* If it is a fatal error, terminate the whole process.
+ * ====
+ *   - gw_errors.h           GW_FATAIL_xxx               [50, 80)
+ *   - polyjuice_globals.h   FATAL_POLYJUICE             -50
+ *   - polyjuice_globals.h   FATAL_PRECOMPILED_CONTRACTS -51
+ */
+bool is_fatal_error(int error_code) {
+  return (error_code >= 50 && error_code < 80) || (error_code > -80 && error_code <= -50);
+}
+
+/* See evmc.h evmc_status_code */
+bool is_evmc_error(int error_code) {
+  return error_code >= 1 && error_code <= 16;
 }
 
 #endif // POLYJUICE_UTILS_H

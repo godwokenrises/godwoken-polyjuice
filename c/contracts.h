@@ -35,15 +35,6 @@
 #define BLAKE2F_FINAL_BLOCK_BYTES 0x1
 #define BLAKE2F_NON_FINAL_BLOCK_BYTES 0x0
 
-#define ERROR_MOD_EXP -23
-#define ERROR_BLAKE2F_INVALID_INPUT_LENGTH -24
-#define ERROR_BLAKE2F_INVALID_FINAL_FLAG -25
-#define ERROR_BN256_ADD -26
-#define ERROR_BN256_SCALAR_MUL -27
-#define ERROR_BN256_PAIRING -28
-#define ERROR_BN256_INVALID_POINT -29
-
-
 /* pre-compiled Ethereum contracts */
 
 typedef int (*precompiled_contract_gas_fn)(const uint8_t* input_src,
@@ -67,6 +58,7 @@ int ecrecover_required_gas(const uint8_t* input, const size_t input_size,
 /*
  * ecrecover() is a useful Solidity function.
  * It allows the smart contract to validate that incoming data is properly signed.
+ * When input data is wrong we just return empty output with 0 return code.
 
   The input data: (hash, v, r, s), each 32 bytes
   ===============
@@ -92,7 +84,7 @@ int ecrecover(gw_context_t* ctx,
   ret = ckb_secp256k1_custom_verify_only_initialize(&context, secp_data);
 #endif
   if (ret != 0) {
-    return ret;
+    return FATAL_PRECOMPILED_CONTRACTS;
   }
 
   uint8_t input[128] = {0};
@@ -101,7 +93,7 @@ int ecrecover(gw_context_t* ctx,
   for (int i = 32; i < 63; i++) {
     if (input[i] != 0) {
       ckb_debug("input[32:63] not all zero!");
-      return -75;
+      return 0;
     }
   }
   int recid = input[63] - 27;
@@ -110,7 +102,7 @@ int ecrecover(gw_context_t* ctx,
   /* NOTE: r,s overflow will be checked in secp256k1 library code */
   if (recid != 0 && recid != 1) {
     ckb_debug("v value is not in {27,28}");
-    return -1;
+    return 0;
   }
 
   uint8_t signature_data[64];
@@ -120,13 +112,13 @@ int ecrecover(gw_context_t* ctx,
   if (secp256k1_ecdsa_recoverable_signature_parse_compact(
           &context, &signature, signature_data, recid) == 0) {
     ckb_debug("parse signature failed");
-    return -1;
+    return 0;
   }
   /* Recover pubkey */
   secp256k1_pubkey pubkey;
   if (secp256k1_ecdsa_recover(&context, &pubkey, &signature, input) != 1) {
     ckb_debug("recover public key failed");
-    return -77;
+    return 0;
   }
 
   /* Check pubkey hash */
@@ -135,13 +127,13 @@ int ecrecover(gw_context_t* ctx,
   if (secp256k1_ec_pubkey_serialize(&context, temp, &pubkey_size, &pubkey,
                                     SECP256K1_EC_UNCOMPRESSED) != 1) {
     ckb_debug("public key serialize failed");
-    return -1;
+    return FATAL_PRECOMPILED_CONTRACTS;
   }
 
   union ethash_hash256 hash_result = ethash::keccak256(temp + 1, 64);
   *output = (uint8_t*)malloc(32);
   if (*output == NULL) {
-    return -1;
+    return FATAL_PRECOMPILED_CONTRACTS;
   }
   memset(*output, 0, 12);
   memcpy(*output + 12, hash_result.bytes + 12, 20);
@@ -164,7 +156,7 @@ int sha256hash(gw_context_t* ctx,
                const size_t input_size, uint8_t** output, size_t* output_size) {
   *output = (uint8_t*)malloc(32);
   if (*output == NULL) {
-    return -1;
+    return FATAL_PRECOMPILED_CONTRACTS;
   }
   *output_size = 32;
   SHA256_CTX hash_ctx;
@@ -190,7 +182,7 @@ int ripemd160hash(gw_context_t* ctx,
                   size_t* output_size) {
   if (input_size > (size_t)UINT32_MAX) {
     /* input_size overflow */
-    return -1;
+    return FATAL_PRECOMPILED_CONTRACTS;
   }
   *output = (uint8_t*)malloc(32);
   if (*output == NULL) {
@@ -217,7 +209,7 @@ int data_copy(gw_context_t* ctx,
               const size_t input_size, uint8_t** output, size_t* output_size) {
   *output = (uint8_t*)malloc(input_size);
   if (*output == NULL) {
-    return -1;
+    return FATAL_PRECOMPILED_CONTRACTS;
   }
   *output_size = input_size;
   memcpy(*output, input_src, input_size);
@@ -332,7 +324,7 @@ int big_mod_exp_required_gas(const uint8_t* input, const size_t input_size,
     : (input_size > 96 ? input_size - 96 : 0);
   uint8_t *content = (uint8_t*)malloc(content_size);
   if (content == NULL) {
-    return_value = ERROR_MOD_EXP;
+    return_value = FATAL_PRECOMPILED_CONTRACTS;
     goto mod_exp_gas_cleanup;
   }
   memset(content, 0, content_size);
@@ -456,7 +448,7 @@ int big_mod_exp(gw_context_t* ctx,
     : (input_size > 96 ? input_size - 96 : 0);
   uint8_t *content = (uint8_t*)malloc(content_size);
   if (content == NULL) {
-    return_value = ERROR_MOD_EXP;
+    return_value = FATAL_PRECOMPILED_CONTRACTS;
     goto mod_exp_cleanup;
   }
   memset(content, 0, content_size);
@@ -742,7 +734,7 @@ int blake2f(gw_context_t* ctx,
 
   *output = (uint8_t*)malloc(64);
   if (*output == NULL) {
-    return -1;
+    return FATAL_PRECOMPILED_CONTRACTS;
   }
   *output_size = 64;
   for (size_t i = 0; i < 8; i++) {
@@ -814,7 +806,7 @@ int bn256_add_istanbul(gw_context_t* ctx,
 
   *output = (uint8_t *)malloc(64);
   if (*output == NULL) {
-    return -1;
+    return FATAL_PRECOMPILED_CONTRACTS;
   }
   *output_size = 64;
   intx::be::unsafe::store(*output, res[0]);
@@ -853,7 +845,7 @@ int bn256_scalar_mul_istanbul(gw_context_t* ctx,
 
   *output = (uint8_t *)malloc(64);
   if (*output == NULL) {
-    return -1;
+    return FATAL_PRECOMPILED_CONTRACTS;
   }
   *output_size = 64;
   intx::be::unsafe::store(*output, res[0]);
@@ -887,12 +879,12 @@ int bn256_pairing_istanbul(gw_context_t* ctx,
   /* G1[] */
   intx::uint256 *cs = (intx::uint256 *)malloc(length * 4 * sizeof(intx::uint256));
   if (cs == NULL) {
-    return -1;
+    return FATAL_PRECOMPILED_CONTRACTS;
   }
   /* G2[] */
   intx::uint256 *ts = (intx::uint256 *)malloc(length * 4 * sizeof(intx::uint256));
   if (ts == NULL) {
-    return -1;
+    return FATAL_PRECOMPILED_CONTRACTS;
   }
   for (size_t i = 0; i < input_size; i += 192) {
     ret = parse_curve_point((void *)(cs + i / 192 * 4), (uint8_t *)input_src + i);

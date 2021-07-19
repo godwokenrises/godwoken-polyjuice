@@ -1,7 +1,8 @@
 pub use gw_common::{
     blake2b::new_blake2b,
     builtins::{CKB_SUDT_ACCOUNT_ID, RESERVED_ACCOUNT_ID},
-    state::State,
+    h256_ext::H256Ext,
+    state::{build_data_hash_key, State},
     CKB_SUDT_SCRIPT_ARGS, H256,
 };
 use gw_config::BackendConfig;
@@ -53,6 +54,9 @@ pub const GW_LOG_SUDT_TRANSFER: u8 = 0x0;
 pub const GW_LOG_SUDT_PAY_FEE: u8 = 0x1;
 pub const GW_LOG_POLYJUICE_SYSTEM: u8 = 0x2;
 pub const GW_LOG_POLYJUICE_USER: u8 = 0x3;
+
+// pub const FATAL_POLYJUICE: i8 = -50;
+pub const FATAL_PRECOMPILED_CONTRACTS: i8 = -51;
 
 lazy_static::lazy_static! {
     pub static ref SECP_DATA_HASH: H256 = {
@@ -399,6 +403,9 @@ pub fn setup() -> (Store, DummyState, Generator, u32) {
     println!("creator_account_id: {}", creator_account_id);
 
     state.insert_data(*SECP_DATA_HASH, Bytes::from(SECP_DATA));
+    state
+        .update_raw(build_data_hash_key(SECP_DATA_HASH.as_slice()), H256::one())
+        .expect("update secp data key");
 
     // ==== Build generator
     let configs = vec![

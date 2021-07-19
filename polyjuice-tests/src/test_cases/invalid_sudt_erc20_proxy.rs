@@ -167,7 +167,8 @@ fn test_invalid_sudt_erc20_proxy() {
         } else if let Err(err) = result {
             // [contract debug]: The contract is not allowed to call transfer_to_any_sudt
             // ERROR_TRANSFER_TO_ANY_SUDT -31
-            assert_eq!(err, TransactionError::InvalidExitCode(-31));
+            // by: revert(0, 0)
+            assert_eq!(err, TransactionError::InvalidExitCode(2));
         } else {
             unreachable!();
         }

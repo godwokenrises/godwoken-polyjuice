@@ -8,9 +8,6 @@
 /* Gas fee */
 #define RECOVER_ACCOUNT_GAS 3600 /* more than ecrecover */
 
-/* Errors */
-#define ERROR_RECOVER_ACCOUNT -40
-
 int recover_account_gas(const uint8_t* input_src,
                         const size_t input_size,
                         uint64_t* gas) {
@@ -18,8 +15,7 @@ int recover_account_gas(const uint8_t* input_src,
   return 0;
 }
 
-/*
-  Recover an EoA account script hash by signature
+/* Recover an EoA account script hash by signature
 
   input: (the input data is from abi.encode(mesage, signature, code_hash))
   ======
@@ -31,7 +27,7 @@ int recover_account_gas(const uint8_t* input_src,
 
   output (32 bytes):
   =======
-    output[12..32] => godwoken short address
+    output[0..32] => account script hash
  */
 int recover_account(gw_context_t* ctx,
                     const uint8_t* code_data,
@@ -41,7 +37,8 @@ int recover_account(gw_context_t* ctx,
                     const size_t input_size,
                     uint8_t** output, size_t* output_size) {
   if (input_size < 128) {
-    return ERROR_RECOVER_ACCOUNT;
+    debug_print_int("input size too small", input_size);
+    return 0;
   }
   int ret;
   uint8_t *message = (uint8_t *)input_src;
@@ -62,13 +59,18 @@ int recover_account(gw_context_t* ctx,
   ret = ctx->sys_recover_account(ctx, message, signature, signature_len, code_hash, script, &script_len);
   if (ret != 0) {
     debug_print_int("call sys_recover_account failed", ret);
-    return ERROR_RECOVER_ACCOUNT;
+    /* wrong code_hash is fatal, so we return the error code here */
+    if (is_fatal_error(ret)) {
+      return FATAL_PRECOMPILED_CONTRACTS;
+    } else {
+      return ERROR_RECOVER_ACCOUNT;
+    }
   }
   debug_print_data("script", script, script_len);
   *output = (uint8_t *)malloc(32);
   if (*output == NULL) {
     ckb_debug("malloc failed");
-    return -1;
+    return FATAL_PRECOMPILED_CONTRACTS;
   }
   *output_size = 32;
   blake2b_hash(*output, script, script_len);
