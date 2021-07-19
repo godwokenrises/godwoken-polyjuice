@@ -91,7 +91,7 @@ int test_contract(const uint8_t n,
     ret = -1;
     goto test_contract_cleanup;
   }
-  if (memcmp(expected_output, output, output_size) != 0) {
+  if (output_size > 0 && memcmp(expected_output, output, output_size) != 0) {
     debug_print_data("expected output", expected_output, output_size);
     debug_print_data("returned output", output, output_size);
     ret = -1;
