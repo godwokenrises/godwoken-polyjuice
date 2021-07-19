@@ -37,10 +37,9 @@ jobs:
       working-directory: ./polyjuice-tests/fuzz
       run: make build/test_rlp && ./build/test_rlp
 
-    # FIXME:
-    # - name: test_contracts on x86 with sanitizers
-    #   working-directory: ./polyjuice-tests/fuzz
-    #   run: make build/test_contracts && ./build/test_contracts
+    - name: test_contracts on x86 with sanitizers
+      working-directory: ./polyjuice-tests/fuzz
+      run: make build/test_contracts && ./build/test_contracts
 
     - name: Fuzzing Polyjuice Generator 360 seconds
       working-directory: polyjuice-tests/fuzz
