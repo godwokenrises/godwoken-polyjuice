@@ -28,6 +28,3 @@
 [submodule "deps/godwoken-scripts"]
 	path = deps/godwoken-scripts
 	url = https://github.com/nervosnetwork/godwoken-scripts.git
-[submodule "deps/ckb-smt"]
-	path = deps/ckb-smt
-	url = https://github.com/nervosnetwork/sparse-merkle-tree.git
