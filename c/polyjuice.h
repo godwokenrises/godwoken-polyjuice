@@ -549,6 +549,7 @@ void selfdestruct(struct evmc_host_context* context,
 struct evmc_result call(struct evmc_host_context* context,
                         const struct evmc_message* msg) {
   ckb_debug("BEGIN call");
+  debug_print_int("msg.depth", msg->depth);
   debug_print_data("msg.input_data", msg->input_data, msg->input_size);
   debug_print_int("msg.kind", msg->kind);
   debug_print_data("call.sender", msg->sender.bytes, 20);
@@ -562,7 +563,11 @@ struct evmc_result call(struct evmc_host_context* context,
 
   precompiled_contract_gas_fn contract_gas;
   precompiled_contract_fn contract;
-  if (match_precompiled_address(&msg->destination, &contract_gas, &contract)) {
+  if (msg->depth >= 32) {
+    ckb_debug("call depth exceeded");
+    res.status_code = EVMC_CALL_DEPTH_EXCEEDED;
+    context->error_code = FATAL_CALL_DEPTH_EXCEEDED;
+  } else if (match_precompiled_address(&msg->destination, &contract_gas, &contract)) {
     uint64_t gas_cost = 0;
     ret = contract_gas(msg->input_data, msg->input_size, &gas_cost);
     if (is_fatal_error(ret)) {
