@@ -2,8 +2,8 @@
 //!   See ./evm-contracts/RecursionContract.sol
 
 use crate::helper::{
-    build_eth_l2_script, deploy, new_account_script,
-    new_block_info, setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
+    build_eth_l2_script, deploy, new_account_script, new_block_info, setup, PolyjuiceArgsBuilder,
+    CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
 use gw_generator::{error::TransactionError, traits::StateExt};
@@ -49,10 +49,12 @@ fn test_recursion_contract_call() {
         .unwrap()
         .unwrap();
 
-    {// Call Sum(31), 31 < max_depth=32
+    {
+        // Call Sum(31), 31 < max_depth=32
         let block_info = new_block_info(0, block_number, block_number);
         let input =
-            hex::decode("188b85b4000000000000000000000000000000000000000000000000000000000000001f").unwrap();
+            hex::decode("188b85b4000000000000000000000000000000000000000000000000000000000000001f")
+                .unwrap();
         let args = PolyjuiceArgsBuilder::default()
             .gas_limit(200000)
             .gas_price(1)
@@ -75,18 +77,21 @@ fn test_recursion_contract_call() {
             )
             .expect("recursive call depth to 32");
         state.apply_run_result(&run_result).expect("update state");
-        println!(
-            "\t call result {:?}", run_result.return_data
-        );
-        let expected_sum = [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 1, 240];
+        println!("\t call result {:?}", run_result.return_data);
+        let expected_sum = [
+            0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+            0, 1, 240,
+        ];
         assert_eq!(run_result.return_data, expected_sum);
     }
 
-    {// EVMC_CALL_DEPTH_EXCEEDED Case 
+    {
+        // EVMC_CALL_DEPTH_EXCEEDED Case
         block_number += 1;
         let block_info = new_block_info(0, block_number, block_number);
         let input =
-            hex::decode("188b85b40000000000000000000000000000000000000000000000000000000000000020").unwrap();
+            hex::decode("188b85b40000000000000000000000000000000000000000000000000000000000000020")
+                .unwrap();
         let args = PolyjuiceArgsBuilder::default()
             .gas_limit(200000)
             .gas_price(1)
@@ -111,11 +116,13 @@ fn test_recursion_contract_call() {
         assert_eq!(err, TransactionError::InvalidExitCode(-52));
     }
 
-    {// Case: out of gas and revert
+    {
+        // Case: out of gas and revert
         block_number += 1;
         let block_info = new_block_info(0, block_number, block_number);
         let input =
-            hex::decode("188b85b40000000000000000000000000000000000000000000000000000000000000020").unwrap();
+            hex::decode("188b85b40000000000000000000000000000000000000000000000000000000000000020")
+                .unwrap();
         let args = PolyjuiceArgsBuilder::default()
             .gas_limit(50000)
             .gas_price(1)
@@ -140,11 +147,13 @@ fn test_recursion_contract_call() {
         assert_eq!(err, TransactionError::InvalidExitCode(2));
     }
 
-    {// Case: out of gas and no revert
+    {
+        // Case: out of gas and no revert
         block_number += 1;
         let block_info = new_block_info(0, block_number, block_number);
         let input =
-            hex::decode("188b85b40000000000000000000000000000000000000000000000000000000000000020").unwrap();
+            hex::decode("188b85b40000000000000000000000000000000000000000000000000000000000000020")
+                .unwrap();
         let args = PolyjuiceArgsBuilder::default()
             .gas_limit(4100)
             .gas_price(1)
