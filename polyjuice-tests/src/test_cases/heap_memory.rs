@@ -49,8 +49,9 @@ fn test_heap_momory() {
         .unwrap()
         .unwrap();
 
-    for k_bytes in 1..70 {
-        let call_code = format!("4e688844{:064x}", 1024 * k_bytes);
+    {
+        // newMemory less than 512K
+        let call_code = format!("4e688844{:064x}", 1024 * 15); // < 16 * 32 = 512
         println!("{}", call_code);
         block_number += 1;
         let block_info = new_block_info(0, block_number, block_number);
@@ -77,16 +78,74 @@ fn test_heap_momory() {
             )
             .expect("success to malloc memory");
         println!(
-            "\t new byte({}K) => call result {:?}",
-            k_bytes, run_result.return_data
+            "\t new byte(about {}K) => call result {:?}",
+            16 * 32,
+            run_result.return_data
         );
-        // let expected_sum = [
-        //     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
-        //     0, 1, 240,
-        // ];
-        // assert_eq!(run_result.return_data, expected_sum);
     }
 
-    // let uint8Length = await contract.newMemory(step);
-    // console.log("uint8Length = ", parseInt(uint8Length));
+    {
+        // newMemory more than 512K
+        let call_code = format!("4e688844{:064x}", 1024 * 16 + 1);
+        println!("{}", call_code);
+        block_number += 1;
+        let block_info = new_block_info(0, block_number, block_number);
+        let input = hex::decode(call_code).unwrap();
+        let args = PolyjuiceArgsBuilder::default()
+            .gas_limit(20000000)
+            .gas_price(1)
+            .value(0)
+            .input(&input)
+            .build();
+        let raw_tx = RawL2Transaction::new_builder()
+            .from_id(from_id.pack())
+            .to_id(contract_account_id.pack())
+            .args(Bytes::from(args).pack())
+            .build();
+        let db = store.begin_transaction();
+        let tip_block_hash = store.get_tip_block_hash().unwrap();
+        let err = generator
+            .execute_transaction(
+                &ChainView::new(&db, tip_block_hash),
+                &state,
+                &block_info,
+                &raw_tx,
+            )
+            .expect_err("OOM");
+        println!("{:?}", err);
+        // assert_eq!(err, TransactionError::VM(InvalidEcall(64)));
+    }
+
+    // for k_bytes in 10..17 {
+    //     let call_code = format!("4e688844{:064x}", 1024 * k_bytes);
+    //     println!("{}", call_code);
+    //     block_number += 1;
+    //     let block_info = new_block_info(0, block_number, block_number);
+    //     let input = hex::decode(call_code).unwrap();
+    //     let args = PolyjuiceArgsBuilder::default()
+    //         .gas_limit(20000000)
+    //         .gas_price(1)
+    //         .value(0)
+    //         .input(&input)
+    //         .build();
+    //     let raw_tx = RawL2Transaction::new_builder()
+    //         .from_id(from_id.pack())
+    //         .to_id(contract_account_id.pack())
+    //         .args(Bytes::from(args).pack())
+    //         .build();
+    //     let db = store.begin_transaction();
+    //     let tip_block_hash = store.get_tip_block_hash().unwrap();
+    //     let run_result = generator
+    //         .execute_transaction(
+    //             &ChainView::new(&db, tip_block_hash),
+    //             &state,
+    //             &block_info,
+    //             &raw_tx,
+    //         )
+    //         .expect("success to malloc memory");
+    //     println!(
+    //         "\t new byte({}K) => call result {:?}",
+    //         k_bytes, run_result.return_data
+    //     );
+    // }
 }
