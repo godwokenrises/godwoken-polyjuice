@@ -43,7 +43,7 @@ jobs:
 
     - name: Fuzzing Polyjuice Generator 360 seconds
       working-directory: polyjuice-tests/fuzz
-      run: make build/polyjuice_generator_fuzzer && ./build/polyjuice_generator_fuzzer corpus -max_total_time=360 -timeout=2
+      run: make build/polyjuice_generator_fuzzer && ./build/polyjuice_generator_fuzzer corpus -max_total_time=360 -timeout=2 -rss_limit_mb=4096
 
     - name: Archive inputs that triggered crashes or sanitizer failures
       uses: actions/upload-artifact@v2
