@@ -4,7 +4,7 @@
     {
       "label": "build and run polyjuice_generator_fuzzer_log",
       "type": "shell",
-      "command": "mv build/polyjuice_generator_fuzzer ./ & make build/polyjuice_generator_fuzzer_log && ./build/polyjuice_generator_fuzzer_log corpus -max_total_time=2",
+      "command": "cp build/polyjuice_generator_fuzzer_log build/polyjuice_generator_fuzzer_log.bak & make build/polyjuice_generator_fuzzer_log && ./build/polyjuice_generator_fuzzer_log corpus -max_total_time=6",
       "options": {
         "cwd": "${cwd}/polyjuice-tests/fuzz"
       },
@@ -17,7 +17,7 @@
     {
       "label": "build and run polyjuice_generator_fuzzer",
       "type": "shell",
-      "command": "mv build/polyjuice_generator_fuzzer ./ & make build/polyjuice_generator_fuzzer && ./build/polyjuice_generator_fuzzer corpus -jobs=2",
+      "command": "cp build/polyjuice_generator_fuzzer build/polyjuice_generator_fuzzer.bak & make build/polyjuice_generator_fuzzer && ./build/polyjuice_generator_fuzzer corpus -jobs=2",
       "options": {
         "cwd": "${cwd}/polyjuice-tests/fuzz"
       },
@@ -29,7 +29,7 @@
     {
       "label": "build test_contracts",
       "type": "shell",
-      "command": "mv build/test_contracts ./ & make -C ./ build/test_contracts && ./build/test_contracts",
+      "command": "cp build/test_contracts build/test_contracts.bak & make -C ./ build/test_contracts && ./build/test_contracts",
       "options": {
         "cwd": "${cwd}/polyjuice-tests/fuzz"
       },
