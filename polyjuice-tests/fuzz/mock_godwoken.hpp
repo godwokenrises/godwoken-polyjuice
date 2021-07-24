@@ -38,6 +38,15 @@ auto in = fuzz_input{};
 MockedGodwoken* gw_host = &in.mock_gw;
 
 
+extern "C" int ckb_debug(const char* str) {
+  cout << "[debug] " << str << endl;
+  return 0;
+}
+#ifdef NO_DEBUG_LOG
+#undef ckb_debug
+#define ckb_debug(s) do {} while (0)
+#endif
+
 inline ostream& operator<<(ostream& stream, const bytes32& b32) {
   stream << "H256[";
   for (size_t i = 0; i < 31; i++)
