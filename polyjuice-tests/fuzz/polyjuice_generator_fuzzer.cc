@@ -105,13 +105,31 @@ bool execute_predefined_transactions() {
 }
 
 bool is_predefined_test_passed = execute_predefined_transactions();
-extern "C" int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
-  // TODO: load RawL2Transaction from corpus
-  // TODO: msg = pupulate_input(data, size), and fill the msg into LOAD_TRANSACTION SYSCALL
+extern "C" int LLVMFuzzerTestOneInput(uint8_t *data, size_t size) {
   dbg_print("Input Data Size: %d", size);
+
+  mol_seg_t l2transaction_seg;
+  l2transaction_seg.ptr = data;
+  l2transaction_seg.size = size;
+  if (MolReader_RawL2Transaction_verify(&l2transaction_seg, false) == MOL_OK) {
+    mol_seg_t args_bytes_seg = MolReader_RawL2Transaction_get_args(&l2transaction_seg);
+    mol_seg_t args_seg = MolReader_Bytes_raw_bytes(&args_bytes_seg);
+    if (args_seg.size >= 8 + 8 + 16 + 16 + 4) {
+      // reduce gas_limit to avoid timeout while fuzzing
+      int64_t gas_limit;
+      memcpy(&gas_limit, args_seg.ptr + 8, sizeof(int64_t));
+      if (gas_limit > 5500000) {
+        dbg_print("gas_limit: %ld", gas_limit);
+        // (std::numeric_limits<int64_t>::max() >> 40) is close to 5.5 * 10^6
+        gas_limit = gas_limit >> 40;
+        dbg_print("gas_limit: %ld", gas_limit);
+        memcpy(args_seg.ptr + 8, &gas_limit, sizeof(int64_t));
+      }      
+    }
+  }
+
   in.raw_tx = bytes(data, size);
 
-  //TODO: wrap run_polyjuice and return the RunResult => struct evmc_result call
   // const auto res = polyjuice_execute();
   run_polyjuice();
 
