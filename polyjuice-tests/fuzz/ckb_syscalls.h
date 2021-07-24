@@ -76,7 +76,9 @@ static int inline __internal_syscall(long n, long _a0, long _a1, long _a2,
       dbg_print("====== mock syscall(GW_SYS_LOAD) ======");
       dbg_print("raw_key:");
       dbg_print_h256((uint8_t*)_a0);
-      return gw_sys_load((uint8_t *)_a0, (uint8_t *)_a1);
+      gw_sys_load((uint8_t *)_a0, (uint8_t *)_a1);
+      // always return 0, even the key(_a0) is not found
+      return MOCK_SUCCESS;
 
     // mock syscall(GW_SYS_LOAD_DATA, data, &inner_len, offset, data_hash, 0, 0)
     case GW_SYS_LOAD_DATA:

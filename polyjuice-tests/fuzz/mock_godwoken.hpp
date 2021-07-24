@@ -70,25 +70,30 @@ bytes32 u256_to_bytes32(const uint8_t u8[32]) {
 //   dbg_print(<< b32);
 // }
 
+extern "C" void gw_update_raw(const uint8_t k[GW_KEY_BYTES], const uint8_t v[GW_KEY_BYTES]){
+  in.mock_gw.state[u256_to_bytes32(k)] = u256_to_bytes32(v);
+}
+
 /* store code or script */
 extern "C" int gw_store_data(const uint64_t len, uint8_t *data) {
   uint8_t script_hash[GW_KEY_BYTES];
   blake2b_hash(script_hash, data, len);
 
-  dbg_print("gw_store_data[%ld] blake2b_hash:", len);
-  dbg_print_h256(script_hash);
 
-  static const uint64_t MAX_DATA_SIZE = 24576;
-  if (len <= 0 || len > MAX_DATA_SIZE) {
-    // FIXME:
+  if (len <= 0 || len > GW_MAX_DATA_SIZE) {
     dbg_print("[gw_store_data] !!!!!! warning: data_len = %ld !!!!!!", len);
     return GW_FATAL_BUFFER_OVERFLOW;
   }
 
-  bytes bs((uint8_t *)data, len);
-  // debug_print
-  // cout << "\tbytes: " << bs << endl;
-  gw_host->code_store[u256_to_bytes32(script_hash)] = bs;
+  // store(data_hash_key, H256::one) insert data hash into SMT
+  uint8_t data_hash_key[GW_KEY_BYTES];
+  gw_build_data_hash_key(script_hash, data_hash_key);
+  uint32_t one = 1;
+  uint8_t h256_one[GW_VALUE_BYTES] = {0};
+  memcpy(h256_one, &one, sizeof(uint32_t));
+  gw_update_raw(data_hash_key, h256_one);
+
+  gw_host->code_store[u256_to_bytes32(script_hash)] = bytes((uint8_t *)data, len);
   return 0;
 }
 
@@ -118,16 +123,11 @@ extern "C" int gw_sys_load(const uint8_t k[GW_KEY_BYTES], uint8_t v[GW_KEY_BYTES
     dbg_print("gw_sys_load failed, missing key:");
     dbg_print_h256(k);
     dbg_print("all the state as following:");
-    // print_state();
+    print_state();
     return GW_ERROR_NOT_FOUND;
   }
   memcpy(v, search->second.bytes, GW_KEY_BYTES);
   return 0;
-}
-
-extern "C" void gw_update_raw(const uint8_t k[GW_KEY_BYTES], const uint8_t v[GW_KEY_BYTES]){
-  in.mock_gw.state[u256_to_bytes32(k)] = u256_to_bytes32(v);
-  // print_state();
 }
 
 // load raw layer2 transaction data from fuzzInput.raw_tx
@@ -226,6 +226,8 @@ extern "C" int gw_sys_load_rollup_config(uint8_t *addr,
 }
 
 extern "C" int gw_sys_create(uint8_t *script, uint64_t script_len, uint32_t *account_id_ptr) {
+  int ret = 0;
+
   // Return error if script_hash is exists
   uint8_t script_hash[GW_KEY_BYTES];
   blake2b_hash(script_hash, script, script_len);
@@ -310,16 +312,15 @@ extern "C" int gw_sys_create(uint8_t *script, uint64_t script_len, uint32_t *acc
   /* Same logic from State::create_account() */
   uint32_t id = gw_host->account_count; // tmp
   const uint8_t zero_nonce[GW_VALUE_BYTES] = {0};
-
+  uint8_t account_key[GW_KEY_BYTES];
+  
   // store(account_nonce_key -> zero_nonce)
-  uint8_t account_nonce_key[GW_KEY_BYTES];
-  gw_build_account_field_key(id, GW_ACCOUNT_NONCE, account_nonce_key);
-  gw_update_raw(account_nonce_key, zero_nonce);
+  gw_build_account_field_key(id, GW_ACCOUNT_NONCE, account_key);
+  gw_update_raw(account_key, zero_nonce);
   
   // store(script_hash_key -> script_hash)
-  uint8_t account_script_hash_key[GW_KEY_BYTES];
-  gw_build_account_field_key(id, GW_ACCOUNT_SCRIPT_HASH, account_script_hash_key);
-  gw_update_raw(account_script_hash_key, script_hash);
+  gw_build_account_field_key(id, GW_ACCOUNT_SCRIPT_HASH, account_key);
+  gw_update_raw(account_key, script_hash);
 
   // store(script_hash -> account_id)
   uint8_t script_hash_to_id_key[GW_KEY_BYTES];
@@ -327,22 +328,28 @@ extern "C" int gw_sys_create(uint8_t *script, uint64_t script_len, uint32_t *acc
   gw_build_script_hash_to_account_id_key(script_hash, script_hash_to_id_key);
   memcpy(script_hash_to_id_value, (uint8_t *)(&id), 4);
   gw_update_raw(script_hash_to_id_key, script_hash_to_id_value);
-  // dbg_print("\t script_hash_to_id_key");
-  // dbg_print_h256(script_hash_to_id_key);
-  // dbg_print("\t script_hash_to_id_value");
-  // dbg_print_h256(script_hash_to_id_value);
 
-  // store_data(script_hash -> script)
-  gw_host->code_store[u256_to_bytes32(script_hash)] = bytes(script, script_len);
+  // store(script hash -> script_hash)
+  uint8_t short_script_hash_to_script_key[32] = {0};
+  ret = gw_build_short_script_hash_to_script_hash_key(
+    script_hash, GW_DEFAULT_SHORT_SCRIPT_HASH_LEN,
+    short_script_hash_to_script_key
+  );
+  if (ret != 0) return ret;
+  gw_update_raw(short_script_hash_to_script_key, script_hash);
+
+  // insert script: store_data(script_hash -> script)
+  ret = gw_store_data(script_len, script);
+  if (ret != 0) return ret;
 
   // account_count++
   gw_host->account_count++;
 
   // return id
   *account_id_ptr = id;
-
   dbg_print("new account id = %d was created.", id);
-  return 0;
+
+  return ret;
 }
 
 // void create_account(uint8_t script_hash[GW_KEY_BYTES], uint32_t id) {
@@ -361,7 +368,7 @@ uint32_t create_account_from_script(uint8_t *script, uint64_t script_len) {
   // store_data(script_hash -> script)
   uint8_t script_hash[GW_KEY_BYTES];
   blake2b_hash(script_hash, script, script_len);
-  gw_host->code_store[u256_to_bytes32(script_hash)] = bytes(script, script_len);
+  gw_store_data(script_len, script);
 
   // create account with script_hash
   uint32_t id = gw_host->account_count;
@@ -385,6 +392,14 @@ uint32_t create_account_from_script(uint8_t *script, uint64_t script_len) {
   memcpy(script_hash_to_id_value, (uint8_t *)(&id), 4);
   gw_update_raw(script_hash_to_id_key, script_hash_to_id_value);
 
+  /* init short script hash -> script_hash */
+  uint8_t short_script_hash_to_script_key[32] = {0};
+  gw_build_short_script_hash_to_script_hash_key(
+    script_hash, GW_DEFAULT_SHORT_SCRIPT_HASH_LEN,
+    short_script_hash_to_script_key
+  );
+  gw_update_raw(short_script_hash_to_script_key, script_hash);
+
   // account_count++
   dbg_print("new account id = %d was created.", id);
   return gw_host->account_count++;
@@ -396,14 +411,13 @@ int init() {
 
   // TODO: build RollupConfig, @see polyjuice-tests/src/helper.rs
   // init rollup_config
-  const uint8_t rollup_config[] = {189, 1, 0, 0, 60, 0, 0, 0, 92, 0, 0, 0, 124, 0, 0, 0, 156, 0, 0, 0, 188, 0, 0, 0, 220, 0, 0, 0, 252, 0, 0, 0, 28, 1, 0, 0, 60, 1, 0, 0, 68, 1, 0, 0, 76, 1, 0, 0, 84, 1, 0, 0, 85, 1, 0, 0, 89, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 108, 221, 56, 188, 143, 219, 128, 88, 69, 24, 221, 22, 50, 19, 186, 0, 97, 224, 131, 145, 163, 114, 184, 192, 255, 122, 103, 171, 200, 106, 67, 222};
+  const uint8_t rollup_config[] = {189, 1, 0, 0, 60, 0, 0, 0, 92, 0, 0, 0, 124, 0, 0, 0, 156, 0, 0, 0, 188, 0, 0, 0, 220, 0, 0, 0, 252, 0, 0, 0, 28, 1, 0, 0, 60, 1, 0, 0, 68, 1, 0, 0, 76, 1, 0, 0, 84, 1, 0, 0, 85, 1, 0, 0, 89, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 3, 0, 0, 0, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 161, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 162, 22, 32, 241, 19, 215, 157, 151, 224, 246, 229, 9, 24, 60, 121, 13, 182, 82, 23, 174, 212, 233, 95, 5, 215, 202, 209, 205, 163, 74, 191, 27, 11};
   gw_host->rollup_config_size = sizeof(rollup_config);
   memcpy(gw_host->rollup_config, rollup_config, gw_host->rollup_config_size);
   
   
 // TODO: build_script()
 // build_script(g_script_code_hash, g_script_hash_type, script_args, SCRIPT_ARGS_LEN, &new_script_seg);
-
 
   uint32_t new_id = -1;
   // id = 0
@@ -418,7 +432,7 @@ int init() {
                                       ckb_account_script.size());
   // id = 2
   bytes meta_account_script
-     = from_hex("590000001000000030000000310000006cdd38bc8fdb80584518dd163213ba0061e08391a372b8c0ff7a67abc86a43de0124000000a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a901000000");
+     = from_hex("590000001000000030000000310000001620f113d79d97e0f6e509183c790db65217aed4e95f05d7cad1cda34abf1b0b0124000000a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a901000000");
   new_id = create_account_from_script((uint8_t *)meta_account_script.data(),
                                       meta_account_script.size());
   // id = 3
@@ -427,6 +441,7 @@ int init() {
                                       block_producer_script.size());
   // id = 4
   bytes build_eth_l2_script = from_hex("69000000100000003000000031000000aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa0134000000a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a9a90101010101010101010101010101010101010101");
+
   new_id = create_account_from_script((uint8_t *)build_eth_l2_script.data(),
                                       build_eth_l2_script.size());
   
