@@ -80,9 +80,10 @@ extern "C" int gw_store_data(const uint64_t len, uint8_t *data) {
   blake2b_hash(script_hash, data, len);
 
 
-  if (len <= 0 || len > GW_MAX_DATA_SIZE) {
+  if (len < 0 || len > GW_MAX_DATA_SIZE) {
     dbg_print("[gw_store_data] !!!!!! warning: data_len = %ld !!!!!!", len);
-    return GW_FATAL_BUFFER_OVERFLOW;
+    dbg_print("Exceeded max store data size");
+    return GW_FATAL_INVALID_DATA;
   }
 
   // store(data_hash_key, H256::one) insert data hash into SMT
