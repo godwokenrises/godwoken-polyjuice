@@ -91,7 +91,7 @@ int test_contract(const uint8_t n,
     ret = -1;
     goto test_contract_cleanup;
   }
-  if (memcmp(expected_output, output, output_size) != 0) {
+  if (output_size > 0 && memcmp(expected_output, output, output_size) != 0) {
     debug_print_data("expected output", expected_output, output_size);
     debug_print_data("returned output", output, output_size);
     ret = -1;
@@ -622,7 +622,23 @@ int test_blake2f() {
   return 0;
 }
 
+#ifdef FUZZING
+int init_mock_state() {
+  ckb_debug("[init_mock_state] init SECP");
+  uint8_t raw_key[GW_KEY_BYTES];
+  gw_build_data_hash_key(ckb_secp256k1_data_hash, raw_key);
+  gw_update_raw(raw_key, bytes32{1}.bytes);
+  return 0;
+}
+#endif
+
 int main() {
+#ifdef FUZZING
+  if (0 != init_mock_state()) {
+    ckb_debug("[init_mock_state] failed to init_mock_state");
+  }
+#endif
+
   /* NOTE: just want the unused variable warnings go away. */
   g_sudt_id = 0;
   g_created_id = 0;

@@ -12,10 +12,7 @@
 size_t s_INPUT_SIZE = 0;
 uint8_t* s_INPUT_DATA = NULL;
 
-int ckb_debug(const char* str) {
-  printf("[debug] %s\n", str);
-  return 0;
-}
+extern "C" int ckb_debug(const char*);
 static char debug_buf[64 * 1024];
 void dbg_print(const char* fmt, ...) {
     va_list args;
@@ -41,11 +38,9 @@ void dbg_print_hex(const uint8_t* ptr, size_t size) {
 }
 
 #ifdef NO_DEBUG_LOG
-#undef ckb_debug
 #undef dbg_print
 #undef dbg_print_h256
 #undef dbg_print_hex
-#define ckb_debug(s) do {} while (0)
 #define dbg_print(...) do {} while (0)
 #define dbg_print_h256(p) do {} while (0)
 #define dbg_print_hex(p) do {} while (0)
@@ -81,7 +76,9 @@ static int inline __internal_syscall(long n, long _a0, long _a1, long _a2,
       dbg_print("====== mock syscall(GW_SYS_LOAD) ======");
       dbg_print("raw_key:");
       dbg_print_h256((uint8_t*)_a0);
-      return gw_sys_load((uint8_t *)_a0, (uint8_t *)_a1);
+      gw_sys_load((uint8_t *)_a0, (uint8_t *)_a1);
+      // always return 0, even the key(_a0) is not found
+      return MOCK_SUCCESS;
 
     // mock syscall(GW_SYS_LOAD_DATA, data, &inner_len, offset, data_hash, 0, 0)
     case GW_SYS_LOAD_DATA:

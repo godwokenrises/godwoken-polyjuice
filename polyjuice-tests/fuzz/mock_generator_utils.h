@@ -141,6 +141,7 @@ int sys_load(gw_context_t *ctx, uint32_t account_id, const uint8_t *key,
 
   uint8_t raw_key[GW_KEY_BYTES] = {0};
   gw_build_account_key(account_id, key, key_len, raw_key);
+  dbg_print("[sys_load] load value by account_key");
   return _internal_load_raw(ctx, raw_key, value);
 }
 int sys_store(gw_context_t *ctx, uint32_t account_id, const uint8_t *key,
@@ -171,6 +172,7 @@ int sys_get_account_nonce(gw_context_t *ctx, uint32_t account_id,
   uint8_t key[32] = {0};
   gw_build_account_field_key(account_id, GW_ACCOUNT_NONCE, key);
   uint8_t value[32] = {0};
+  dbg_print("[sys_get_account_nonce] load value by account_field_key");
   ret = _internal_load_raw(ctx, key, value);
   if (ret != 0) {
     return ret;
@@ -202,6 +204,7 @@ int sys_get_account_id_by_script_hash(gw_context_t *ctx,
   uint8_t raw_key[32] = {0};
   uint8_t value[32] = {0};
   gw_build_script_hash_to_account_id_key(script_hash, raw_key);
+  dbg_print("[sys_get_account_id_by_script_hash] load value by account_id_key");
   int ret = _internal_load_raw(ctx, raw_key, value);
   if (ret != 0) {
     return ret;
@@ -235,6 +238,7 @@ int sys_get_script_hash_by_account_id(gw_context_t *ctx, uint32_t account_id,
 
   uint8_t raw_key[32] = {0};
   gw_build_account_field_key(account_id, GW_ACCOUNT_SCRIPT_HASH, raw_key);
+  dbg_print("[sys_get_script_hash_by_account_id] load script_hash by account_field_key");
   return _internal_load_raw(ctx, raw_key, script_hash);
 }
 

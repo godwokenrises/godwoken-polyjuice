@@ -1119,6 +1119,9 @@ int handle_message(gw_context_t* ctx,
   debug_print_data("[handle_message] output data", res->output_data, res->output_size);
   debug_print_int("[handle_message] output size", res->output_size);
   debug_print_int("[handle_message] gas left", res->gas_left);
+  uint32_t used_memory;
+  memcpy(&used_memory, res->padding, sizeof(uint32_t));
+  debug_print_int("[handle_message] used_memory(Bytes)", used_memory);
   debug_print_int("[handle_message] status_code", res->status_code);
   ckb_debug("[handle_message] END handle_message");
   return (int)res->status_code;
@@ -1239,6 +1242,11 @@ int run_polyjuice() {
   debug_print_int("gas left", res.gas_left);
   debug_print_int("gas price", gas_price);
   debug_print_int("fee", fee);
+
+  uint32_t used_memory;
+  memcpy(&used_memory, res.padding, sizeof(uint32_t));
+  debug_print_int("[run_polyjuice] used_memory(Bytes)", used_memory);
+
   /* g_sudt_id must already exists */
   ret = sudt_pay_fee(&context, g_sudt_id, POLYJUICE_SHORT_ADDR_LEN, msg.sender.bytes, fee);
   if (ret != 0) {
