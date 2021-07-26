@@ -98,9 +98,10 @@ bool execute_predefined_transactions() {
   }
 
   if (!all_good) {
-    dbg_print("warn: execute_predefined_transactions failed");
+    dbg_print("warn: execute_predefined_transactions failed \n");
     __builtin_trap();
   }
+  dbg_print("Predefined_transactions are all good.\n");
   return all_good;
 }
 

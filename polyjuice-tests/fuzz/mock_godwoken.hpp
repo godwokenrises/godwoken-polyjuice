@@ -123,8 +123,8 @@ extern "C" int gw_sys_load(const uint8_t k[GW_KEY_BYTES], uint8_t v[GW_KEY_BYTES
   if (search == gw_host->state.end()) {
     dbg_print("gw_sys_load failed, missing key:");
     dbg_print_h256(k);
-    dbg_print("all the state as following:");
-    print_state();
+    // dbg_print("all the state as following:");
+    // print_state();
     return GW_ERROR_NOT_FOUND;
   }
   memcpy(v, search->second.bytes, GW_KEY_BYTES);
