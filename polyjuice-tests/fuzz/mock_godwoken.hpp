@@ -182,19 +182,19 @@ extern "C" int gw_sys_load_script_hash_by_account_id(const uint32_t account_id, 
   //   {125, 181, 86, 185, 69, 172, 188, 175, 36, 25, 118, 119, 114, 72, 199, 183, 204, 25, 147, 120, 109, 220, 192, 171, 10, 235, 47, 230, 42, 210, 169, 223}};
 }
 
-extern "C" int gw_sys_get_script_hash_by_short_address(uint8_t *script_hash_addr,
-                                                       uint8_t *prefix_addr,
-                                                       uint64_t prefix_len) {
-  for (auto pair : gw_host->code_store) {
-    if (0 == memcmp(pair.first.bytes, prefix_addr, prefix_len)) {
-      memcpy(script_hash_addr, pair.first.bytes, sizeof(pair.first.bytes));
-      return 0;
-    }
-  }
+// extern "C" int gw_sys_get_script_hash_by_short_address(uint8_t *script_hash_addr,
+//                                                        uint8_t *prefix_addr,
+//                                                        uint64_t prefix_len) {
+//   for (auto pair : gw_host->code_store) {
+//     if (0 == memcmp(pair.first.bytes, prefix_addr, prefix_len)) {
+//       memcpy(script_hash_addr, pair.first.bytes, sizeof(pair.first.bytes));
+//       return 0;
+//     }
+//   }
   
-  dbg_print("gw_sys_get_script_hash_by_short_address failed");
-  return GW_ERROR_NOT_FOUND;
-}
+//   dbg_print("gw_sys_get_script_hash_by_short_address failed");
+//   return GW_ERROR_NOT_FOUND;
+// }
 
 extern "C" int gw_sys_load_account_id_by_script_hash(uint8_t *script_hash,
                                                      uint32_t *account_id_ptr) {
@@ -224,6 +224,30 @@ extern "C" int gw_sys_load_rollup_config(uint8_t *addr,
   *len_ptr = gw_host->rollup_config_size;
   memcpy(addr, gw_host->rollup_config, *len_ptr);
   return 0;
+}
+
+void _sudt_build_key(uint32_t key_flag, const uint8_t *short_addr,
+                     uint32_t short_addr_len, uint8_t *key);
+/// mock_mint_sudt on layer2
+void mock_mint_sudt(uint32_t sudt_id, uint32_t account_id, uint128_t balance)
+{
+  uint8_t script_hash[GW_KEY_BYTES] = {0};
+  gw_sys_load_script_hash_by_account_id(account_id, script_hash);
+
+  uint8_t key[GW_KEY_BYTES + 8] = {0};
+  uint64_t key_len = POLYJUICE_SHORT_ADDR_LEN + 8;
+  _sudt_build_key(1, // SUDT_KEY_FLAG_BALANCE = 1
+                  script_hash,
+                  POLYJUICE_SHORT_ADDR_LEN,
+                  key);
+
+  uint8_t value[32] = {0};
+  *(uint128_t *)value = balance;
+
+  // sys_store balance
+  uint8_t raw_key[GW_KEY_BYTES];
+  gw_build_account_key(sudt_id, key, key_len, raw_key);
+  gw_update_raw(raw_key, value);
 }
 
 extern "C" int gw_sys_create(uint8_t *script, uint64_t script_len, uint32_t *account_id_ptr) {
@@ -445,12 +469,11 @@ int init() {
 
   new_id = create_account_from_script((uint8_t *)build_eth_l2_script.data(),
                                       build_eth_l2_script.size());
+  mock_mint_sudt(1, new_id, 40000);
   
-  
-  // init destructed key
+  // TODO: init destructed key
   const uint8_t zero_nonce[32] = {0};
   const uint8_t poly_destructed_key[32] = {5, 0, 0, 0, 255, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
-  // FIXME:
   gw_update_raw(poly_destructed_key, zero_nonce);
 
   print_state();
