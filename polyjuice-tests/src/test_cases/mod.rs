@@ -8,6 +8,7 @@ pub(crate) mod erc20;
 pub(crate) mod fallback_function;
 pub(crate) mod get_block_info;
 pub(crate) mod get_chain_id;
+pub(crate) mod heap_memory;
 pub(crate) mod parse_log_event;
 pub(crate) mod selfdestruct;
 pub(crate) mod simple_storage;
