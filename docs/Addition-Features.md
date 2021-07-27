@@ -24,7 +24,7 @@
     output[0..32] => account script hash
 ```
 
-See: [Example](polyjuice-tests/src/test_cases/evm-contracts/RecoverAccount.sol)
+See: [Example](../polyjuice-tests/src/test_cases/evm-contracts/RecoverAccount.sol)
 
 ### `balance_of_any_sudt` Spec
 
@@ -41,7 +41,7 @@ See: [Example](polyjuice-tests/src/test_cases/evm-contracts/RecoverAccount.sol)
      output[0..32] => amount
 ```
 
-See: [Example](solidity/erc20/SudtERC20Proxy.sol)
+See: [Example](../solidity/erc20/SudtERC20Proxy.sol)
 
 ### `transfer_to_any_sudt` Spec
 
@@ -61,7 +61,7 @@ See: [Example](solidity/erc20/SudtERC20Proxy.sol)
    output: []
 ```
 
-See: [Example](solidity/erc20/SudtERC20Proxy.sol)
+See: [Example](../solidity/erc20/SudtERC20Proxy.sol)
 
 ### `eth_to_godwoken_addr` Spec
 
@@ -76,4 +76,4 @@ See: [Example](solidity/erc20/SudtERC20Proxy.sol)
    output[12..32] => godwoken short address
 ```
 
-See: [Example](polyjuice-tests/src/test_cases/evm-contracts/EthToGodwokenAddr.sol)
+See: [Example](../polyjuice-tests/src/test_cases/evm-contracts/EthToGodwokenAddr.sol)
