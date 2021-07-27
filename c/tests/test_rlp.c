@@ -1,5 +1,4 @@
-
-
+#define restrict __restrict__
 
 #define GW_GENERATOR
 
