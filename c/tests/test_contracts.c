@@ -1,4 +1,3 @@
-
 #define GW_GENERATOR
 
 #include <stddef.h>

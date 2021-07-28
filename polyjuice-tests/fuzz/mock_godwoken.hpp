@@ -296,13 +296,13 @@ extern "C" int gw_sys_create(uint8_t *script, uint64_t script_len, uint32_t *acc
         mol_seg_t raw_args_seg = MolReader_Bytes_raw_bytes(&args_seg);
         if (raw_args_seg.size < 32) {
           ckb_debug("disallow contract script because args is less than 32 bytes");
-          return GW_ERROR_INVALID_CONTRACT_SCRIPT;
+          return GW_ERROR_INVALID_ACCOUNT_SCRIPT;
         }
         // check contract script short length
         if (memcmp(g_rollup_script_hash, raw_args_seg.ptr, 32) != 0) {
           ckb_debug("disallow contract script because args is not start with "
                     "rollup_script_hash");
-          return GW_ERROR_INVALID_CONTRACT_SCRIPT;
+          return GW_ERROR_INVALID_ACCOUNT_SCRIPT;
         }
       }
     }
