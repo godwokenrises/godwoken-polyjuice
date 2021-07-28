@@ -226,27 +226,27 @@ extern "C" int gw_sys_load_rollup_config(uint8_t *addr,
   return 0;
 }
 
-void _sudt_build_key(uint32_t key_flag, const uint8_t *short_addr,
-                     uint32_t short_addr_len, uint8_t *key);
 /// mock_mint_sudt on layer2
 void mock_mint_sudt(uint32_t sudt_id, uint32_t account_id, uint128_t balance)
 {
   uint8_t script_hash[GW_KEY_BYTES] = {0};
   gw_sys_load_script_hash_by_account_id(account_id, script_hash);
 
+  // _sudt_build_key
   uint8_t key[GW_KEY_BYTES + 8] = {0};
   uint64_t key_len = POLYJUICE_SHORT_ADDR_LEN + 8;
-  _sudt_build_key(1, // SUDT_KEY_FLAG_BALANCE = 1
-                  script_hash,
-                  POLYJUICE_SHORT_ADDR_LEN,
-                  key);
+  const uint32_t SUDT_KEY_FLAG_BALANCE = 1;
+  const uint32_t short_addr_len = POLYJUICE_SHORT_ADDR_LEN;
+  memcpy(key, (uint8_t *)(&SUDT_KEY_FLAG_BALANCE), sizeof(uint32_t));
+  memcpy(key + 4, (uint8_t *)(&short_addr_len), sizeof(uint32_t));
+  memcpy(key + 8, script_hash, short_addr_len);
+  uint8_t raw_key[GW_KEY_BYTES];
+  gw_build_account_key(sudt_id, key, key_len, raw_key);
 
   uint8_t value[32] = {0};
   *(uint128_t *)value = balance;
 
   // sys_store balance
-  uint8_t raw_key[GW_KEY_BYTES];
-  gw_build_account_key(sudt_id, key, key_len, raw_key);
   gw_update_raw(raw_key, value);
 }
 
