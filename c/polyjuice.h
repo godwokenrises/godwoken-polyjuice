@@ -1,5 +1,3 @@
-#define restrict __restrict__
-
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
