@@ -41,9 +41,9 @@ jobs:
       working-directory: ./polyjuice-tests/fuzz
       run: make build/test_contracts && ./build/test_contracts
 
-    - name: Fuzzing Polyjuice Generator 360 seconds
+    - name: Fuzzing Polyjuice Generator 30 minutes
       working-directory: polyjuice-tests/fuzz
-      run: make build/polyjuice_generator_fuzzer && ./build/polyjuice_generator_fuzzer corpus -max_total_time=360 -timeout=2
+      run: make build/polyjuice_generator_fuzzer && ./build/polyjuice_generator_fuzzer corpus -max_total_time=1800 -timeout=60
 
     - name: Archive inputs that triggered crashes or sanitizer failures
       uses: actions/upload-artifact@v2
