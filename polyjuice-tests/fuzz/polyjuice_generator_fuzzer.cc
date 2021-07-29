@@ -119,8 +119,8 @@ extern "C" int LLVMFuzzerTestOneInput(uint8_t *data, size_t size) {
       // reduce gas_limit to avoid timeout while fuzzing
       int64_t gas_limit;
       memcpy(&gas_limit, args_seg.ptr + 8, sizeof(int64_t));
+      dbg_print("gas_limit: %ld", gas_limit);
       if (gas_limit > 5500000) {
-        dbg_print("gas_limit: %ld", gas_limit);
         // The recommended gas limit in EIP-150 is 5.5 million.
         // (std::numeric_limits<int64_t>::max() >> 40) is close to 5.5 * 10^6
         // We make the max_gas_limit less than (std::numeric_limits<int64_t>::max() >> 38).
