@@ -146,7 +146,7 @@ build/instruction_metrics.o: $(DEPS)/evmone/evmc/lib/instructions/instruction_me
 build/instruction_names.o: $(DEPS)/evmone/evmc/lib/instructions/instruction_names.c
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -c -o $@ $<
 build/instructions_calls.o: $(DEPS)/evmone/lib/evmone/instructions_calls.cpp
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) -c -o $@ $<
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -g -c -o $@ $<
 build/evmc_hex.o: $(DEPS)/evmone/evmc/lib/hex/hex.cpp
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -c -o $@ $<
 

@@ -549,14 +549,15 @@ void selfdestruct(struct evmc_host_context* context,
 struct evmc_result call(struct evmc_host_context* context,
                         const struct evmc_message* msg) {
   ckb_debug("BEGIN call");
+  debug_print_int("msg.gas", msg->gas);
+  debug_print_int("msg.depth", msg->depth);
   debug_print_data("msg.input_data", msg->input_data, msg->input_size);
   debug_print_int("msg.kind", msg->kind);
   debug_print_data("call.sender", msg->sender.bytes, 20);
   debug_print_data("call.destination", msg->destination.bytes, 20);
   int ret;
   struct evmc_result res;
-  res.output_data = NULL;
-  res.output_size = 0;
+  memset(&res, 0, sizeof(res));
   res.release = release_result;
   gw_context_t* gw_ctx = context->gw_ctx;
 
