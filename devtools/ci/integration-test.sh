@@ -13,12 +13,13 @@ if [ -d "$GODWOKEN_DIR" ]
 then
     echo "godwoken project already exists"
 else
-    git clone https://github.com/nervosnetwork/godwoken.git $GODWOKEN_DIR
+    git clone --depth=1 https://github.com/nervosnetwork/godwoken.git $GODWOKEN_DIR
 fi
 cd $GODWOKEN_DIR
-git checkout 2221efdfcf06351fa1884ea0f2df1604790c3378
+git fetch origin --tags
+git checkout v0.6.0-rc3
 git submodule update --init --recursive
-cd godwoken-scripts/c
+cd tests-deps/godwoken-scripts/c
 make all-via-docker
 
 cd $PROJECT_ROOT
