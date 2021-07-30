@@ -16,6 +16,8 @@ else
 fi
 cd $GODWOKEN_DIR
 git checkout 4e65efde86bb16aafc6d29aee1bf6f586077eaf6
+# git fetch origin --tags
+# git checkout v0.6.0-rc3
 git submodule update --init --recursive
 
 cd tests-deps/godwoken-scripts/c
