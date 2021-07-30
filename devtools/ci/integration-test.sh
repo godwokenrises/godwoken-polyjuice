@@ -15,11 +15,15 @@ then
 else
     git clone --depth=1 https://github.com/nervosnetwork/godwoken.git $GODWOKEN_DIR
 fi
+
 cd $GODWOKEN_DIR
 git fetch origin --tags
 git checkout v0.6.0-rc3
 git submodule update --init --recursive
+
 cd tests-deps/godwoken-scripts/c
+git checkout v0.8.0-rc2
+git submodule update --init --recursive
 make all-via-docker
 
 cd $PROJECT_ROOT
