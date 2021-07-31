@@ -58,3 +58,5 @@ integration-test/
 /.vscode/launch.json
 /.vscode/settings.json
 /.vscode/*.log
+.editorconfig
+.vscode/c_cpp_properties.json

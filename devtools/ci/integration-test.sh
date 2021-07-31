@@ -33,3 +33,4 @@ make all-via-docker
 cd $TESTS_DIR
 export RUST_BACKTRACE=full
 cargo test -- --nocapture
+cargo bench

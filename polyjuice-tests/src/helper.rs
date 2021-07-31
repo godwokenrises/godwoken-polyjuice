@@ -8,13 +8,14 @@ pub use gw_common::{
 use gw_config::BackendConfig;
 use gw_db::schema::{COLUMN_INDEX, COLUMN_META, META_TIP_BLOCK_HASH_KEY};
 pub use gw_generator::{
-    account_lock_manage::{always_success::AlwaysSuccess, secp256k1::Secp256k1, AccountLockManage},
+    account_lock_manage::{secp256k1::Secp256k1, AccountLockManage},
     backend_manage::{Backend, BackendManage},
     dummy_state::DummyState,
     traits::StateExt,
     types::RollupContext,
     Generator,
 };
+// pub use gw_generator::account_lock_manage::always_success::AlwaysSuccess;
 use gw_store::traits::KVStore;
 pub use gw_store::{chain_view::ChainView, Store};
 use gw_traits::CodeStore;
