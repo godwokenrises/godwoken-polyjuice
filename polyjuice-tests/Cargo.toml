@@ -1,6 +1,6 @@
 [package]
 name = "polyjuice-tests"
-version = "0.1.0"
+version = "0.2.0"
 authors = ["Linfeng Qian <thewawar@gmail.com>"]
 edition = "2018"
 
@@ -25,3 +25,8 @@ rlp = "0.5.0"
 hex = "0.4.2"
 rand = "0.7.3"
 env_logger = "0.8.3"
+criterion = { version = "0.3", features = ["html_reports"] }
+
+[[bench]]
+name = "bench_main"
+harness = false
