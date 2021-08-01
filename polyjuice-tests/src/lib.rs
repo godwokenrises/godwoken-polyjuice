@@ -3,5 +3,6 @@
 pub mod helper;
 
 #[cfg(test)]
+// #[cfg(bench)]
 #[allow(clippy::too_many_arguments)]
-pub(crate) mod test_cases;
+pub mod test_cases;

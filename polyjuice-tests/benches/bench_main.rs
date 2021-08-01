@@ -7,4 +7,5 @@ criterion_main! {
     // benchmarks::polyjuice_generator::pre_compiled_contracts,
 
     benchmarks::polyjuice_generator::bench_rlp,
+    benchmarks::setup::bench_setup,
 }

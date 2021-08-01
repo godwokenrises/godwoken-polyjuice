@@ -1,4 +1,4 @@
-use criterion::{black_box, criterion_group, Criterion};
+use criterion::{criterion_group, Criterion};
 
 use ckb_vm::{
     machine::asm::{AsmCoreMachine, AsmMachine},
@@ -50,8 +50,8 @@ impl L2Syscalls {
             addr += 1;
         }
 
-        let s = String::from_utf8(buffer).map_err(|_| VMError::ParseError)?;
-        println!("[contract debug]: {}", s);
+        let _s = String::from_utf8(buffer).map_err(|_| VMError::ParseError)?;
+        // println!("[contract debug]: {}", s);
         Ok(())
     }
 }
