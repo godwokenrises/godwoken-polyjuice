@@ -359,10 +359,18 @@ impl PolyjuiceArgsBuilder {
     }
 }
 
+/// ## Dummy Setup
+/// 1. setup temp store as store
+/// 2. create reserved account
+/// 3. setup CKB simple UDT contract
+/// 4. setup creator account
+/// 5. setup SECP_DATA
+/// 6. setup backend manager and build generator
 pub fn setup() -> (Store, DummyState, Generator, u32) {
     let _ = env_logger::try_init();
     let store = Store::open_tmp().unwrap();
     let mut state = DummyState::default();
+
     let reserved_id = state
         .create_account_from_script(
             Script::new_builder()
@@ -400,8 +408,8 @@ pub fn setup() -> (Store, DummyState, Generator, u32) {
                 .args(args.to_vec().pack())
                 .build(),
         )
-        .expect("create account");
-    println!("creator_account_id: {}", creator_account_id);
+        .expect("create creator_account id => 2");
+    // println!("creator_account_id: {}", creator_account_id);
 
     state.insert_data(*SECP_DATA_HASH, Bytes::from(SECP_DATA));
     state
