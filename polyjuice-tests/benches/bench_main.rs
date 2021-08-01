@@ -8,4 +8,5 @@ criterion_main! {
 
     benchmarks::polyjuice_generator::bench_rlp,
     benchmarks::setup::bench_setup,
+    benchmarks::deploy_contract::bench_deploy_contract,
 }

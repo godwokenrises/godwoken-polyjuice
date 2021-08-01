@@ -282,7 +282,7 @@ pub fn new_account_script_with_nonce(
     let mut stream = RlpStream::new_list(2);
     stream.append(&sender);
     stream.append(&from_nonce);
-    println!("rlp data: {}", hex::encode(stream.as_raw()));
+    // println!("rlp data: {}", hex::encode(stream.as_raw()));
     let data_hash = tiny_keccak::keccak256(stream.as_raw());
 
     let mut new_account_args = vec![0u8; 32 + 4 + 20];
@@ -512,7 +512,7 @@ pub fn deploy(
             &block_info,
             &raw_tx,
         )
-        .expect("construct");
+        .expect("execute_transaction");
     state.apply_run_result(&run_result).expect("update state");
     // println!("[deploy contract] used cycles: {}", run_result.used_cycles);
     run_result

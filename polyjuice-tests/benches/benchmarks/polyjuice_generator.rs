@@ -66,11 +66,11 @@ fn test_rlp() {
     assert_eq!(code, 0);
 }
 
-pub fn bench(c: &mut Criterion) {
+fn bench(c: &mut Criterion) {
     c.bench_function("rlp", |b| b.iter(|| test_rlp()));
 }
 
-criterion_group!{
+criterion_group! {
     name = bench_rlp;
     config = Criterion::default().sample_size(10);
     targets = bench
