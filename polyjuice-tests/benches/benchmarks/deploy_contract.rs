@@ -31,7 +31,7 @@ fn bench(c: &mut Criterion) {
     let from_short_address = &from_script_hash[0..20];
     let from_id = state.create_account_from_script(from_script).unwrap();
     state
-        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_short_address, 16000000)
+        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_short_address, 160000000)
         .unwrap();
     let _from_balance1 = state
         .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, from_short_address)
@@ -100,6 +100,8 @@ fn bench(c: &mut Criterion) {
     //     |b, i| {
     //     }
     // );
+
+    group.finish();
 }
 
 criterion_group! {
