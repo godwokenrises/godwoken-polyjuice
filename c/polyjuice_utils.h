@@ -53,8 +53,6 @@ int build_script(const uint8_t code_hash[32], const uint8_t hash_type,
   }
   memcpy(args_seg.ptr, (uint8_t*)(&args_len), 4);
   memcpy(args_seg.ptr + 4, args, args_len);
-  debug_print_data("script.args", args, args_len);
-  debug_print_data("script.code_hash", code_hash, 32);
   debug_print_int("script.hash_type", hash_type);
 
   mol_builder_t script_builder;
@@ -76,7 +74,6 @@ int build_script(const uint8_t code_hash[32], const uint8_t hash_type,
 
   *script_seg = script_res.seg;
 
-  debug_print_data("script ", script_seg->ptr, script_seg->size);
   if (MolReader_Script_verify(script_seg, false) != MOL_OK) {
     ckb_debug("built an invalid script");
     return FATAL_POLYJUICE;

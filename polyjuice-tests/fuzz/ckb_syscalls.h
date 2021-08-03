@@ -150,7 +150,6 @@ static int inline __internal_syscall(long n, long _a0, long _a1, long _a2,
     // mock syscall(GW_SYS_LOG, account_id, service_flag, data_length, data, 0, 0)
     case GW_SYS_LOG: // TODO: @see emit_evm_result_log
       dbg_print("[GW_SYS_LOG] service_flag[%d] account[%d] ", (uint8_t)_a1, _a1);
-      // TODO: debug_print_data("GW_SYS_LOG", (uint32_t)_a3, (uint8_t *)_a2);
       return 0;
 
     // mock syscall(GW_SYS_PAY_FEE, payer_addr, short_addr_len, sudt_id, &amount, 0, 0)
