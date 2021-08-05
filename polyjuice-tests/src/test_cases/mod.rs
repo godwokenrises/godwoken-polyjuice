@@ -13,6 +13,7 @@ pub(crate) mod parse_log_event;
 pub(crate) mod selfdestruct;
 pub(crate) mod simple_storage;
 pub(crate) mod simple_transfer;
+pub(crate) mod simple_wallet;
 //  The account polyjuice want to create already created by meta_contract
 pub(crate) mod account_already_exists;
 

@@ -67,7 +67,6 @@ int recover_account(gw_context_t* ctx,
       return ERROR_RECOVER_ACCOUNT;
     }
   }
-  debug_print_data("script", script, script_len);
   *output = (uint8_t *)malloc(32);
   if (*output == NULL) {
     ckb_debug("malloc failed");
@@ -137,4 +136,3 @@ int eth_to_godwoken_addr(gw_context_t* ctx,
 }
 
 #endif  /* #define OTHER_CONTRACTS_H_ */
-

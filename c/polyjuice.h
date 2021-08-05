@@ -184,7 +184,6 @@ int parse_args(struct evmc_message* msg, uint128_t* gas_price,
     value.bytes[31 - i] = args[offset + i];
   }
   offset += 16;
-  debug_print_data("[value]", value.bytes, 32);
 
   /* args[48..52] */
   uint32_t input_size = *((uint32_t*)(args + offset));
@@ -203,7 +202,6 @@ int parse_args(struct evmc_message* msg, uint128_t* gas_price,
 
   /* args[52..52+input_size] */
   uint8_t* input_data = args + offset;
-  debug_print_data("[input_data]", input_data, input_size);
 
   int ret;
   evmc_address sender{0};
@@ -285,7 +283,6 @@ int load_account_code(gw_context_t* gw_ctx, uint32_t account_id,
     debug_print_int("[load_account_code] sys_load failed", ret);
     return ret;
   }
-  debug_print_data("[load_account_code] data_hash", data_hash, 32);
 
   bool is_data_hash_zero = true;
   for (size_t i = 0; i < 32; i++) {
@@ -302,11 +299,6 @@ int load_account_code(gw_context_t* gw_ctx, uint32_t account_id,
 
   uint64_t old_code_size = *code_size;
   ret = gw_ctx->sys_load_data(gw_ctx, data_hash, code_size, offset, code);
-  debug_print_data("code data", code, *code_size > 100 ? 100 : *code_size);
-  if (*code_size > 100) {
-    ckb_debug("...data...");
-    debug_print_int("[load_account_code] code_size", *code_size);
-  }
   if (ret != 0) {
     ckb_debug("[load_account_code] sys_load_data failed");
     return ret;
@@ -480,7 +472,6 @@ size_t copy_code(struct evmc_host_context* context, const evmc_address* address,
     context->error_code = ret;
     return 0;
   }
-  debug_print_data("code slice", buffer_data, buffer_size);
   ckb_debug("END copy_code");
   return 0;
 }
@@ -551,7 +542,6 @@ struct evmc_result call(struct evmc_host_context* context,
   ckb_debug("BEGIN call");
   debug_print_int("msg.gas", msg->gas);
   debug_print_int("msg.depth", msg->depth);
-  debug_print_data("msg.input_data", msg->input_data, msg->input_size);
   debug_print_int("msg.kind", msg->kind);
   debug_print_data("call.sender", msg->sender.bytes, 20);
   debug_print_data("call.destination", msg->destination.bytes, 20);
@@ -594,7 +584,6 @@ struct evmc_result call(struct evmc_host_context* context,
       return res;
     }
     res.status_code = EVMC_SUCCESS;
-    debug_print_data("output data", res.output_data, res.output_size);
   } else {
     ret = handle_message(gw_ctx, context->from_id, context->to_id, &context->destination, msg, &res);
     if (is_fatal_error(ret)) {
@@ -634,7 +623,6 @@ void emit_log(struct evmc_host_context* context, const evmc_address* address,
               const uint8_t* data, size_t data_size,
               const evmc_bytes32 topics[], size_t topics_count) {
   ckb_debug("BEGIN emit_log");
-  debug_print_data("log.data", data, data_size);
   /*
     output[ 0..20]                     = callee_contract.address
     output[20..24]                     = data_size_u32
@@ -792,7 +780,6 @@ int create_new_account(gw_context_t* ctx,
     debug_print_int("from_id", from_id);
     debug_print_int("nonce", nonce);
     rlp_encode_sender_and_nonce(&msg->sender, nonce, data, &data_len);
-    debug_print_data("rlp data", data, data_len);
   } else if (msg->kind == EVMC_CREATE2) {
     /* CREATE2 contract account script.args[36..36+20] content before hash
        Include:
@@ -902,7 +889,6 @@ int execute_in_evmone(gw_context_t* ctx,
   /* Execute the code in EVM */
   debug_print_int("[execute_in_evmone] code size", code_size);
   debug_print_int("[execute_in_evmone] input_size", msg->input_size);
-  debug_print_data("[execute_in_evmone] msg.input_data", msg->input_data, msg->input_size);
   *res = vm->execute(vm, &interface, &context, EVMC_MAX_REVISION, msg, code_data, code_size);
   if (res->status_code != EVMC_SUCCESS && res->status_code != EVMC_REVERT) {
     res->output_data = NULL;
@@ -1117,7 +1103,6 @@ int handle_message(gw_context_t* ctx,
     memcpy(res->create_address.bytes, msg.destination.bytes, 20);
   }
 
-  debug_print_data("[handle_message] output data", res->output_data, res->output_size);
   debug_print_int("[handle_message] output size", res->output_size);
   debug_print_int("[handle_message] gas left", res->gas_left);
   uint32_t used_memory;
