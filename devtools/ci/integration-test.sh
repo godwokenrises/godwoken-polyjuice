@@ -32,4 +32,8 @@ make all-via-docker
 cd $TESTS_DIR
 export RUST_BACKTRACE=full
 cargo test -- --nocapture
-# cargo bench | egrep -v debug
+cargo bench | egrep -v debug
+
+cd $PROJECT_ROOT
+make clean-via-docker  
+make all-via-docker-in-debug-mode
