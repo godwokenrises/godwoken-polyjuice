@@ -17,10 +17,10 @@ CFLAGS_MBEDTLS := -Ideps/mbedtls/include
 CFLAGS_EVMONE := -Ideps/evmone/lib/evmone -Ideps/evmone/include -Ideps/evmone/evmc/include
 CFLAGS_SMT := -Ideps/godwoken-scripts/c/deps/sparse-merkle-tree/c
 CFLAGS_GODWOKEN := -Ideps/godwoken-scripts/c
-CFLAGS := -O3 -Ic/ripemd160 $(CFLAGS_CKB_STD) $(CFLAGS_EVMONE) $(CFLAGS_INTX) $(CFLAGS_BN128) $(CFLAGS_ETHASH) $(CFLAGS_CRYPTO_ALGORITHMS) $(CFLAGS_MBEDTLS) $(CFLAGS_SMT) $(CFLAGS_GODWOKEN) $(CFLAGS_SECP) -Wall -fdata-sections -ffunction-sections
+CFLAGS := -O3 -Ic/ripemd160 $(CFLAGS_CKB_STD) $(CFLAGS_EVMONE) $(CFLAGS_INTX) $(CFLAGS_BN128) $(CFLAGS_ETHASH) $(CFLAGS_CRYPTO_ALGORITHMS) $(CFLAGS_MBEDTLS) $(CFLAGS_SMT) $(CFLAGS_GODWOKEN) $(CFLAGS_SECP)
 CXXFLAGS := $(CFLAGS) -std=c++1z
 # -Wl,<args> Pass the comma separated arguments in args to the linker(GNU linker)
-LDFLAGS := -Wl,--gc-sections
+LDFLAGS := -Wl,--gc-sections -Wall -fdata-sections -ffunction-sections
 
 SECP256K1_SRC := $(SECP_DIR)/src/ecmult_static_pre_context.h
 
@@ -44,8 +44,7 @@ all-via-docker: generate-protocol
 	docker run --rm -v `pwd`:/code ${BUILDER_DOCKER} bash -c "cd /code && make"
 
 # Be aware that a given prerequisite will only be built once per invocation of make, at most.
-all-in-debug-mode: CFLAGS += -g
-all-in-debug-mode: CXXFLAGS += -g
+all-in-debug-mode: LDFLAGS := -g
 all-in-debug-mode: $(ALL_OBJS) build/generator_log build/validator_log
 
 all-via-docker-in-debug-mode: generate-protocol
