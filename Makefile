@@ -46,7 +46,7 @@ all-via-docker: generate-protocol
 	mkdir -p build
 	docker run --rm -v `pwd`:/code ${BUILDER_DOCKER} bash -c "cd /code && make"
 
-clean-via-docker: generate-protocol
+clean-via-docker:
 	mkdir -p build
 	docker run --rm -v `pwd`:/code ${BUILDER_DOCKER} bash -c "cd /code && make clean"
 
