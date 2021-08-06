@@ -1154,6 +1154,12 @@ int clean_evmc_result_and_return(evmc_result *res, int code) {
 }
 
 int run_polyjuice() {
+#ifndef NO_DEBUG_LOG
+  // init buffer for debug_print
+  char buffer[DEBUG_BUFFER_SIZE];
+  debug_buffer = buffer;
+#endif
+
   int ret;
 
   /* prepare context */
