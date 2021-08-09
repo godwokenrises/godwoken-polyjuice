@@ -61,7 +61,7 @@ int main() {
 #ifndef NO_DEBUG_LOG
   // init buffer for debug_print
   char buffer[DEBUG_BUFFER_SIZE];
-  debug_buffer = buffer;
+  g_debug_buffer = buffer;
 #endif
 
   test("004ec07d2329997267ec62b4166639513386f32e", 142, "d794004ec07d2329997267ec62b4166639513386f32e818e", "8d7bb25141ff9c4c77e9e208b6bf4d1d3ca684b0");
