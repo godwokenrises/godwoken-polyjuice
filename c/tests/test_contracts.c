@@ -632,6 +632,12 @@ int init_mock_state() {
 #endif
 
 int main() {
+#ifndef NO_DEBUG_LOG
+  // init buffer for debug_print
+  char buffer[DEBUG_BUFFER_SIZE];
+  debug_buffer = buffer;
+#endif
+
 #ifdef FUZZING
   if (0 != init_mock_state()) {
     ckb_debug("[init_mock_state] failed to init_mock_state");

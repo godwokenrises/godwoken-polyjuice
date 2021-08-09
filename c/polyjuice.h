@@ -48,6 +48,8 @@ int printf(const char *format, ...) {
 
 /* Max data buffer size: 24KB */
 #define MAX_DATA_SIZE 24576
+/* Max evm_memory size 512KB */
+#define MAX_EVM_MEMORY_SIZE 524288
 #define POLYJUICE_SYSTEM_PREFIX 0xFF
 #define POLYJUICE_CONTRACT_CODE 0x01
 #define POLYJUICE_DESTRUCTED 0x02
@@ -1154,6 +1156,12 @@ int clean_evmc_result_and_return(evmc_result *res, int code) {
 }
 
 int run_polyjuice() {
+#ifndef NO_DEBUG_LOG
+  // init buffer for debug_print
+  char buffer[DEBUG_BUFFER_SIZE];
+  debug_buffer = buffer;
+#endif
+
   int ret;
 
   /* prepare context */
@@ -1188,6 +1196,9 @@ int run_polyjuice() {
     }
     memcpy(msg.destination.bytes, script_hash, 20);
   }
+
+  uint8_t evm_memory[MAX_EVM_MEMORY_SIZE];
+  init_evm_memory(evm_memory, MAX_EVM_MEMORY_SIZE);
 
   struct evmc_result res;
   memset(&res, 0, sizeof(evmc_result));

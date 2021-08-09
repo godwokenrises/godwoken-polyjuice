@@ -46,10 +46,12 @@ void dbg_print_hex(const uint8_t* ptr, size_t size) {
 #define dbg_print_hex(p) do {} while (0)
 #endif
 
+#define MOCK_SUCCESS 0
+
 int ckb_exit(int8_t code) {
   printf("ckb_exit, code=%d\n", code);
   exit(0);
-  return CKB_SUCCESS;
+  return MOCK_SUCCESS;
 }
 
 // Mock implementation for the SYS_ckb_load_cell_data_as_code syscall in
@@ -61,14 +63,15 @@ static int inline __internal_syscall(long n, long _a0, long _a1, long _a2,
                                      long _a3, long _a4, long _a5);
 
 #ifdef GW_GENERATOR
-#include "mock_generator_utils.h"
+#include "generator_utils.h"
+#include "mock_godwoken.hpp"
 #endif
 
 static int inline __internal_syscall(long n, long _a0, long _a1, long _a2,
                                      long _a3, long _a4, long _a5) {
   switch (n) {
     // mock syscall(GW_SYS_LOAD_TRANSACTION, addr, &inner_len, 0, 0, 0, 0)
-    case GW_SYS_LOAD_TRANSACTION:
+    case GW_SYS_LOAD_TRANSACTION: // Load Layer2 Transaction
       return gw_load_transaction_from_raw_tx((uint8_t *)_a0, (uint64_t *)_a1);
 
     // mock syscall(GW_SYS_LOAD, raw_key, value, 0, 0, 0, 0)
@@ -90,7 +93,7 @@ static int inline __internal_syscall(long n, long _a0, long _a1, long _a2,
         fclose(stream);
         stream = NULL;
         if (ret != 1) { // ret = The total number of elements successfully read
-          return MOCK_SECP256K1_ERROR_LOADING_DATA;
+          return GW_ERROR_NOT_FOUND;
         }
         *(uint64_t *)_a1 = CKB_SECP256K1_DATA_SIZE;
         return MOCK_SUCCESS;
@@ -125,19 +128,6 @@ static int inline __internal_syscall(long n, long _a0, long _a1, long _a2,
     // mock syscall(GW_SYS_LOAD_ACCOUNT_SCRIPT, script, &inner_len, offset, account_id, 0, 0)
     case GW_SYS_LOAD_ACCOUNT_SCRIPT:
       return gw_sys_load_account_script((uint8_t *)_a0, (uint64_t *)_a1, _a2, _a3);
-
-    // mock syscall(GW_SYS_LOAD_SCRIPT_HASH_BY_ACCOUNT_ID, account_id, script_hash, 0, 0, 0, 0)
-    case GW_SYS_LOAD_SCRIPT_HASH_BY_ACCOUNT_ID:
-      return gw_sys_load_script_hash_by_account_id(_a0, (uint8_t *)_a1);
-
-    // mock syscall(GW_SYS_LOAD_ACCOUNT_ID_BY_SCRIPT_HASH, script_hash, account_id, 0, 0, 0, 0)
-    case GW_SYS_LOAD_ACCOUNT_ID_BY_SCRIPT_HASH:
-      // TODO: test this 
-      return gw_sys_load_account_id_by_script_hash((uint8_t *)_a0, (uint32_t *)_a1);
-
-    // mock syscall(GW_SYS_GET_SCRIPT_HASH_BY_SHORT_ADDRESS, script_hash, prefix, prefix_len, 0, 0, 0)
-    case GW_SYS_GET_SCRIPT_HASH_BY_SHORT_ADDRESS:
-      return gw_sys_get_script_hash_by_short_address((uint8_t *)_a0, (uint8_t *)_a1, _a2);
 
     // mock syscall(GW_SYS_LOAD_ROLLUP_CONFIG, addr, &inner_len, 0, 0, 0, 0)
     case GW_SYS_LOAD_ROLLUP_CONFIG:
