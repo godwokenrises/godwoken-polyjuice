@@ -18,7 +18,7 @@ else
 fi
 
 cd $GODWOKEN_DIR
-git pull -r origin master
+# git pull -r origin master
 git submodule update --init --recursive
 
 cd tests-deps/godwoken-scripts/c

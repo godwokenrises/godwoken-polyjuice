@@ -941,7 +941,6 @@ version = "0.1.0"
 dependencies = [
  "cfg-if 0.1.10",
  "ckb-fixed-hash",
- "ckb-types",
  "gw-hash",
  "molecule",
  "sparse-merkle-tree",
@@ -1341,6 +1340,7 @@ name = "polyjuice-tests"
 version = "0.2.0"
 dependencies = [
  "blake2b-rs 0.2.0",
+ "ckb-vm",
  "criterion",
  "env_logger",
  "ethabi",

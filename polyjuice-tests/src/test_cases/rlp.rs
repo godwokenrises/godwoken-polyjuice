@@ -4,7 +4,7 @@ use ckb_vm::{
     registers::{A0, A7},
     DefaultMachineBuilder, Error as VMError, Register, SupportMachine, Syscalls,
 };
-use gw_types::bytes::Bytes;
+// use gw_types::bytes::Bytes;
 
 const BINARY: &[u8] = include_bytes!("../../../build/test_rlp");
 const DEBUG_PRINT_SYSCALL_NUMBER: u64 = 2177;
@@ -56,11 +56,16 @@ impl L2Syscalls {
 
 #[test]
 fn test_rlp() {
-    let binary: Bytes = BINARY.to_vec().into();
-    let core_machine = Box::<AsmCoreMachine>::default();
+    let core_machine = AsmCoreMachine::new(
+        ckb_vm::ISA_IMC | ckb_vm::ISA_B | ckb_vm::ISA_MOP,
+        ckb_vm::machine::VERSION1,
+        1,
+    ); //TODO: test MAX_CYCLES_EXCEEDED
     let machine_builder = DefaultMachineBuilder::new(core_machine).syscall(Box::new(L2Syscalls));
     let mut machine = AsmMachine::new(machine_builder.build(), None);
-    machine.load_program(&binary, &[]).unwrap();
+    machine
+        .load_program(&ckb_vm::Bytes::from_static(BINARY), &[])
+        .unwrap();
     let code = machine.run().unwrap();
     assert_eq!(code, 0);
 }
