@@ -18,7 +18,7 @@
 #else /* NO_DEBUG_LOG */
 /* 64 KB */
 #define DEBUG_BUFFER_SIZE 65536
-static char *debug_buffer;
+static char *g_debug_buffer;
 void debug_print_data(const char *prefix, const uint8_t *data,
                       uint32_t data_len) {
   if (data_len > (DEBUG_BUFFER_SIZE - 1024) / 2 - 1) { // leave 1KB to prefix
@@ -27,20 +27,20 @@ void debug_print_data(const char *prefix, const uint8_t *data,
   }
 
   int offset = 0;
-  offset += sprintf(debug_buffer, "%s 0x", prefix);
+  offset += sprintf(g_debug_buffer, "%s 0x", prefix);
   if (offset > 1024) {
     ckb_debug("warning: length of prefix is too large");
     return;
   }
   for (size_t i = 0; i < data_len; i++) {
-    offset += sprintf(debug_buffer + offset, "%02x", data[i]);
+    offset += sprintf(g_debug_buffer + offset, "%02x", data[i]);
   }
-  debug_buffer[offset] = '\0';
-  ckb_debug(debug_buffer);
+  g_debug_buffer[offset] = '\0';
+  ckb_debug(g_debug_buffer);
 }
 void debug_print_int(const char* prefix, int64_t ret) {
-  sprintf(debug_buffer, "%s => %ld", prefix, ret);
-  ckb_debug(debug_buffer);
+  sprintf(g_debug_buffer, "%s => %ld", prefix, ret);
+  ckb_debug(g_debug_buffer);
 }
 #endif /* NO_DEBUG_LOG */
 

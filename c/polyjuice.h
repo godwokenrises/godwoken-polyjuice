@@ -1159,7 +1159,7 @@ int run_polyjuice() {
 #ifndef NO_DEBUG_LOG
   // init buffer for debug_print
   char buffer[DEBUG_BUFFER_SIZE];
-  debug_buffer = buffer;
+  g_debug_buffer = buffer;
 #endif
 
   int ret;
