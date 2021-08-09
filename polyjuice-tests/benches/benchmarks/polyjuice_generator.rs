@@ -1,10 +1,12 @@
+use criterion::{criterion_group, Criterion};
+
 use ckb_vm::{
     machine::asm::{AsmCoreMachine, AsmMachine},
     memory::Memory,
     registers::{A0, A7},
     DefaultMachineBuilder, Error as VMError, Register, SupportMachine, Syscalls,
 };
-// use gw_types::bytes::Bytes;
+use gw_types::bytes::Bytes;
 
 const BINARY: &[u8] = include_bytes!("../../../build/test_rlp");
 const DEBUG_PRINT_SYSCALL_NUMBER: u64 = 2177;
@@ -48,24 +50,28 @@ impl L2Syscalls {
             addr += 1;
         }
 
-        let s = String::from_utf8(buffer).map_err(|_| VMError::ParseError)?;
-        println!("[contract debug]: {}", s);
+        let _s = String::from_utf8(buffer).map_err(|_| VMError::ParseError)?;
+        // println!("[contract debug]: {}", s);
         Ok(())
     }
 }
 
-#[test]
 fn test_rlp() {
-    let core_machine = AsmCoreMachine::new(
-        ckb_vm::ISA_IMC | ckb_vm::ISA_B | ckb_vm::ISA_MOP,
-        ckb_vm::machine::VERSION1,
-        1,
-    ); //TODO: test MAX_CYCLES_EXCEEDED
+    let binary: Bytes = BINARY.to_vec().into();
+    let core_machine = Box::<AsmCoreMachine>::default();
     let machine_builder = DefaultMachineBuilder::new(core_machine).syscall(Box::new(L2Syscalls));
     let mut machine = AsmMachine::new(machine_builder.build(), None);
-    machine
-        .load_program(&ckb_vm::Bytes::from_static(BINARY), &[])
-        .unwrap();
+    machine.load_program(&binary, &[]).unwrap();
     let code = machine.run().unwrap();
     assert_eq!(code, 0);
+}
+
+fn bench(c: &mut Criterion) {
+    c.bench_function("rlp", |b| b.iter(|| test_rlp()));
+}
+
+criterion_group! {
+    name = bench_rlp;
+    config = Criterion::default().sample_size(10);
+    targets = bench
 }

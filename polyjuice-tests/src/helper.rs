@@ -8,13 +8,14 @@ pub use gw_common::{
 use gw_config::BackendConfig;
 use gw_db::schema::{COLUMN_INDEX, COLUMN_META, META_TIP_BLOCK_HASH_KEY};
 pub use gw_generator::{
-    account_lock_manage::{always_success::AlwaysSuccess, secp256k1::Secp256k1, AccountLockManage},
+    account_lock_manage::{secp256k1::Secp256k1, AccountLockManage},
     backend_manage::{Backend, BackendManage},
     dummy_state::DummyState,
     traits::StateExt,
     types::RollupContext,
     Generator,
 };
+// pub use gw_generator::account_lock_manage::always_success::AlwaysSuccess;
 use gw_store::traits::KVStore;
 pub use gw_store::{chain_view::ChainView, Store};
 use gw_traits::CodeStore;
@@ -30,15 +31,15 @@ use std::{fs, io::Read, path::PathBuf};
 
 // meta contract
 pub const META_VALIDATOR_PATH: &str =
-    "../integration-test/godwoken/godwoken-scripts/c/build/meta-contract-validator";
+    "../integration-test/godwoken/tests-deps/godwoken-scripts/c/build/meta-contract-validator";
 pub const META_GENERATOR_PATH: &str =
-    "../integration-test/godwoken/godwoken-scripts/c/build/meta-contract-generator";
+    "../integration-test/godwoken/tests-deps/godwoken-scripts/c/build/meta-contract-generator";
 pub const META_VALIDATOR_SCRIPT_TYPE_HASH: [u8; 32] = [0xa1u8; 32];
 // simple UDT
 pub const SUDT_VALIDATOR_PATH: &str =
-    "../integration-test/godwoken/godwoken-scripts/c/build/sudt-validator";
+    "../integration-test/godwoken/tests-deps/godwoken-scripts/c/build/sudt-validator";
 pub const SUDT_GENERATOR_PATH: &str =
-    "../integration-test/godwoken/godwoken-scripts/c/build/sudt-generator";
+    "../integration-test/godwoken/tests-deps/godwoken-scripts/c/build/sudt-generator";
 pub const SUDT_VALIDATOR_SCRIPT_TYPE_HASH: [u8; 32] = [0xa2u8; 32];
 pub const SECP_DATA: &[u8] = include_bytes!("../../build/secp256k1_data");
 // polyjuice
@@ -281,7 +282,7 @@ pub fn new_account_script_with_nonce(
     let mut stream = RlpStream::new_list(2);
     stream.append(&sender);
     stream.append(&from_nonce);
-    println!("rlp data: {}", hex::encode(stream.as_raw()));
+    // println!("rlp data: {}", hex::encode(stream.as_raw()));
     let data_hash = tiny_keccak::keccak256(stream.as_raw());
 
     let mut new_account_args = vec![0u8; 32 + 4 + 20];
@@ -358,10 +359,18 @@ impl PolyjuiceArgsBuilder {
     }
 }
 
+/// ## Dummy Setup
+/// 1. setup temp store as store
+/// 2. create reserved account
+/// 3. setup CKB simple UDT contract
+/// 4. setup creator account
+/// 5. setup SECP_DATA
+/// 6. setup backend manager and build generator
 pub fn setup() -> (Store, DummyState, Generator, u32) {
     let _ = env_logger::try_init();
     let store = Store::open_tmp().unwrap();
     let mut state = DummyState::default();
+
     let reserved_id = state
         .create_account_from_script(
             Script::new_builder()
@@ -399,8 +408,8 @@ pub fn setup() -> (Store, DummyState, Generator, u32) {
                 .args(args.to_vec().pack())
                 .build(),
         )
-        .expect("create account");
-    println!("creator_account_id: {}", creator_account_id);
+        .expect("create creator_account id => 2");
+    // println!("creator_account_id: {}", creator_account_id);
 
     state.insert_data(*SECP_DATA_HASH, Bytes::from(SECP_DATA));
     state
@@ -503,7 +512,7 @@ pub fn deploy(
             &block_info,
             &raw_tx,
         )
-        .expect("construct");
+        .expect("execute_transaction");
     state.apply_run_result(&run_result).expect("update state");
     run_result
 }

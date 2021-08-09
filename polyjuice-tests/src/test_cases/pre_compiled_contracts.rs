@@ -101,7 +101,6 @@ impl L2Syscalls {
 
 #[test]
 fn test_contracts() {
-    let binary: Bytes = BINARY.to_vec().into();
     println!(
         "secp_data_hash: {:?}, data.len(): {}",
         *SECP_DATA_HASH,
@@ -112,11 +111,15 @@ fn test_contracts() {
     let mut tree = HashMap::default();
     tree.insert(build_data_hash_key(SECP_DATA_HASH.as_slice()), H256::one());
 
-    let core_machine = Box::<AsmCoreMachine>::default();
+    let core_machine = AsmCoreMachine::new(
+        ckb_vm::ISA_IMC | ckb_vm::ISA_B | ckb_vm::ISA_MOP,
+        ckb_vm::machine::VERSION1,
+        1,
+    ); //TODO: test MAX_CYCLES_EXCEEDED
     let machine_builder =
         DefaultMachineBuilder::new(core_machine).syscall(Box::new(L2Syscalls { data, tree }));
     let mut machine = AsmMachine::new(machine_builder.build(), None);
-    machine.load_program(&binary, &[]).unwrap();
+    machine.load_program(&ckb_vm::Bytes::from_static(BINARY), &[]).unwrap();
     let code = machine.run().unwrap();
     assert_eq!(code, 0);
 }

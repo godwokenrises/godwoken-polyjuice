@@ -15,28 +15,34 @@
 #define debug_print(s) {}
 #define debug_print_int(prefix, value) {}
 #define debug_print_data(prefix, data, data_len) {}
-#else  /* #ifdef NO_DEBUG_LOG */
-static char debug_buffer[64 * 1024];
+#else /* NO_DEBUG_LOG */
+/* 64 KB */
+#define DEBUG_BUFFER_SIZE 65536
+static char *g_debug_buffer;
 void debug_print_data(const char *prefix, const uint8_t *data,
                       uint32_t data_len) {
-  if (data_len > 31 * 1024) {
-    ckb_debug("warning: print_data is too large");
+  if (data_len > (DEBUG_BUFFER_SIZE - 1024) / 2 - 1) { // leave 1KB to prefix
+    ckb_debug("warning: length of data is too large");
     return;
   }
 
   int offset = 0;
-  offset += sprintf(debug_buffer, "%s 0x", prefix);
-  for (size_t i = 0; i < data_len; i++) {
-    offset += sprintf(debug_buffer + offset, "%02x", data[i]);
+  offset += sprintf(g_debug_buffer, "%s 0x", prefix);
+  if (offset > 1024) {
+    ckb_debug("warning: length of prefix is too large");
+    return;
   }
-  debug_buffer[offset] = '\0';
-  ckb_debug(debug_buffer);
+  for (size_t i = 0; i < data_len; i++) {
+    offset += sprintf(g_debug_buffer + offset, "%02x", data[i]);
+  }
+  g_debug_buffer[offset] = '\0';
+  ckb_debug(g_debug_buffer);
 }
 void debug_print_int(const char* prefix, int64_t ret) {
-  sprintf(debug_buffer, "%s => %ld", prefix, ret);
-  ckb_debug(debug_buffer);
+  sprintf(g_debug_buffer, "%s => %ld", prefix, ret);
+  ckb_debug(g_debug_buffer);
 }
-#endif  /* #ifdef NO_DEBUG_LOG */
+#endif /* NO_DEBUG_LOG */
 
 /* polyjuice contract account (normal/create2) script args size*/
 static const uint32_t CONTRACT_ACCOUNT_SCRIPT_ARGS_SIZE = 32 + 4 + 20;

@@ -1,9 +1,8 @@
-#[cfg(test)]
+// #[cfg(test)]
 #[allow(clippy::too_many_arguments)]
-pub(crate) mod helper;
+pub mod helper;
 
 #[cfg(test)]
+// #[cfg(bench)]
 #[allow(clippy::too_many_arguments)]
-pub(crate) mod test_cases;
-
-fn main() {}
+pub mod test_cases;
