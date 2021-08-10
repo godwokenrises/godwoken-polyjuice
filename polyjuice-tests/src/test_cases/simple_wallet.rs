@@ -24,9 +24,9 @@ fn test_simple_wallet() {
         .unwrap();
     let mut block_number = 0;
 
-    // Deploy Contract
+    // Deploy SimpleWallet Contract
     block_number += 1;
-    let _run_result = helper::deploy(
+    let run_result = helper::deploy(
         &generator,
         &store,
         &mut state,
@@ -38,6 +38,9 @@ fn test_simple_wallet() {
         block_producer_id,
         block_number,
     );
+    // [Deploy SimpleWallet Contract] used cycles: 1741377 < 1750K
+    helper::check_cycles("Deploy SimpleWallet", run_result.used_cycles, 1_750_000);
+
     let account_script = helper::new_account_script(&mut state, creator_account_id, from_id, false);
     let _contract_account_id = state
         .get_account_id_by_script_hash(&account_script.hash().into())

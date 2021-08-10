@@ -2,12 +2,12 @@
 //!   See ./evm-contracts/Memory.sol
 
 use crate::helper::{
-    build_eth_l2_script, deploy, new_account_script, new_block_info, setup, PolyjuiceArgsBuilder,
-    CKB_SUDT_ACCOUNT_ID,
+    self, build_eth_l2_script, deploy, new_account_script, new_block_info, setup,
+    PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
 };
 
 use gw_common::state::State;
-use gw_generator::{traits::StateExt}; // error::TransactionError, 
+use gw_generator::traits::StateExt; // error::TransactionError,
 use gw_store::chain_view::ChainView;
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
 
@@ -77,6 +77,8 @@ fn test_heap_momory() {
                 &raw_tx,
             )
             .expect("success to malloc memory");
+        // [newMemory less than 512K] used cycles: 3454814 < 3465K
+        helper::check_cycles("new Memory", run_result.used_cycles, 3_465_000);
         println!(
             "\t new byte(about {}K) => call result {:?}",
             16 * 32,

@@ -2,7 +2,7 @@
 //!   See ./evm-contracts/CallContract.sol
 
 use crate::helper::{
-    build_eth_l2_script, contract_script_to_eth_address, deploy, new_account_script,
+    self, build_eth_l2_script, contract_script_to_eth_address, deploy, new_account_script,
     new_block_info, setup, simple_storage_get, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
@@ -58,7 +58,7 @@ fn test_contract_call_contract() {
         INIT_CODE,
         hex::encode(contract_script_to_eth_address(&ss_account_script, true)),
     );
-    let _run_result = deploy(
+    let run_result = deploy(
         &generator,
         &store,
         &mut state,
@@ -71,6 +71,9 @@ fn test_contract_call_contract() {
         block_number,
     );
     block_number += 1;
+    // [Deploy CreateContract] used cycles: 600288 < 610K
+    helper::check_cycles("Deploy CreateContract", run_result.used_cycles, 610_000);
+
     // println!(
     //     "result {}",
     //     serde_json::to_string_pretty(&RunResult::from(run_result)).unwrap()
@@ -123,6 +126,8 @@ fn test_contract_call_contract() {
             )
             .expect("construct");
         state.apply_run_result(&run_result).expect("update state");
+        // [CallContract.proxySet(222)] used cycles: 961599 < 970K
+        helper::check_cycles("CallContract.proxySet()", run_result.used_cycles, 970_000);
     }
 
     let run_result = simple_storage_get(
@@ -161,7 +166,7 @@ fn test_contract_call_non_exists_contract() {
     let block_number = 1;
 
     // Deploy CallNonExistsContract
-    let _run_result = deploy(
+    let run_result = deploy(
         &generator,
         &store,
         &mut state,
@@ -172,6 +177,12 @@ fn test_contract_call_non_exists_contract() {
         0,
         block_producer_id,
         block_number,
+    );
+    // [Deploy CallNonExistsContract] used cycles: 657243 < 670K
+    helper::check_cycles(
+        "Deploy CallNonExistsContract",
+        run_result.used_cycles,
+        670_000,
     );
 
     let contract_account_script =
@@ -207,6 +218,13 @@ fn test_contract_call_non_exists_contract() {
                 &raw_tx,
             )
             .expect("construct");
+        // [CallNonExistsContract.rawCall(addr)] used cycles: 862060 < 870K
+        helper::check_cycles(
+            "CallNonExistsContract.rawCall(addr)",
+            run_result.used_cycles,
+            870_000,
+        );
+
         assert_eq!(
             run_result.return_data,
             vec![

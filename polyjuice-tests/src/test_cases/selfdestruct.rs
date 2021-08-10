@@ -2,8 +2,8 @@
 //!   See ./evm-contracts/SelfDestruct.sol
 
 use crate::helper::{
-    account_id_to_eth_address, build_eth_l2_script, new_account_script, new_block_info, setup,
-    PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
+    self, account_id_to_eth_address, build_eth_l2_script, new_account_script, new_block_info,
+    setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
@@ -68,8 +68,9 @@ fn test_selfdestruct() {
                 &raw_tx,
             )
             .expect("construct");
+        // [Deploy SelfDestruct] used cycles: 570570 < 580K
+        helper::check_cycles("Deploy SelfDestruct", run_result.used_cycles, 580_000);
         state.apply_run_result(&run_result).expect("update state");
-        // println!("result {:?}", run_result);
     }
 
     let contract_account_script =
@@ -117,8 +118,9 @@ fn test_selfdestruct() {
                 &raw_tx,
             )
             .expect("construct");
+        // [call SelfDestruct.done()] used cycles: 589657 < 600K
+        helper::check_cycles("call SelfDestruct.done()", run_result.used_cycles, 600_000);
         state.apply_run_result(&run_result).expect("update state");
-        // println!("result {:?}", run_result);
     }
     assert_eq!(
         state

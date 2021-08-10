@@ -2,7 +2,7 @@
 //!   See ./evm-contracts/SimpleStorage.sol
 
 use crate::helper::{
-    build_eth_l2_script, new_account_script, new_block_info, setup, PolyjuiceArgsBuilder,
+    self, build_eth_l2_script, new_account_script, new_block_info, setup, PolyjuiceArgsBuilder,
     CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
@@ -59,8 +59,9 @@ fn test_simple_storage() {
             )
             .expect("construct");
         state.apply_run_result(&run_result).expect("update state");
-        // println!("result {:?}", run_result);
         println!("return_data: {}", hex::encode(&run_result.return_data[..]));
+        // 557534 < 560K
+        helper::check_cycles("Deploy SimpleStorage", run_result.used_cycles, 560_000);
     }
 
     let contract_account_script =
@@ -109,7 +110,8 @@ fn test_simple_storage() {
             )
             .expect("construct");
         state.apply_run_result(&run_result).expect("update state");
-        // println!("result {:?}", run_result);
+        // 489767 < 500K
+        helper::check_cycles("SimpleStorage.set", run_result.used_cycles, 500_000);
     }
 
     {
@@ -142,37 +144,7 @@ fn test_simple_storage() {
         expected_return_data[30] = 0x0d;
         expected_return_data[31] = 0x10;
         assert_eq!(run_result.return_data, expected_return_data);
-        // println!("result {:?}", run_result);
     }
 
-    {
-        // SimpleStorage.get();
-        let block_info = new_block_info(0, 3, 0);
-        let input = hex::decode("6d4ce63c").unwrap();
-        let args = PolyjuiceArgsBuilder::default()
-            .gas_limit(21000)
-            .gas_price(0)
-            .value(0)
-            .input(&input)
-            .build();
-        let raw_tx = RawL2Transaction::new_builder()
-            .from_id(from_id.pack())
-            .to_id(new_account_id.pack())
-            .args(Bytes::from(args).pack())
-            .build();
-        let db = store.begin_transaction();
-        let tip_block_hash = store.get_tip_block_hash().unwrap();
-        let run_result = generator
-            .execute_transaction(
-                &ChainView::new(&db, tip_block_hash),
-                &state,
-                &block_info,
-                &raw_tx,
-            )
-            .expect("construct");
-        let mut expected_return_data = vec![0u8; 32];
-        expected_return_data[30] = 0x0d;
-        expected_return_data[31] = 0x10;
-        assert_eq!(run_result.return_data, expected_return_data);
-    }
+    helper::simple_storage_get(&store, &state, &generator, 4, from_id, new_account_id);
 }

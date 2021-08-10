@@ -2,8 +2,8 @@
 //!   See ./evm-contracts/ERC20.bin
 
 use crate::helper::{
-    account_id_to_eth_address, build_eth_l2_script, deploy, new_account_script, new_block_info,
-    setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
+    self, account_id_to_eth_address, build_eth_l2_script, deploy, new_account_script,
+    new_block_info, setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
@@ -41,7 +41,7 @@ fn test_erc20() {
         .unwrap();
 
     // Deploy ERC20
-    let _run_result = deploy(
+    let run_result = deploy(
         &generator,
         &store,
         &mut state,
@@ -53,6 +53,8 @@ fn test_erc20() {
         block_producer_id,
         1,
     );
+    // [Deploy ERC20] used cycles: 1004236 < 1010K
+    helper::check_cycles("Deploy ERC20", run_result.used_cycles, 1_010_000);
 
     let contract_account_script =
         new_account_script(&mut state, creator_account_id, from_id1, false);
@@ -166,6 +168,8 @@ fn test_erc20() {
                 &raw_tx,
             )
             .expect("construct");
+        // [ERC20 contract method_x] used cycles: 942107 < 950K
+        helper::check_cycles("ERC20 contract method_x", run_result.used_cycles, 950_000);
         state.apply_run_result(&run_result).expect("update state");
         assert_eq!(
             run_result.return_data,

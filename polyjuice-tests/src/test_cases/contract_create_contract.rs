@@ -2,8 +2,8 @@
 //!   See ./evm-contracts/CreateContract.sol
 
 use crate::helper::{
-    build_eth_l2_script, deploy, new_account_script, new_account_script_with_nonce, new_block_info,
-    setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
+    self, build_eth_l2_script, deploy, new_account_script, new_account_script_with_nonce,
+    new_block_info, setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
@@ -30,7 +30,7 @@ fn test_contract_create_contract() {
         .unwrap();
 
     // Deploy CreateContract
-    let _run_result = deploy(
+    let run_result = deploy(
         &generator,
         &store,
         &mut state,
@@ -42,6 +42,8 @@ fn test_contract_create_contract() {
         block_producer_id,
         1,
     );
+    // [Deploy CreateContract] used cycles: 2109521 < 2120K
+    helper::check_cycles("Deploy CreateContract", run_result.used_cycles, 2120_000);
     // println!(
     //     "result {}",
     //     serde_json::to_string_pretty(&RunResult::from(run_result)).unwrap()

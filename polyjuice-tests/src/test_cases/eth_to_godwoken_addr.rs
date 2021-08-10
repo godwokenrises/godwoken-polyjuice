@@ -1,8 +1,8 @@
 //! See ./evm-contracts/EthToGodwokenAddr.sol
 
 use crate::helper::{
-    build_eth_l2_script, deploy, new_account_script, new_block_info, setup, PolyjuiceArgsBuilder,
-    CKB_SUDT_ACCOUNT_ID, PROGRAM_CODE_HASH, ROLLUP_SCRIPT_HASH,
+    self, build_eth_l2_script, deploy, new_account_script, new_block_info, setup,
+    PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, PROGRAM_CODE_HASH, ROLLUP_SCRIPT_HASH,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
@@ -33,7 +33,7 @@ fn test_eth_to_godwoken_addr() {
         .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_short_address, 200000)
         .unwrap();
 
-    let _run_result = deploy(
+    let run_result = deploy(
         &generator,
         &store,
         &mut state,
@@ -44,6 +44,12 @@ fn test_eth_to_godwoken_addr() {
         0,
         block_producer_id,
         0,
+    );
+    // [Deploy EthToGodwokenAddr Contract] used cycles: 593775 < 600K
+    helper::check_cycles(
+        "Deploy EthToGodwokenAddr Contract",
+        run_result.used_cycles,
+        600_000,
     );
 
     let contract_account_script =
@@ -83,6 +89,12 @@ fn test_eth_to_godwoken_addr() {
                 &raw_tx,
             )
             .expect("construct");
+        // [EthToGodwokenAddr.convert(addr)] used cycles: 573228 < 580K
+        helper::check_cycles(
+            "EthToGodwokenAddr.convert(addr)",
+            run_result.used_cycles,
+            580_000,
+        );
         state.apply_run_result(&run_result).expect("update state");
         let mut script_args = vec![0u8; 32 + 4 + 20];
         script_args[0..32].copy_from_slice(&ROLLUP_SCRIPT_HASH);

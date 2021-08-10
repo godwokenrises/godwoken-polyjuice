@@ -2,7 +2,7 @@
 //!   See ./evm-contracts/SimpleTransfer.sol
 
 use crate::helper::{
-    account_id_to_eth_address, build_eth_l2_script, contract_script_to_eth_address, deploy,
+    self, account_id_to_eth_address, build_eth_l2_script, contract_script_to_eth_address, deploy,
     new_account_script, new_block_info, setup, simple_storage_get, PolyjuiceArgsBuilder,
     CKB_SUDT_ACCOUNT_ID,
 };
@@ -106,6 +106,9 @@ fn test_simple_transfer() {
         block_producer_id,
         block_number,
     );
+    // [Deploy SimpleTransfer] used cycles: 491894 < 500K
+    helper::check_cycles("Deploy SimpleTransfer", run_result.used_cycles, 500_000);
+
     block_number += 1;
     let contract_account_script =
         new_account_script(&mut state, creator_account_id, from_id, false);
@@ -158,6 +161,8 @@ fn test_simple_transfer() {
                 &raw_tx,
             )
             .expect("construct");
+        // [SimpleTransfer to EoA] used cycles: 725217 < 736K
+        helper::check_cycles("SimpleTransfer to EoA", run_result.used_cycles, 736_000);
         state.apply_run_result(&run_result).expect("update state");
 
         let new_balance = state
@@ -203,6 +208,13 @@ fn test_simple_transfer() {
                 &raw_tx,
             )
             .expect("construct");
+        // [SimpleTransfer to zero address] used cycles: 699554 < 710K
+        helper::check_cycles(
+            "SimpleTransfer to zero address",
+            run_result.used_cycles,
+            710_000,
+        );
+
         state.apply_run_result(&run_result).expect("update state");
 
         let new_balance = state
@@ -249,6 +261,12 @@ fn test_simple_transfer() {
                 &raw_tx,
             )
             .expect("construct");
+        // [SimpleTransfer.transferToSimpleStorage1] used cycles: 1203332 < 1210K
+        helper::check_cycles(
+            "SimpleTransfer.transferToSimpleStorage1()",
+            run_result.used_cycles,
+            1_210_000,
+        );
         state.apply_run_result(&run_result).expect("update state");
 
         let new_balance = state

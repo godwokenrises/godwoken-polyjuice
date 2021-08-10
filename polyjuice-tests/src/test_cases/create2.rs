@@ -2,8 +2,8 @@
 //!   See ./evm-contracts/CallContract.sol
 
 use crate::helper::{
-    build_eth_l2_script, compute_create2_script, deploy, new_account_script, new_block_info, setup,
-    simple_storage_get, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
+    self, build_eth_l2_script, compute_create2_script, deploy, new_account_script, new_block_info,
+    setup, simple_storage_get, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
@@ -12,7 +12,7 @@ use gw_store::chain_view::ChainView;
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
 
 const SS_INIT_CODE: &str = include_str!("./evm-contracts/SimpleStorage.bin");
-const INIT_CODE: &str = include_str!("./evm-contracts/Create2Impl.bin");
+const CREATE2_IMPL_CODE: &str = include_str!("./evm-contracts/Create2Impl.bin");
 
 #[test]
 fn test_create2() {
@@ -31,20 +31,22 @@ fn test_create2() {
         .unwrap();
     let mut block_number = 1;
 
-    // Deploy CreateContract
-    let _run_result = deploy(
+    // Deploy CREATE2_IMPL_CODE
+    let run_result = deploy(
         &generator,
         &store,
         &mut state,
         creator_account_id,
         from_id,
-        INIT_CODE,
+        CREATE2_IMPL_CODE,
         122000,
         0,
         block_producer_id,
         block_number,
     );
     block_number += 1;
+    // [Deploy Create2Impl] used cycles: 805376 < 810K
+    helper::check_cycles("Deploy Create2Impl", run_result.used_cycles, 810_000);
     // println!(
     //     "result {}",
     //     serde_json::to_string_pretty(&RunResult::from(run_result)).unwrap()
@@ -98,7 +100,8 @@ fn test_create2() {
                 &raw_tx,
             )
             .expect("construct");
-        // println!("run_result: {:?}", run_result);
+        // [Create2Impl.deploy(...)] used cycles: 1197555 < 1210K
+        helper::check_cycles("Create2Impl.deploy(...)", run_result.used_cycles, 1210_000);
         state.apply_run_result(&run_result).expect("update state");
         run_result
     };

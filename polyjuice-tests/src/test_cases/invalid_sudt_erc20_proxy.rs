@@ -2,7 +2,7 @@
 //!   See ./evm-contracts/ERC20.bin
 
 use crate::helper::{
-    account_id_to_eth_address, build_eth_l2_script, build_l2_sudt_script, deploy,
+    self, account_id_to_eth_address, build_eth_l2_script, build_l2_sudt_script, deploy,
     new_account_script, new_block_info, setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
@@ -49,11 +49,11 @@ fn test_invalid_sudt_erc20_proxy() {
         .unwrap();
 
     assert_eq!(CKB_SUDT_ACCOUNT_ID, 1);
-    // Deploy ERC20
+    // Deploy InvalidSudtERC20Proxy
     // ethabi encode params -v string "test" -v string "tt" -v uint256 000000000000000000000000000000000000000204fce5e3e250261100000000 -v uint256 0000000000000000000000000000000000000000000000000000000000000001
     let args = format!("000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000c0000000000000000000000000000000000000000204fce5e3e25026110000000000000000000000000000000000000000000000000000000000000000000000{:02x}0000000000000000000000000000000000000000000000000000000000000004746573740000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000027474000000000000000000000000000000000000000000000000000000000000", new_sudt_id);
     let init_code = format!("{}{}", INIT_CODE, args);
-    let _run_result = deploy(
+    let run_result = deploy(
         &generator,
         &store,
         &mut state,
@@ -64,6 +64,12 @@ fn test_invalid_sudt_erc20_proxy() {
         0,
         block_producer_id,
         1,
+    );
+    // [Deploy InvalidSudtERC20Proxy] used cycles: 1421789 < 1430K
+    helper::check_cycles(
+        "Deploy InvalidSudtERC20Proxy",
+        run_result.used_cycles,
+        1_430_000,
     );
 
     let contract_account_script =
@@ -157,8 +163,15 @@ fn test_invalid_sudt_erc20_proxy() {
             &block_info,
             &raw_tx,
         );
+
         if *success {
             let run_result = result.expect("execute");
+            // used cycles: 844202 < 850K
+            helper::check_cycles(
+                "ERC20.{balanceOf|transfer}",
+                run_result.used_cycles,
+                850_000,
+            );
             state.apply_run_result(&run_result).expect("update state");
             assert_eq!(
                 run_result.return_data,

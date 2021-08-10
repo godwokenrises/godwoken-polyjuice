@@ -2,7 +2,7 @@
 //!   See ./evm-contracts/FallbackFunction.sol
 
 use crate::helper::{
-    build_eth_l2_script, new_account_script, new_block_info, setup, simple_storage_get,
+    self, build_eth_l2_script, new_account_script, new_block_info, setup, simple_storage_get,
     PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
@@ -29,7 +29,7 @@ fn test_fallback_function() {
         .unwrap();
 
     {
-        // Deploy SimpleStorage
+        // Deploy FallbackFunction Contract
         let block_info = new_block_info(0, 1, 0);
         let input = hex::decode(INIT_CODE).unwrap();
         let args = PolyjuiceArgsBuilder::default()
@@ -54,6 +54,8 @@ fn test_fallback_function() {
                 &raw_tx,
             )
             .expect("construct");
+        // [Deploy FallbackFunction] used cycles: 587271 < 590K
+        helper::check_cycles("Deploy FallbackFunction", run_result.used_cycles, 590_000);
         state.apply_run_result(&run_result).expect("update state");
     }
 
@@ -70,6 +72,7 @@ fn test_fallback_function() {
     );
 
     {
+        // Call fallback()
         let block_info = new_block_info(0, 2, 0);
         let input = hex::decode("3333").unwrap();
         let args = PolyjuiceArgsBuilder::default()
@@ -93,6 +96,8 @@ fn test_fallback_function() {
                 &raw_tx,
             )
             .expect("construct");
+        // [Call fallback()] used cycles: 504210 < 510K
+        helper::check_cycles("Call fallback()", run_result.used_cycles, 510_000);
         assert!(run_result.return_data.is_empty());
         state.apply_run_result(&run_result).expect("update state");
     }
