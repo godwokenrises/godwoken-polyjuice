@@ -2,7 +2,7 @@
 //!   See ./evm-contracts/SelfDestruct.sol
 
 use crate::helper::{
-    account_id_to_eth_address, build_eth_l2_script, contract_script_to_eth_address, deploy,
+    self, account_id_to_eth_address, build_eth_l2_script, contract_script_to_eth_address, deploy,
     new_account_script_with_nonce, new_block_info, setup, PolyjuiceArgsBuilder,
     CKB_SUDT_ACCOUNT_ID,
 };
@@ -12,7 +12,7 @@ use gw_store::chain_view::ChainView;
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
 
 const SD_INIT_CODE: &str = include_str!("./evm-contracts/SelfDestruct.bin");
-const INIT_CODE: &str = include_str!("./evm-contracts/CallSelfDestruct.bin");
+const CALL_SD_INIT_CODE: &str = include_str!("./evm-contracts/CallSelfDestruct.bin");
 
 #[test]
 fn test_selfdestruct() {
@@ -44,12 +44,13 @@ fn test_selfdestruct() {
         0
     );
 
+    // deploy SelfDestruct
     let input = format!(
         "{}{}",
         SD_INIT_CODE,
         hex::encode(account_id_to_eth_address(&state, beneficiary_id, true))
     );
-    let _run_result = deploy(
+    let run_result = deploy(
         &generator,
         &store,
         &mut state,
@@ -61,6 +62,9 @@ fn test_selfdestruct() {
         block_producer_id,
         block_number,
     );
+    // 571282 < 580K
+    helper::check_cycles("deploy SelfDestruct", run_result.used_cycles, 580_000);
+
     block_number += 1;
     let sd_account_script = new_account_script_with_nonce(&state, creator_account_id, from_id, 0);
     let sd_script_hash = sd_account_script.hash();
@@ -82,18 +86,22 @@ fn test_selfdestruct() {
         0
     );
 
-    let _run_result = deploy(
+    // deploy CallSelfDestruct
+    let run_result = deploy(
         &generator,
         &store,
         &mut state,
         creator_account_id,
         from_id,
-        INIT_CODE,
+        CALL_SD_INIT_CODE,
         122000,
         0,
         block_producer_id,
         block_number,
     );
+    // [deploy CallSelfDestruct] used cycles: 551984 < 560K
+    helper::check_cycles("deploy CallSelfDestruct", run_result.used_cycles, 560_000);
+
     block_number += 1;
     let new_account_script = new_account_script_with_nonce(&state, creator_account_id, from_id, 1);
     let new_account_id = state
@@ -135,6 +143,12 @@ fn test_selfdestruct() {
             )
             .expect("construct");
         state.apply_run_result(&run_result).expect("update state");
+        // [call CallSelfDestruct.proxyDone(sd_account_id)] used cycles: 1043108 < 1100K
+        helper::check_cycles(
+            "CallSelfDestruct.proxyDone(sd_account_id)",
+            run_result.used_cycles,
+            1100_000,
+        );
     }
 
     assert_eq!(state.get_nonce(from_id).unwrap(), 3);

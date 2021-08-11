@@ -1,9 +1,9 @@
-//! Test SimpleStorage
-//!   See ./evm-contracts/SimpleStorage.sol
+//! Test ecrecover
+//!   See ./evm-contracts/HeadTail.sol
 
 use crate::helper::{
-    build_eth_l2_script, deploy, new_account_script, new_block_info, setup, PolyjuiceArgsBuilder,
-    CKB_SUDT_ACCOUNT_ID,
+    self, build_eth_l2_script, deploy, new_account_script, new_block_info, setup,
+    PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
@@ -28,8 +28,8 @@ fn test_ecrecover() {
         .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_short_address, 200000)
         .unwrap();
 
-    // Deploy CreateContract
-    let _run_result = deploy(
+    // Deploy HeadTail Contract
+    let run_result = deploy(
         &generator,
         &store,
         &mut state,
@@ -40,6 +40,12 @@ fn test_ecrecover() {
         0,
         block_producer_id,
         1,
+    );
+    // [Deploy HeadTail Contract] used cycles: 1590800 < 1600K
+    helper::check_cycles(
+        "Deploy HeadTail Contract",
+        run_result.used_cycles,
+        1_600_000,
     );
     // println!(
     //     "result {}",
@@ -56,7 +62,7 @@ fn test_ecrecover() {
 
     println!("\n==============================================\n");
     {
-        // SimpleStorage.get();
+        // verify|recover(bytes32 hash, bytes memory signature)
         let block_info = new_block_info(0, 2, 0);
         let hash = "8ab0890f028c9502cc20d441b4c4bb116f48ea632f522ac84e965d1dadf918e1";
         let signed_hash = "aaa99f644a5c4447314c5b7fcfac80deb186218aca1edaa63711aa75eb36585b47743901ce20f32768c7108bf85457ee0f16020f9bebc2bf456d6094c1c923c11c";
@@ -86,6 +92,8 @@ fn test_ecrecover() {
                 &raw_tx,
             )
             .expect("construct");
+        // [recover] used cycles: 2604412 < 2610K
+        helper::check_cycles("verify|recover", run_result.used_cycles, 2_610_000);
         state.apply_run_result(&run_result).expect("update state");
         assert_eq!(
             run_result.return_data,

@@ -5,7 +5,7 @@
  * and provides layer2 syscalls.
  *
  * A program should be able to generate a post state after run the generator,
- * and should be able to use the states to construct a transaction that satifies
+ * and should be able to use the states to construct a transaction that satisfies
  * the validator.
  */
 

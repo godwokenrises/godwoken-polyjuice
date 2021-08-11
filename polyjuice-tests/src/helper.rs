@@ -505,6 +505,7 @@ pub fn deploy(
         )
         .expect("construct");
     state.apply_run_result(&run_result).expect("update state");
+    // println!("[deploy contract] used cycles: {}", run_result.used_cycles);
     run_result
 }
 
@@ -563,14 +564,17 @@ pub fn simple_storage_get(
         .build();
     let db = store.begin_transaction();
     let tip_block_hash = store.get_tip_block_hash().unwrap();
-    generator
+    let run_result = generator
         .execute_transaction(
             &ChainView::new(&db, tip_block_hash),
             state,
             &block_info,
             &raw_tx,
         )
-        .expect("construct")
+        .expect("construct");
+    // 491894, 571661 < 580K
+    check_cycles("simple_storage_get", run_result.used_cycles, 580_000);
+    run_result
 }
 
 pub fn build_l2_sudt_script(args: [u8; 32]) -> Script {
@@ -593,4 +597,13 @@ pub fn build_eth_l2_script(args: [u8; 20]) -> Script {
         .code_hash(ETH_ACCOUNT_LOCK_CODE_HASH.clone().pack())
         .hash_type(ScriptHashType::Type.into())
         .build()
+}
+
+pub fn check_cycles(l2_tx_label: &str, used_cycles: u64, warning_cycles: u64) {
+    assert!(
+        used_cycles < warning_cycles,
+        "[Warning: {} used too many cycles = {}]",
+        l2_tx_label,
+        used_cycles
+    );
 }

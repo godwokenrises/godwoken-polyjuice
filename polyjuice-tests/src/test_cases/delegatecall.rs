@@ -2,7 +2,7 @@
 //!   See ./evm-contracts/CallContract.sol
 
 use crate::helper::{
-    build_eth_l2_script, contract_script_to_eth_address, deploy, new_account_script,
+    self, build_eth_l2_script, contract_script_to_eth_address, deploy, new_account_script,
     new_account_script_with_nonce, new_block_info, setup, simple_storage_get, PolyjuiceArgsBuilder,
     CKB_SUDT_ACCOUNT_ID,
 };
@@ -53,7 +53,7 @@ fn test_delegatecall() {
         .unwrap();
 
     // Deploy DelegateCall
-    let _run_result = deploy(
+    let run_result = deploy(
         &generator,
         &store,
         &mut state,
@@ -65,6 +65,8 @@ fn test_delegatecall() {
         block_producer_id,
         block_number,
     );
+    // [Deploy DelegateCall] used cycles: 742217 < 750K
+    helper::check_cycles("Deploy DelegateCall", run_result.used_cycles, 750_000);
     block_number += 1;
     // println!(
     //     "result {}",
@@ -82,17 +84,17 @@ fn test_delegatecall() {
     assert_eq!(state.get_nonce(new_account_id).unwrap(), 0);
 
     for (fn_sighash, expected_return_value) in [
-        // DelegateCall.set(address, uint)
+        // DelegateCall.set(address, uint) => used cycles: 1002251
         (
             "3825d828",
             "0000000000000000000000000000000000000000000000000000000000000022",
         ),
-        // DelegateCall.overwrite(address, uint)
+        // DelegateCall.overwrite(address, uint) => used cycles: 1002099
         (
             "3144564b",
             "0000000000000000000000000000000000000000000000000000000000000023",
         ),
-        // DelegateCall.multiCall(address, uint)
+        // DelegateCall.multiCall(address, uint) => used cycles: 1422033
         (
             "c6c211e9",
             "0000000000000000000000000000000000000000000000000000000000000024",
@@ -129,6 +131,7 @@ fn test_delegatecall() {
                 &raw_tx,
             )
             .expect("construct");
+        helper::check_cycles("DelegateCall", run_result.used_cycles, 1_430_000);
         state.apply_run_result(&run_result).expect("update state");
         // println!(
         //     "result {}",

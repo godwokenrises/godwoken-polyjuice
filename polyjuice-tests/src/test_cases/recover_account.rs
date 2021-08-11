@@ -2,9 +2,9 @@
 //!   See ./evm-contracts/RecoverAccount.sol
 
 use crate::helper::{
-    build_eth_l2_script, deploy, new_account_script, new_block_info, setup, simple_storage_get,
-    PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, FATAL_PRECOMPILED_CONTRACTS, ROLLUP_SCRIPT_HASH,
-    SECP_LOCK_CODE_HASH,
+    self, build_eth_l2_script, deploy, new_account_script, new_block_info, setup,
+    simple_storage_get, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, FATAL_PRECOMPILED_CONTRACTS,
+    ROLLUP_SCRIPT_HASH, SECP_LOCK_CODE_HASH,
 };
 use gw_common::state::State;
 use gw_generator::{error::TransactionError, traits::StateExt};
@@ -35,7 +35,8 @@ fn test_recover_account() {
         .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_short_address, 200000)
         .unwrap();
 
-    let _run_result = deploy(
+    // Deploy RecoverAccount Contract
+    let run_result = deploy(
         &generator,
         &store,
         &mut state,
@@ -47,7 +48,12 @@ fn test_recover_account() {
         block_producer_id,
         0,
     );
-
+    // Deploy RecoverAccount Contract used cycles = 682404 < 690K
+    helper::check_cycles(
+        "Deploy RecoverAccount Contract",
+        run_result.used_cycles,
+        690_000,
+    );
     let contract_account_script =
         new_account_script(&mut state, creator_account_id, from_id, false);
     let new_account_id = state
@@ -93,6 +99,12 @@ fn test_recover_account() {
                 &raw_tx,
             )
             .expect("construct");
+        // [RecoverAccount.recover(message, signature, code_hash)] used cycles: 648630 < 660K
+        helper::check_cycles(
+            "RecoverAccount.recover(message, signature, code_hash)",
+            run_result.used_cycles,
+            660_000,
+        );
         state.apply_run_result(&run_result).expect("update state");
         let mut script_args = vec![0u8; 32 + 20];
         script_args[0..32].copy_from_slice(&ROLLUP_SCRIPT_HASH);
