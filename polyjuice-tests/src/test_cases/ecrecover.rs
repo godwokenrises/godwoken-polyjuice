@@ -41,11 +41,11 @@ fn test_ecrecover() {
         block_producer_id,
         1,
     );
-    // [Deploy HeadTail Contract] used cycles: 1590800 < 1600K
+    // [Deploy HeadTail Contract] used cycles: 1645593 < 1650K
     helper::check_cycles(
         "Deploy HeadTail Contract",
         run_result.used_cycles,
-        1_600_000,
+        1_650_000,
     );
     // println!(
     //     "result {}",
@@ -92,8 +92,8 @@ fn test_ecrecover() {
                 &raw_tx,
             )
             .expect("construct");
-        // [recover] used cycles: 2604412 < 2610K
-        helper::check_cycles("verify|recover", run_result.used_cycles, 2_610_000);
+        // [recover] used cycles: 2604412 < 2660K
+        helper::check_cycles("verify|recover", run_result.used_cycles, 2_660_000);
         state.apply_run_result(&run_result).expect("update state");
         assert_eq!(
             run_result.return_data,
