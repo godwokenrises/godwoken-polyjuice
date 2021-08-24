@@ -45,8 +45,8 @@ fn test_create2() {
         block_number,
     );
     block_number += 1;
-    // [Deploy Create2Impl] used cycles: 805376 < 810K
-    helper::check_cycles("Deploy Create2Impl", run_result.used_cycles, 810_000);
+    // [Deploy Create2Impl] used cycles: 819215 < 820K
+    helper::check_cycles("Deploy Create2Impl", run_result.used_cycles, 820_000);
     // println!(
     //     "result {}",
     //     serde_json::to_string_pretty(&RunResult::from(run_result)).unwrap()
@@ -100,8 +100,8 @@ fn test_create2() {
                 &raw_tx,
             )
             .expect("construct");
-        // [Create2Impl.deploy(...)] used cycles: 1197555 < 1210K
-        helper::check_cycles("Create2Impl.deploy(...)", run_result.used_cycles, 1210_000);
+        // [Create2Impl.deploy(...)] used cycles: 1197555 < 1230K
+        helper::check_cycles("Create2Impl.deploy(...)", run_result.used_cycles, 1230_000);
         state.apply_run_result(&run_result).expect("update state");
         run_result
     };

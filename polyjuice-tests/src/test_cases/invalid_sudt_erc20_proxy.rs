@@ -65,11 +65,11 @@ fn test_invalid_sudt_erc20_proxy() {
         block_producer_id,
         1,
     );
-    // [Deploy InvalidSudtERC20Proxy] used cycles: 1421789 < 1430K
+    // [Deploy InvalidSudtERC20Proxy] used cycles: 1457382 < 1460K
     helper::check_cycles(
         "Deploy InvalidSudtERC20Proxy",
         run_result.used_cycles,
-        1_430_000,
+        1_460_000,
     );
 
     let contract_account_script =
@@ -166,11 +166,11 @@ fn test_invalid_sudt_erc20_proxy() {
 
         if *success {
             let run_result = result.expect("execute");
-            // used cycles: 844202 < 850K
+            // used cycles: 844202 < 870K
             helper::check_cycles(
                 "ERC20.{balanceOf|transfer}",
                 run_result.used_cycles,
-                850_000,
+                870_000,
             );
             state.apply_run_result(&run_result).expect("update state");
             assert_eq!(

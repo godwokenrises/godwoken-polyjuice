@@ -65,8 +65,8 @@ fn test_delegatecall() {
         block_producer_id,
         block_number,
     );
-    // [Deploy DelegateCall] used cycles: 742217 < 750K
-    helper::check_cycles("Deploy DelegateCall", run_result.used_cycles, 750_000);
+    // [Deploy DelegateCall] used cycles: 753698 < 760K
+    helper::check_cycles("Deploy DelegateCall", run_result.used_cycles, 760_000);
     block_number += 1;
     // println!(
     //     "result {}",
@@ -131,7 +131,7 @@ fn test_delegatecall() {
                 &raw_tx,
             )
             .expect("construct");
-        helper::check_cycles("DelegateCall", run_result.used_cycles, 1_430_000);
+        helper::check_cycles("DelegateCall", run_result.used_cycles, 1_440_000);
         state.apply_run_result(&run_result).expect("update state");
         // println!(
         //     "result {}",

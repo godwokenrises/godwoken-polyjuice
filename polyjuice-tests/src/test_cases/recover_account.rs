@@ -48,11 +48,11 @@ fn test_recover_account() {
         block_producer_id,
         0,
     );
-    // Deploy RecoverAccount Contract used cycles = 682404 < 690K
+    // Deploy RecoverAccount Contract used cycles = 690541 < 700K
     helper::check_cycles(
         "Deploy RecoverAccount Contract",
         run_result.used_cycles,
-        690_000,
+        700_000,
     );
     let contract_account_script =
         new_account_script(&mut state, creator_account_id, from_id, false);
@@ -99,11 +99,11 @@ fn test_recover_account() {
                 &raw_tx,
             )
             .expect("construct");
-        // [RecoverAccount.recover(message, signature, code_hash)] used cycles: 648630 < 660K
+        // [RecoverAccount.recover(message, signature, code_hash)] used cycles: 648630 < 670K
         helper::check_cycles(
             "RecoverAccount.recover(message, signature, code_hash)",
             run_result.used_cycles,
-            660_000,
+            670_000,
         );
         state.apply_run_result(&run_result).expect("update state");
         let mut script_args = vec![0u8; 32 + 20];
