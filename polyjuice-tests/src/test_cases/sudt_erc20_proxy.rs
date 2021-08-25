@@ -236,7 +236,12 @@ fn test_sudt_erc20_proxy_inner(
             format!("70a08231{}", eoa2_hex),
             "000000000000000000000000000000000000000000000000000000000000082c",
         ),
-        // TODO: TEST DECIMALS
+        // decimals()
+        (
+            from_id1,
+            "313ce567".to_string(),
+            &format!("00000000000000000000000000000000000000000000000000000000000000{:02x}", decimals.unwrap_or(18))
+        )
     ]
     .iter()
     .enumerate()
