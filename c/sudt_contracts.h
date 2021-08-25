@@ -108,22 +108,33 @@ int transfer_to_any_sudt(gw_context_t* ctx,
                          const uint8_t* input_src,
                          const size_t input_size,
                          uint8_t** output, size_t* output_size) {
-  /* Contract code hash of `SudtERC20Proxy.sol`
+  /* Contract code hash of `SudtERC20Proxy.bin`
      => 0x43a008ec973b648bd71ad67e6b66f2be8a6fa88e89c7dad046c948b00aa866aa */
   static const uint8_t sudt_erc20_proxy_contract_code_hash[32] =
-    {
-      0x43, 0xa0, 0x08, 0xec, 0x97, 0x3b, 0x64, 0x8b,
-      0xd7, 0x1a, 0xd6, 0x7e, 0x6b, 0x66, 0xf2, 0xbe,
-      0x8a, 0x6f, 0xa8, 0x8e, 0x89, 0xc7, 0xda, 0xd0,
-      0x46, 0xc9, 0x48, 0xb0, 0x0a, 0xa8, 0x66, 0xaa,
-    };
+  {
+    0x43, 0xa0, 0x08, 0xec, 0x97, 0x3b, 0x64, 0x8b,
+    0xd7, 0x1a, 0xd6, 0x7e, 0x6b, 0x66, 0xf2, 0xbe,
+    0x8a, 0x6f, 0xa8, 0x8e, 0x89, 0xc7, 0xda, 0xd0,
+    0x46, 0xc9, 0x48, 0xb0, 0x0a, 0xa8, 0x66, 0xaa,
+  };
+  /* Contract code hash of `SudtERC20Proxy_UserDefinedDecimals.bin`
+     => 0x1d8516872890ddf85b01d354463459e576f27453f152120cd722be30059e9ad8 */
+  static const uint8_t sudt_erc20_proxy_user_defined_decimals_contract_code_hash[32] =
+  {
+    0x1d, 0x85, 0x16, 0x87, 0x28, 0x90, 0xdd, 0xf8,
+    0x5b, 0x01, 0xd3, 0x54, 0x46, 0x34, 0x59, 0xe5,
+    0x76, 0xf2, 0x74, 0x53, 0xf1, 0x52, 0x12, 0x0c,
+    0xd7, 0x22, 0xbe, 0x30, 0x05, 0x9e, 0x9a, 0xd8
+  };
   if (code_data == NULL || code_size == 0) {
     ckb_debug("Invalid caller contract code");
     return ERROR_TRANSFER_TO_ANY_SUDT;
   }
   uint8_t code_hash[32] = {0};
   blake2b_hash(code_hash, (uint8_t *)code_data, code_size);
-  if (memcmp(code_hash, sudt_erc20_proxy_contract_code_hash, 32) != 0) {
+  if (memcmp(code_hash, sudt_erc20_proxy_contract_code_hash, 32) != 0 &&
+      memcmp(code_hash, sudt_erc20_proxy_user_defined_decimals_contract_code_hash, 32) != 0
+  ) {
     ckb_debug("The contract is not allowed to call transfer_to_any_sudt");
     debug_print_data("     got code hash", code_hash, 32);
     debug_print_data("expected code hash", sudt_erc20_proxy_contract_code_hash, 32);
@@ -167,4 +178,3 @@ int transfer_to_any_sudt(gw_context_t* ctx,
 }
 
 #endif  /* #define SUDT_CONTRACTS_H_ */
-
