@@ -11,7 +11,7 @@ use gw_generator::{error::TransactionError, traits::StateExt};
 use gw_store::chain_view::ChainView;
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
 
-const INIT_CODE: &str = include_str!("./evm-contracts/InvalidSudtERC20Proxy.bin");
+const INVALID_SUDT_ERC20_PROXY_CODE: &str = include_str!("./evm-contracts/InvalidSudtERC20Proxy.bin");
 
 #[test]
 fn test_invalid_sudt_erc20_proxy() {
@@ -38,6 +38,7 @@ fn test_invalid_sudt_erc20_proxy() {
     let from_script_hash3 = from_script3.hash();
     let from_short_address3 = &from_script_hash3[0..20];
     let from_id3 = state.create_account_from_script(from_script3).unwrap();
+
     state
         .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_short_address1, 2000000)
         .unwrap();
@@ -47,12 +48,13 @@ fn test_invalid_sudt_erc20_proxy() {
     state
         .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_short_address3, 2000000)
         .unwrap();
-
     assert_eq!(CKB_SUDT_ACCOUNT_ID, 1);
     // Deploy InvalidSudtERC20Proxy
     // ethabi encode params -v string "test" -v string "tt" -v uint256 000000000000000000000000000000000000000204fce5e3e250261100000000 -v uint256 0000000000000000000000000000000000000000000000000000000000000001
+    let mut block_number = 0;
     let args = format!("000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000c0000000000000000000000000000000000000000204fce5e3e25026110000000000000000000000000000000000000000000000000000000000000000000000{:02x}0000000000000000000000000000000000000000000000000000000000000004746573740000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000027474000000000000000000000000000000000000000000000000000000000000", new_sudt_id);
-    let init_code = format!("{}{}", INIT_CODE, args);
+    let init_code = format!("{}{}", INVALID_SUDT_ERC20_PROXY_CODE, args);
+    block_number += 1;
     let run_result = deploy(
         &generator,
         &store,
@@ -63,7 +65,7 @@ fn test_invalid_sudt_erc20_proxy() {
         122000,
         0,
         block_producer_id,
-        1,
+        block_number,
     );
     // [Deploy InvalidSudtERC20Proxy] used cycles: 1457382 < 1460K
     helper::check_cycles(
@@ -71,10 +73,9 @@ fn test_invalid_sudt_erc20_proxy() {
         run_result.used_cycles,
         1_460_000,
     );
-
     let contract_account_script =
         new_account_script(&mut state, creator_account_id, from_id1, false);
-    let new_account_id = state
+    let invalid_proxy_account_id = state
         .get_account_id_by_script_hash(&contract_account_script.hash().into())
         .unwrap()
         .unwrap();
@@ -111,7 +112,7 @@ fn test_invalid_sudt_erc20_proxy() {
             .unwrap(),
         0
     );
-    for (idx, (from_id, args_str, success, return_data_str)) in [
+    for (_idx, (from_id, args_str, success, return_data_str)) in [
         // balanceOf(eoa1)
         (
             from_id1,
@@ -140,7 +141,7 @@ fn test_invalid_sudt_erc20_proxy() {
     .iter()
     .enumerate()
     {
-        let block_number = 2 + idx as u64;
+        block_number += 1;
         let block_info = new_block_info(0, block_number, block_number);
         println!(">> [input]: {}", args_str);
         let input = hex::decode(args_str).unwrap();
@@ -152,7 +153,7 @@ fn test_invalid_sudt_erc20_proxy() {
             .build();
         let raw_tx = RawL2Transaction::new_builder()
             .from_id(from_id.pack())
-            .to_id(new_account_id.pack())
+            .to_id(invalid_proxy_account_id.pack())
             .args(Bytes::from(args).pack())
             .build();
         let db = store.begin_transaction();

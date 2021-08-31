@@ -12,7 +12,9 @@ use gw_generator::{dummy_state::DummyState, error::TransactionError, traits::Sta
 use gw_store::{chain_view::ChainView, Store};
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
 
-const INIT_CODE: &str = include_str!("../../../solidity/erc20/SudtERC20Proxy.bin");
+const SUDT_ERC20_PROXY_CODE: &str = include_str!("../../../solidity/erc20/SudtERC20Proxy.bin");
+const SUDT_ERC20_PROXY_USER_DEFINED_DECIMALS_CODE: &str =
+    include_str!("../../../solidity/erc20/SudtERC20Proxy_UserDefinedDecimals.bin");
 
 fn test_sudt_erc20_proxy_inner(
     generator: &Generator,
@@ -21,6 +23,7 @@ fn test_sudt_erc20_proxy_inner(
     creator_account_id: u32,
     new_sudt_id: u32,
     block_producer_id: u32,
+    decimals: Option<u8>,
 ) -> Result<(), TransactionError> {
     let from_script1 = build_eth_l2_script([1u8; 20]);
     let from_script_hash1 = from_script1.hash();
@@ -46,26 +49,60 @@ fn test_sudt_erc20_proxy_inner(
         .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_short_address3, 2000000)
         .unwrap();
 
-    // Deploy ERC20
-    // ethabi encode params -v string "test" -v string "tt" -v uint256 000000000000000000000000000000000000000204fce5e3e250261100000000 -v uint256 0000000000000000000000000000000000000000000000000000000000000001
-    let args = format!("000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000c0000000000000000000000000000000000000000204fce5e3e25026110000000000000000000000000000000000000000000000000000000000000000000000{:02x}0000000000000000000000000000000000000000000000000000000000000004746573740000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000027474000000000000000000000000000000000000000000000000000000000000", new_sudt_id);
-    let init_code = format!("{}{}", INIT_CODE, args);
-    let _run_result = deploy(
-        &generator,
-        &store,
-        state,
-        creator_account_id,
-        from_id1,
-        init_code.as_str(),
-        122000,
-        0,
-        block_producer_id,
-        1,
-    );
+    // Deploy sUDT ERC20 Proxy
+    match decimals {
+        None => {
+            // ethabi encode params -v string "test" -v string "tt" -v uint256 000000000000000000000000000000000000000204fce5e3e250261100000000 -v uint256 0000000000000000000000000000000000000000000000000000000000000001
+            let args = format!("000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000c0000000000000000000000000000000000000000204fce5e3e25026110000000000000000000000000000000000000000000000000000000000000000000000{:02x}0000000000000000000000000000000000000000000000000000000000000004746573740000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000027474000000000000000000000000000000000000000000000000000000000000", new_sudt_id);
+            let init_code = format!("{}{}", SUDT_ERC20_PROXY_CODE, args);
+            let _run_result = deploy(
+                &generator,
+                &store,
+                state,
+                creator_account_id,
+                from_id1,
+                init_code.as_str(),
+                122000,
+                0,
+                block_producer_id,
+                1,
+            );
+            print!("SudtERC20Proxy.ContractCode.hex: 0x");
+            for byte in _run_result.return_data {
+                print!("{:02x}", byte);
+            }
+            println!();
+        }
+        Some(decimals) => {
+            // Deploy SudtERC20Proxy_UserDefinedDecimals
+            // encodeDeploy(["erc20_decimals", "DEC", BigNumber.from(9876543210), 1, 8])
+            // => 0x00000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000e0000000000000000000000000000000000000000000000000000000024cb016ea00000000000000000000000000000000000000000000000000000000000000010000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000e65726332305f646563696d616c7300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000034445430000000000000000000000000000000000000000000000000000000000
+            let args = format!("00000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000e0000000000000000000000000000000000000000000000000000000024cb016ea00000000000000000000000000000000000000000000000000000000000000{:02x}00000000000000000000000000000000000000000000000000000000000000{:02x}000000000000000000000000000000000000000000000000000000000000000e65726332305f646563696d616c7300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000034445430000000000000000000000000000000000000000000000000000000000", new_sudt_id, decimals);
+            let init_code = format!("{}{}", SUDT_ERC20_PROXY_USER_DEFINED_DECIMALS_CODE, args);
+            let _run_result = deploy(
+                &generator,
+                &store,
+                state,
+                creator_account_id,
+                from_id1,
+                init_code.as_str(),
+                122000,
+                0,
+                block_producer_id,
+                1,
+            );
+            print!("SudtERC20Proxy_UserDefinedDecimals.ContractCode.hex: 0x");
+            for byte in _run_result.return_data {
+                print!("{:02x}", byte);
+            }
+            println!();
+        }
+    }
 
     let contract_account_script = new_account_script(state, creator_account_id, from_id1, false);
+    let script_hash = contract_account_script.hash().into();
     let new_account_id = state
-        .get_account_id_by_script_hash(&contract_account_script.hash().into())
+        .get_account_id_by_script_hash(&script_hash)
         .unwrap()
         .unwrap();
     let is_ethabi = true;
@@ -199,6 +236,12 @@ fn test_sudt_erc20_proxy_inner(
             format!("70a08231{}", eoa2_hex),
             "000000000000000000000000000000000000000000000000000000000000082c",
         ),
+        // decimals()
+        (
+            from_id1,
+            "313ce567".to_string(),
+            &format!("00000000000000000000000000000000000000000000000000000000000000{:02x}", decimals.unwrap_or(18))
+        )
     ]
     .iter()
     .enumerate()
@@ -306,6 +349,30 @@ fn test_sudt_erc20_proxy_inner(
 }
 
 #[test]
+fn test_sudt_erc20_proxy_user_defined_decimals() {
+    let (store, mut state, generator, creator_account_id) = setup();
+    let block_producer_script = build_eth_l2_script([0x99u8; 20]);
+    let block_producer_id = state
+        .create_account_from_script(block_producer_script)
+        .unwrap();
+    let new_sudt_script = build_l2_sudt_script([0xffu8; 32]);
+    let new_sudt_id = state.create_account_from_script(new_sudt_script).unwrap();
+
+    assert_eq!(
+        test_sudt_erc20_proxy_inner(
+            &generator,
+            &store,
+            &mut state,
+            creator_account_id,
+            new_sudt_id,
+            block_producer_id,
+            Some(8)
+        ),
+        Ok(())
+    );
+}
+
+#[test]
 fn test_sudt_erc20_proxy() {
     let (store, mut state, generator, creator_account_id) = setup();
     let block_producer_script = build_eth_l2_script([0x99u8; 20]);
@@ -326,6 +393,7 @@ fn test_sudt_erc20_proxy() {
             creator_account_id,
             new_sudt_id,
             block_producer_id,
+            None
         ),
         Ok(())
     );
@@ -353,6 +421,7 @@ fn test_error_sudt_id_sudt_erc20_proxy() {
             creator_account_id,
             error_new_sudt_id,
             block_producer_id,
+            None
         ),
         Err(TransactionError::InvalidExitCode(
             FATAL_PRECOMPILED_CONTRACTS
