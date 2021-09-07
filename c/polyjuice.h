@@ -1160,6 +1160,8 @@ int run_polyjuice() {
   // init buffer for debug_print
   char buffer[DEBUG_BUFFER_SIZE];
   g_debug_buffer = buffer;
+
+  ckb_debug(POLYJUICE_VERSION);
 #endif
 
   int ret;

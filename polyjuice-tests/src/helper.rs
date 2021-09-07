@@ -606,4 +606,11 @@ pub fn check_cycles(l2_tx_label: &str, used_cycles: u64, warning_cycles: u64) {
         l2_tx_label,
         used_cycles
     );
+    let cycles_left = warning_cycles - used_cycles;
+    println!(
+        "[{}] cycles left: {}({}%)",
+        l2_tx_label,
+        cycles_left,
+        cycles_left * 100 / warning_cycles 
+    );
 }
