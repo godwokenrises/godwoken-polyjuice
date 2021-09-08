@@ -173,6 +173,18 @@ build/blockchain.h: build/blockchain.mol
 build/godwoken.h: build/godwoken.mol
 	${MOLC} --language c --schema-file $< > $@
 
+contract/sudt-erc20-proxy:
+	docker run --rm -v $$(pwd)/solidity/erc20:/contracts ethereum/solc:0.8.7 -o /contracts --bin --overwrite /contracts/SudtERC20Proxy_UserDefinedDecimals.sol
+	ERC20BIN_SHASUM="$$(ckb-cli util blake2b --binary-path solidity/erc20/ERC20.bin 2>&1 | head -n1)" && \
+	echo $$ERC20BIN_SHASUM && \
+	if [ "$$ERC20BIN_SHASUM" = "0xa63fcc117d9c73fcaaf65bd469e70bcfe5b3c46f61d1e7e13761c969fd261316" ]; \
+	then echo "ERC20BIN_SHASUM matches" ; \
+	else echo "ERC20BIN_SHASUM does not match" ; exit 1 ; fi
+# ERC20BIN_SHASUM="$$(shasum -a 256 solidity/erc20/ERC20.bin | cut -d' ' -f1)" && \
+# if [ "$$ERC20BIN_SHASUM" = "9f7bf1ab25b377ddc339e6de79a800d4c7dc83de7e12057a0129b467794ce3a3" ] ; \
+# then echo "ERC20BIN_SHASUM matches" ; \
+# else echo "ERC20BIN_SHASUM does not match" ; exit 1 ; fi
+
 fmt:
 	clang-format -i -style=Google c/**/*.*
 

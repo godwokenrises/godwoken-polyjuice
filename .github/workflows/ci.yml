@@ -13,9 +13,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-    - uses: actions/checkout@v1
-    - name: Install Rust components
-      run: rustup component add rustfmt && rustup component add clippy
+    - uses: actions/checkout@v2
+
     - uses: actions/cache@v2
       with:
         path: |
@@ -23,7 +22,18 @@ jobs:
           ~/.cargo/git
           target
         key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
+    
+    - name: Install Rust components
+      run: rustup component add rustfmt && rustup component add clippy
     - name: Install moleculec
-      run: CARGO_TARGET_DIR=target/ cargo install moleculec --version 0.6.1
+      run: |
+        test "$(moleculec --version)" = "Moleculec 0.6.1" \
+        || CARGO_TARGET_DIR=target/ cargo install moleculec --version 0.6.1
+    - name: Install ckb-cli
+      run: CARGO_TARGET_DIR=target/ cargo install ckb-cli
+
+    - name: Validate the checksum of SudtERC20Proxy Contract.bin
+      run: make contract/sudt-erc20-proxy
+        
     - name: Run Integration-Test
       run: bash devtools/ci/integration-test.sh
