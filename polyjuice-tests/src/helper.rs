@@ -43,8 +43,8 @@ pub const SUDT_VALIDATOR_SCRIPT_TYPE_HASH: [u8; 32] = [0xa2u8; 32];
 pub const SECP_DATA: &[u8] = include_bytes!("../../build/secp256k1_data");
 // polyjuice
 pub const BIN_DIR: &str = "../build";
-pub const GENERATOR_NAME: &str = "generator_log";
-pub const VALIDATOR_NAME: &str = "validator_log";
+pub const GENERATOR_NAME: &str = "generator";
+pub const VALIDATOR_NAME: &str = "validator";
 
 pub const ROLLUP_SCRIPT_HASH: [u8; 32] = [0xa9u8; 32];
 pub const ETH_ACCOUNT_LOCK_CODE_HASH: [u8; 32] = [0xaau8; 32];
