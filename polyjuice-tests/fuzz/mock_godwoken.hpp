@@ -21,6 +21,12 @@ public:
     auto result = MockedHost::call(msg);
     return result;
   }
+
+  /// Overwrite get_block_hash (EVMC host method).
+  /// disable blockhashes record
+  bytes32 get_block_hash(int64_t block_number) const noexcept override {
+    return block_hash;
+  }
 };
 
 struct fuzz_input {
