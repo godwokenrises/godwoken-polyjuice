@@ -30,7 +30,7 @@ jobs:
         test "$(moleculec --version)" = "Moleculec 0.6.1" \
         || CARGO_TARGET_DIR=target/ cargo install moleculec --version 0.6.1
     - name: Install ckb-cli
-      run: CARGO_TARGET_DIR=target/ cargo install ckb-cli
+      run: which ckb-cli || CARGO_TARGET_DIR=target/ cargo install ckb-cli --version 0.43.0
 
     - name: Validate the checksum of SudtERC20Proxy Contract.bin
       run: make contract/sudt-erc20-proxy
