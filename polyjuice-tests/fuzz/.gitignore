@@ -6,3 +6,6 @@ artifacts/
 coverage/
 /corpus/*
 !/corpus/regression/
+!/corpus/merged/
+
+/*CORPUS*
