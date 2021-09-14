@@ -57,5 +57,4 @@ For some contracts that consume a lot of memory or that have deep call stacks, t
 * The `transfer value` can not exceed `uint128:MAX`, because the type of [sUDT.amount](https://github.com/nervosnetwork/rfcs/blob/master/rfcs/0025-simple-udt/0025-simple-udt.md#sudt-cell) is `uint128`
 
 * Pre-compiled contract
-  * `bn256_pairing` is not supported yet，due to too high cycle cost (WIP)
   * [addition pre-compiled contracts](Addition-Features.md)
