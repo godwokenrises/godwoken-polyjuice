@@ -56,7 +56,7 @@ int recover_account(gw_context_t* ctx,
     return ERROR_RECOVER_ACCOUNT;
   }
   uint8_t script[GW_MAX_SCRIPT_SIZE];
-  uint64_t script_len = 0;
+  uint64_t script_len = GW_MAX_SCRIPT_SIZE;
   ret = ctx->sys_recover_account(ctx, message, signature, signature_len, code_hash, script, &script_len);
   if (ret != 0) {
     debug_print_int("call sys_recover_account failed", ret);
