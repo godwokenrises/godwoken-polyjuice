@@ -37,3 +37,6 @@ jobs:
         
     - name: Run Integration-Test
       run: bash devtools/ci/integration-test.sh
+
+    - name: Checksums of generator and validator
+      run: sha256sum build/generator build/generator_log build/validator build/validator_log
