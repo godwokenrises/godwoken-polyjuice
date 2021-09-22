@@ -30,8 +30,7 @@ CFLAGS_GODWOKEN := -I$(DEPS)/godwoken-scripts/c
 CFLAGS_MBEDTLS := -I$(DEPS)/mbedtls/include
 CFLAGS_CRYPTO_ALGORITHMS := -I$(DEPS)/crypto-algorithms
 CFLAGS_INTX := -I$(DEPS)/intx/lib/intx -I$(DEPS)/intx/include
-CFLAGS_BN128 := -I$(DEPS)/bn128/include
-CFLAGS := -Wall -O2 -I../../c -I../../c/ripemd160 $(CFLAGS_CKB_STD) $(CFLAGS_ETHASH) $(CFLAGS_EVMONE) $(CFLAGS_SMT) $(CFLAGS_GODWOKEN) $(CFLAGS_SECP) $(CFLAGS_MBEDTLS) $(CFLAGS_CRYPTO_ALGORITHMS) $(CFLAGS_INTX) $(CFLAGS_BN128)
+CFLAGS := -Wall -O2 -I../../c -I../../c/ripemd160 $(CFLAGS_CKB_STD) $(CFLAGS_ETHASH) $(CFLAGS_EVMONE) $(CFLAGS_SMT) $(CFLAGS_GODWOKEN) $(CFLAGS_SECP) $(CFLAGS_MBEDTLS) $(CFLAGS_CRYPTO_ALGORITHMS) $(CFLAGS_INTX)
 CXXFLAGS := $(CFLAGS) -std=c++1z
 LDFLAGS := -Wl,--gc-sections
 SANITIZER_FLAGS := -g -O1 -fsanitize=address,undefined -Wno-incompatible-pointer-types
@@ -45,7 +44,8 @@ PROTOCOL_SCHEMA_URL := https://raw.githubusercontent.com/nervosnetwork/godwoken/
 
 ALL_OBJS := $(BUILD)/keccak.o $(BUILD)/keccakf800.o \
   $(BUILD)/execution_state.o $(BUILD)/evmc_hex.o $(BUILD)/baseline.o $(BUILD)/analysis.o $(BUILD)/instruction_metrics.o $(BUILD)/instruction_names.o $(BUILD)/execution.o $(BUILD)/instructions.o $(BUILD)/instructions_calls.o $(BUILD)/evmone.o \
-  $(BUILD)/sha256.o $(BUILD)/memzero.o $(BUILD)/ripemd160.o $(BUILD)/bignum.o $(BUILD)/platform_util.o
+  $(BUILD)/sha256.o $(BUILD)/memzero.o $(BUILD)/ripemd160.o $(BUILD)/bignum.o $(BUILD)/platform_util.o \
+  $(BUILD)/libalt_bn128.o
 BIN_DEPS := ../../c/contracts.h ../../c/sudt_contracts.h ../../c/other_contracts.h ../../c/polyjuice.h ../../c/polyjuice_utils.h $(BUILD)/secp256k1_data_info.h $(ALL_OBJS)
 GENERATOR_DEPS := ../../c/generator/secp256k1_helper.h $(BIN_DEPS)
 VALIDATOR_DEPS := ../../c/validator/secp256k1_helper.h $(BIN_DEPS)
@@ -116,12 +116,11 @@ build/validator_log: ../../c/validator.c $(VALIDATOR_DEPS)
 	cd $(SECP_DIR) && (git apply -R workaround-fix-g++-linking.patch || true) && cd - # revert patch
 
 build/test_contracts: generate-protocol ../../c/tests/test_contracts.c $(VALIDATOR_DEPS)
-# FIXME: error: unknown register name 't0' in asm - https://github.com/Flouse/godwoken-polyjuice/runs/3671039479?check_suite_focus=true#step:10:14
-# 	cd $(SECP_DIR) && (git apply workaround-fix-g++-linking.patch || true) && cd - # apply patch
-# 	${CXX} $(CFLAGS) $(LDFLAGS) $(SANITIZER_FLAGS) -Ibuild -o $@ ../../c/tests/test_contracts.c $(ALL_OBJS) -DFUZZING
-# 	$(OBJCOPY) --only-keep-debug $@ $@.debug
-# 	$(OBJCOPY) --strip-debug --strip-all $@
-# 	cd $(SECP_DIR) && (git apply -R workaround-fix-g++-linking.patch || true) && cd - # revert patch
+	cd $(SECP_DIR) && (git apply workaround-fix-g++-linking.patch || true) && cd - # apply patch
+	${CXX} $(CFLAGS) $(LDFLAGS) $(SANITIZER_FLAGS) -Ibuild -o $@ ../../c/tests/test_contracts.c $(ALL_OBJS) -DFUZZING
+	$(OBJCOPY) --only-keep-debug $@ $@.debug
+	$(OBJCOPY) --strip-debug --strip-all $@
+	cd $(SECP_DIR) && (git apply -R workaround-fix-g++-linking.patch || true) && cd - # revert patch
 
 # test rlp_encode_sender_and_nonce
 # RLP (Recursive Length Prefix)
@@ -173,6 +172,13 @@ build/platform_util.o: $(DEPS)/mbedtls/library/platform_util.c
 build/bignum.o: $(DEPS)/mbedtls/library/bignum.c
 	$(CC) $(CFLAGS) $(LDFLAGS) -c -o $@ $<
 
+# Pairing cryptography library in Rust
+build/libalt_bn128.o:
+# This output will create *.so files on Linux, *.dylib files on macOS.
+	cd $(DEPS)/bn/alt_bn128_cdylib && cargo build --release
+	cp $(DEPS)/bn/alt_bn128_cdylib/target/release/libalt_bn128.so build/libalt_bn128.o || \
+	cp $(DEPS)/bn/alt_bn128_cdylib/target/release/libalt_bn128.dylib build/libalt_bn128.o
+	
 build/sha256.o: $(DEPS)/crypto-algorithms/sha256.c
 	$(CXX) $(CFLAGS) $(LDFLAGS) -c -o $@ $<
 
