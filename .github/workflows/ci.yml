@@ -25,7 +25,7 @@ jobs:
         key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
     
     - name: Install Rust components
-      run: rustup component add rustfmt && rustup component add clippy && rustup target add riscv64imac-unknown-none-elf
+      run: rustup component add rustfmt && rustup component add clippy
     - name: Install moleculec
       run: |
         export MOLC_VERSION=$(cat deps/godwoken-scripts/c/Makefile | egrep "MOLC_VERSION :=" | awk '{print $3}')

@@ -198,6 +198,7 @@ build/bignum.o: deps/mbedtls/library/bignum.c
 
 # Pairing cryptography library in Rust
 build/libalt_bn128.a:
+	cd deps/bn/alt_bn128_staticlib && rustup target add riscv64imac-unknown-none-elf
 	cd deps/bn/alt_bn128_staticlib && cargo build --release --target riscv64imac-unknown-none-elf
 	cp deps/bn/alt_bn128_staticlib/target/riscv64imac-unknown-none-elf/release/libalt_bn128.a build/
 
