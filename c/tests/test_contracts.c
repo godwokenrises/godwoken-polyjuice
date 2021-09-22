@@ -684,6 +684,9 @@ int init_mock_state() {
 #endif
 
 int main() {
+  // A temporal patch to solve https://github.com/nervosnetwork/ckb-vm/issues/97
+  CKB_SP_ALIGN;
+
 #ifdef POLYJUICE_DEBUG_LOG
   // init buffer for debug_print
   char buffer[DEBUG_BUFFER_SIZE];
@@ -707,31 +710,41 @@ int main() {
   memset(g_script_code_hash, 0, 32);
 
   if (test_ecrecover() != 0) {
+    CKB_SP_ALIGN_END;
     return -1;
   }
   if (test_sha256hash() != 0) {
+    CKB_SP_ALIGN_END;
     return -2;
   }
   if (test_ripemd160hash() != 0) {
+    CKB_SP_ALIGN_END;
     return -3;
   }
   if (test_data_copy() != 0) {
+    CKB_SP_ALIGN_END;
     return -4;
   }
   if (test_big_mod_exp() != 0) {
+    CKB_SP_ALIGN_END;
     return -5;
   }
   if (test_bn256_add_istanbul() != 0) {
+    CKB_SP_ALIGN_END;
     return -6;
   }
   if (test_bn256_scalar_mul_istanbul() != 0) {
+    CKB_SP_ALIGN_END; // use CKB_SP_ALIGN_END before exiting
     return -7;
   }
   if (test_bn256_pairing_istanbul() != 0) {
+    CKB_SP_ALIGN_END; // use CKB_SP_ALIGN_END before exiting
     return -8;
   }
   if (test_blake2f() != 0) {
+    CKB_SP_ALIGN_END; // use CKB_SP_ALIGN_END before exiting
     return -9;
   }
+  CKB_SP_ALIGN_END;
   return 0;
 }

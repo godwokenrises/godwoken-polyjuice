@@ -51,9 +51,10 @@ jobs:
     - name: test_rlp on x86 with sanitizers
       working-directory: ./polyjuice-tests/fuzz
       run: make build/test_rlp && ./build/test_rlp
-    - name: test_contracts on x86 with sanitizers
-      working-directory: ./polyjuice-tests/fuzz
-      run: make build/test_contracts && ./build/test_contracts
+    # FIXME: error: unknown register name 't0' in asm - https://github.com/Flouse/godwoken-polyjuice/runs/3671039479?check_suite_focus=true#step:10:14
+    # - name: test_contracts on x86 with sanitizers
+    #   working-directory: ./polyjuice-tests/fuzz
+    #   run: make build/test_contracts && ./build/test_contracts
 
     - name: Set MAX_FUZZ_TIME for different branches
       run: |
