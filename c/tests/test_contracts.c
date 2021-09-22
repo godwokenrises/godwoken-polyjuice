@@ -681,6 +681,10 @@ int init_mock_state() {
   gw_update_raw(raw_key, bytes32{1}.bytes);
   return 0;
 }
+#undef CKB_SP_ALIGN
+#undef CKB_SP_ALIGN_END
+#define CKB_SP_ALIGN do {} while (0)
+#define CKB_SP_ALIGN_END do {} while (0)
 #endif
 
 int main() {
