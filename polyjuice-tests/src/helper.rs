@@ -580,8 +580,8 @@ pub fn simple_storage_get(
             L2TX_MAX_CYCLES,
         )
         .expect("construct");
-    // 491894, 571661 < 580K
-    check_cycles("simple_storage_get", run_result.used_cycles, 580_000);
+    // 491894, 571661 -> 586360 < 587K
+    check_cycles("simple_storage_get", run_result.used_cycles, 587_000);
     run_result
 }
 

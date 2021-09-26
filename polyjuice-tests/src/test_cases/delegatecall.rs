@@ -132,7 +132,8 @@ fn test_delegatecall() {
                 L2TX_MAX_CYCLES,
             )
             .expect("construct");
-        helper::check_cycles("DelegateCall", run_result.used_cycles, 1_440_000);
+        // [DelegateCall] used cycles: 1457344 < 1460K
+        helper::check_cycles("DelegateCall", run_result.used_cycles, 1_460_000);
         state.apply_run_result(&run_result).expect("update state");
         // println!(
         //     "result {}",

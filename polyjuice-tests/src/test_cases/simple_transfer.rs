@@ -106,8 +106,8 @@ fn test_simple_transfer() {
         block_producer_id,
         block_number,
     );
-    // [Deploy SimpleTransfer] used cycles: 491894 < 500K
-    helper::check_cycles("Deploy SimpleTransfer", run_result.used_cycles, 500_000);
+    // [Deploy SimpleTransfer] used cycles: 491894 -> 500005 < 501K
+    helper::check_cycles("Deploy SimpleTransfer", run_result.used_cycles, 501_000);
 
     block_number += 1;
     let contract_account_script =

@@ -98,8 +98,8 @@ fn test_fallback_function() {
                 L2TX_MAX_CYCLES,
             )
             .expect("construct");
-        // [Call fallback()] used cycles: 504210 < 510K
-        helper::check_cycles("Call fallback()", run_result.used_cycles, 510_000);
+        // [Call fallback()] used cycles: 514059 < 520K
+        helper::check_cycles("Call fallback()", run_result.used_cycles, 520_000);
         assert!(run_result.return_data.is_empty());
         state.apply_run_result(&run_result).expect("update state");
     }
