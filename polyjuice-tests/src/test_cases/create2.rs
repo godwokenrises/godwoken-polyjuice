@@ -8,7 +8,6 @@ use crate::helper::{
 use gw_common::state::State;
 use gw_generator::{constants::L2TX_MAX_CYCLES, traits::StateExt};
 use gw_store::chain_view::ChainView;
-// use gw_jsonrpc_types::parameter::RunResult;
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
 
 const SS_INIT_CODE: &str = include_str!("./evm-contracts/SimpleStorage.bin");

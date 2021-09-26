@@ -7,7 +7,6 @@ use crate::helper::{
 };
 use gw_common::state::State;
 use gw_generator::{constants::L2TX_MAX_CYCLES, traits::StateExt};
-// use gw_jsonrpc_types::parameter::RunResult;
 use gw_store::chain_view::ChainView;
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
 
