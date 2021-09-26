@@ -6,12 +6,12 @@ use crate::helper::{
     new_account_script, new_block_info, setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
-use gw_generator::{error::TransactionError, traits::StateExt};
-// use gw_jsonrpc_types::parameter::RunResult;
+use gw_generator::{constants::L2TX_MAX_CYCLES, error::TransactionError, traits::StateExt};
 use gw_store::chain_view::ChainView;
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
 
-const INVALID_SUDT_ERC20_PROXY_CODE: &str = include_str!("./evm-contracts/InvalidSudtERC20Proxy.bin");
+const INVALID_SUDT_ERC20_PROXY_CODE: &str =
+    include_str!("./evm-contracts/InvalidSudtERC20Proxy.bin");
 
 #[test]
 fn test_invalid_sudt_erc20_proxy() {
@@ -163,6 +163,7 @@ fn test_invalid_sudt_erc20_proxy() {
             &state,
             &block_info,
             &raw_tx,
+            L2TX_MAX_CYCLES,
         );
 
         if *success {

@@ -7,7 +7,10 @@ use crate::helper::{
     FATAL_PRECOMPILED_CONTRACTS,
 };
 use gw_common::state::State;
-use gw_generator::{dummy_state::DummyState, error::TransactionError, traits::StateExt, Generator};
+use gw_generator::{
+    constants::L2TX_MAX_CYCLES, dummy_state::DummyState, error::TransactionError, traits::StateExt,
+    Generator,
+};
 // use gw_jsonrpc_types::parameter::RunResult;
 use gw_store::{chain_view::ChainView, Store};
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
@@ -240,8 +243,11 @@ fn test_sudt_erc20_proxy_inner(
         (
             from_id1,
             "313ce567".to_string(),
-            &format!("00000000000000000000000000000000000000000000000000000000000000{:02x}", decimals.unwrap_or(18))
-        )
+            &format!(
+                "00000000000000000000000000000000000000000000000000000000000000{:02x}",
+                decimals.unwrap_or(18)
+            ),
+        ),
     ]
     .iter()
     .enumerate()
@@ -268,6 +274,7 @@ fn test_sudt_erc20_proxy_inner(
             state,
             &block_info,
             &raw_tx,
+            L2TX_MAX_CYCLES,
         )?;
         state.apply_run_result(&run_result).expect("update state");
         assert_eq!(
@@ -305,6 +312,7 @@ fn test_sudt_erc20_proxy_inner(
                 state,
                 &block_info,
                 &raw_tx,
+                L2TX_MAX_CYCLES,
             )
             .expect_err("err");
         // by: `revert(0, 0)`
@@ -340,6 +348,7 @@ fn test_sudt_erc20_proxy_inner(
                 state,
                 &block_info,
                 &raw_tx,
+                L2TX_MAX_CYCLES,
             )
             .expect_err("err");
         // by: `revert(0, 0)`

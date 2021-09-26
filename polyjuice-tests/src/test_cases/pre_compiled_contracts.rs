@@ -6,7 +6,7 @@ use ckb_vm::{
     DefaultMachineBuilder, Error as VMError, Register, SupportMachine, Syscalls,
 };
 use gw_common::{h256_ext::H256Ext, state::build_data_hash_key, H256};
-use gw_generator::syscalls::store_data;
+use gw_generator::{constants::L2TX_MAX_CYCLES, syscalls::store_data};
 use gw_types::bytes::Bytes;
 use std::collections::HashMap;
 
@@ -99,6 +99,29 @@ impl L2Syscalls {
     }
 }
 
+struct AsmCoreMachineParams {
+    pub vm_isa: u8,
+    pub vm_version: u32,
+}
+
+impl AsmCoreMachineParams {
+    pub fn with_version(vm_version: u32) -> Result<AsmCoreMachineParams, VMError> {
+        if vm_version == 0 {
+            Ok(AsmCoreMachineParams {
+                vm_isa: ckb_vm::ISA_IMC,
+                vm_version: ckb_vm::machine::VERSION0,
+            })
+        } else if vm_version == 1 {
+            Ok(AsmCoreMachineParams {
+                vm_isa: ckb_vm::ISA_IMC | ckb_vm::ISA_B | ckb_vm::ISA_MOP,
+                vm_version: ckb_vm::machine::VERSION1,
+            })
+        } else {
+            Err(VMError::InvalidVersion)
+        }
+    }
+}
+
 #[test]
 fn test_contracts() {
     let binary: Bytes = BINARY.to_vec().into();
@@ -112,7 +135,9 @@ fn test_contracts() {
     let mut tree = HashMap::default();
     tree.insert(build_data_hash_key(SECP_DATA_HASH.as_slice()), H256::one());
 
-    let core_machine = Box::<AsmCoreMachine>::default();
+    let params = AsmCoreMachineParams::with_version(1).unwrap();
+    let core_machine = AsmCoreMachine::new(params.vm_isa, params.vm_version, L2TX_MAX_CYCLES);
+
     let machine_builder =
         DefaultMachineBuilder::new(core_machine).syscall(Box::new(L2Syscalls { data, tree }));
     let mut machine = AsmMachine::new(machine_builder.build(), None);

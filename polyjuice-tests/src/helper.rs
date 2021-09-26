@@ -10,14 +10,15 @@ use gw_db::schema::{COLUMN_INDEX, COLUMN_META, META_TIP_BLOCK_HASH_KEY};
 pub use gw_generator::{
     account_lock_manage::{always_success::AlwaysSuccess, secp256k1::Secp256k1, AccountLockManage},
     backend_manage::{Backend, BackendManage},
+    constants::L2TX_MAX_CYCLES,
     dummy_state::DummyState,
     traits::StateExt,
-    types::RollupContext,
     Generator,
 };
 use gw_store::traits::KVStore;
 pub use gw_store::{chain_view::ChainView, Store};
 use gw_traits::CodeStore;
+use gw_types::offchain::RollupContext;
 use gw_types::{
     bytes::Bytes,
     core::ScriptHashType,
@@ -445,7 +446,12 @@ pub fn setup() -> (Store, DummyState, Generator, u32) {
         rollup_script_hash: ROLLUP_SCRIPT_HASH.clone().into(),
         rollup_config,
     };
-    let generator = Generator::new(backend_manage, account_lock_manage, rollup_context);
+    let generator = Generator::new(
+        backend_manage,
+        account_lock_manage,
+        rollup_context,
+        Default::default(),
+    );
 
     let tx = store.begin_transaction();
     let tip_block_number: Uint64 = 8.pack();
@@ -502,6 +508,7 @@ pub fn deploy(
             state,
             &block_info,
             &raw_tx,
+            L2TX_MAX_CYCLES,
         )
         .expect("construct");
     state.apply_run_result(&run_result).expect("update state");
@@ -570,6 +577,7 @@ pub fn simple_storage_get(
             state,
             &block_info,
             &raw_tx,
+            L2TX_MAX_CYCLES,
         )
         .expect("construct");
     // 491894, 571661 < 580K
@@ -611,6 +619,6 @@ pub fn check_cycles(l2_tx_label: &str, used_cycles: u64, warning_cycles: u64) {
         "[{}] cycles left: {}({}%)",
         l2_tx_label,
         cycles_left,
-        cycles_left * 100 / warning_cycles 
+        cycles_left * 100 / warning_cycles
     );
 }

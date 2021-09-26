@@ -5,7 +5,7 @@ use crate::helper::{
     PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, PROGRAM_CODE_HASH, ROLLUP_SCRIPT_HASH,
 };
 use gw_common::state::State;
-use gw_generator::traits::StateExt;
+use gw_generator::{constants::L2TX_MAX_CYCLES, traits::StateExt};
 use gw_store::chain_view::ChainView;
 use gw_types::{
     bytes::Bytes,
@@ -87,6 +87,7 @@ fn test_eth_to_godwoken_addr() {
                 &state,
                 &block_info,
                 &raw_tx,
+                L2TX_MAX_CYCLES,
             )
             .expect("construct");
         // [EthToGodwokenAddr.convert(addr)] used cycles: 573228 < 580K

@@ -6,7 +6,7 @@ use crate::helper::{
     PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
-use gw_generator::traits::StateExt;
+use gw_generator::{constants::L2TX_MAX_CYCLES, traits::StateExt};
 use gw_store::chain_view::ChainView;
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
 
@@ -52,6 +52,7 @@ fn test_fallback_function() {
                 &state,
                 &block_info,
                 &raw_tx,
+                L2TX_MAX_CYCLES,
             )
             .expect("construct");
         // [Deploy FallbackFunction] used cycles: 587271 < 590K
@@ -94,6 +95,7 @@ fn test_fallback_function() {
                 &state,
                 &block_info,
                 &raw_tx,
+                L2TX_MAX_CYCLES,
             )
             .expect("construct");
         // [Call fallback()] used cycles: 504210 < 510K

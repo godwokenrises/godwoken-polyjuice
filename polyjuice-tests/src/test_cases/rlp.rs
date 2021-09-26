@@ -4,7 +4,6 @@ use ckb_vm::{
     registers::{A0, A7},
     DefaultMachineBuilder, Error as VMError, Register, SupportMachine, Syscalls,
 };
-use gw_types::bytes::Bytes;
 
 const BINARY: &[u8] = include_bytes!("../../../build/test_rlp");
 const DEBUG_PRINT_SYSCALL_NUMBER: u64 = 2177;
@@ -54,10 +53,40 @@ impl L2Syscalls {
     }
 }
 
+struct AsmCoreMachineParams {
+    pub vm_isa: u8,
+    pub vm_version: u32,
+}
+
+impl AsmCoreMachineParams {
+    pub fn with_version(vm_version: u32) -> Result<AsmCoreMachineParams, VMError> {
+        if vm_version == 0 {
+            Ok(AsmCoreMachineParams {
+                vm_isa: ckb_vm::ISA_IMC,
+                vm_version: ckb_vm::machine::VERSION0,
+            })
+        } else if vm_version == 1 {
+            Ok(AsmCoreMachineParams {
+                vm_isa: ckb_vm::ISA_IMC | ckb_vm::ISA_B | ckb_vm::ISA_MOP,
+                vm_version: ckb_vm::machine::VERSION1,
+            })
+        } else {
+            Err(VMError::InvalidVersion)
+        }
+    }
+}
+
 #[test]
 fn test_rlp() {
-    let binary: Bytes = BINARY.to_vec().into();
-    let core_machine = Box::<AsmCoreMachine>::default();
+    let binary: gw_types::bytes::Bytes = BINARY.to_vec().into();
+
+    let params = AsmCoreMachineParams::with_version(1).unwrap();
+    let core_machine = AsmCoreMachine::new(
+        params.vm_isa,
+        params.vm_version,
+        gw_generator::constants::L2TX_MAX_CYCLES,
+    );
+
     let machine_builder = DefaultMachineBuilder::new(core_machine).syscall(Box::new(L2Syscalls));
     let mut machine = AsmMachine::new(machine_builder.build(), None);
     machine.load_program(&binary, &[]).unwrap();

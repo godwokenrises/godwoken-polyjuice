@@ -7,7 +7,7 @@ use crate::helper::{
     CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
-use gw_generator::traits::StateExt;
+use gw_generator::{constants::L2TX_MAX_CYCLES, traits::StateExt};
 use gw_store::chain_view::ChainView;
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
 
@@ -140,6 +140,7 @@ fn test_selfdestruct() {
                 &state,
                 &block_info,
                 &raw_tx,
+                L2TX_MAX_CYCLES,
             )
             .expect("construct");
         state.apply_run_result(&run_result).expect("update state");
@@ -191,6 +192,7 @@ fn test_selfdestruct() {
             &state,
             &block_info,
             &raw_tx,
+            L2TX_MAX_CYCLES,
         );
         println!("result {:?}", result);
         assert!(result.is_err());
@@ -222,6 +224,7 @@ fn test_selfdestruct() {
             &state,
             &block_info,
             &raw_tx,
+            L2TX_MAX_CYCLES,
         );
         println!("result {:?}", result);
         assert!(result.is_err());

@@ -6,7 +6,7 @@ use crate::helper::{
     setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
-use gw_generator::traits::StateExt;
+use gw_generator::{constants::L2TX_MAX_CYCLES, traits::StateExt};
 use gw_store::chain_view::ChainView;
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
 
@@ -66,6 +66,7 @@ fn test_selfdestruct() {
                 &state,
                 &block_info,
                 &raw_tx,
+                L2TX_MAX_CYCLES,
             )
             .expect("construct");
         // [Deploy SelfDestruct] used cycles: 570570 < 580K
@@ -116,6 +117,7 @@ fn test_selfdestruct() {
                 &state,
                 &block_info,
                 &raw_tx,
+                L2TX_MAX_CYCLES,
             )
             .expect("construct");
         // [call SelfDestruct.done()] used cycles: 589657 < 600K
@@ -157,6 +159,7 @@ fn test_selfdestruct() {
             &state,
             &block_info,
             &raw_tx,
+            L2TX_MAX_CYCLES,
         );
         println!("result {:?}", result);
         assert!(result.is_err());
