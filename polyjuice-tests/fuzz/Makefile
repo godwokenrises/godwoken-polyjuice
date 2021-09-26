@@ -37,9 +37,10 @@ LDFLAGS := -Wl,--gc-sections
 SANITIZER_FLAGS := -g -O1 -fsanitize=address,undefined -Wno-incompatible-pointer-types
 LIMIT_ERROR := -ferror-limit=1
 
+# TODO: read PROTOCOL_VERSION from deps/godwoken-scripts/c/Makefile
 MOLC := moleculec
-MOLC_VERSION := 0.6.1
-PROTOCOL_VERSION := 2221efdfcf06351fa1884ea0f2df1604790c3378
+MOLC_VERSION := 0.7.2
+PROTOCOL_VERSION := f6c8f8d8edf094bd45469a28d8493c54958c3321
 PROTOCOL_SCHEMA_URL := https://raw.githubusercontent.com/nervosnetwork/godwoken/${PROTOCOL_VERSION}/crates/types/schemas
 
 ALL_OBJS := $(BUILD)/keccak.o $(BUILD)/keccakf800.o \

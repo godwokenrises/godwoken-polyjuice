@@ -15,7 +15,7 @@ else
     git clone -b master https://github.com/nervosnetwork/godwoken.git $GODWOKEN_DIR
 fi
 cd $GODWOKEN_DIR
-git checkout 4e65efde86bb16aafc6d29aee1bf6f586077eaf6
+git checkout 5a59b6d3ac83c0b9378b199148db8e934c4ea658
 git submodule update --init --recursive
 
 cd tests-deps/godwoken-scripts/c

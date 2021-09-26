@@ -27,8 +27,8 @@ jobs:
       run: rustup component add rustfmt && rustup component add clippy
     - name: Install moleculec
       run: |
-        test "$(moleculec --version)" = "Moleculec 0.6.1" \
-        || CARGO_TARGET_DIR=target/ cargo install moleculec --version 0.6.1
+        test "$(moleculec --version)" = "Moleculec 0.7.2" \
+        || CARGO_TARGET_DIR=target/ cargo install moleculec --version 0.7.2
     - name: Install ckb-cli
       run: which ckb-cli || CARGO_TARGET_DIR=target/ cargo install ckb-cli --version 0.43.0
 
