@@ -1,3 +1,5 @@
+SHELL=/bin/bash
+
 # TARGET := riscv64-unknown-linux-gnu
 TARGET := riscv64-unknown-elf
 CC := $(TARGET)-gcc
@@ -23,10 +25,9 @@ LDFLAGS := -Wl,--gc-sections
 
 SECP256K1_SRC := $(SECP_DIR)/src/ecmult_static_pre_context.h
 
-# TODO: read PROTOCOL_VERSION from deps/godwoken-scripts/c/Makefile
 MOLC := moleculec
-MOLC_VERSION := 0.7.2
-PROTOCOL_VERSION := f6c8f8d8edf094bd45469a28d8493c54958c3321
+MOLC_VERSION := $(shell cat deps/godwoken-scripts/c/Makefile | egrep "MOLC_VERSION :=" | awk '{print $$3}')
+PROTOCOL_VERSION := $(shell cat deps/godwoken-scripts/c/Makefile | egrep "PROTOCOL_VERSION :=" | awk '{print $$3}')
 PROTOCOL_SCHEMA_URL := https://raw.githubusercontent.com/nervosnetwork/godwoken/${PROTOCOL_VERSION}/crates/types/schemas
 
 ALL_OBJS := build/execution_state.o build/baseline.o build/analysis.o build/instruction_metrics.o build/instruction_names.o build/execution.o build/instructions.o build/instructions_calls.o build/evmone.o \

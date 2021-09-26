@@ -39,8 +39,8 @@ LIMIT_ERROR := -ferror-limit=1
 
 # TODO: read PROTOCOL_VERSION from deps/godwoken-scripts/c/Makefile
 MOLC := moleculec
-MOLC_VERSION := 0.7.2
-PROTOCOL_VERSION := f6c8f8d8edf094bd45469a28d8493c54958c3321
+MOLC_VERSION := $(shell cat $(DEPS)/godwoken-scripts/c/Makefile | egrep "MOLC_VERSION :=" | awk '{print $$3}')
+PROTOCOL_VERSION := $(shell cat $(DEPS)/godwoken-scripts/c/Makefile | egrep "PROTOCOL_VERSION :=" | awk '{print $$3}')
 PROTOCOL_SCHEMA_URL := https://raw.githubusercontent.com/nervosnetwork/godwoken/${PROTOCOL_VERSION}/crates/types/schemas
 
 ALL_OBJS := $(BUILD)/keccak.o $(BUILD)/keccakf800.o \
@@ -190,6 +190,7 @@ $(SECP256K1_SRC):
 generate-protocol: check-moleculec-version build/blockchain.h build/godwoken.h
 check-moleculec-version:
 	test "$$(${MOLC} --version | awk '{ print $$2 }' | tr -d ' ')" = ${MOLC_VERSION}
+
 build/blockchain.h: build/blockchain.mol
 	${MOLC} --language c --schema-file $< > $@
 build/godwoken.h: build/godwoken.mol
