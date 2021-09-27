@@ -7,7 +7,7 @@ use crate::helper::{
 };
 use gw_common::state::State;
 use gw_db::schema::COLUMN_INDEX;
-use gw_generator::traits::StateExt;
+use gw_generator::{constants::L2TX_MAX_CYCLES, traits::StateExt};
 // use gw_jsonrpc_types::parameter::RunResult;
 use gw_store::chain_view::ChainView;
 use gw_store::traits::KVStore;
@@ -76,6 +76,7 @@ fn test_get_block_info() {
             &state,
             &block_info,
             &raw_tx,
+            L2TX_MAX_CYCLES,
         )
         .expect("construct");
     state.apply_run_result(&run_result).expect("update state");
@@ -145,6 +146,7 @@ fn test_get_block_info() {
                 &state,
                 &block_info,
                 &raw_tx,
+                L2TX_MAX_CYCLES,
             )
             .expect("construct");
         assert_eq!(

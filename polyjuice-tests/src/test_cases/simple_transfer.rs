@@ -7,7 +7,7 @@ use crate::helper::{
     CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
-use gw_generator::traits::StateExt;
+use gw_generator::{constants::L2TX_MAX_CYCLES, traits::StateExt};
 // use gw_jsonrpc_types::parameter::RunResult;
 use gw_store::chain_view::ChainView;
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
@@ -106,8 +106,8 @@ fn test_simple_transfer() {
         block_producer_id,
         block_number,
     );
-    // [Deploy SimpleTransfer] used cycles: 491894 < 500K
-    helper::check_cycles("Deploy SimpleTransfer", run_result.used_cycles, 500_000);
+    // [Deploy SimpleTransfer] used cycles: 491894 -> 500005 < 501K
+    helper::check_cycles("Deploy SimpleTransfer", run_result.used_cycles, 501_000);
 
     block_number += 1;
     let contract_account_script =
@@ -159,6 +159,7 @@ fn test_simple_transfer() {
                 &state,
                 &block_info,
                 &raw_tx,
+                L2TX_MAX_CYCLES,
             )
             .expect("construct");
         // [SimpleTransfer to EoA] used cycles: 725217 < 736K
@@ -206,6 +207,7 @@ fn test_simple_transfer() {
                 &state,
                 &block_info,
                 &raw_tx,
+                L2TX_MAX_CYCLES,
             )
             .expect("construct");
         // [SimpleTransfer to zero address] used cycles: 699554 < 710K
@@ -259,6 +261,7 @@ fn test_simple_transfer() {
                 &state,
                 &block_info,
                 &raw_tx,
+                L2TX_MAX_CYCLES,
             )
             .expect("construct");
         // [SimpleTransfer.transferToSimpleStorage1] used cycles: 1203332 < 1210K
@@ -324,6 +327,7 @@ fn test_simple_transfer() {
                 &state,
                 &block_info,
                 &raw_tx,
+                L2TX_MAX_CYCLES,
             )
             .expect("construct");
         state.apply_run_result(&run_result).expect("update state");

@@ -23,9 +23,10 @@ LDFLAGS := -Wl,--gc-sections
 
 SECP256K1_SRC := $(SECP_DIR)/src/ecmult_static_pre_context.h
 
+# TODO: read PROTOCOL_VERSION from deps/godwoken-scripts/c/Makefile
 MOLC := moleculec
-MOLC_VERSION := 0.6.1
-PROTOCOL_VERSION := 2221efdfcf06351fa1884ea0f2df1604790c3378
+MOLC_VERSION := 0.7.2
+PROTOCOL_VERSION := f6c8f8d8edf094bd45469a28d8493c54958c3321
 PROTOCOL_SCHEMA_URL := https://raw.githubusercontent.com/nervosnetwork/godwoken/${PROTOCOL_VERSION}/crates/types/schemas
 
 ALL_OBJS := build/execution_state.o build/baseline.o build/analysis.o build/instruction_metrics.o build/instruction_names.o build/execution.o build/instructions.o build/instructions_calls.o build/evmone.o \

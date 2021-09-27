@@ -7,7 +7,7 @@ use crate::helper::{
 };
 
 use gw_common::state::State;
-use gw_generator::traits::StateExt; // error::TransactionError,
+use gw_generator::{constants::L2TX_MAX_CYCLES, traits::StateExt};
 use gw_store::chain_view::ChainView;
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
 
@@ -75,10 +75,11 @@ fn test_heap_momory() {
                 &state,
                 &block_info,
                 &raw_tx,
+                L2TX_MAX_CYCLES,
             )
             .expect("success to malloc memory");
-        // [newMemory less than 512K] used cycles: 752,115 < 760K
-        helper::check_cycles("new Memory", run_result.used_cycles, 760_000);
+        // [newMemory less than 512K] used cycles: 752,115 -> 883611 (increase 17.48%) < 890K
+        helper::check_cycles("new Memory", run_result.used_cycles, 890_000);
         println!(
             "\t new byte(about {}K) => call result {:?}",
             16 * 32,
@@ -112,6 +113,7 @@ fn test_heap_momory() {
                 &state,
                 &block_info,
                 &raw_tx,
+                L2TX_MAX_CYCLES,
             )
             .expect_err("OOM");
         println!("{:?}", err);

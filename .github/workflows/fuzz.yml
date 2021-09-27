@@ -21,8 +21,8 @@ jobs:
         key: ${{ runner.os }}-cargo-${{ hashFiles('Cargo.lock') }}
     - name: Install moleculec
       run: |
-        test "$(moleculec --version)" = "Moleculec 0.6.1" \
-        || CARGO_TARGET_DIR=target/ cargo install moleculec --version 0.6.1
+        test "$(moleculec --version)" = "Moleculec 0.7.2" \
+        || CARGO_TARGET_DIR=target/ cargo install moleculec --version 0.7.2 --force
     - name: Cache LLVM and Clang
       id: cache-llvm
       uses: actions/cache@v2

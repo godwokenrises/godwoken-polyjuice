@@ -7,7 +7,7 @@ use crate::helper::{
     ROLLUP_SCRIPT_HASH, SECP_LOCK_CODE_HASH,
 };
 use gw_common::state::State;
-use gw_generator::{error::TransactionError, traits::StateExt};
+use gw_generator::{constants::L2TX_MAX_CYCLES, error::TransactionError, traits::StateExt};
 use gw_store::chain_view::ChainView;
 use gw_types::{
     bytes::Bytes,
@@ -97,6 +97,7 @@ fn test_recover_account() {
                 &state,
                 &block_info,
                 &raw_tx,
+                L2TX_MAX_CYCLES,
             )
             .expect("construct");
         // [RecoverAccount.recover(message, signature, code_hash)] used cycles: 648630 < 670K
@@ -150,6 +151,7 @@ fn test_recover_account() {
                 &state,
                 &block_info,
                 &raw_tx,
+                L2TX_MAX_CYCLES,
             )
             .expect("construct");
         state.apply_run_result(&run_result).expect("update state");
@@ -188,6 +190,7 @@ fn test_recover_account() {
                 &state,
                 &block_info,
                 &raw_tx,
+                L2TX_MAX_CYCLES,
             )
             .expect_err("construct");
         assert_eq!(

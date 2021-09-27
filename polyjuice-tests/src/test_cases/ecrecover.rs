@@ -6,7 +6,7 @@ use crate::helper::{
     PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
-use gw_generator::traits::StateExt;
+use gw_generator::{constants::L2TX_MAX_CYCLES, traits::StateExt};
 use gw_store::chain_view::ChainView;
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
 
@@ -90,6 +90,7 @@ fn test_ecrecover() {
                 &state,
                 &block_info,
                 &raw_tx,
+                L2TX_MAX_CYCLES,
             )
             .expect("construct");
         // [recover] used cycles: 2604412 < 2660K

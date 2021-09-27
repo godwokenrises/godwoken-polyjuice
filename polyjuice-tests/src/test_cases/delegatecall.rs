@@ -7,7 +7,7 @@ use crate::helper::{
     CKB_SUDT_ACCOUNT_ID,
 };
 use gw_common::state::State;
-use gw_generator::traits::StateExt;
+use gw_generator::{constants::L2TX_MAX_CYCLES, traits::StateExt};
 // use gw_jsonrpc_types::parameter::RunResult;
 use gw_store::chain_view::ChainView;
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
@@ -129,9 +129,11 @@ fn test_delegatecall() {
                 &state,
                 &block_info,
                 &raw_tx,
+                L2TX_MAX_CYCLES,
             )
             .expect("construct");
-        helper::check_cycles("DelegateCall", run_result.used_cycles, 1_440_000);
+        // [DelegateCall] used cycles: 1457344 < 1460K
+        helper::check_cycles("DelegateCall", run_result.used_cycles, 1_460_000);
         state.apply_run_result(&run_result).expect("update state");
         // println!(
         //     "result {}",
