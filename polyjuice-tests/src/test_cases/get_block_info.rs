@@ -8,7 +8,6 @@ use crate::helper::{
 use gw_common::state::State;
 use gw_db::schema::COLUMN_INDEX;
 use gw_generator::{constants::L2TX_MAX_CYCLES, traits::StateExt};
-// use gw_jsonrpc_types::parameter::RunResult;
 use gw_store::chain_view::ChainView;
 use gw_store::traits::KVStore;
 use gw_types::{

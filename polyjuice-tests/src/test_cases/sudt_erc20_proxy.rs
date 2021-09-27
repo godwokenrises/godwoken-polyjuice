@@ -11,7 +11,6 @@ use gw_generator::{
     constants::L2TX_MAX_CYCLES, dummy_state::DummyState, error::TransactionError, traits::StateExt,
     Generator,
 };
-// use gw_jsonrpc_types::parameter::RunResult;
 use gw_store::{chain_view::ChainView, Store};
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
 
