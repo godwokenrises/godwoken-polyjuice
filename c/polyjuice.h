@@ -928,6 +928,7 @@ int store_contract_code(gw_context_t* ctx,
     return ret;
   }
   ckb_debug("BEGIN store data");
+  debug_print_int("contract_code_len", res->output_size);
   ret = ctx->sys_store_data(ctx, res->output_size, (uint8_t*)res->output_data);
   ckb_debug("END store data");
   if (ret != 0) {
