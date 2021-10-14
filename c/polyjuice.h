@@ -1209,21 +1209,30 @@ int run_polyjuice() {
 
   int ret_handle_message = handle_message(&context, UINT32_MAX, UINT32_MAX, NULL, &msg, &res);
   uint64_t gas_used = (uint64_t)(msg.gas - res.gas_left);
+
+  // debug_print evmc_result.output_data if the execution failed
+  if (res.status_code != 0) {
+    debug_print_int("evmc_result.output_size", res.output_size);
+    // The output contains data coming from REVERT opcode
+    debug_print_data("evmc_result.output_data:", res.output_data, res.output_size);
+  }
+  
   ret = emit_evm_result_log(&context, gas_used, res.status_code);
   if (ret != 0) {
     ckb_debug("emit_evm_result_log failed");
     return clean_evmc_result_and_return(&res, ret);
   }
-  if (ret_handle_message != 0) {
-    ckb_debug("handle message failed");
-    return clean_evmc_result_and_return(&res, ret_handle_message);
-  }
 
-  ret = context.sys_set_program_return_data(&context, (uint8_t*)res.output_data,
+  ret = context.sys_set_program_return_data(&context, (uint8_t *)res.output_data,
                                             res.output_size);
   if (ret != 0) {
     ckb_debug("set return data failed");
     return clean_evmc_result_and_return(&res, ret);
+  }
+
+  if (ret_handle_message != 0) {
+    ckb_debug("handle message failed");
+    return clean_evmc_result_and_return(&res, ret_handle_message);
   }
 
   /* Handle transaction fee */
