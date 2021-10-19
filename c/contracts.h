@@ -870,33 +870,7 @@ int bn256_pairing_istanbul(gw_context_t* ctx,
                            const uint8_t* input_src,
                            const size_t input_size,
                            uint8_t** output, size_t* output_size) {
-  if (input_size % 192 > 0) {
-    return ERROR_BN256_PAIRING;
-  }
-
-  int ret;
-  size_t length = input_size / 192;
-  /* G1[] */
-  intx::uint256 *cs = (intx::uint256 *)malloc(length * 4 * sizeof(intx::uint256));
-  if (cs == NULL) {
-    return FATAL_PRECOMPILED_CONTRACTS;
-  }
-  /* G2[] */
-  intx::uint256 *ts = (intx::uint256 *)malloc(length * 4 * sizeof(intx::uint256));
-  if (ts == NULL) {
-    return FATAL_PRECOMPILED_CONTRACTS;
-  }
-  for (size_t i = 0; i < input_size; i += 192) {
-    ret = parse_curve_point((void *)(cs + i / 192 * 4), (uint8_t *)input_src + i);
-    if (ret != 0) {
-      return ret;
-    }
-    ret = parse_twist_point((void *)(ts + i / 192 * 4), (uint8_t *)input_src + i + 64);
-    if (ret != 0) {
-      return ret;
-    }
-  }
-  ckb_debug("pairing is unsupported yet due to very high cycle cost!");
+  ckb_debug("bn256_pairing is unsupported yet due to very high cycle cost!");
   return ERROR_BN256_PAIRING;
 }
 
