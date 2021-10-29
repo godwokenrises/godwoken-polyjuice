@@ -156,8 +156,18 @@ int parse_args(struct evmc_message* msg, uint128_t* gas_price,
   uint8_t* args = tx_ctx->args;
 
   /* args[0..8] magic header + call kind */
-  static const uint8_t polyjuice_args_header[7] = {0xff, 0xff, 0xff, 'P', 'O', 'L', 'Y'};
-  if (memcmp(polyjuice_args_header, args, 7) != 0) {
+  static const uint8_t eth_polyjuice_args_header[7]
+    = {'E', 'T', 'H', 'P', 'O', 'L', 'Y'};
+  static const uint8_t polyjuice_args_header[7]
+    = {0xff, 0xff, 0xff, 'P', 'O', 'L', 'Y'};
+  if (memcmp(eth_polyjuice_args_header, args, 7) == 0) {
+    // Only access eth_address in this kind of L2TX
+    g_is_using_native_eth_address = true;
+  } else if (memcmp(polyjuice_args_header, args, 7) == 0) {
+    // TODO: deprecate this kind of L2TX
+    ckb_debug("[WARN] This kind of L2TX will be deprecated.");
+    g_is_using_native_eth_address = false;
+  } else {
     debug_print_data("invalid polyjuice args header", args, 7);
     return -1;
   }

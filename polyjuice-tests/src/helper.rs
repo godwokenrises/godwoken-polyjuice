@@ -318,6 +318,8 @@ pub fn contract_script_to_eth_address(script: &Script, ethabi: bool) -> Vec<u8> 
 
 #[derive(Default, Debug)]
 pub struct PolyjuiceArgsBuilder {
+    /// default to false
+    is_using_native_eth_address: bool,
     is_create: bool,
     gas_limit: u64,
     gas_price: u128,
@@ -326,6 +328,10 @@ pub struct PolyjuiceArgsBuilder {
 }
 
 impl PolyjuiceArgsBuilder {
+    pub fn using_native_eth_address(mut self, v: bool) -> Self {
+        self.is_using_native_eth_address = v;
+        self
+    }
     pub fn do_create(mut self, value: bool) -> Self {
         self.is_create = value;
         self
@@ -348,8 +354,13 @@ impl PolyjuiceArgsBuilder {
     }
     pub fn build(self) -> Vec<u8> {
         let mut output: Vec<u8> = vec![0u8; 52];
+        if self.is_using_native_eth_address {
+            output[0..3].copy_from_slice(&[b'E', b'T', b'H'][..]);
+        } else {
+            output[0..3].copy_from_slice(&[0xff, 0xff, 0xff][..]);
+        }
         let call_kind: u8 = if self.is_create { 3 } else { 0 };
-        output[0..8].copy_from_slice(&[0xff, 0xff, 0xff, b'P', b'O', b'L', b'Y', call_kind][..]);
+        output[3..8].copy_from_slice(&[b'P', b'O', b'L', b'Y', call_kind][..]);
         output[8..16].copy_from_slice(&self.gas_limit.to_le_bytes()[..]);
         output[16..32].copy_from_slice(&self.gas_price.to_le_bytes()[..]);
         output[32..48].copy_from_slice(&self.value.to_le_bytes()[..]);
