@@ -89,7 +89,12 @@ int build_script(const uint8_t code_hash[32], const uint8_t hash_type,
   return 0;
 }
 
-int address_to_account_id(gw_context_t* ctx, const uint8_t address[20], uint32_t *account_id) {
+/**
+ * @param address eth_address of a contract account is also short_script_hash
+ */
+int short_script_hash_to_account_id(gw_context_t *ctx,
+                                    const uint8_t address[20],
+                                    uint32_t *account_id) {
   uint8_t script_hash[32] = {0};
   int ret = ctx->sys_get_script_hash_by_prefix(ctx, (uint8_t *)address, 20, script_hash);
   if (ret != 0) {
