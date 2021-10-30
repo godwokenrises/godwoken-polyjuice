@@ -42,10 +42,16 @@ pub const SUDT_GENERATOR_PATH: &str =
     "../integration-test/godwoken/tests-deps/godwoken-scripts/c/build/sudt-generator";
 pub const SUDT_VALIDATOR_SCRIPT_TYPE_HASH: [u8; 32] = [0xa2u8; 32];
 pub const SECP_DATA: &[u8] = include_bytes!("../../build/secp256k1_data");
-// polyjuice
+
 pub const BIN_DIR: &str = "../build";
-pub const GENERATOR_NAME: &str = "generator";
-pub const VALIDATOR_NAME: &str = "validator";
+// polyjuice
+pub const POLYJUICE_GENERATOR_NAME: &str = "generator";
+pub const POLYJUICE_VALIDATOR_NAME: &str = "validator";
+// ETH Address Registry
+pub const ETH_ADDRESS_REGISTRY_GENERATOR_NAME: &str = "eth-addr-reg-generator";
+pub const ETH_ADDRESS_REGISTRY_VALIDATOR_NAME: &str = "eth-addr-reg-validator";
+
+// del pub const ETH_ADDRESS_REGISTRY_PROGRAM_CODE_HASH: [u8; 32] = [6u8; 32];
 
 pub const ROLLUP_SCRIPT_HASH: [u8; 32] = [0xa9u8; 32];
 pub const ETH_ACCOUNT_LOCK_CODE_HASH: [u8; 32] = [0xaau8; 32];
@@ -59,6 +65,16 @@ pub const GW_LOG_POLYJUICE_USER: u8 = 0x3;
 // pub const FATAL_POLYJUICE: i8 = -50;
 pub const FATAL_PRECOMPILED_CONTRACTS: i8 = -51;
 
+fn load_program(program_name: &str) -> Bytes {
+    let mut buf = Vec::new();
+    let mut path = PathBuf::new();
+    path.push(&BIN_DIR);
+    path.push(program_name);
+    let mut f = fs::File::open(&path).expect("load program");
+    f.read_to_end(&mut buf).expect("read program");
+    Bytes::from(buf.to_vec())
+}
+
 lazy_static::lazy_static! {
     pub static ref SECP_DATA_HASH: H256 = {
         let mut buf = [0u8; 32];
@@ -67,28 +83,27 @@ lazy_static::lazy_static! {
         hasher.finalize(&mut buf);
         buf.into()
     };
-    pub static ref GENERATOR_PROGRAM: Bytes = {
-        let mut buf = Vec::new();
-        let mut path = PathBuf::new();
-        path.push(&BIN_DIR);
-        path.push(&GENERATOR_NAME);
-        let mut f = fs::File::open(&path).expect("load program");
-        f.read_to_end(&mut buf).expect("read program");
-        Bytes::from(buf.to_vec())
-    };
-    pub static ref VALIDATOR_PROGRAM: Bytes = {
-        let mut buf = Vec::new();
-        let mut path = PathBuf::new();
-        path.push(&BIN_DIR);
-        path.push(&VALIDATOR_NAME);
-        let mut f = fs::File::open(&path).expect("load program");
-        f.read_to_end(&mut buf).expect("read program");
-        Bytes::from(buf.to_vec())
-    };
-    pub static ref PROGRAM_CODE_HASH: [u8; 32] = {
+
+    pub static ref POLYJUICE_GENERATOR_PROGRAM: Bytes
+        = load_program(&POLYJUICE_GENERATOR_NAME);
+    pub static ref POLYJUICE_VALIDATOR_PROGRAM: Bytes
+        = load_program(&POLYJUICE_VALIDATOR_NAME);
+    pub static ref POLYJUICE_PROGRAM_CODE_HASH: [u8; 32] = {
         let mut buf = [0u8; 32];
         let mut hasher = new_blake2b();
-        hasher.update(&VALIDATOR_PROGRAM);
+        hasher.update(&POLYJUICE_VALIDATOR_PROGRAM);
+        hasher.finalize(&mut buf);
+        buf
+    };
+
+    pub static ref ETH_ADDRESS_REGISTRY_GENERATOR_PROGRAM: Bytes
+        = load_program(&ETH_ADDRESS_REGISTRY_GENERATOR_NAME);
+    pub static ref ETH_ADDRESS_REGISTRY_VALIDATOR_PROGRAM: Bytes
+        = load_program(&ETH_ADDRESS_REGISTRY_VALIDATOR_NAME);
+    pub static ref ETH_ADDRESS_REGISTRY_PROGRAM_CODE_HASH: [u8; 32] = {
+        let mut buf = [0u8; 32];
+        let mut hasher = new_blake2b();
+        hasher.update(&ETH_ADDRESS_REGISTRY_VALIDATOR_PROGRAM);
         hasher.finalize(&mut buf);
         buf
     };
@@ -291,7 +306,7 @@ pub fn new_account_script_with_nonce(
     new_account_args[36..36 + 20].copy_from_slice(&data_hash[12..]);
 
     Script::new_builder()
-        .code_hash(PROGRAM_CODE_HASH.pack())
+        .code_hash(POLYJUICE_PROGRAM_CODE_HASH.pack())
         .hash_type(ScriptHashType::Type.into())
         .args(new_account_args.pack())
         .build()
@@ -406,7 +421,7 @@ pub fn setup() -> (Store, DummyState, Generator, u32) {
     let creator_account_id = state
         .create_account_from_script(
             Script::new_builder()
-                .code_hash(PROGRAM_CODE_HASH.pack())
+                .code_hash(POLYJUICE_PROGRAM_CODE_HASH.pack())
                 .hash_type(ScriptHashType::Type.into())
                 .args(args.to_vec().pack())
                 .build(),
@@ -435,9 +450,14 @@ pub fn setup() -> (Store, DummyState, Generator, u32) {
     let mut backend_manage = BackendManage::from_config(configs).expect("default backend");
     // NOTICE in this test we won't need SUM validator
     backend_manage.register_backend(Backend {
-        validator: VALIDATOR_PROGRAM.clone(),
-        generator: GENERATOR_PROGRAM.clone(),
-        validator_script_type_hash: PROGRAM_CODE_HASH.clone().into(),
+        validator: POLYJUICE_VALIDATOR_PROGRAM.clone(),
+        generator: POLYJUICE_GENERATOR_PROGRAM.clone(),
+        validator_script_type_hash: POLYJUICE_PROGRAM_CODE_HASH.clone().into(),
+    });
+    backend_manage.register_backend(Backend {
+        validator: ETH_ADDRESS_REGISTRY_VALIDATOR_PROGRAM.clone(),
+        generator: ETH_ADDRESS_REGISTRY_GENERATOR_PROGRAM.clone(),
+        validator_script_type_hash: ETH_ADDRESS_REGISTRY_PROGRAM_CODE_HASH.clone().into(),
     });
     let mut account_lock_manage = AccountLockManage::default();
     account_lock_manage
@@ -448,7 +468,8 @@ pub fn setup() -> (Store, DummyState, Generator, u32) {
             vec![
                 META_VALIDATOR_SCRIPT_TYPE_HASH.clone().pack(),
                 SUDT_VALIDATOR_SCRIPT_TYPE_HASH.clone().pack(),
-                PROGRAM_CODE_HASH.clone().pack(),
+                POLYJUICE_PROGRAM_CODE_HASH.clone().pack(),
+                // ETH_ADDRESS_REGISTRY_PROGRAM_CODE_HASH.clone().pack(),
             ]
             .pack(),
         )
@@ -553,7 +574,7 @@ pub fn compute_create2_script(
     println!("init_code: {}", hex::encode(init_code));
     println!("create2_script_args: {}", hex::encode(&script_args[..]));
     Script::new_builder()
-        .code_hash(PROGRAM_CODE_HASH.pack())
+        .code_hash(POLYJUICE_PROGRAM_CODE_HASH.pack())
         .hash_type(ScriptHashType::Type.into())
         .args(script_args.pack())
         .build()
