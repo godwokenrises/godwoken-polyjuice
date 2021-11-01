@@ -26,3 +26,6 @@ pub(crate) mod rlp;
 //  Special pre-compiled contract to support transfer to any sudt
 pub(crate) mod invalid_sudt_erc20_proxy;
 pub(crate) mod sudt_erc20_proxy;
+
+mod eth_addr_reg;
+// mod eoa_transfer_to_eoa;
