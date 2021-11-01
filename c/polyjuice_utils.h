@@ -100,7 +100,8 @@ int short_script_hash_to_account_id(gw_context_t *ctx,
                                     const uint8_t address[20],
                                     uint32_t *account_id) {
   uint8_t script_hash[32] = {0};
-  int ret = ctx->sys_get_script_hash_by_prefix(ctx, (uint8_t *)address, 20, script_hash);
+  int ret = ctx->sys_get_script_hash_by_prefix(ctx, (uint8_t *)address, 20,
+                                               script_hash);
   if (ret != 0) {
     return ret;
   }
@@ -120,7 +121,7 @@ void gw_build_script_hash_to_eth_address_key(uint8_t script_hash[GW_KEY_BYTES],
 }
 
 void gw_build_eth_address_to_script_hash_key(
-    uint8_t eth_address[ETH_ADDRESS_LEN], uint8_t raw_key[GW_KEY_BYTES]) {
+    const uint8_t eth_address[ETH_ADDRESS_LEN], uint8_t raw_key[GW_KEY_BYTES]) {
   blake2b_state blake2b_ctx;
   blake2b_init(&blake2b_ctx, GW_KEY_BYTES);
   /* placeholder: 0 */
@@ -138,7 +139,7 @@ void gw_build_eth_address_to_script_hash_key(
  * @param script_hash should have been initialed as zero_hash = {0}
  */
 int load_script_hash_by_eth_address(gw_context_t *ctx,
-                                    uint8_t eth_address[ETH_ADDRESS_LEN],
+                                    const uint8_t eth_address[ETH_ADDRESS_LEN],
                                     uint8_t script_hash[GW_VALUE_BYTES]) {
   if (ctx == NULL) {
     return GW_FATAL_INVALID_CONTEXT;
@@ -174,7 +175,7 @@ int load_eth_address_by_script_hash(gw_context_t *ctx,
   /** 
    * ethabi address format
    *  e.g. web3.eth.abi.decodeParameter('address',
-   *          '0000000000000000000000001829d79cce6aa43d13e67216b355e81a7fffb220')
+   *         '0000000000000000000000001829d79cce6aa43d13e67216b355e81a7fffb220')
    */
   uint8_t value[GW_VALUE_BYTES] = {0};
   int ret = ctx->_internal_load_raw(ctx, raw_key, value);
@@ -189,6 +190,18 @@ int load_eth_address_by_script_hash(gw_context_t *ctx,
   _gw_fast_memcpy(eth_address, value + 12, ETH_ADDRESS_LEN);
   return 0;
 }
+
+// int load_account_id_by_eth_address(gw_context_t *ctx,
+//                               const uint8_t address[20],
+//                               uint32_t *account_id) {
+//   uint8_t script_hash[32] = {0};
+//   int ret = load_script_hash_by_eth_address(ctx, address, script_hash);
+//   if (ret != 0) {
+//     debug_print_int("load_script_hash_by_eth_address failed", ret);
+//     return ret;
+//   }
+//   return ctx->sys_get_account_id_by_script_hash(ctx, script_hash, account_id);
+// }
 
 void rlp_encode_sender_and_nonce(const evmc_address *sender, uint32_t nonce,
                                  uint8_t *data, uint32_t *data_len) {
