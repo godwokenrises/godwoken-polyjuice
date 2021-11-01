@@ -194,6 +194,7 @@ check-moleculec-version:
 build/blockchain.h: build/blockchain.mol
 	${MOLC} --language c --schema-file $< > $@
 build/godwoken.h: build/godwoken.mol
+	cat ../../c/polyjuice.mol >> build/godwoken.mol
 	${MOLC} --language c --schema-file $< > $@
 build/blockchain.mol:
 	mkdir -p build
