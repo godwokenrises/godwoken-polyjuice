@@ -9,6 +9,10 @@
 #include "ckb_syscalls.h"
 #include "polyjuice_errors.h"
 
+#define ETH_ADDRESS_LEN 20
+#define GW_ETH_ADDRESS_TO_ACCOUNT_SCRIPT_HASH 6
+#define GW_ACCOUNT_SCRIPT_HASH_TO_ETH_ADDRESS 7
+
 #ifdef NO_DEBUG_LOG
 #undef ckb_debug
 #define ckb_debug(s) do {} while (0)
@@ -89,13 +93,101 @@ int build_script(const uint8_t code_hash[32], const uint8_t hash_type,
   return 0;
 }
 
-int address_to_account_id(gw_context_t* ctx, const uint8_t address[20], uint32_t *account_id) {
+/**
+ * @param address eth_address of a contract account is also short_script_hash
+ */
+int short_script_hash_to_account_id(gw_context_t *ctx,
+                                    const uint8_t address[20],
+                                    uint32_t *account_id) {
   uint8_t script_hash[32] = {0};
   int ret = ctx->sys_get_script_hash_by_prefix(ctx, (uint8_t *)address, 20, script_hash);
   if (ret != 0) {
     return ret;
   }
   return ctx->sys_get_account_id_by_script_hash(ctx, script_hash, account_id);
+}
+
+void gw_build_script_hash_to_eth_address_key(uint8_t script_hash[GW_KEY_BYTES],
+                                             uint8_t raw_key[GW_KEY_BYTES]) {
+  blake2b_state blake2b_ctx;
+  blake2b_init(&blake2b_ctx, GW_KEY_BYTES);
+  uint32_t placeholder = 0;
+  blake2b_update(&blake2b_ctx, (uint8_t *)&placeholder, sizeof(uint32_t));
+  uint8_t type = GW_ACCOUNT_SCRIPT_HASH_TO_ETH_ADDRESS;
+  blake2b_update(&blake2b_ctx, (uint8_t *)&type, 1);
+  blake2b_update(&blake2b_ctx, script_hash, GW_KEY_BYTES);
+  blake2b_final(&blake2b_ctx, raw_key, GW_KEY_BYTES);
+}
+
+void gw_build_eth_address_to_script_hash_key(
+    uint8_t eth_address[ETH_ADDRESS_LEN], uint8_t raw_key[GW_KEY_BYTES]) {
+  blake2b_state blake2b_ctx;
+  blake2b_init(&blake2b_ctx, GW_KEY_BYTES);
+  /* placeholder: 0 */
+  uint32_t placeholder = 0;
+  blake2b_update(&blake2b_ctx, (uint8_t *)&placeholder, sizeof(uint32_t));
+  /* type */
+  uint8_t type = GW_ETH_ADDRESS_TO_ACCOUNT_SCRIPT_HASH;
+  blake2b_update(&blake2b_ctx, (uint8_t *)&type, 1);
+  /* eth_address */
+  blake2b_update(&blake2b_ctx, eth_address, ETH_ADDRESS_LEN);
+  blake2b_final(&blake2b_ctx, raw_key, GW_KEY_BYTES);
+}
+
+/**
+ * @param script_hash should have been initialed as zero_hash = {0}
+ */
+int load_script_hash_by_eth_address(gw_context_t *ctx,
+                                    uint8_t eth_address[ETH_ADDRESS_LEN],
+                                    uint8_t script_hash[GW_VALUE_BYTES]) {
+  if (ctx == NULL) {
+    return GW_FATAL_INVALID_CONTEXT;
+  }
+
+  uint8_t raw_key[GW_KEY_BYTES] = {0};
+  gw_build_eth_address_to_script_hash_key(eth_address, raw_key);
+
+  int ret = ctx->_internal_load_raw(ctx, raw_key, script_hash);
+  if (ret != 0) {
+    return ret;
+  }
+
+  if (_is_zero_hash(script_hash)) {
+    return GW_ERROR_NOT_FOUND;
+  }
+  return 0;
+}
+
+/**
+ * @param script_hash should have been initialed as zero_hash = {0}
+ */
+int load_eth_address_by_script_hash(gw_context_t *ctx,
+                                    uint8_t script_hash[GW_KEY_BYTES],
+                                    uint8_t eth_address[ETH_ADDRESS_LEN]) {
+  if (ctx == NULL) {
+    return GW_FATAL_INVALID_CONTEXT;
+  }
+
+  uint8_t raw_key[GW_KEY_BYTES] = {0};
+  gw_build_script_hash_to_eth_address_key(script_hash, raw_key);
+
+  /** 
+   * ethabi address format
+   *  e.g. web3.eth.abi.decodeParameter('address',
+   *          '0000000000000000000000001829d79cce6aa43d13e67216b355e81a7fffb220')
+   */
+  uint8_t value[GW_VALUE_BYTES] = {0};
+  int ret = ctx->_internal_load_raw(ctx, raw_key, value);
+  if (ret != 0) {
+    return ret;
+  }
+  if (_is_zero_hash(script_hash)) {
+    // TODO: check not found situation
+    return GW_ERROR_NOT_FOUND;
+  }
+
+  _gw_fast_memcpy(eth_address, value + 12, ETH_ADDRESS_LEN);
+  return 0;
 }
 
 void rlp_encode_sender_and_nonce(const evmc_address *sender, uint32_t nonce,
