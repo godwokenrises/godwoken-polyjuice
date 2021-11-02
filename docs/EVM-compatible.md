@@ -1,4 +1,4 @@
-## Comarison with EVM
+## Comparison with EVM
 Polyjuice aims at 100% EVM compatibility as a goal, meaning we plan to support all smart contracts supported by the latest Ethereum hardfork version. But in the current version, something is incompatible with EVM.
 
 ### pETH
