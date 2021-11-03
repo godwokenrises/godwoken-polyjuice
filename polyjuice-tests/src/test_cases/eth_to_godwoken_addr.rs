@@ -2,7 +2,8 @@
 
 use crate::helper::{
     self, build_eth_l2_script, deploy, new_account_script, new_block_info, setup,
-    PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, POLYJUICE_PROGRAM_CODE_HASH, ROLLUP_SCRIPT_HASH,
+    PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, L2TX_MAX_CYCLES, POLYJUICE_PROGRAM_CODE_HASH,
+    ROLLUP_SCRIPT_HASH,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;

@@ -49,7 +49,7 @@ int balance_of_any_sudt(gw_context_t* ctx,
   // Default return zero balance
   *output = (uint8_t *)malloc(32);
   if (*output == NULL) {
-    ckb_debug("malloc failed");
+    ckb_debug("[balance_of_any_sudt] malloc failed");
     return FATAL_PRECOMPILED_CONTRACTS;
   }
   *output_size = 32;
@@ -57,18 +57,31 @@ int balance_of_any_sudt(gw_context_t* ctx,
 
   for (int i = 0; i < 12; i++) {
     if (input_src[32 + i] != 0) {
-      ckb_debug("invalid ethereum address");
+      ckb_debug("[balance_of_any_sudt] invalid ethereum address");
       return ERROR_BALANCE_OF_ANY_SUDT;
     }
   }
   evmc_address address = *((evmc_address *)(input_src + 32 + 12));
   uint128_t balance;
-  ret = sudt_get_balance(ctx, sudt_id, POLYJUICE_SHORT_ADDR_LEN, address.bytes, &balance);
+  if (g_is_using_native_eth_address) {
+    uint8_t script_hash[32] = {0};
+    ret = load_script_hash_by_eth_address(ctx, address.bytes, script_hash);
+    if (ret != 0) {
+      debug_print_int("[balance_of_any_sudt] load_script_hash failed", ret);
+      return ERROR_BALANCE_OF_ANY_SUDT; 
+    }
+    ret = sudt_get_balance(ctx, sudt_id, POLYJUICE_SHORT_ADDR_LEN,
+                           script_hash, &balance);
+  } else {
+    ret = sudt_get_balance(ctx, sudt_id, POLYJUICE_SHORT_ADDR_LEN,
+                           address.bytes, &balance);
+  }
+
   if (ret == GW_ERROR_NOT_FOUND) {
-    debug_print_int("sudt account not found", sudt_id);
+    debug_print_int("[balance_of_any_sudt] sudt account not found", sudt_id);
     return 0;
   } else if (ret != 0) {
-    debug_print_int("sudt_get_balance failed", ret);
+    debug_print_int("[balance_of_any_sudt] sudt_get_balance failed", ret);
     if (is_fatal_error(ret)) {
       return FATAL_PRECOMPILED_CONTRACTS;
     } else {
@@ -163,9 +176,30 @@ int transfer_to_any_sudt(gw_context_t* ctx,
 
   evmc_address from_address = *((evmc_address *)(input_src + 32 + 12));
   evmc_address to_address = *((evmc_address *)(input_src + 64 + 12));
-  ret = sudt_transfer(ctx, sudt_id, POLYJUICE_SHORT_ADDR_LEN, from_address.bytes, to_address.bytes, amount);
+  if (g_is_using_native_eth_address) {
+    uint8_t from_script_hash[32] = {0};
+    ret = load_script_hash_by_eth_address(ctx, from_address.bytes,
+                                          from_script_hash);
+    if (ret != 0) {
+      debug_print_int("[transfer_to_any_sudt] load from_script_hash failed",
+                      ret);
+      return ERROR_TRANSFER_TO_ANY_SUDT;
+    }
+    uint8_t to_script_hash[32] = {0};
+    ret = load_script_hash_by_eth_address(ctx, to_address.bytes,
+                                          to_script_hash);
+    if (ret != 0) {
+      debug_print_int("[transfer_to_any_sudt] load to_script_hash failed", ret);
+      return ERROR_TRANSFER_TO_ANY_SUDT;
+    }
+    ret = sudt_transfer(ctx, sudt_id, POLYJUICE_SHORT_ADDR_LEN,
+                        from_script_hash, to_script_hash, amount);
+  } else {
+    ret = sudt_transfer(ctx, sudt_id, POLYJUICE_SHORT_ADDR_LEN,
+                        from_address.bytes, to_address.bytes, amount);
+  }
   if (ret != 0) {
-    ckb_debug("transfer failed");
+    debug_print_int("[transfer_to_any_sudt] transfer failed", ret);
     if (is_fatal_error(ret)) {
       return FATAL_PRECOMPILED_CONTRACTS;
     } else {

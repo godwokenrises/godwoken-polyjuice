@@ -1,6 +1,8 @@
-use crate::helper::{new_block_info, setup, ETH_ADDRESS_REGISTRY_PROGRAM_CODE_HASH};
-use gw_common::{blake2b::new_blake2b, state::State, H256};
-use gw_generator::{constants::L2TX_MAX_CYCLES, traits::StateExt};
+use crate::helper::{
+    new_block_info, setup, update_eth_address_registry, ETH_ADDRESS_REGISTRY_PROGRAM_CODE_HASH,
+    L2TX_MAX_CYCLES,
+};
+use gw_generator::traits::StateExt;
 use gw_store::chain_view::ChainView;
 use gw_types::{
     bytes::Bytes,
@@ -9,9 +11,6 @@ use gw_types::{
     prelude::*,
 };
 use hex::FromHex;
-
-const GW_ETH_ADDRESS_TO_ACCOUNT_SCRIPT_HASH: u8 = 6;
-const GW_ACCOUNT_SCRIPT_HASH_TO_ETH_ADDRESS: u8 = 7;
 
 #[derive(Debug, Default)]
 pub struct EthToGwArgsBuilder {
@@ -57,16 +56,6 @@ impl GwToEthArgsBuilder {
     }
 }
 
-fn build_eth_address_to_script_hash_key(eth_address: &[u8; 20]) -> H256 {
-    let mut key: [u8; 32] = H256::zero().into();
-    let mut hasher = new_blake2b();
-    hasher.update(&gw_common::state::GW_NON_ACCOUNT_PLACEHOLDER);
-    hasher.update(&[GW_ETH_ADDRESS_TO_ACCOUNT_SCRIPT_HASH]);
-    hasher.update(eth_address);
-    hasher.finalize(&mut key);
-    key.into()
-}
-
 #[test]
 fn test_eth_to_gw() {
     let (store, mut state, generator, _creator_account_id) = setup();
@@ -93,19 +82,14 @@ fn test_eth_to_gw() {
 
     let eth_address = <[u8; 20]>::from_hex("D1667CBf1cc60da94c1cf6C9cfb261e71b6047f7")
         .expect("eth_address hex_string to u8_vec");
-    let key = build_eth_address_to_script_hash_key(&eth_address);
-    // println!("{:?}", key);
-    state
-        .update_raw(
-            key,
-            [
-                92, 80, 32, 52, 234, 89, 14, 59, 217, 115, 180, 122, 92, 128, 255, 41, 87, 208,
-                136, 49, 126, 66, 188, 93, 72, 74, 109, 211, 242, 49, 50, 217,
-            ]
-            .into(),
-        )
-        .expect("add GW_ETH_ADDRESS_TO_SCRIPT_HASH mapping into state");
-
+    update_eth_address_registry(
+        &mut state,
+        &eth_address,
+        &[
+            92, 80, 32, 52, 234, 89, 14, 59, 217, 115, 180, 122, 92, 128, 255, 41, 87, 208, 136,
+            49, 126, 66, 188, 93, 72, 74, 109, 211, 242, 49, 50, 217,
+        ],
+    );
     let args = EthToGwArgsBuilder::default()
         .method(0u32)
         .eth_address(eth_address)
@@ -137,16 +121,6 @@ fn test_eth_to_gw() {
     );
 }
 
-fn build_script_hash_to_eth_address_key(script_hash: &[u8; 32]) -> H256 {
-    let mut key: [u8; 32] = H256::zero().into();
-    let mut hasher = new_blake2b();
-    hasher.update(&gw_common::state::GW_NON_ACCOUNT_PLACEHOLDER);
-    hasher.update(&[GW_ACCOUNT_SCRIPT_HASH_TO_ETH_ADDRESS]);
-    hasher.update(script_hash);
-    hasher.finalize(&mut key);
-    key.into()
-}
-
 #[test]
 fn test_gw_to_eth() {
     let (store, mut state, generator, _creator_account_id) = setup();
@@ -172,15 +146,9 @@ fn test_gw_to_eth() {
         .expect("create account a");
 
     let gw_account_script_hash = [8u8; 32];
-    let key = build_script_hash_to_eth_address_key(&gw_account_script_hash);
     let eth_address = <[u8; 20]>::from_hex("D1667CBf1cc60da94c1cf6C9cfb261e71b6047f7")
         .expect("eth_address hex_string to u8_vec");
-    let mut value = [0u8; 32];
-    value[12..].copy_from_slice(&eth_address);
-    // println!("eth_address ethabi format: {:?}", value);
-    state
-        .update_raw(key, value.into())
-        .expect("add GW_ACCOUNT_SCRIPT_HASH_TO_ETH_ADDRESS mapping into state");
+    update_eth_address_registry(&mut state, &eth_address, &gw_account_script_hash);
 
     let args = GwToEthArgsBuilder::default()
         .method(1u32)
