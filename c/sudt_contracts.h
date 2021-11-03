@@ -2,7 +2,6 @@
 #ifndef SUDT_CONTRACTS_H_
 #define SUDT_CONTRACTS_H_
 
-#include "polyjuice_globals.h"
 #include "polyjuice_utils.h"
 
 #define BALANCE_OF_ANY_SUDT_GAS 150
