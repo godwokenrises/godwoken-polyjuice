@@ -30,7 +30,6 @@ int printf(const char *format, ...) {
 #include "common.h"
 
 #include "sudt_utils.h"
-#include "polyjuice_globals.h"
 #include "polyjuice_errors.h"
 #include "polyjuice_utils.h"
 
@@ -274,7 +273,7 @@ int load_account_code(gw_context_t* gw_ctx, uint32_t account_id,
   mol_seg_t hash_type_seg = MolReader_Script_get_hash_type(&script_seg);
   mol_seg_t args_seg = MolReader_Script_get_args(&script_seg);
   mol_seg_t raw_args_seg = MolReader_Bytes_raw_bytes(&args_seg);
-  if (raw_args_seg.size != CONTRACT_ACCOUNT_SCRIPT_ARGS_SIZE) {
+  if (raw_args_seg.size != CONTRACT_ACCOUNT_SCRIPT_ARGS_LEN) {
     debug_print_int("[load_account_code] invalid account script", account_id);
     debug_print_int("[load_account_code] raw_args_seg.size", raw_args_seg.size);
     // This is an EoA or other kind of account
@@ -811,7 +810,7 @@ int load_globals(gw_context_t* ctx, uint32_t to_id, evmc_call_kind call_kind) {
     /* polyjuice creator account */
     g_creator_account_id = to_id;
     creator_raw_args_seg = raw_args_seg;
-  } else if (raw_args_seg.size == CONTRACT_ACCOUNT_SCRIPT_ARGS_SIZE) {
+  } else if (raw_args_seg.size == CONTRACT_ACCOUNT_SCRIPT_ARGS_LEN) {
     /* read creator account id and do some checking */
     memcpy(&g_creator_account_id, raw_args_seg.ptr + 32, sizeof(uint32_t));
     int ret = load_account_script(ctx,
@@ -858,7 +857,7 @@ int create_new_account(gw_context_t* ctx,
   }
 
   int ret = 0;
-  uint8_t script_args[SCRIPT_ARGS_LEN];
+  uint8_t script_args[CONTRACT_ACCOUNT_SCRIPT_ARGS_LEN];
   uint8_t data[128] = {0};
   uint32_t data_len = 0;
   if (msg->kind == EVMC_CREATE) {
@@ -913,7 +912,7 @@ int create_new_account(gw_context_t* ctx,
   mol_seg_t new_script_seg;
   uint32_t new_account_id;
   ret = build_script(g_script_code_hash, g_script_hash_type, script_args,
-                     SCRIPT_ARGS_LEN, &new_script_seg);
+                     CONTRACT_ACCOUNT_SCRIPT_ARGS_LEN, &new_script_seg);
   if (ret != 0) {
     return ret;
   }
