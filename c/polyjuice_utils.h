@@ -156,12 +156,11 @@ int load_script_hash_by_eth_address(gw_context_t *ctx,
   if (_is_zero_hash(script_hash)) {
     return GW_ERROR_NOT_FOUND;
   }
+
+  // TODO: cache [eth_address <=> script_hash] mapping data here
   return 0;
 }
 
-/**
- * @param script_hash should have been initialed as zero_hash = {0}
- */
 int load_eth_address_by_script_hash(gw_context_t *ctx,
                                     uint8_t script_hash[GW_KEY_BYTES],
                                     uint8_t eth_address[ETH_ADDRESS_LEN]) {
@@ -182,8 +181,7 @@ int load_eth_address_by_script_hash(gw_context_t *ctx,
   if (ret != 0) {
     return ret;
   }
-  if (_is_zero_hash(script_hash)) {
-    // TODO: check not found situation
+  if (_is_zero_hash(value)) {
     return GW_ERROR_NOT_FOUND;
   }
 
@@ -194,6 +192,9 @@ int load_eth_address_by_script_hash(gw_context_t *ctx,
 // int load_account_id_by_eth_address(gw_context_t *ctx,
 //                               const uint8_t address[20],
 //                               uint32_t *account_id) {
+//   if (ctx == NULL) {
+//     return GW_FATAL_INVALID_CONTEXT;
+//   }
 //   uint8_t script_hash[32] = {0};
 //   int ret = load_script_hash_by_eth_address(ctx, address, script_hash);
 //   if (ret != 0) {
