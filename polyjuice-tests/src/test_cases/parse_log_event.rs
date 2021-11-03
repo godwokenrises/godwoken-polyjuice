@@ -2,8 +2,9 @@
 //!   See ./evm-contracts/LogEvents.sol
 
 use crate::helper::{
-    account_id_to_eth_address, build_eth_l2_script, deploy, new_account_script, new_block_info,
-    parse_log, setup, Log, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, L2TX_MAX_CYCLES,
+    account_id_to_short_script_hash, build_eth_l2_script, deploy, new_account_script,
+    new_block_info, parse_log, setup, Log, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
+    L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
@@ -95,13 +96,13 @@ fn test_parse_log_event() {
         {
             assert_eq!(
                 &address[..],
-                &account_id_to_eth_address(&state, new_account_id, false)[..]
+                &account_id_to_short_script_hash(&state, new_account_id, false)[..]
             );
             assert_eq!(data[31], deploy_value as u8);
             assert_eq!(data[63], 1); // true
             assert_eq!(
                 topics[1].as_slice(),
-                account_id_to_eth_address(&state, from_id, true)
+                account_id_to_short_script_hash(&state, from_id, true)
             );
         } else {
             panic!("unexpected polyjuice log");
@@ -196,13 +197,13 @@ fn test_parse_log_event() {
             {
                 assert_eq!(
                     &address[..],
-                    &account_id_to_eth_address(&state, new_account_id, false)[..]
+                    &account_id_to_short_script_hash(&state, new_account_id, false)[..]
                 );
                 assert_eq!(data[31], call_value as u8);
                 assert_eq!(data[63], 0); // false
                 assert_eq!(
                     topics[1].as_slice(),
-                    account_id_to_eth_address(&state, from_id, true)
+                    account_id_to_short_script_hash(&state, from_id, true)
                 );
             } else {
                 panic!("unexpected polyjuice log");

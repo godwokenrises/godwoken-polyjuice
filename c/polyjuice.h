@@ -956,14 +956,14 @@ int handle_transfer(gw_context_t* ctx,
     ret = load_script_hash_by_eth_address(ctx, msg->sender.bytes,
                                           from_script_hash);
     if (ret != 0) {
-      debug_print_int("[transfer] load from_script_hash failed", ret);
+      debug_print_int("[handle_transfer] load from_script_hash failed", ret);
       return ret;
     }
     uint8_t to_script_hash[32] = {0};
     ret = load_script_hash_by_eth_address(ctx, msg->destination.bytes,
                                           to_script_hash);
     if (ret != 0) {
-      debug_print_int("[transfer] load to_script_hash failed", ret);
+      debug_print_int("[handle_transfer] load to_script_hash failed", ret);
       return ret;
     }
     ret = sudt_transfer(ctx, g_sudt_id,
@@ -983,14 +983,11 @@ int handle_transfer(gw_context_t* ctx,
     return ret;
   }
 
-  // TODO: test transfer value from eoa to eoa
   if (msg->kind == EVMC_CALL
    && memcmp(msg->sender.bytes, g_tx_origin.bytes, 20) == 0
    && to_address_is_eoa) {
-    ckb_debug("[WARN] transfer value from eoa to eoa");
-    if (!g_is_using_native_eth_address) {
-      return FATAL_POLYJUICE;
-    }
+    ckb_debug("warning: transfer value from eoa to eoa");
+    return FATAL_POLYJUICE;
   }
 
   return 0;
@@ -1073,7 +1070,6 @@ int handle_message(gw_context_t* ctx,
                    const evmc_message* msg_origin, struct evmc_result* res) {
   static const evmc_address zero_address{0};
 
-  ckb_debug("[handle_message] BEGIN handle_message");
   evmc_message msg = *msg_origin;
   int ret;
 
@@ -1096,7 +1092,7 @@ int handle_message(gw_context_t* ctx,
       to_address_exists = true;
       ret = ctx->sys_get_account_id_by_script_hash(ctx, to_script_hash, &to_id);
       if (ret != 0) {
-        debug_print_data("get to_account_id by script_hash failed",
+        debug_print_data("[handle_message] get to_account_id by failed",
                          to_script_hash, 32);
         return ret;
       }
@@ -1205,7 +1201,7 @@ int handle_message(gw_context_t* ctx,
      */
     ret = gw_increase_nonce(ctx, from_id, NULL);
     if (ret != 0) {
-      debug_print_int("increase nonce failed", ret);
+      debug_print_int("[handle_message] increase nonce failed", ret);
       return ret;
     }
   }
@@ -1247,13 +1243,12 @@ int handle_message(gw_context_t* ctx,
     memcpy(res->create_address.bytes, msg.destination.bytes, 20);
   }
 
-  debug_print_int("[handle_message] output size", res->output_size);
-  debug_print_int("[handle_message] gas left", res->gas_left);
   uint32_t used_memory;
   memcpy(&used_memory, res->padding, sizeof(uint32_t));
   debug_print_int("[handle_message] used_memory(Bytes)", used_memory);
+  debug_print_int("[handle_message] gas left", res->gas_left);
   debug_print_int("[handle_message] status_code", res->status_code);
-  ckb_debug("[handle_message] END handle_message");
+
   return (int)res->status_code;
 }
 
@@ -1412,18 +1407,37 @@ int run_polyjuice() {
   debug_print_int("[run_polyjuice] used_memory(Bytes)", used_memory);
 
   /* g_sudt_id must already exists */
-  ret = sudt_pay_fee(&context, g_sudt_id, POLYJUICE_SHORT_ADDR_LEN, msg.sender.bytes, fee);
+  uint8_t sender_script_hash[32] = {0};
+  if (g_is_using_native_eth_address) {
+    ret = load_script_hash_by_eth_address(&context, msg.sender.bytes,
+                                          sender_script_hash);
+    if (ret != 0) {
+      debug_print_int("[run_polyjuice] load_script_hash failed", ret);
+      return clean_evmc_result_and_return(&res, ret);
+    }
+    ret = sudt_pay_fee(&context, g_sudt_id, POLYJUICE_SHORT_ADDR_LEN,
+                       sender_script_hash, fee);
+  } else {
+    ret = sudt_pay_fee(&context, g_sudt_id, POLYJUICE_SHORT_ADDR_LEN,
+                       msg.sender.bytes, fee);
+  }
   if (ret != 0) {
-    debug_print_int("pay fee to block_producer failed", ret);
+    debug_print_int("[run_polyjuice] pay fee to block_producer failed", ret);
     return clean_evmc_result_and_return(&res, ret);
   }
-  ret = sys_pay_fee(&context, msg.sender.bytes, POLYJUICE_SHORT_ADDR_LEN, g_sudt_id, fee);
+  if (g_is_using_native_eth_address) {
+    ret = sys_pay_fee(&context, sender_script_hash, POLYJUICE_SHORT_ADDR_LEN,
+                      g_sudt_id, fee);
+  } else {
+    ret = sys_pay_fee(&context, msg.sender.bytes, POLYJUICE_SHORT_ADDR_LEN,
+                      g_sudt_id, fee);
+  }
   if (ret != 0) {
-    debug_print_int("Record fee payment failed", ret);
+    debug_print_int("[run_polyjuice] Record fee payment failed", ret);
     return clean_evmc_result_and_return(&res, ret);
   }
 
-  ckb_debug("finalize");
+  ckb_debug("[run_polyjuice] finalize");
   ret = gw_finalize(&context);
   if (ret != 0) {
     return clean_evmc_result_and_return(&res, ret);

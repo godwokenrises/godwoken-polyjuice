@@ -13,7 +13,5 @@ struct EthToGw {
 
 struct GwToEth {
     gw_script_hash: Byte32,
-    // TODO: should we use gw_short_script_hash?
-    // a.k.a. godwoken short address (script_hash[0..n])
 }
 // --- end of ETH Address Registry ---
