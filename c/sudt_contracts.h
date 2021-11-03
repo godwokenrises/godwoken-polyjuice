@@ -3,7 +3,6 @@
 #define SUDT_CONTRACTS_H_
 
 #include "polyjuice_utils.h"
-#include "polyjuice_globals.h"
 
 #define BALANCE_OF_ANY_SUDT_GAS 150
 #define TRANSFER_TO_ANY_SUDT_GAS 300

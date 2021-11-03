@@ -7,6 +7,7 @@
 
 #include <evmc/evmc.h>
 #include "ckb_syscalls.h"
+#include "polyjuice_globals.h"
 #include "polyjuice_errors.h"
 
 #define ETH_ADDRESS_LEN 20
@@ -49,9 +50,6 @@ void debug_print_int(const char* prefix, int64_t ret) {
 #endif /* NO_DEBUG_LOG */
 
 #define memset(dest, c, n) _smt_fast_memset(dest, c, n)
-
-/* polyjuice contract account (normal/create2) script args size*/
-static const uint32_t CONTRACT_ACCOUNT_SCRIPT_ARGS_SIZE = 32 + 4 + 20;
 
 int build_script(const uint8_t code_hash[32], const uint8_t hash_type,
                  const uint8_t* args, const uint32_t args_len,
