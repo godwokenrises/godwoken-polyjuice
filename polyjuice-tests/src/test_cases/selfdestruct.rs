@@ -2,7 +2,7 @@
 //!   See ./evm-contracts/SelfDestruct.sol
 
 use crate::helper::{
-    self, account_id_to_eth_address, build_eth_l2_script, new_account_script, new_block_info,
+    self, account_id_to_short_script_hash, build_eth_l2_script, new_account_script, new_block_info,
     setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
@@ -46,7 +46,11 @@ fn test_selfdestruct() {
         // Deploy SelfDestruct
         let block_info = new_block_info(0, 1, 0);
         let mut input = hex::decode(INIT_CODE).unwrap();
-        input.extend(account_id_to_eth_address(&state, beneficiary_id, true));
+        input.extend(account_id_to_short_script_hash(
+            &state,
+            beneficiary_id,
+            true,
+        ));
         let args = PolyjuiceArgsBuilder::default()
             .do_create(true)
             .gas_limit(22000)

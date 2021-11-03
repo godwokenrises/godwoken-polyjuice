@@ -2,8 +2,8 @@
 //!   See ./evm-contracts/BlockInfo.sol
 
 use crate::helper::{
-    account_id_to_eth_address, build_eth_l2_script, new_account_script, new_block_info, setup,
-    PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, L2TX_MAX_CYCLES,
+    account_id_to_short_script_hash, build_eth_l2_script, new_account_script, new_block_info,
+    setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
 use gw_db::schema::COLUMN_INDEX;
@@ -48,7 +48,11 @@ fn test_get_block_info() {
     let aggregator_script = build_eth_l2_script([2u8; 20]);
     let aggregator_id = state.create_account_from_script(aggregator_script).unwrap();
     assert_eq!(aggregator_id, 5);
-    let coinbase_hex = hex::encode(&account_id_to_eth_address(&state, aggregator_id, true));
+    let coinbase_hex = hex::encode(&account_id_to_short_script_hash(
+        &state,
+        aggregator_id,
+        true,
+    ));
     println!("coinbase_hex: {}", coinbase_hex);
 
     // Deploy BlockInfo

@@ -2,8 +2,8 @@
 //!   See ./evm-contracts/SelfDestruct.sol
 
 use crate::helper::{
-    self, account_id_to_eth_address, build_eth_l2_script, contract_script_to_eth_address, deploy,
-    new_account_script_with_nonce, new_block_info, setup, PolyjuiceArgsBuilder,
+    self, account_id_to_short_script_hash, build_eth_l2_script, contract_script_to_eth_address,
+    deploy, new_account_script_with_nonce, new_block_info, setup, PolyjuiceArgsBuilder,
     CKB_SUDT_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
@@ -49,7 +49,11 @@ fn test_selfdestruct() {
     let input = format!(
         "{}{}",
         SD_INIT_CODE,
-        hex::encode(account_id_to_eth_address(&state, beneficiary_id, true))
+        hex::encode(account_id_to_short_script_hash(
+            &state,
+            beneficiary_id,
+            true
+        ))
     );
     let run_result = deploy(
         &generator,

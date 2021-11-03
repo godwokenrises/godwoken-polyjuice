@@ -2,8 +2,8 @@
 //!   See ./evm-contracts/SimpleTransfer.sol
 
 use crate::helper::{
-    self, account_id_to_eth_address, build_eth_l2_script, contract_script_to_eth_address, deploy,
-    new_account_script, new_block_info, setup, simple_storage_get, PolyjuiceArgsBuilder,
+    self, account_id_to_short_script_hash, build_eth_l2_script, contract_script_to_eth_address,
+    deploy, new_account_script, new_block_info, setup, simple_storage_get, PolyjuiceArgsBuilder,
     CKB_SUDT_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
@@ -137,7 +137,7 @@ fn test_simple_transfer() {
         let block_info = new_block_info(block_producer_id, block_number, block_number);
         let input = hex::decode(format!(
             "a03fa7e3{}",
-            hex::encode(account_id_to_eth_address(&state, target_id, true)),
+            hex::encode(account_id_to_short_script_hash(&state, target_id, true)),
         ))
         .unwrap();
         let args = PolyjuiceArgsBuilder::default()

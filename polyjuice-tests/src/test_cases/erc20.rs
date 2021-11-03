@@ -2,7 +2,7 @@
 //!   See ./evm-contracts/ERC20.bin
 
 use crate::helper::{
-    self, account_id_to_eth_address, build_eth_l2_script, deploy, new_account_script,
+    self, account_id_to_short_script_hash, build_eth_l2_script, deploy, new_account_script,
     new_block_info, setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
@@ -63,9 +63,9 @@ fn test_erc20() {
         .unwrap()
         .unwrap();
     let is_ethabi = true;
-    let eoa1_hex = hex::encode(account_id_to_eth_address(&state, from_id1, is_ethabi));
-    let eoa2_hex = hex::encode(account_id_to_eth_address(&state, from_id2, is_ethabi));
-    let eoa3_hex = hex::encode(account_id_to_eth_address(&state, from_id3, is_ethabi));
+    let eoa1_hex = hex::encode(account_id_to_short_script_hash(&state, from_id1, is_ethabi));
+    let eoa2_hex = hex::encode(account_id_to_short_script_hash(&state, from_id2, is_ethabi));
+    let eoa3_hex = hex::encode(account_id_to_short_script_hash(&state, from_id3, is_ethabi));
     for (idx, (from_id, args_str, return_data_str)) in [
         // balanceOf(eoa1)
         (
