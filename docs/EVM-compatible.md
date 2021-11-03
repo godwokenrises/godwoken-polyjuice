@@ -23,9 +23,9 @@ When you pass some [address-type](https://docs.soliditylang.org/en/v0.8.9/types.
 
 ## Transaction Structure
 
-A Polyjuice transaction is essentially just a godwoken transaction, since Polyjuice is the main [backend of Godwoken](https://github.com/nervosnetwork/godwoken/blob/master/docs/life_of_a_godwoken_transaction.md#backend) for state computation.
+A Polyjuice transaction is essentially just a Godwoken transaction.
 
-When you send an ethereum transaction to Godwoken-Polyjuice, the data structure of this very transaction needs to be converted to godwoken [RawL2Transaction](https://github.com/nervosnetwork/godwoken/blob/9a3d92/crates/types/schemas/godwoken.mol#L56-L61) type. Also [Polyjuice-Provider](https://github.com/nervosnetwork/polyjuice-provider) has been designed to handle it.
+When you send an ethereum transaction, the transaction is converted to Godwoken [RawL2Transaction](https://github.com/nervosnetwork/godwoken/blob/9a3d92/crates/types/schemas/godwoken.mol#L56-L61) type which is automatically handled by [Polyjuice-Provider](https://github.com/nervosnetwork/polyjuice-provider).
 
 ## Behavioral differences of some opcodes
 
