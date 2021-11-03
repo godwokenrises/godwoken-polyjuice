@@ -3,7 +3,6 @@
 #define OTHER_CONTRACTS_H_
 
 #include "polyjuice_utils.h"
-#include "polyjuice_globals.h"
 
 /* Gas fee */
 #define RECOVER_ACCOUNT_GAS 3600 /* more than ecrecover */
@@ -91,7 +90,7 @@ int eth_to_godwoken_addr_gas(const uint8_t* input_src,
    input[12..32] => ETH address
 
  output:
-   output[12..32] => godwoken short address
+   output[12..32] => short_gw_script_hash, a.k.a. godwoken short address
  */
 int eth_to_godwoken_addr(gw_context_t* ctx,
                          const uint8_t* code_data,
@@ -111,13 +110,13 @@ int eth_to_godwoken_addr(gw_context_t* ctx,
     }
   }
   int ret;
-  uint8_t script_args[SCRIPT_ARGS_LEN];
+  uint8_t script_args[CONTRACT_ACCOUNT_SCRIPT_ARGS_LEN];
   memcpy(script_args, g_rollup_script_hash, 32);
   memcpy(script_args + 32, (uint8_t*)(&g_creator_account_id), 4);
   memcpy(script_args + 32 + 4, input_src + 12, 20);
   mol_seg_t new_script_seg;
   ret = build_script(g_script_code_hash, g_script_hash_type, script_args,
-                     SCRIPT_ARGS_LEN, &new_script_seg);
+                     CONTRACT_ACCOUNT_SCRIPT_ARGS_LEN, &new_script_seg);
   if (ret != 0) {
     return ret;
   }
