@@ -64,8 +64,8 @@ log-version-via-docker: generate-protocol
 all-via-docker-in-debug-mode: generate-protocol
 	docker run --rm -v `pwd`:/code -w /code ${BUILDER_DOCKER} make all-in-debug-mode
 # Be aware that a given prerequisite will only be built once per invocation of make, at most.
-# all-in-debug-mode: LDFLAGS := -g
-all-in-debug-mode: CFLAGS += -DCKB_C_STDLIB_PRINTF -O0
+all-in-debug-mode: LDFLAGS := -g -O3
+all-in-debug-mode: CFLAGS += -DCKB_C_STDLIB_PRINTF
 all-in-debug-mode: all
 
 clean-via-docker:
@@ -84,8 +84,8 @@ build/generator: c/generator.c $(GENERATOR_DEPS)
 build/validator: c/validator.c $(VALIDATOR_DEPS)
 	cd $(SECP_DIR) && (git apply workaround-fix-g++-linking.patch || true) && cd - # apply patch
 	$(CXX) $(CFLAGS) $(LDFLAGS) -Ibuild -o $@ c/validator.c $(ALL_OBJS) -DNO_DEBUG_LOG
-	$(OBJCOPY) --only-keep-debug $@ $@.debug
-	$(OBJCOPY) --strip-debug --strip-all $@
+# $(OBJCOPY) --only-keep-debug $@ $@.debug
+# $(OBJCOPY) --strip-debug --strip-all $@
 	cd $(SECP_DIR) && (git apply -R workaround-fix-g++-linking.patch || true) && cd - # revert patch
 
 build/generator_log: c/generator.c $(GENERATOR_DEPS)
@@ -100,8 +100,8 @@ build/validator_log: c/validator.c $(VALIDATOR_DEPS)
 	cd $(SECP_DIR) && (git apply workaround-fix-g++-linking.patch || true) && cd - # apply patch
 	$(CXX) $(CFLAGS) $(LDFLAGS) -Ibuild -o $@ c/validator.c $(ALL_OBJS)
 #	If we need the whole one for performance analysis, don't separate the executable here
-	$(OBJCOPY) --only-keep-debug $@ $@.debug
-	$(OBJCOPY) --strip-debug --strip-all $@
+# $(OBJCOPY) --only-keep-debug $@ $@.debug
+# $(OBJCOPY) --strip-debug --strip-all $@
 	cd $(SECP_DIR) && (git apply -R workaround-fix-g++-linking.patch || true) && cd - # revert patch
 
 build/eth-addr-reg-generator: c/eth_addr_reg.c
