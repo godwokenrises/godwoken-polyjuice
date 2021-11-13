@@ -8,7 +8,7 @@ pub use gw_common::{
 use gw_config::BackendConfig;
 use gw_db::schema::{COLUMN_INDEX, COLUMN_META, META_TIP_BLOCK_HASH_KEY};
 pub use gw_generator::{
-    account_lock_manage::{always_success::AlwaysSuccess, secp256k1::Secp256k1, AccountLockManage},
+    account_lock_manage::{secp256k1::Secp256k1, AccountLockManage},
     backend_manage::{Backend, BackendManage},
     constants::L2TX_MAX_CYCLES,
     dummy_state::DummyState,
@@ -608,6 +608,7 @@ pub fn build_eth_l2_script(args: [u8; 20]) -> Script {
 }
 
 pub fn check_cycles(l2_tx_label: &str, used_cycles: u64, warning_cycles: u64) {
+    println!("[check_cycles] used_cycles: {}", used_cycles);
     assert!(
         used_cycles < warning_cycles,
         "[Warning: {} used too many cycles = {}]",
