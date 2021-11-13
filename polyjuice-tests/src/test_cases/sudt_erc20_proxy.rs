@@ -140,21 +140,24 @@ fn test_sudt_erc20_proxy_inner(
             .unwrap(),
         0
     );
-    for (idx, (from_id, args_str, return_data_str)) in [
+    for (idx, (action, from_id, args_str, return_data_str)) in [
         // balanceOf(eoa1)
         (
+            "balanceOf(eoa1)",
             from_id1,
             format!("70a08231{}", eoa1_hex),
             "000000000000000000000000000000000000000204fce5e3e250261100000000",
         ),
-        // balanceOf(eoa2)
+        //
         (
+            "balanceOf(eoa2)",
             from_id1,
             format!("70a08231{}", eoa2_hex),
             "0000000000000000000000000000000000000000000000000000000000000000",
         ),
         // transfer("eoa2", 0x22b)
         (
+            "transfer(eoa2, 0x22b)",
             from_id1,
             format!(
                 "a9059cbb{}000000000000000000000000000000000000000000000000000000000000022b",
@@ -164,12 +167,14 @@ fn test_sudt_erc20_proxy_inner(
         ),
         // balanceOf(eoa2)
         (
+            "balanceOf(eoa2)",
             from_id1,
             format!("70a08231{}", eoa2_hex),
             "000000000000000000000000000000000000000000000000000000000000022b",
         ),
         // transfer("eoa2", 0x219)
         (
+            "transfer(eoa2, 0x219)",
             from_id1,
             format!(
                 "a9059cbb{}0000000000000000000000000000000000000000000000000000000000000219",
@@ -180,6 +185,7 @@ fn test_sudt_erc20_proxy_inner(
         //// === Transfer to self ====
         // transfer("eoa1", 0x0)
         (
+            "transfer(eoa1, 0x0)",
             from_id1,
             format!(
                 "a9059cbb{}0000000000000000000000000000000000000000000000000000000000000000",
@@ -189,6 +195,7 @@ fn test_sudt_erc20_proxy_inner(
         ),
         // transfer("eoa1", 0x219)
         (
+            "transfer(eoa1, 0x219)",
             from_id1,
             format!(
                 "a9059cbb{}0000000000000000000000000000000000000000000000000000000000000219",
@@ -198,18 +205,21 @@ fn test_sudt_erc20_proxy_inner(
         ),
         // balanceOf(eoa2)
         (
+            "balanceOf(eoa2)",
             from_id1,
             format!("70a08231{}", eoa2_hex),
             "0000000000000000000000000000000000000000000000000000000000000444",
         ),
         // balanceOf(eoa1)
         (
+            "balanceOf(eoa1)",
             from_id1,
             format!("70a08231{}", eoa1_hex),
             "000000000000000000000000000000000000000204fce5e3e2502610fffffbbc",
         ),
         // approve(eoa3, 0x3e8)
         (
+            "approve(eoa3, 0x3e8)",
             from_id1,
             format!(
                 "095ea7b3{}00000000000000000000000000000000000000000000000000000000000003e8",
@@ -219,6 +229,7 @@ fn test_sudt_erc20_proxy_inner(
         ),
         // transferFrom(eoa1, eoa2, 0x3e8)
         (
+            "transferFrom(eoa1, eoa2, 0x3e8)",
             from_id3,
             format!(
                 "23b872dd{}{}00000000000000000000000000000000000000000000000000000000000003e8",
@@ -228,18 +239,21 @@ fn test_sudt_erc20_proxy_inner(
         ),
         // balanceOf(eoa1)
         (
+            "balanceOf(eoa1)",
             from_id1,
             format!("70a08231{}", eoa1_hex),
             "000000000000000000000000000000000000000204fce5e3e2502610fffff7d4",
         ),
         // balanceOf(eoa2)
         (
+            "balanceOf(eoa2)",
             from_id1,
             format!("70a08231{}", eoa2_hex),
             "000000000000000000000000000000000000000000000000000000000000082c",
         ),
         // decimals()
         (
+            "decimals()",
             from_id1,
             "313ce567".to_string(),
             &format!(
@@ -268,6 +282,7 @@ fn test_sudt_erc20_proxy_inner(
             .build();
         let db = store.begin_transaction();
         let tip_block_hash = store.get_tip_block_hash().unwrap();
+        let t = std::time::Instant::now();
         let run_result = generator.execute_transaction(
             &ChainView::new(&db, tip_block_hash),
             state,
@@ -275,6 +290,13 @@ fn test_sudt_erc20_proxy_inner(
             &raw_tx,
             L2TX_MAX_CYCLES,
         )?;
+        println!(
+            "[execute_transaction] {} {}ms",
+            action,
+            t.elapsed().as_millis()
+        );
+        println!("used_cycles: {}", run_result.used_cycles);
+        println!("write_values.len: {}", run_result.write_values.len());
         state.apply_run_result(&run_result).expect("update state");
         assert_eq!(
             run_result.return_data,
