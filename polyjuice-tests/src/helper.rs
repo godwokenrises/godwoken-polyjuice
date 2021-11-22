@@ -10,7 +10,6 @@ use gw_db::schema::{COLUMN_INDEX, COLUMN_META, META_TIP_BLOCK_HASH_KEY};
 pub use gw_generator::{
     account_lock_manage::{secp256k1::Secp256k1, AccountLockManage},
     backend_manage::{Backend, BackendManage},
-    constants::L2TX_MAX_CYCLES,
     dummy_state::DummyState,
     traits::StateExt,
     Generator,
@@ -29,23 +28,25 @@ use gw_types::{
 use rlp::RlpStream;
 use std::{fs, io::Read, path::PathBuf};
 
+pub const L2TX_MAX_CYCLES: u64 = 7000_0000;
+
 // meta contract
-pub const META_VALIDATOR_PATH: &str =
-    "../integration-test/godwoken/tests-deps/godwoken-scripts/c/build/meta-contract-validator";
-pub const META_GENERATOR_PATH: &str =
-    "../integration-test/godwoken/tests-deps/godwoken-scripts/c/build/meta-contract-generator";
+pub const META_VALIDATOR_PATH: &str = "../build/godwoken-scripts/meta-contract-validator";
+pub const META_GENERATOR_PATH: &str = "../build/godwoken-scripts/meta-contract-generator";
 pub const META_VALIDATOR_SCRIPT_TYPE_HASH: [u8; 32] = [0xa1u8; 32];
 // simple UDT
-pub const SUDT_VALIDATOR_PATH: &str =
-    "../integration-test/godwoken/tests-deps/godwoken-scripts/c/build/sudt-validator";
-pub const SUDT_GENERATOR_PATH: &str =
-    "../integration-test/godwoken/tests-deps/godwoken-scripts/c/build/sudt-generator";
+pub const SUDT_VALIDATOR_PATH: &str = "../build/godwoken-scripts/sudt-validator";
+pub const SUDT_GENERATOR_PATH: &str = "../build/godwoken-scripts/sudt-generator";
 pub const SUDT_VALIDATOR_SCRIPT_TYPE_HASH: [u8; 32] = [0xa2u8; 32];
 pub const SECP_DATA: &[u8] = include_bytes!("../../build/secp256k1_data");
-// polyjuice
+
 pub const BIN_DIR: &str = "../build";
-pub const GENERATOR_NAME: &str = "generator";
-pub const VALIDATOR_NAME: &str = "validator";
+// polyjuice
+pub const POLYJUICE_GENERATOR_NAME: &str = "generator";
+pub const POLYJUICE_VALIDATOR_NAME: &str = "validator";
+// ETH Address Registry
+pub const ETH_ADDRESS_REGISTRY_GENERATOR_NAME: &str = "eth-addr-reg-generator";
+pub const ETH_ADDRESS_REGISTRY_VALIDATOR_NAME: &str = "eth-addr-reg-validator";
 
 pub const ROLLUP_SCRIPT_HASH: [u8; 32] = [0xa9u8; 32];
 pub const ETH_ACCOUNT_LOCK_CODE_HASH: [u8; 32] = [0xaau8; 32];
@@ -59,6 +60,22 @@ pub const GW_LOG_POLYJUICE_USER: u8 = 0x3;
 // pub const FATAL_POLYJUICE: i8 = -50;
 pub const FATAL_PRECOMPILED_CONTRACTS: i8 = -51;
 
+const GW_ETH_ADDRESS_TO_ACCOUNT_SCRIPT_HASH: u8 = 6;
+const GW_ACCOUNT_SCRIPT_HASH_TO_ETH_ADDRESS: u8 = 7;
+
+pub(crate) const SUDT_ERC20_PROXY_USER_DEFINED_DECIMALS_CODE: &str =
+    include_str!("../../solidity/erc20/SudtERC20Proxy_UserDefinedDecimals.bin");
+
+fn load_program(program_name: &str) -> Bytes {
+    let mut buf = Vec::new();
+    let mut path = PathBuf::new();
+    path.push(&BIN_DIR);
+    path.push(program_name);
+    let mut f = fs::File::open(&path).expect("load program");
+    f.read_to_end(&mut buf).expect("read program");
+    Bytes::from(buf.to_vec())
+}
+
 lazy_static::lazy_static! {
     pub static ref SECP_DATA_HASH: H256 = {
         let mut buf = [0u8; 32];
@@ -67,28 +84,27 @@ lazy_static::lazy_static! {
         hasher.finalize(&mut buf);
         buf.into()
     };
-    pub static ref GENERATOR_PROGRAM: Bytes = {
-        let mut buf = Vec::new();
-        let mut path = PathBuf::new();
-        path.push(&BIN_DIR);
-        path.push(&GENERATOR_NAME);
-        let mut f = fs::File::open(&path).expect("load program");
-        f.read_to_end(&mut buf).expect("read program");
-        Bytes::from(buf.to_vec())
-    };
-    pub static ref VALIDATOR_PROGRAM: Bytes = {
-        let mut buf = Vec::new();
-        let mut path = PathBuf::new();
-        path.push(&BIN_DIR);
-        path.push(&VALIDATOR_NAME);
-        let mut f = fs::File::open(&path).expect("load program");
-        f.read_to_end(&mut buf).expect("read program");
-        Bytes::from(buf.to_vec())
-    };
-    pub static ref PROGRAM_CODE_HASH: [u8; 32] = {
+
+    pub static ref POLYJUICE_GENERATOR_PROGRAM: Bytes
+        = load_program(&POLYJUICE_GENERATOR_NAME);
+    pub static ref POLYJUICE_VALIDATOR_PROGRAM: Bytes
+        = load_program(&POLYJUICE_VALIDATOR_NAME);
+    pub static ref POLYJUICE_PROGRAM_CODE_HASH: [u8; 32] = {
         let mut buf = [0u8; 32];
         let mut hasher = new_blake2b();
-        hasher.update(&VALIDATOR_PROGRAM);
+        hasher.update(&POLYJUICE_VALIDATOR_PROGRAM);
+        hasher.finalize(&mut buf);
+        buf
+    };
+
+    pub static ref ETH_ADDRESS_REGISTRY_GENERATOR_PROGRAM: Bytes
+        = load_program(&ETH_ADDRESS_REGISTRY_GENERATOR_NAME);
+    pub static ref ETH_ADDRESS_REGISTRY_VALIDATOR_PROGRAM: Bytes
+        = load_program(&ETH_ADDRESS_REGISTRY_VALIDATOR_NAME);
+    pub static ref ETH_ADDRESS_REGISTRY_PROGRAM_CODE_HASH: [u8; 32] = {
+        let mut buf = [0u8; 32];
+        let mut hasher = new_blake2b();
+        hasher.update(&ETH_ADDRESS_REGISTRY_VALIDATOR_PROGRAM);
         hasher.finalize(&mut buf);
         buf
     };
@@ -241,7 +257,11 @@ pub fn new_block_info(block_producer_id: u32, number: u64, timestamp: u64) -> Bl
         .build()
 }
 
-pub fn account_id_to_eth_address(state: &DummyState, id: u32, ethabi: bool) -> Vec<u8> {
+pub(crate) fn account_id_to_short_script_hash(
+    state: &DummyState,
+    id: u32,
+    ethabi: bool,
+) -> Vec<u8> {
     let offset = if ethabi { 12 } else { 0 };
     let mut data = vec![0u8; offset + 20];
     let account_script_hash = state.get_script_hash(id).unwrap();
@@ -278,7 +298,7 @@ pub fn new_account_script_with_nonce(
     from_id: u32,
     from_nonce: u32,
 ) -> Script {
-    let sender = account_id_to_eth_address(state, from_id, false);
+    let sender = account_id_to_short_script_hash(state, from_id, false);
     let mut stream = RlpStream::new_list(2);
     stream.append(&sender);
     stream.append(&from_nonce);
@@ -291,7 +311,7 @@ pub fn new_account_script_with_nonce(
     new_account_args[36..36 + 20].copy_from_slice(&data_hash[12..]);
 
     Script::new_builder()
-        .code_hash(PROGRAM_CODE_HASH.pack())
+        .code_hash(POLYJUICE_PROGRAM_CODE_HASH.pack())
         .hash_type(ScriptHashType::Type.into())
         .args(new_account_args.pack())
         .build()
@@ -318,6 +338,8 @@ pub fn contract_script_to_eth_address(script: &Script, ethabi: bool) -> Vec<u8> 
 
 #[derive(Default, Debug)]
 pub struct PolyjuiceArgsBuilder {
+    /// default to false
+    is_using_native_eth_address: bool,
     is_create: bool,
     gas_limit: u64,
     gas_price: u128,
@@ -326,6 +348,10 @@ pub struct PolyjuiceArgsBuilder {
 }
 
 impl PolyjuiceArgsBuilder {
+    pub fn using_native_eth_address(mut self, v: bool) -> Self {
+        self.is_using_native_eth_address = v;
+        self
+    }
     pub fn do_create(mut self, value: bool) -> Self {
         self.is_create = value;
         self
@@ -348,8 +374,13 @@ impl PolyjuiceArgsBuilder {
     }
     pub fn build(self) -> Vec<u8> {
         let mut output: Vec<u8> = vec![0u8; 52];
+        if self.is_using_native_eth_address {
+            output[0..3].copy_from_slice(&[b'E', b'T', b'H'][..]);
+        } else {
+            output[0..3].copy_from_slice(&[0xff, 0xff, 0xff][..]);
+        }
         let call_kind: u8 = if self.is_create { 3 } else { 0 };
-        output[0..8].copy_from_slice(&[0xff, 0xff, 0xff, b'P', b'O', b'L', b'Y', call_kind][..]);
+        output[3..8].copy_from_slice(&[b'P', b'O', b'L', b'Y', call_kind][..]);
         output[8..16].copy_from_slice(&self.gas_limit.to_le_bytes()[..]);
         output[16..32].copy_from_slice(&self.gas_price.to_le_bytes()[..]);
         output[32..48].copy_from_slice(&self.value.to_le_bytes()[..]);
@@ -395,7 +426,7 @@ pub fn setup() -> (Store, DummyState, Generator, u32) {
     let creator_account_id = state
         .create_account_from_script(
             Script::new_builder()
-                .code_hash(PROGRAM_CODE_HASH.pack())
+                .code_hash(POLYJUICE_PROGRAM_CODE_HASH.pack())
                 .hash_type(ScriptHashType::Type.into())
                 .args(args.to_vec().pack())
                 .build(),
@@ -424,9 +455,14 @@ pub fn setup() -> (Store, DummyState, Generator, u32) {
     let mut backend_manage = BackendManage::from_config(configs).expect("default backend");
     // NOTICE in this test we won't need SUM validator
     backend_manage.register_backend(Backend {
-        validator: VALIDATOR_PROGRAM.clone(),
-        generator: GENERATOR_PROGRAM.clone(),
-        validator_script_type_hash: PROGRAM_CODE_HASH.clone().into(),
+        validator: POLYJUICE_VALIDATOR_PROGRAM.clone(),
+        generator: POLYJUICE_GENERATOR_PROGRAM.clone(),
+        validator_script_type_hash: POLYJUICE_PROGRAM_CODE_HASH.clone().into(),
+    });
+    backend_manage.register_backend(Backend {
+        validator: ETH_ADDRESS_REGISTRY_VALIDATOR_PROGRAM.clone(),
+        generator: ETH_ADDRESS_REGISTRY_GENERATOR_PROGRAM.clone(),
+        validator_script_type_hash: ETH_ADDRESS_REGISTRY_PROGRAM_CODE_HASH.clone().into(),
     });
     let mut account_lock_manage = AccountLockManage::default();
     account_lock_manage
@@ -437,7 +473,8 @@ pub fn setup() -> (Store, DummyState, Generator, u32) {
             vec![
                 META_VALIDATOR_SCRIPT_TYPE_HASH.clone().pack(),
                 SUDT_VALIDATOR_SCRIPT_TYPE_HASH.clone().pack(),
-                PROGRAM_CODE_HASH.clone().pack(),
+                POLYJUICE_PROGRAM_CODE_HASH.clone().pack(),
+                // ETH_ADDRESS_REGISTRY_PROGRAM_CODE_HASH.clone().pack(),
             ]
             .pack(),
         )
@@ -451,6 +488,7 @@ pub fn setup() -> (Store, DummyState, Generator, u32) {
         account_lock_manage,
         rollup_context,
         Default::default(),
+        L2TX_MAX_CYCLES,
     );
 
     let tx = store.begin_transaction();
@@ -525,7 +563,7 @@ pub fn compute_create2_script(
 ) -> Script {
     assert_eq!(create2_salt.len(), 32);
 
-    let sender = account_id_to_eth_address(state, sender_account_id, false);
+    let sender = account_id_to_short_script_hash(state, sender_account_id, false);
     let init_code_hash = tiny_keccak::keccak256(init_code);
     let mut data = [0u8; 1 + 20 + 32 + 32];
     data[0] = 0xff;
@@ -542,7 +580,7 @@ pub fn compute_create2_script(
     println!("init_code: {}", hex::encode(init_code));
     println!("create2_script_args: {}", hex::encode(&script_args[..]));
     Script::new_builder()
-        .code_hash(PROGRAM_CODE_HASH.pack())
+        .code_hash(POLYJUICE_PROGRAM_CODE_HASH.pack())
         .hash_type(ScriptHashType::Type.into())
         .args(script_args.pack())
         .build()
@@ -622,4 +660,46 @@ pub fn check_cycles(l2_tx_label: &str, used_cycles: u64, warning_cycles: u64) {
         cycles_left,
         cycles_left * 100 / warning_cycles
     );
+}
+
+fn build_eth_address_to_script_hash_key(eth_address: &[u8; 20]) -> H256 {
+    let mut key: [u8; 32] = H256::zero().into();
+    let mut hasher = new_blake2b();
+    hasher.update(&gw_common::state::GW_NON_ACCOUNT_PLACEHOLDER);
+    hasher.update(&[GW_ETH_ADDRESS_TO_ACCOUNT_SCRIPT_HASH]);
+    hasher.update(eth_address);
+    hasher.finalize(&mut key);
+    key.into()
+}
+
+fn build_script_hash_to_eth_address_key(script_hash: &[u8; 32]) -> H256 {
+    let mut key: [u8; 32] = H256::zero().into();
+    let mut hasher = new_blake2b();
+    hasher.update(&gw_common::state::GW_NON_ACCOUNT_PLACEHOLDER);
+    hasher.update(&[GW_ACCOUNT_SCRIPT_HASH_TO_ETH_ADDRESS]);
+    hasher.update(script_hash);
+    hasher.finalize(&mut key);
+    key.into()
+}
+
+pub(crate) fn update_eth_address_registry(
+    state: &mut DummyState,
+    eth_address: &[u8; 20],
+    script_hash: &[u8; 32],
+) {
+    state
+        .update_raw(
+            build_eth_address_to_script_hash_key(eth_address),
+            script_hash.clone().into(),
+        )
+        .expect("add GW_ETH_ADDRESS_TO_SCRIPT_HASH mapping into state");
+
+    let mut eth_address_abi_format = [0u8; 32];
+    eth_address_abi_format[12..].copy_from_slice(eth_address);
+    state
+        .update_raw(
+            build_script_hash_to_eth_address_key(script_hash),
+            eth_address_abi_format.into(),
+        )
+        .expect("add GW_ACCOUNT_SCRIPT_HASH_TO_ETH_ADDRESS mapping into state");
 }

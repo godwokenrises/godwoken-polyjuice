@@ -2,21 +2,16 @@
 //!   See ./evm-contracts/ERC20.bin
 
 use crate::helper::{
-    account_id_to_eth_address, build_eth_l2_script, build_l2_sudt_script, deploy,
+    account_id_to_short_script_hash, build_eth_l2_script, build_l2_sudt_script, deploy,
     new_account_script, new_block_info, setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
-    FATAL_PRECOMPILED_CONTRACTS,
+    FATAL_PRECOMPILED_CONTRACTS, L2TX_MAX_CYCLES, SUDT_ERC20_PROXY_USER_DEFINED_DECIMALS_CODE,
 };
 use gw_common::state::State;
-use gw_generator::{
-    constants::L2TX_MAX_CYCLES, dummy_state::DummyState, error::TransactionError, traits::StateExt,
-    Generator,
-};
+use gw_generator::{dummy_state::DummyState, error::TransactionError, traits::StateExt, Generator};
 use gw_store::{chain_view::ChainView, Store};
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
 
 const SUDT_ERC20_PROXY_CODE: &str = include_str!("../../../solidity/erc20/SudtERC20Proxy.bin");
-const SUDT_ERC20_PROXY_USER_DEFINED_DECIMALS_CODE: &str =
-    include_str!("../../../solidity/erc20/SudtERC20Proxy_UserDefinedDecimals.bin");
 
 fn test_sudt_erc20_proxy_inner(
     generator: &Generator,
@@ -108,9 +103,9 @@ fn test_sudt_erc20_proxy_inner(
         .unwrap()
         .unwrap();
     let is_ethabi = true;
-    let eoa1_hex = hex::encode(account_id_to_eth_address(state, from_id1, is_ethabi));
-    let eoa2_hex = hex::encode(account_id_to_eth_address(state, from_id2, is_ethabi));
-    let eoa3_hex = hex::encode(account_id_to_eth_address(state, from_id3, is_ethabi));
+    let eoa1_hex = hex::encode(account_id_to_short_script_hash(state, from_id1, is_ethabi));
+    let eoa2_hex = hex::encode(account_id_to_short_script_hash(state, from_id2, is_ethabi));
+    let eoa3_hex = hex::encode(account_id_to_short_script_hash(state, from_id3, is_ethabi));
     println!("eoa1_hex: {}", eoa1_hex);
     println!("eoa2_hex: {}", eoa2_hex);
     println!("eoa3_hex: {}", eoa3_hex);

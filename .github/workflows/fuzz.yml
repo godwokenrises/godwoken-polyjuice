@@ -1,6 +1,10 @@
 name: FuzzTest
 
-on: [push, pull_request]
+on:
+  push:
+  pull_request:
+  schedule:
+  - cron: '00 22 * * *'
 
 jobs:
   build-and-run-fuzzing:
@@ -57,22 +61,24 @@ jobs:
 
     - name: Set MAX_FUZZ_TIME for different branches
       run: |
-        if [[ ${{ github.event_name == 'pull_request' }} ]]; then
+        if ${{ github.event_name == 'pull_request' }}; then
           echo "MAX_FUZZ_TIME=6" >> $GITHUB_ENV
-        elif [[ ${{ startsWith(github.base_ref, 'fuzz') }} ]]; then
+        elif ${{ github.event_name == 'schedule' }}; then
+          echo "MAX_FUZZ_TIME=7200" >> $GITHUB_ENV
+        elif ${{ contains(github.ref, 'fuzz') }}; then
           echo "MAX_FUZZ_TIME=3600" >> $GITHUB_ENV
         else
           echo "MAX_FUZZ_TIME=60" >> $GITHUB_ENV
         fi
 
-    - name: Fuzzing Polyjuice Generator 1 hour
+    - name: Fuzzing Polyjuice Generator
       working-directory: polyjuice-tests/fuzz
       run: |
         mkdir -p corpus-cache
         ls corpus-cache
         make build/polyjuice_generator_fuzzer && \
         ./build/polyjuice_generator_fuzzer corpus corpus-cache \
-          -max_total_time=$MAX_FUZZ_TIME -timeout=120 \
+          -max_total_time=${{ env.MAX_FUZZ_TIME }} -timeout=120 \
           -max_len=25000 -rss_limit_mb=0
       # Max data buffer size: 24KB < 25000 bytes
         

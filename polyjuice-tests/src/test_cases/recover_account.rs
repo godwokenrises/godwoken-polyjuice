@@ -4,10 +4,10 @@
 use crate::helper::{
     self, build_eth_l2_script, deploy, new_account_script, new_block_info, setup,
     simple_storage_get, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, FATAL_PRECOMPILED_CONTRACTS,
-    ROLLUP_SCRIPT_HASH, SECP_LOCK_CODE_HASH,
+    L2TX_MAX_CYCLES, ROLLUP_SCRIPT_HASH, SECP_LOCK_CODE_HASH,
 };
 use gw_common::state::State;
-use gw_generator::{constants::L2TX_MAX_CYCLES, error::TransactionError, traits::StateExt};
+use gw_generator::{error::TransactionError, traits::StateExt};
 use gw_store::chain_view::ChainView;
 use gw_types::{
     bytes::Bytes,

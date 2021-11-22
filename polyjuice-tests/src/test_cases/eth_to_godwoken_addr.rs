@@ -2,10 +2,11 @@
 
 use crate::helper::{
     self, build_eth_l2_script, deploy, new_account_script, new_block_info, setup,
-    PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, PROGRAM_CODE_HASH, ROLLUP_SCRIPT_HASH,
+    PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, L2TX_MAX_CYCLES, POLYJUICE_PROGRAM_CODE_HASH,
+    ROLLUP_SCRIPT_HASH,
 };
 use gw_common::state::State;
-use gw_generator::{constants::L2TX_MAX_CYCLES, traits::StateExt};
+use gw_generator::traits::StateExt;
 use gw_store::chain_view::ChainView;
 use gw_types::{
     bytes::Bytes,
@@ -102,7 +103,7 @@ fn test_eth_to_godwoken_addr() {
         script_args[32..36].copy_from_slice(&creator_account_id.to_le_bytes()[..]);
         script_args[36..56].copy_from_slice(&hex::decode(hex_eth_address).unwrap());
         let script_hash = Script::new_builder()
-            .code_hash(PROGRAM_CODE_HASH.pack())
+            .code_hash(POLYJUICE_PROGRAM_CODE_HASH.pack())
             .hash_type(ScriptHashType::Type.into())
             .args(Bytes::from(script_args).pack())
             .build()

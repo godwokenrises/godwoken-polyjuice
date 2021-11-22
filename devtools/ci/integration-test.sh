@@ -15,17 +15,22 @@ else
     git clone --depth=66 -b master https://github.com/nervosnetwork/godwoken.git $GODWOKEN_DIR
 fi
 cd $GODWOKEN_DIR
-git checkout 3f5526fef8f2b341d2ed4f01c17e98c2fade3538
+git checkout 81508486047d14e75b870de628f2fd4bf48fdad3 # Commit on Nov 22, 2021
 git submodule update --init --recursive --depth=1
-
-cd tests-deps/godwoken-scripts/c
-# git pull -r origin master
-# git submodule update --init --recursive
-make all-via-docker
 
 cd $PROJECT_ROOT
 git submodule update --init --recursive --depth=1
 make all-via-docker
+
+# fetch godwoken-scripts from godwoken-prebuilds image,
+# including meta-contract and sudt-contract
+GW_SCRIPTS_DIR=$PROJECT_ROOT/build
+docker pull nervos/godwoken-prebuilds:latest
+mkdir -p $GW_SCRIPTS_DIR && echo "Create dir"
+docker run --rm -v $GW_SCRIPTS_DIR:/build-dir \
+  nervos/godwoken-prebuilds:latest \
+  cp -r /scripts/godwoken-scripts /build-dir \
+  && echo "Copy godwoken-scripts"
 
 cd $TESTS_DIR
 export RUST_BACKTRACE=full
