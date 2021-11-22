@@ -2,8 +2,12 @@
 # Godwoken polyjuice
 An Ethereum compatible backend for [Godwoken](https://github.com/nervosnetwork/godwoken) rollup framework. It include generator and validator implementations.
 
+Polyjuice provides an [Ethereum](https://ethereum.org/en/) compatible layer on [Nervos CKB](https://github.com/nervosnetwork/ckb). It leverages account model as well as scalability provided by [Godwoken](./life_of_a_godwoken_transaction.md), then integrates [evmone](https://github.com/ethereum/evmone) as an EVM engine for running Ethereum smart contracts.
+
+Polyjuice aims at 100% EVM compatibility as a goal, meaning we plan to support all smart contracts supported by the latest Ethereum hardfork version. See [EVM-compatible.md](docs/EVM-compatible.md) and [Addition-Features.md](docs/Addition-Features.md) for more details.
+
 ### Features
-- [x] All op codes
+- [x] All [Ethereum Virtual Machine Opcodes](https://ethervm.io/)
 - [x] Value transfer
 - [ ] pre-compiled contracts
   + [x] ecrecover
@@ -96,3 +100,5 @@ short_address = blake2b(script.as_slice())[0..20]
 ## More docs
 * [EVM compatible](docs/EVM-compatible.md)
 * [Addition Features](docs/Addition-Features.md)
+* [Life of a Polyjuice Transaction](https://github.com/nervosnetwork/godwoken/blob/master/docs/life_of_a_polyjuice_transaction.md)
+* [Life of a Godwoken Transaction](https://github.com/nervosnetwork/godwoken/blob/master/docs/life_of_a_godwoken_transaction.md)
