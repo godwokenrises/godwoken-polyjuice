@@ -2,11 +2,11 @@
 
 use crate::helper::{
     build_eth_l2_script, deploy, new_account_script, new_block_info, setup,
-    update_eth_address_registry, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
+    update_eth_address_registry, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, L2TX_MAX_CYCLES,
     SUDT_ERC20_PROXY_USER_DEFINED_DECIMALS_CODE,
 };
 use gw_common::state::State;
-use gw_generator::{constants::L2TX_MAX_CYCLES, traits::StateExt};
+use gw_generator::traits::StateExt;
 use gw_store::chain_view::ChainView;
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
 
