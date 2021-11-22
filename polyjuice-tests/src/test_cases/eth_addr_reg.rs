@@ -1,7 +1,8 @@
 use crate::helper::{
     new_block_info, setup, update_eth_address_registry, ETH_ADDRESS_REGISTRY_PROGRAM_CODE_HASH,
+    L2TX_MAX_CYCLES,
 };
-use gw_generator::{constants::L2TX_MAX_CYCLES, traits::StateExt};
+use gw_generator::traits::StateExt;
 use gw_store::chain_view::ChainView;
 use gw_types::{
     bytes::Bytes,
