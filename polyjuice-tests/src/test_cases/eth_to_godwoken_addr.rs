@@ -2,10 +2,11 @@
 
 use crate::helper::{
     self, build_eth_l2_script, deploy, new_account_script, new_block_info, setup,
-    PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, PROGRAM_CODE_HASH, ROLLUP_SCRIPT_HASH,
+    PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, L2TX_MAX_CYCLES, PROGRAM_CODE_HASH,
+    ROLLUP_SCRIPT_HASH,
 };
 use gw_common::state::State;
-use gw_generator::{constants::L2TX_MAX_CYCLES, traits::StateExt};
+use gw_generator::traits::StateExt;
 use gw_store::chain_view::ChainView;
 use gw_types::{
     bytes::Bytes,

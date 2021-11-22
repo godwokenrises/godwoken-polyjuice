@@ -4,13 +4,10 @@
 use crate::helper::{
     account_id_to_eth_address, build_eth_l2_script, build_l2_sudt_script, deploy,
     new_account_script, new_block_info, setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
-    FATAL_PRECOMPILED_CONTRACTS,
+    FATAL_PRECOMPILED_CONTRACTS, L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
-use gw_generator::{
-    constants::L2TX_MAX_CYCLES, dummy_state::DummyState, error::TransactionError, traits::StateExt,
-    Generator,
-};
+use gw_generator::{dummy_state::DummyState, error::TransactionError, traits::StateExt, Generator};
 use gw_store::{chain_view::ChainView, Store};
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
 

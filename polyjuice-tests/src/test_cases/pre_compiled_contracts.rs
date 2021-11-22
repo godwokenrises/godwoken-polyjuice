@@ -1,4 +1,4 @@
-use crate::helper::{SECP_DATA, SECP_DATA_HASH};
+use crate::helper::{L2TX_MAX_CYCLES, SECP_DATA, SECP_DATA_HASH};
 use ckb_vm::{
     machine::asm::{AsmCoreMachine, AsmMachine},
     memory::Memory,
@@ -6,7 +6,7 @@ use ckb_vm::{
     DefaultMachineBuilder, Error as VMError, Register, SupportMachine, Syscalls,
 };
 use gw_common::{h256_ext::H256Ext, state::build_data_hash_key, H256};
-use gw_generator::{constants::L2TX_MAX_CYCLES, syscalls::store_data};
+use gw_generator::syscalls::store_data;
 use gw_types::bytes::Bytes;
 use std::collections::HashMap;
 

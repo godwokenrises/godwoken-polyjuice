@@ -3,11 +3,11 @@
 
 use crate::helper::{
     account_id_to_eth_address, build_eth_l2_script, new_account_script, new_block_info, setup,
-    PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
+    PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
 use gw_db::schema::COLUMN_INDEX;
-use gw_generator::{constants::L2TX_MAX_CYCLES, traits::StateExt};
+use gw_generator::traits::StateExt;
 use gw_store::chain_view::ChainView;
 use gw_store::traits::KVStore;
 use gw_types::{
