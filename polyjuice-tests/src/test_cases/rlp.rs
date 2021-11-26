@@ -84,7 +84,7 @@ fn test_rlp() {
     let core_machine = AsmCoreMachine::new(
         params.vm_isa,
         params.vm_version,
-        gw_generator::constants::L2TX_MAX_CYCLES,
+        crate::helper::L2TX_MAX_CYCLES,
     );
 
     let machine_builder = DefaultMachineBuilder::new(core_machine).syscall(Box::new(L2Syscalls));

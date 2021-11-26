@@ -10,7 +10,6 @@ use gw_db::schema::{COLUMN_INDEX, COLUMN_META, META_TIP_BLOCK_HASH_KEY};
 pub use gw_generator::{
     account_lock_manage::{secp256k1::Secp256k1, AccountLockManage},
     backend_manage::{Backend, BackendManage},
-    constants::L2TX_MAX_CYCLES,
     dummy_state::DummyState,
     traits::StateExt,
     Generator,
@@ -29,17 +28,15 @@ use gw_types::{
 use rlp::RlpStream;
 use std::{fs, io::Read, path::PathBuf};
 
+pub const L2TX_MAX_CYCLES: u64 = 7000_0000;
+
 // meta contract
-pub const META_VALIDATOR_PATH: &str =
-    "../integration-test/godwoken/tests-deps/godwoken-scripts/c/build/meta-contract-validator";
-pub const META_GENERATOR_PATH: &str =
-    "../integration-test/godwoken/tests-deps/godwoken-scripts/c/build/meta-contract-generator";
+pub const META_VALIDATOR_PATH: &str = "../build/godwoken-scripts/meta-contract-validator";
+pub const META_GENERATOR_PATH: &str = "../build/godwoken-scripts/meta-contract-generator";
 pub const META_VALIDATOR_SCRIPT_TYPE_HASH: [u8; 32] = [0xa1u8; 32];
 // simple UDT
-pub const SUDT_VALIDATOR_PATH: &str =
-    "../integration-test/godwoken/tests-deps/godwoken-scripts/c/build/sudt-validator";
-pub const SUDT_GENERATOR_PATH: &str =
-    "../integration-test/godwoken/tests-deps/godwoken-scripts/c/build/sudt-generator";
+pub const SUDT_VALIDATOR_PATH: &str = "../build/godwoken-scripts/sudt-validator";
+pub const SUDT_GENERATOR_PATH: &str = "../build/godwoken-scripts/sudt-generator";
 pub const SUDT_VALIDATOR_SCRIPT_TYPE_HASH: [u8; 32] = [0xa2u8; 32];
 pub const SECP_DATA: &[u8] = include_bytes!("../../build/secp256k1_data");
 // polyjuice
@@ -451,6 +448,7 @@ pub fn setup() -> (Store, DummyState, Generator, u32) {
         account_lock_manage,
         rollup_context,
         Default::default(),
+        L2TX_MAX_CYCLES,
     );
 
     let tx = store.begin_transaction();

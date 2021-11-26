@@ -4,10 +4,10 @@
 use crate::helper::{
     self, account_id_to_eth_address, build_eth_l2_script, contract_script_to_eth_address, deploy,
     new_account_script_with_nonce, new_block_info, setup, PolyjuiceArgsBuilder,
-    CKB_SUDT_ACCOUNT_ID,
+    CKB_SUDT_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
-use gw_generator::{constants::L2TX_MAX_CYCLES, traits::StateExt};
+use gw_generator::traits::StateExt;
 use gw_store::chain_view::ChainView;
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
 
