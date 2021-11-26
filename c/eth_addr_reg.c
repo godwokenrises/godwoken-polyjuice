@@ -29,6 +29,7 @@ int printf(const char *format, ...) {
 /* MSG_TYPE */
 #define MSG_QUERY_GW_BY_ETH 0
 #define MSG_QUERY_ETH_BY_GW 1
+#define MSG_SET_MAPPING     2
 
 int main() {
 #ifndef NO_DEBUG_LOG
@@ -57,9 +58,7 @@ int main() {
   /* handle message */
   if (msg.item_id == MSG_QUERY_GW_BY_ETH) {
     mol_seg_t eth_address_seg = MolReader_EthToGw_get_eth_address(&msg.seg);
-
     uint8_t script_hash[GW_VALUE_BYTES] = {0};
-
     ret = load_script_hash_by_eth_address(&ctx,
                                           eth_address_seg.ptr,
                                           script_hash);
@@ -74,7 +73,6 @@ int main() {
   }
   else if (msg.item_id == MSG_QUERY_ETH_BY_GW) {
     mol_seg_t script_hash_seg = MolReader_GwToEth_get_gw_script_hash(&msg.seg);
-
     uint8_t eth_address[ETH_ADDRESS_LEN] = {0};
     ret = load_eth_address_by_script_hash(&ctx,
                                           script_hash_seg.ptr,
@@ -83,6 +81,13 @@ int main() {
       return ret;
     }
     ret = ctx.sys_set_program_return_data(&ctx, eth_address, ETH_ADDRESS_LEN);
+    if (ret != 0) {
+      return ret;
+    }
+  }
+  else if (msg.item_id == MSG_SET_MAPPING) {
+    mol_seg_t script_hash_seg = MolReader_SetMapping_get_gw_script_hash(&msg.seg);
+    ret = eth_address_register(&ctx, script_hash_seg.ptr);
     if (ret != 0) {
       return ret;
     }

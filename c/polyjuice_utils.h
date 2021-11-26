@@ -51,6 +51,14 @@ void debug_print_int(const char* prefix, int64_t ret) {
 
 #define memset(dest, c, n) _smt_fast_memset(dest, c, n)
 
+/* https://stackoverflow.com/a/1545079 */
+#pragma push_macro("errno")
+#undef errno
+bool is_errno_ok(mol_seg_res_t *script_res) {
+  return script_res->errno == MOL_OK;
+}
+#pragma pop_macro("errno")
+
 int build_script(const uint8_t code_hash[32], const uint8_t hash_type,
                  const uint8_t* args, const uint32_t args_len,
                  mol_seg_t* script_seg) {
@@ -73,17 +81,12 @@ int build_script(const uint8_t code_hash[32], const uint8_t hash_type,
   mol_seg_res_t script_res = MolBuilder_Script_build(script_builder);
   free(args_seg.ptr);
 
-  /* https://stackoverflow.com/a/1545079 */
-#pragma push_macro("errno")
-#undef errno
-  if (script_res.errno != MOL_OK) {
+  if (!is_errno_ok(&script_res)) {
     ckb_debug("molecule build script failed");
     return FATAL_POLYJUICE;
   }
-#pragma pop_macro("errno")
 
   *script_seg = script_res.seg;
-
   if (MolReader_Script_verify(script_seg, false) != MOL_OK) {
     ckb_debug("built an invalid script");
     return FATAL_POLYJUICE;
@@ -106,8 +109,8 @@ int short_script_hash_to_account_id(gw_context_t *ctx,
   return ctx->sys_get_account_id_by_script_hash(ctx, script_hash, account_id);
 }
 
-void gw_build_script_hash_to_eth_address_key(uint8_t script_hash[GW_KEY_BYTES],
-                                             uint8_t raw_key[GW_KEY_BYTES]) {
+void gw_build_script_hash_to_eth_address_key(
+    const uint8_t script_hash[GW_KEY_BYTES], uint8_t raw_key[GW_KEY_BYTES]) {
   blake2b_state blake2b_ctx;
   blake2b_init(&blake2b_ctx, GW_KEY_BYTES);
   uint32_t placeholder = 0;
@@ -155,12 +158,12 @@ int load_script_hash_by_eth_address(gw_context_t *ctx,
     return GW_ERROR_NOT_FOUND;
   }
 
-  // TODO: cache [eth_address <=> script_hash] mapping data here
+  // TODO: cache [eth_address <=> script_hash] mapping data
   return 0;
 }
 
 int load_eth_address_by_script_hash(gw_context_t *ctx,
-                                    uint8_t script_hash[GW_KEY_BYTES],
+                                    const uint8_t script_hash[GW_KEY_BYTES],
                                     uint8_t eth_address[ETH_ADDRESS_LEN]) {
   if (ctx == NULL) {
     return GW_FATAL_INVALID_CONTEXT;
@@ -185,6 +188,132 @@ int load_eth_address_by_script_hash(gw_context_t *ctx,
 
   _gw_fast_memcpy(eth_address, value + 12, ETH_ADDRESS_LEN);
   return 0;
+}
+
+int update_eth_address_registry(gw_context_t *ctx,
+                                const uint8_t eth_address[ETH_ADDRESS_LEN],
+                                const uint8_t script_hash[GW_VALUE_BYTES]) {
+  debug_print_data("[eth_address_registry] update eth_address",
+                     eth_address, ETH_ADDRESS_LEN);
+  debug_print_data("[eth_address_registry] update godwoken_account_script_hash",
+                     script_hash, GW_VALUE_BYTES);
+
+  if (ctx == NULL) {
+    return GW_FATAL_INVALID_CONTEXT;
+  }
+  int ret;
+  uint8_t raw_key[GW_KEY_BYTES];
+
+  // eth_address -> gw_script_hash
+  gw_build_eth_address_to_script_hash_key(eth_address, raw_key);
+  ret = ctx->_internal_store_raw(ctx, raw_key, script_hash);
+  if (ret != 0) {
+    return ret;
+  }
+
+  // gw_script_hash -> eth_address
+  gw_build_script_hash_to_eth_address_key(script_hash, raw_key);
+  /** 
+   * ethabi address format
+   *  e.g. web3.eth.abi.decodeParameter('address',
+   *         '0000000000000000000000001829d79cce6aa43d13e67216b355e81a7fffb220')
+   */
+  uint8_t value[GW_VALUE_BYTES] = {0};
+  _gw_fast_memcpy(value + 12, eth_address, ETH_ADDRESS_LEN);
+  ret = ctx->_internal_store_raw(ctx, raw_key, value);
+  if (ret != 0) {
+    return ret;
+  }
+
+  ckb_debug("[eth_address_registry] set mapping finished");
+  return 0;
+}
+
+int eth_address_register(gw_context_t *ctx,
+                         uint8_t script_hash[GW_VALUE_BYTES]) {
+  debug_print_data("[eth_address_registry] new mapping for account_script_hash",
+                   script_hash, GW_VALUE_BYTES);
+  if (ctx == NULL) {
+    return GW_FATAL_INVALID_CONTEXT;
+  }
+  int ret;
+
+  // check account existence
+  uint32_t account_id;
+  ret = ctx->sys_get_account_id_by_script_hash(ctx, script_hash, &account_id);
+  if (ret != 0) {
+    debug_print_int("[eth_address_registry] account not found", ret);
+    return GW_ERROR_ACCOUNT_NOT_EXISTS;
+  }
+
+  // get the script of the account
+  uint8_t script_buffer[GW_MAX_SCRIPT_SIZE];
+  uint64_t script_len = GW_MAX_SCRIPT_SIZE;
+  ret = ctx->sys_get_account_script(ctx, account_id, &script_len, 0,
+                                    script_buffer);
+  if (ret != 0) {
+    debug_print_int("[eth_address_registry] get_account_script failed", ret);
+    return ret;
+  }
+  mol_seg_t script_seg;
+  script_seg.ptr = script_buffer;
+  script_seg.size = script_len;
+  if (MolReader_Script_verify(&script_seg, false) != MOL_OK) {
+    // TODO: maybe we don't need to verify script,
+    // since it is a Script of an existing Godwoken account
+    return GW_ERROR_INVALID_ACCOUNT_SCRIPT;
+  }
+  mol_seg_t script_code_hash_seg = MolReader_Script_get_code_hash(&script_seg);
+
+  // get rollup_config to compare with
+  mol_seg_t rollup_config_seg;
+  rollup_config_seg.ptr = ctx->rollup_config;
+  rollup_config_seg.size = ctx->rollup_config_size;
+  uint8_t eth_address[ETH_ADDRESS_LEN];
+
+  // Option 1: EOA account with native eth_address
+  mol_seg_t allowed_eoa_list_seg =
+      MolReader_RollupConfig_get_allowed_eoa_type_hashes(&rollup_config_seg);
+  const uint32_t eth_eoa_idx = 0;
+  mol_seg_res_t eth_lock_code_hash_res =
+      MolReader_Byte32Vec_get(&allowed_eoa_list_seg, eth_eoa_idx);
+  if (!is_errno_ok(&eth_lock_code_hash_res)) {
+    ckb_debug("[eth_address_registry] failed to get eth_lock EOA code_hash");
+    return GW_FATAL_INVALID_DATA;
+  }
+  if (memcmp(script_code_hash_seg.ptr, eth_lock_code_hash_res.seg.ptr, 
+             script_code_hash_seg.size) == 0) {
+    ckb_debug("[eth_address_registry] EOA account with native eth_address");
+    mol_seg_t args_seg = MolReader_Script_get_args(&script_seg);
+    mol_seg_t raw_bytes_seg = MolReader_Bytes_raw_bytes(&args_seg);
+    if (raw_bytes_seg.size != 52 ) {
+      ckb_debug("[eth_address_registry] not eth_account_lock");
+      return GW_FATAL_UNKNOWN_ARGS;
+    }
+    _gw_fast_memcpy(eth_address, raw_bytes_seg.ptr + 32, ETH_ADDRESS_LEN);
+    return update_eth_address_registry(ctx, eth_address, script_hash);
+  }
+
+  // Option 2: Polyjuice Contract Account
+  mol_seg_t allowed_contract_list_seg =
+      MolReader_RollupConfig_get_allowed_contract_type_hashes(&rollup_config_seg);
+  const uint32_t polyjuice_idx = 2;
+  mol_seg_res_t polyjuice_code_hash_res =
+      MolReader_Byte32Vec_get(&allowed_contract_list_seg, polyjuice_idx);
+  if (!is_errno_ok(&polyjuice_code_hash_res)) {
+    ckb_debug("[eth_address_registry] failed to get Polyjuice code_hash");
+    return GW_FATAL_INVALID_DATA;
+  }
+  if (memcmp(script_code_hash_seg.ptr, polyjuice_code_hash_res.seg.ptr,
+             script_code_hash_seg.size) == 0) {
+    ckb_debug("[eth_address_registry] Polyjuice contract account");
+    // eth_address is short_godwoken_account_script_hash in this situation
+    return update_eth_address_registry(ctx, script_hash, script_hash);
+  }
+
+  // TODO: check selfdestruct?
+
+  return GW_ERROR_UNKNOWN_SCRIPT_CODE_HASH;
 }
 
 // int load_account_id_by_eth_address(gw_context_t *ctx,
