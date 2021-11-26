@@ -52,7 +52,7 @@ VALIDATOR_DEPS := c/validator/secp256k1_helper.h $(BIN_DEPS)
 BUILDER_DOCKER := nervos/ckb-riscv-gnu-toolchain@sha256:7b168b4b109a0f741078a71b7c4dddaf1d283a5244608f7851f5714fbad273ba
 # TODO: update to BUILDER_DOCKER := nervos/ckb-riscv-gnu-toolchain:bionic-20190702-newlib-debug-symbols
 
-all: build/test_contracts build/test_rlp build/generator build/validator build/generator_log build/validator_log build/test_ripemd160 build/blockchain.h build/godwoken.h build/eth-addr-reg-generator build/eth-addr-reg-validator
+all: build/test_contracts build/test_rlp build/generator build/validator build/generator_log build/validator_log build/test_ripemd160 build/blockchain.h build/godwoken.h build/eth_addr_reg_generator build/eth_addr_reg_validator
 
 all-via-docker: generate-protocol
 	mkdir -p build
@@ -65,8 +65,8 @@ log-version-via-docker: generate-protocol
 all-via-docker-in-debug-mode: generate-protocol
 	docker run --rm -v `pwd`:/code -w /code ${BUILDER_DOCKER} make all-in-debug-mode
 # Be aware that a given prerequisite will only be built once per invocation of make, at most.
-# all-in-debug-mode: LDFLAGS := -g
-all-in-debug-mode: CFLAGS += -DCKB_C_STDLIB_PRINTF -O0
+all-in-debug-mode: LDFLAGS := -g # only use -O0 to decrease compile time while coding and debugging
+all-in-debug-mode: CFLAGS += -DCKB_C_STDLIB_PRINTF
 all-in-debug-mode: all
 
 clean-via-docker:
@@ -130,13 +130,13 @@ build/validator_log: c/validator.c $(VALIDATOR_DEPS)
 	$(OBJCOPY) --strip-debug --strip-all $@
 	cd $(SECP_DIR) && (git apply -R workaround-fix-g++-linking.patch || true) && cd - # revert patch
 
-build/eth-addr-reg-generator: c/eth_addr_reg.c
-	$(CC) $(CFLAGS) $(GENERATOR_FLAGS) $(LDFLAGS) -Ibuild -o $@ $<
+build/eth_addr_reg_generator: c/eth_addr_reg.c
+	$(CC) $(CFLAGS) $(GENERATOR_FLAGS) $(LDFLAGS) -Ibuild -o $@ $< -DNO_DEBUG_LOG
 	$(OBJCOPY) --only-keep-debug $@ $@.debug
 	$(OBJCOPY) --strip-debug --strip-all $@
 
-build/eth-addr-reg-validator: c/eth_addr_reg.c
-	$(CC) $(CFLAGS) $(VALIDATOR_FLAGS) $(LDFLAGS) -Ibuild -o $@ $<
+build/eth_addr_reg_validator: c/eth_addr_reg.c
+	$(CC) $(CFLAGS) $(VALIDATOR_FLAGS) $(LDFLAGS) -Ibuild -o $@ $< -DNO_DEBUG_LOG
 	$(OBJCOPY) --only-keep-debug $@ $@.debug
 	$(OBJCOPY) --strip-debug --strip-all $@
 

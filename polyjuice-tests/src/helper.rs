@@ -46,8 +46,8 @@ pub const BIN_DIR: &str = "../build";
 pub const POLYJUICE_GENERATOR_NAME: &str = "generator.aot";
 pub const POLYJUICE_VALIDATOR_NAME: &str = "validator";
 // ETH Address Registry
-pub const ETH_ADDRESS_REGISTRY_GENERATOR_NAME: &str = "eth-addr-reg-generator";
-pub const ETH_ADDRESS_REGISTRY_VALIDATOR_NAME: &str = "eth-addr-reg-validator";
+pub const ETH_ADDRESS_REGISTRY_GENERATOR_NAME: &str = "eth_addr_reg_generator";
+pub const ETH_ADDRESS_REGISTRY_VALIDATOR_NAME: &str = "eth_addr_reg_validator";
 
 pub const ROLLUP_SCRIPT_HASH: [u8; 32] = [0xa9u8; 32];
 pub const ETH_ACCOUNT_LOCK_CODE_HASH: [u8; 32] = [0xaau8; 32];
@@ -483,6 +483,7 @@ pub fn setup() -> (Store, DummyState, Generator, u32) {
             ]
             .pack(),
         )
+        .allowed_eoa_type_hashes(vec![ETH_ACCOUNT_LOCK_CODE_HASH.clone().pack()].pack())
         .build();
     let rollup_context = RollupContext {
         rollup_script_hash: ROLLUP_SCRIPT_HASH.clone().into(),

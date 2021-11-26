@@ -1,10 +1,11 @@
 // --- ETH Address Registry ---
+
 array Byte20 [byte; 20];
-// option ETHAddrOpt (Byte20);
 
 union ETHAddrRegArgs {
     EthToGw,
     GwToEth,
+    SetMapping,
 }
 
 struct EthToGw {
@@ -12,6 +13,10 @@ struct EthToGw {
 }
 
 struct GwToEth {
+    gw_script_hash: Byte32,
+}
+
+struct SetMapping {
     gw_script_hash: Byte32,
 }
 // --- end of ETH Address Registry ---
