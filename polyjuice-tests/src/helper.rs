@@ -45,8 +45,8 @@ pub const BIN_DIR: &str = "../build";
 pub const POLYJUICE_GENERATOR_NAME: &str = "generator";
 pub const POLYJUICE_VALIDATOR_NAME: &str = "validator";
 // ETH Address Registry
-pub const ETH_ADDRESS_REGISTRY_GENERATOR_NAME: &str = "eth-addr-reg-generator";
-pub const ETH_ADDRESS_REGISTRY_VALIDATOR_NAME: &str = "eth-addr-reg-validator";
+pub const ETH_ADDRESS_REGISTRY_GENERATOR_NAME: &str = "eth_addr_reg_generator";
+pub const ETH_ADDRESS_REGISTRY_VALIDATOR_NAME: &str = "eth_addr_reg_validator";
 
 pub const ROLLUP_SCRIPT_HASH: [u8; 32] = [0xa9u8; 32];
 pub const ETH_ACCOUNT_LOCK_CODE_HASH: [u8; 32] = [0xaau8; 32];

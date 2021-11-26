@@ -106,8 +106,8 @@ int short_script_hash_to_account_id(gw_context_t *ctx,
   return ctx->sys_get_account_id_by_script_hash(ctx, script_hash, account_id);
 }
 
-void gw_build_script_hash_to_eth_address_key(uint8_t script_hash[GW_KEY_BYTES],
-                                             uint8_t raw_key[GW_KEY_BYTES]) {
+void gw_build_script_hash_to_eth_address_key(
+    const uint8_t script_hash[GW_KEY_BYTES], uint8_t raw_key[GW_KEY_BYTES]) {
   blake2b_state blake2b_ctx;
   blake2b_init(&blake2b_ctx, GW_KEY_BYTES);
   uint32_t placeholder = 0;
@@ -155,12 +155,12 @@ int load_script_hash_by_eth_address(gw_context_t *ctx,
     return GW_ERROR_NOT_FOUND;
   }
 
-  // TODO: cache [eth_address <=> script_hash] mapping data here
+  // TODO: cache [eth_address <=> script_hash] mapping data
   return 0;
 }
 
 int load_eth_address_by_script_hash(gw_context_t *ctx,
-                                    uint8_t script_hash[GW_KEY_BYTES],
+                                    const uint8_t script_hash[GW_KEY_BYTES],
                                     uint8_t eth_address[ETH_ADDRESS_LEN]) {
   if (ctx == NULL) {
     return GW_FATAL_INVALID_CONTEXT;
@@ -184,6 +184,39 @@ int load_eth_address_by_script_hash(gw_context_t *ctx,
   }
 
   _gw_fast_memcpy(eth_address, value + 12, ETH_ADDRESS_LEN);
+  return 0;
+}
+
+int update_eth_address_registry(gw_context_t *ctx,
+                                const uint8_t eth_address[ETH_ADDRESS_LEN],
+                                const uint8_t script_hash[GW_VALUE_BYTES]) {
+  if (ctx == NULL) {
+    return GW_FATAL_INVALID_CONTEXT;
+  }
+
+  // eth_address -> gw_script_hash
+  uint8_t raw_key[GW_KEY_BYTES] = {0};
+  gw_build_eth_address_to_script_hash_key(eth_address, raw_key);
+  int ret = ctx->_internal_store_raw(ctx, raw_key, script_hash);
+  if (ret != 0) {
+    return ret;
+  }
+
+  /** 
+   * ethabi address format
+   *  e.g. web3.eth.abi.decodeParameter('address',
+   *         '0000000000000000000000001829d79cce6aa43d13e67216b355e81a7fffb220')
+   */
+  uint8_t value[GW_VALUE_BYTES] = {0};
+  _gw_fast_memcpy(value + 12, eth_address, ETH_ADDRESS_LEN);
+
+  // gw_script_hash -> eth_address
+  gw_build_script_hash_to_eth_address_key(script_hash, raw_key);
+  ret = ctx->_internal_store_raw(ctx, raw_key, value);
+  if (ret != 0) {
+    return ret;
+  }
+
   return 0;
 }
 

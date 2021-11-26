@@ -29,6 +29,7 @@ int printf(const char *format, ...) {
 /* MSG_TYPE */
 #define MSG_QUERY_GW_BY_ETH 0
 #define MSG_QUERY_ETH_BY_GW 1
+#define MSG_SET_MAPPING     2
 
 int main() {
 #ifndef NO_DEBUG_LOG
@@ -83,6 +84,15 @@ int main() {
       return ret;
     }
     ret = ctx.sys_set_program_return_data(&ctx, eth_address, ETH_ADDRESS_LEN);
+    if (ret != 0) {
+      return ret;
+    }
+  }
+  else if (msg.item_id == MSG_SET_MAPPING) {
+    mol_seg_t eth_address_seg = MolReader_SetMapping_get_eth_address(&msg.seg);
+    mol_seg_t script_hash_seg = MolReader_SetMapping_get_gw_script_hash(&msg.seg);
+    ret = update_eth_address_registry(&ctx,
+                                      eth_address_seg.ptr, script_hash_seg.ptr);
     if (ret != 0) {
       return ret;
     }
