@@ -65,7 +65,7 @@ log-version-via-docker: generate-protocol
 all-via-docker-in-debug-mode: generate-protocol
 	docker run --rm -v `pwd`:/code -w /code ${BUILDER_DOCKER} make all-in-debug-mode
 # Be aware that a given prerequisite will only be built once per invocation of make, at most.
-all-in-debug-mode: LDFLAGS := -g # only use -O0 to decrease compile time while coding and debugging
+all-in-debug-mode: LDFLAGS := -g # only use -O0 to decrease compile time while coding and debugging (O0 compile time: 1m58s)
 all-in-debug-mode: CFLAGS += -DCKB_C_STDLIB_PRINTF
 all-in-debug-mode: all
 
@@ -242,6 +242,14 @@ contract/sudt-erc20-proxy:
 # if [ "$$ERC20BIN_SHASUM" = "9f7bf1ab25b377ddc339e6de79a800d4c7dc83de7e12057a0129b467794ce3a3" ] ; \
 # then echo "ERC20BIN_SHASUM matches" ; \
 # else echo "ERC20BIN_SHASUM does not match" ; exit 1 ; fi
+
+fetch-gw-scripts:
+	mkdir -p build
+	docker pull nervos/godwoken-prebuilds:latest
+	docker run --rm -v `pwd`/build:/build-dir \
+		nervos/godwoken-prebuilds:latest \
+		cp -r /scripts/godwoken-scripts /build-dir \
+		&& echo "Copy godwoken-scripts"
 
 fmt:
 	clang-format -i -style=Google c/**/*.*
