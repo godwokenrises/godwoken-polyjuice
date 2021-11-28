@@ -18,5 +18,6 @@ struct GwToEth {
 
 struct SetMapping {
     gw_script_hash: Byte32,
+    fee: Fee,
 }
 // --- end of ETH Address Registry ---

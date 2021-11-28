@@ -16,6 +16,7 @@
 
 #include "gw_syscalls.h"
 #include "polyjuice_utils.h"
+#include "sudt_utils.h"
 
 #ifdef NO_DEBUG_LOG
 int printf(const char *format, ...) { return 0; }
@@ -30,6 +31,29 @@ int printf(const char *format, ...) {
 #define MSG_QUERY_GW_BY_ETH 0
 #define MSG_QUERY_ETH_BY_GW 1
 #define MSG_SET_MAPPING     2
+
+int handle_fee(gw_context_t *ctx, mol_seg_t fee_seg) {
+  if (ctx == NULL) {
+    return GW_FATAL_INVALID_CONTEXT;
+  }
+
+  /* payer's short address */
+  uint8_t payer_account_script_hash[32] = {0};
+  int ret = ctx->sys_get_script_hash_by_account_id(
+      ctx, ctx->transaction_context.from_id, payer_account_script_hash);
+  if (ret != 0) {
+    return ret;
+  }
+  uint64_t short_script_hash_len = POLYJUICE_SHORT_ADDR_LEN;
+  /* sudt */
+  mol_seg_t sudt_id_seg = MolReader_Fee_get_sudt_id(&fee_seg);
+  uint32_t sudt_id = *(uint32_t *)sudt_id_seg.ptr;
+  /* amount */
+  mol_seg_t amount_seg = MolReader_Fee_get_amount(&fee_seg);
+  uint128_t amount = *(uint128_t *)amount_seg.ptr;
+  return sudt_pay_fee(ctx, sudt_id, short_script_hash_len,
+                      payer_account_script_hash, amount);
+}
 
 int main() {
 #ifndef NO_DEBUG_LOG
@@ -65,7 +89,6 @@ int main() {
     if (ret != 0) {
       return ret;
     }
-
     ret = ctx.sys_set_program_return_data(&ctx, script_hash, GW_VALUE_BYTES);
     if (ret != 0) {
       return ret;
@@ -86,6 +109,13 @@ int main() {
     }
   }
   else if (msg.item_id == MSG_SET_MAPPING) {
+    /* charge fee */
+    mol_seg_t fee_seg = MolReader_SetMapping_get_fee(&msg.seg);
+    ret = handle_fee(&ctx, fee_seg);
+    if (ret != 0) {
+      return ret;
+    }
+
     mol_seg_t script_hash_seg = MolReader_SetMapping_get_gw_script_hash(&msg.seg);
     ret = eth_address_register(&ctx, script_hash_seg.ptr);
     if (ret != 0) {
