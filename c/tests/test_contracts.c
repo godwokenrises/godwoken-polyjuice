@@ -8,15 +8,6 @@
 
 #include "ckb_syscalls.h"
 
-#ifdef NO_DEBUG_LOG
-int printf(const char *format, ...) { return 0; }
-#else
-int printf(const char *format, ...) {
-  ckb_debug(format);
-  return 0;
-}
-#endif
-
 #include <ethash/keccak.hpp>
 #include <evmc/evmc.h>
 
@@ -632,7 +623,7 @@ int init_mock_state() {
 #endif
 
 int main() {
-#ifndef NO_DEBUG_LOG
+#ifdef CKB_C_STDLIB_PRINTF
   // init buffer for debug_print
   char buffer[DEBUG_BUFFER_SIZE];
   g_debug_buffer = buffer;

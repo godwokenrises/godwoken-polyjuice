@@ -18,15 +18,6 @@
 #include "polyjuice_utils.h"
 #include "sudt_utils.h"
 
-#ifdef NO_DEBUG_LOG
-int printf(const char *format, ...) { return 0; }
-#else
-int printf(const char *format, ...) {
-  ckb_debug(format);
-  return 0;
-}
-#endif
-
 /* MSG_TYPE */
 #define MSG_QUERY_GW_BY_ETH 0
 #define MSG_QUERY_ETH_BY_GW 1
@@ -56,7 +47,7 @@ int handle_fee(gw_context_t *ctx, mol_seg_t fee_seg) {
 }
 
 int main() {
-#ifndef NO_DEBUG_LOG
+#ifdef CKB_C_STDLIB_PRINTF
   // init buffer for debug_print
   char buffer[DEBUG_BUFFER_SIZE];
   g_debug_buffer = buffer;

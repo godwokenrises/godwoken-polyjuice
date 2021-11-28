@@ -48,7 +48,8 @@ extern "C" int ckb_debug(const char* str) {
   cout << "[debug] " << str << endl;
   return 0;
 }
-#ifdef NO_DEBUG_LOG
+
+#ifndef CKB_C_STDLIB_PRINTF
 #undef ckb_debug
 #define ckb_debug(s) do {} while (0)
 #endif
