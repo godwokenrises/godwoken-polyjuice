@@ -10,10 +10,6 @@
 #include "polyjuice_globals.h"
 #include "polyjuice_errors.h"
 
-#define ETH_ADDRESS_LEN 20
-#define GW_ETH_ADDRESS_TO_ACCOUNT_SCRIPT_HASH 6
-#define GW_ACCOUNT_SCRIPT_HASH_TO_ETH_ADDRESS 7
-
 #ifdef NO_DEBUG_LOG
 #undef ckb_debug
 #define ckb_debug(s) do {} while (0)
