@@ -12,15 +12,6 @@
 #include <evmc/evmc.hpp>
 #include <evmone/evmone.h>
 
-#ifdef NO_DEBUG_LOG
-int printf(const char *format, ...) { return 0; }
-#else
-int printf(const char *format, ...) {
-  ckb_debug(format);
-  return 0;
-}
-#endif
-
 /* https://stackoverflow.com/a/1545079 */
 #pragma push_macro("errno")
 #undef errno
@@ -1292,7 +1283,7 @@ int clean_evmc_result_and_return(evmc_result *res, int code) {
 }
 
 int run_polyjuice() {
-#ifndef NO_DEBUG_LOG
+#ifdef CKB_C_STDLIB_PRINTF
   // init buffer for debug_print
   char buffer[DEBUG_BUFFER_SIZE];
   g_debug_buffer = buffer;

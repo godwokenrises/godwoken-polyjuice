@@ -37,7 +37,7 @@ void dbg_print_hex(const uint8_t* ptr, size_t size) {
   printf("\n");
 }
 
-#ifdef NO_DEBUG_LOG
+#ifndef CKB_C_STDLIB_PRINTF
 #undef dbg_print
 #undef dbg_print_h256
 #undef dbg_print_hex
