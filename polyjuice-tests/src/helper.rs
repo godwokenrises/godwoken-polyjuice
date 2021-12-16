@@ -5,7 +5,7 @@ pub use gw_common::{
     state::{build_data_hash_key, State},
     CKB_SUDT_SCRIPT_ARGS, H256,
 };
-use gw_config::BackendConfig;
+use gw_config::{BackendConfig, BackendType};
 use gw_db::schema::{COLUMN_INDEX, COLUMN_META, META_TIP_BLOCK_HASH_KEY};
 pub use gw_generator::{
     account_lock_manage::{secp256k1::Secp256k1, AccountLockManage},
@@ -41,7 +41,7 @@ pub const SUDT_VALIDATOR_SCRIPT_TYPE_HASH: [u8; 32] = [0xa2u8; 32];
 pub const SECP_DATA: &[u8] = include_bytes!("../../build/secp256k1_data");
 // polyjuice
 pub const BIN_DIR: &str = "../build";
-pub const GENERATOR_NAME: &str = "generator";
+pub const GENERATOR_NAME: &str = "generator.aot";
 pub const VALIDATOR_NAME: &str = "validator";
 
 pub const ROLLUP_SCRIPT_HASH: [u8; 32] = [0xa9u8; 32];
@@ -408,11 +408,13 @@ pub fn setup() -> (Store, DummyState, Generator, u32) {
     // ==== Build generator
     let configs = vec![
         BackendConfig {
+            backend_type: BackendType::Meta,
             validator_path: META_VALIDATOR_PATH.into(),
             generator_path: META_GENERATOR_PATH.into(),
             validator_script_type_hash: META_VALIDATOR_SCRIPT_TYPE_HASH.into(),
         },
         BackendConfig {
+            backend_type: BackendType::Sudt,
             validator_path: SUDT_VALIDATOR_PATH.into(),
             generator_path: SUDT_GENERATOR_PATH.into(),
             validator_script_type_hash: SUDT_VALIDATOR_SCRIPT_TYPE_HASH.into(),
@@ -421,6 +423,7 @@ pub fn setup() -> (Store, DummyState, Generator, u32) {
     let mut backend_manage = BackendManage::from_config(configs).expect("default backend");
     // NOTICE in this test we won't need SUM validator
     backend_manage.register_backend(Backend {
+        backend_type: BackendType::Polyjuice,
         validator: VALIDATOR_PROGRAM.clone(),
         generator: GENERATOR_PROGRAM.clone(),
         validator_script_type_hash: PROGRAM_CODE_HASH.clone().into(),
@@ -448,7 +451,6 @@ pub fn setup() -> (Store, DummyState, Generator, u32) {
         account_lock_manage,
         rollup_context,
         Default::default(),
-        L2TX_MAX_CYCLES,
     );
 
     let tx = store.begin_transaction();

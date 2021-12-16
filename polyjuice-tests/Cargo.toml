@@ -1,6 +1,6 @@
 [package]
 name = "polyjuice-tests"
-version = "0.1.0"
+version = "0.1.1"
 authors = ["Linfeng Qian <thewawar@gmail.com>"]
 edition = "2018"
 
@@ -17,13 +17,13 @@ gw-generator = { path = "../integration-test/godwoken/crates/generator" }
 # gw-jsonrpc-types = { path = "../integration-test/godwoken/crates/jsonrpc-types" }
 
 ckb-vm = { version = "=0.20.0-rc5", features = ["detect-asm"] }
-# ethabi = "14.0.0"
 lazy_static = "1.4"
 tiny-keccak = "1.4"
 rlp = "0.5.0"
 hex = "0.4.2"
 env_logger = "0.8.3"
 
+# ethabi = "14.0.0"
 # rand = "0.7.3"
 # blake2b-rs = "0.2"
 # serde_json = "1.0"
