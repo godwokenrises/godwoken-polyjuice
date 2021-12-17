@@ -12,10 +12,10 @@ if [ -d "$GODWOKEN_DIR" ]
 then
     echo "godwoken project already exists"
 else
-    git clone --depth=100 -b generator-ahead-of-time-compilation https://github.com/flouse/godwoken.git $GODWOKEN_DIR
+    git clone -b develop https://github.com/nervosnetwork/godwoken.git $GODWOKEN_DIR
 fi
 cd $GODWOKEN_DIR
-git checkout a6405ad140f96f1d7914e18b66c1249a9a4632d6 # Commit on Thu Dec 9 07:10:43 2021 +0000
+git checkout 1dc4092926291542b76f4f80883f5c6959992510 # https://github.com/nervosnetwork/godwoken/commits/1dc4092
 git submodule update --init --recursive --depth=1
 
 cd $PROJECT_ROOT
