@@ -77,12 +77,10 @@ build/ckb-binary-patcher:
 		&& cargo build --release)
 patch-generator: build/ckb-binary-patcher
 	${CKB_BIN_PATCHER} --remove-a -i build/generator -o build/generator.aot
-	mv build/generator build/generator.asm
-	cp build/generator.aot build/generator
+	cp build/generator build/generator.asm
 patch-generator_log: build/ckb-binary-patcher
 	${CKB_BIN_PATCHER} --remove-a -i build/generator_log -o build/generator_log.aot
-	mv build/generator_log build/generator_log.asm
-	cp build/generator_log.aot build/generator_log
+	cp build/generator_log build/generator_log.asm
 # patch-validator: build/ckb-binary-patcher
 # 	${CKB_BIN_PATCHER} --remove-a -i build/validator -o build/validator.aot
 # patch-validator_log: build/ckb-binary-patcher
