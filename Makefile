@@ -72,7 +72,7 @@ build/ckb-binary-patcher:
 	  || git clone --depth=1 https://github.com/nervosnetwork/ckb-binary-patcher.git
 	[ -f ${CKB_BIN_PATCHER} ] \
 	  || (cd deps/ckb-binary-patcher \
-		&& git fetch https://github.com/XuJiandong/ckb-binary-patcher 57144f122e55ee1610779b307d3935918b28167e \
+		&& git fetch https://github.com/XuJiandong/ckb-binary-patcher ad6ab1ad29b9b8b465e7e22f5e4e65bec5b8c43f \
 		&& git checkout FETCH_HEAD \
 		&& cargo build --release)
 patch-generator: build/ckb-binary-patcher
