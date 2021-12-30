@@ -19,9 +19,17 @@ CFLAGS_MBEDTLS := -Ideps/mbedtls/include
 CFLAGS_EVMONE := -Ideps/evmone/lib/evmone -Ideps/evmone/include -Ideps/evmone/evmc/include
 CFLAGS_SMT := -Ideps/godwoken-scripts/c/deps/sparse-merkle-tree/c
 CFLAGS_GODWOKEN := -Ideps/godwoken-scripts/c
-CFLAGS := -O3 -Ic/ripemd160 $(CFLAGS_CKB_STD) $(CFLAGS_EVMONE) $(CFLAGS_INTX) $(CFLAGS_BN128) $(CFLAGS_ETHASH) $(CFLAGS_CRYPTO_ALGORITHMS) $(CFLAGS_MBEDTLS) $(CFLAGS_SMT) $(CFLAGS_GODWOKEN) $(CFLAGS_SECP) -Wall -g -fdata-sections -ffunction-sections
+CFLAGS := -O3 -Ic/ripemd160 $(CFLAGS_CKB_STD) $(CFLAGS_EVMONE) $(CFLAGS_INTX) $(CFLAGS_BN128) $(CFLAGS_ETHASH) $(CFLAGS_CRYPTO_ALGORITHMS) $(CFLAGS_MBEDTLS) $(CFLAGS_SMT) $(CFLAGS_GODWOKEN) $(CFLAGS_SECP)
 CXXFLAGS := $(CFLAGS) -std=c++1z
-LDFLAGS := -Wl,--gc-sections
+# -Wl,<args> Pass the comma separated arguments in args to the linker(GNU linker)
+# --gc-sections
+#   This will perform a garbage collection of code and data never referenced.
+#   together with -ffunction-sections and -fdata-sections
+# -static
+# 	On systems that support dynamic linking, this  pre-
+# 	vents  linking with the shared libraries.  On other
+# 	systems, this option has no effect.
+LDFLAGS := -Wl,-static -Wl,--gc-sections -fdata-sections -ffunction-sections -Wall
 
 SECP256K1_SRC := $(SECP_DIR)/src/ecmult_static_pre_context.h
 
@@ -47,6 +55,7 @@ all: build/test_contracts build/test_rlp build/generator build/validator build/g
 all-via-docker: generate-protocol
 	mkdir -p build
 	docker run --rm -v `pwd`:/code ${BUILDER_DOCKER} bash -c "cd /code && make"
+	make patch-generator
 log-version-via-docker: generate-protocol
 	mkdir -p build
 	docker run --rm -v `pwd`:/code ${BUILDER_DOCKER} bash -c "cd /code && make build/generator_log && make build/validator_log"
@@ -55,7 +64,29 @@ clean-via-docker:
 	mkdir -p build
 	docker run --rm -v `pwd`:/code ${BUILDER_DOCKER} bash -c "cd /code && make clean"
 
-dist: clean-via-docker all-via-docker
+dist: clean-via-docker all-via-docker patch-generator patch-generator_log
+
+CKB_BIN_PATCHER := deps/ckb-binary-patcher/target/release/ckb-binary-patcher
+build/ckb-binary-patcher:
+	cd deps && [ -d "ckb-binary-patcher" ] \
+	  || git clone --depth=1 https://github.com/nervosnetwork/ckb-binary-patcher.git
+	[ -f ${CKB_BIN_PATCHER} ] \
+	  || (cd deps/ckb-binary-patcher \
+		&& git fetch https://github.com/XuJiandong/ckb-binary-patcher ad6ab1ad29b9b8b465e7e22f5e4e65bec5b8c43f \
+		&& git checkout FETCH_HEAD \
+		&& cargo build --release)
+patch-generator: build/ckb-binary-patcher
+	${CKB_BIN_PATCHER} --remove-a -i build/generator -o build/generator.aot
+	cp build/generator build/generator.asm
+patch-generator_log: build/ckb-binary-patcher
+	${CKB_BIN_PATCHER} --remove-a -i build/generator_log -o build/generator_log.aot
+	cp build/generator_log build/generator_log.asm
+# patch-validator: build/ckb-binary-patcher
+# 	${CKB_BIN_PATCHER} --remove-a -i build/validator -o build/validator.aot
+# patch-validator_log: build/ckb-binary-patcher
+# 	${CKB_BIN_PATCHER} --remove-a -i build/validator_log -o build/validator_log.aot
+# patch-test_contracts: build/ckb-binary-patcher
+# 	${CKB_BIN_PATCHER} --remove-a -i build/test_contracts -o build/test_contracts.aot
 
 build/generator: c/generator.c $(GENERATOR_DEPS)
 	cd $(SECP_DIR) && (git apply workaround-fix-g++-linking.patch || true) && cd - # apply patch
