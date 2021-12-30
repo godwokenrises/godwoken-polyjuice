@@ -14,7 +14,8 @@ pub use gw_generator::{
     traits::StateExt,
     Generator,
 };
-use gw_store::traits::KVStore;
+use gw_store::traits::chain_store::ChainStore;
+use gw_store::traits::kv_store::KVStoreWrite;
 pub use gw_store::{chain_view::ChainView, Store};
 use gw_traits::CodeStore;
 use gw_types::offchain::RollupContext;
@@ -501,7 +502,7 @@ pub fn deploy(
         .args(Bytes::from(args).pack())
         .build();
     let db = store.begin_transaction();
-    let tip_block_hash = store.get_tip_block_hash().unwrap();
+    let tip_block_hash = db.get_tip_block_hash().unwrap();
     let run_result = generator
         .execute_transaction(
             &ChainView::new(&db, tip_block_hash),
@@ -570,7 +571,7 @@ pub fn simple_storage_get(
         .args(Bytes::from(args).pack())
         .build();
     let db = store.begin_transaction();
-    let tip_block_hash = store.get_tip_block_hash().unwrap();
+    let tip_block_hash = db.get_tip_block_hash().unwrap();
     let run_result = generator
         .execute_transaction(
             &ChainView::new(&db, tip_block_hash),

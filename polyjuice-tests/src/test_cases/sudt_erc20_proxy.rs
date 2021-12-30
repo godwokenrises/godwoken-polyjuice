@@ -8,6 +8,7 @@ use crate::helper::{
 };
 use gw_common::state::State;
 use gw_generator::{dummy_state::DummyState, error::TransactionError, traits::StateExt, Generator};
+use gw_store::traits::chain_store::ChainStore;
 use gw_store::{chain_view::ChainView, Store};
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
 
@@ -359,7 +360,7 @@ fn test_sudt_erc20_proxy_inner(
             .args(Bytes::from(args).pack())
             .build();
         let db = store.begin_transaction();
-        let tip_block_hash = store.get_tip_block_hash().unwrap();
+        let tip_block_hash = db.get_tip_block_hash().unwrap();
         let err = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),

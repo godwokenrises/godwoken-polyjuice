@@ -8,6 +8,7 @@ use crate::helper::{
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
 use gw_store::chain_view::ChainView;
+use gw_store::traits::chain_store::ChainStore;
 use gw_types::{
     bytes::Bytes,
     core::ScriptHashType,
@@ -81,7 +82,7 @@ fn test_eth_to_godwoken_addr() {
             .args(Bytes::from(args).pack())
             .build();
         let db = store.begin_transaction();
-        let tip_block_hash = store.get_tip_block_hash().unwrap();
+        let tip_block_hash = db.get_tip_block_hash().unwrap();
         let run_result = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
