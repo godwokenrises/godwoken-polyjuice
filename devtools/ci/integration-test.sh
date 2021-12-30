@@ -15,7 +15,7 @@ else
     git clone -b develop https://github.com/nervosnetwork/godwoken.git $GODWOKEN_DIR
 fi
 cd $GODWOKEN_DIR
-git checkout 1dc4092926291542b76f4f80883f5c6959992510 # https://github.com/nervosnetwork/godwoken/commits/1dc4092
+git checkout 7527776abf53ab069015b66e2569148341425bd8 # https://github.com/nervosnetwork/godwoken/commits/7527776a
 git submodule update --init --recursive --depth=1
 
 cd $PROJECT_ROOT

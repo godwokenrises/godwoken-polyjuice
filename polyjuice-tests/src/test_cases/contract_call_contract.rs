@@ -9,6 +9,7 @@ use crate::helper::{
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
 use gw_store::chain_view::ChainView;
+use gw_store::traits::chain_store::ChainStore;
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
 
 const SS_INIT_CODE: &str = include_str!("./evm-contracts/SimpleStorage.bin");
@@ -116,7 +117,7 @@ fn test_contract_call_contract() {
             .args(Bytes::from(args).pack())
             .build();
         let db = store.begin_transaction();
-        let tip_block_hash = store.get_tip_block_hash().unwrap();
+        let tip_block_hash = db.get_tip_block_hash().unwrap();
         let run_result = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
@@ -210,7 +211,7 @@ fn test_contract_call_non_exists_contract() {
             .args(Bytes::from(args).pack())
             .build();
         let db = store.begin_transaction();
-        let tip_block_hash = store.get_tip_block_hash().unwrap();
+        let tip_block_hash = db.get_tip_block_hash().unwrap();
         let run_result = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
