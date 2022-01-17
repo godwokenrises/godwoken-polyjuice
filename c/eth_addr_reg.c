@@ -35,7 +35,7 @@ int handle_fee(gw_context_t *ctx, mol_seg_t fee_seg) {
   if (ret != 0) {
     return ret;
   }
-  uint64_t short_script_hash_len = POLYJUICE_SHORT_ADDR_LEN;
+  uint64_t short_script_hash_len = DEFAULT_SHORT_SCRIPT_HASH_LEN;
   /* sudt */
   mol_seg_t sudt_id_seg = MolReader_Fee_get_sudt_id(&fee_seg);
   uint32_t sudt_id = *(uint32_t *)sudt_id_seg.ptr;

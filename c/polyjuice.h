@@ -145,19 +145,13 @@ int parse_args(struct evmc_message* msg, uint128_t* gas_price,
   size_t offset = 0;
   uint8_t* args = tx_ctx->args;
 
-  /* args[0..8] magic header + call kind */
+  /**
+   * args[0..8] magic header + call kind
+   * Only access native eth_address in this kind of L2TX
+   */
   static const uint8_t eth_polyjuice_args_header[7]
     = {'E', 'T', 'H', 'P', 'O', 'L', 'Y'};
-  static const uint8_t polyjuice_args_header[7]
-    = {0xff, 0xff, 0xff, 'P', 'O', 'L', 'Y'};
-  if (memcmp(eth_polyjuice_args_header, args, 7) == 0) {
-    // Only access native eth_address in this kind of L2TX
-    g_is_using_native_eth_address = true;
-  } else if (memcmp(polyjuice_args_header, args, 7) == 0) {
-    // TODO: deprecate this kind of L2TX
-    ckb_debug("[WARN] This kind of L2TX will be deprecated.");
-    g_is_using_native_eth_address = false;
-  } else {
+  if (memcmp(eth_polyjuice_args_header, args, 7) != 0) {
     debug_print_data("invalid polyjuice args header", args, 7);
     return -1;
   }
@@ -213,15 +207,13 @@ int parse_args(struct evmc_message* msg, uint128_t* gas_price,
     debug_print_int("get from script hash failed", tx_ctx->from_id);
     return ret;
   }
-  if (g_is_using_native_eth_address) {
-    ret = load_eth_address_by_script_hash(ctx, from_script_hash, sender.bytes);
-    if (ret != 0) {
-      debug_print_int("load eth_address by script hash failed", tx_ctx->from_id);
-      return ret;
-    }
-  } else {
-    memcpy(sender.bytes, from_script_hash, 20);
+
+  ret = load_eth_address_by_script_hash(ctx, from_script_hash, sender.bytes);
+  if (ret != 0) {
+    debug_print_int("load eth_address by script hash failed", tx_ctx->from_id);
+    return ret;
   }
+
   memcpy(g_tx_origin.bytes, sender.bytes, 20);
 
   msg->kind = kind;
@@ -365,16 +357,8 @@ bool account_exists(struct evmc_host_context* context,
   debug_print_data("BEGIN account_exists", address->bytes, 20);
   uint8_t script_hash[32] = {0};
   bool exists = true;
-  int ret;
-  if (g_is_using_native_eth_address) {
-    ret = load_script_hash_by_eth_address(context->gw_ctx, address->bytes,
-                                          script_hash);
-  } else {
-    ret = context->gw_ctx->sys_get_script_hash_by_prefix(
-        context->gw_ctx,
-        (uint8_t *)address->bytes,
-        20, script_hash);
-  }
+  int ret = load_script_hash_by_eth_address(context->gw_ctx, address->bytes,
+                                            script_hash);
   if (ret != 0) {
     exists = false;
     return ret;
@@ -508,33 +492,30 @@ size_t copy_code(struct evmc_host_context* context, const evmc_address* address,
 evmc_uint256be get_balance(struct evmc_host_context* context,
                            const evmc_address* address) {
   ckb_debug("BEGIN get_balance");
-  int ret;
   evmc_uint256be balance{};
-  uint128_t value_u128 = 0;
 
-  if (g_is_using_native_eth_address) {
-    uint8_t script_hash[32] = {0};
-    ret = load_script_hash_by_eth_address(context->gw_ctx, address->bytes,
-                                          script_hash);
-    if (ret != 0) {
-      debug_print_int("[get_balance] load_script_hash_by_eth_address failed",
-                      ret);
-      context->error_code = FATAL_POLYJUICE;
-      return balance;
-    }
-    ret = sudt_get_balance(context->gw_ctx, g_sudt_id, POLYJUICE_SHORT_ADDR_LEN,
-                           script_hash, &value_u128);
-  } else {
-    ret = sudt_get_balance(context->gw_ctx, g_sudt_id, POLYJUICE_SHORT_ADDR_LEN,
-                           address->bytes, &value_u128);
+  uint8_t script_hash[32] = {0};
+
+  int ret = load_script_hash_by_eth_address(context->gw_ctx, address->bytes,
+                                            script_hash);
+  if (ret != 0) {
+    debug_print_int("[get_balance] load_script_hash_by_eth_address failed",
+                    ret);
+    context->error_code = FATAL_POLYJUICE;
+    return balance;
   }
 
-  /* g_sudt_id account must exists */
+  uint128_t value_u128 = 0;
+  ret = sudt_get_balance(context->gw_ctx,
+                         g_sudt_id, /* g_sudt_id account must exists */
+                         DEFAULT_SHORT_SCRIPT_HASH_LEN,
+                         script_hash, &value_u128);
   if (ret != 0) {
     ckb_debug("sudt_get_balance failed");
     context->error_code = FATAL_POLYJUICE;
     return balance;
   }
+
   uint8_t* value_ptr = (uint8_t*)(&value_u128);
   for (int i = 0; i < 16; i++) {
     balance.bytes[31 - i] = *(value_ptr + i);
@@ -548,54 +529,42 @@ evmc_uint256be get_balance(struct evmc_host_context* context,
 void selfdestruct(struct evmc_host_context* context,
                   const evmc_address* address,
                   const evmc_address* beneficiary) {
-  int ret;
   uint8_t from_script_hash[32] = {0};
+  int ret = load_script_hash_by_eth_address(context->gw_ctx, address->bytes,
+                                            from_script_hash);
+  if (ret != 0) {
+    debug_print_int("[selfdestruct] load_script_hash_by_eth_address failed",
+                    ret);
+    context->error_code = ret;
+    return;
+  }
   uint128_t balance;
-  if (g_is_using_native_eth_address) {
-    ret = load_script_hash_by_eth_address(context->gw_ctx, address->bytes,
-                                          from_script_hash);
+  ret = sudt_get_balance(context->gw_ctx,
+                         g_sudt_id,  /* g_sudt_id account must exists */
+                         DEFAULT_SHORT_SCRIPT_HASH_LEN,
+                         from_script_hash, &balance);
+  if (ret != 0) {
+    ckb_debug("get balance failed");
+    context->error_code = ret;
+    return;
+  }
+
+  if (balance > 0) {
+    uint8_t to_script_hash[32] = {0};
+    ret = load_script_hash_by_eth_address(context->gw_ctx, beneficiary->bytes,
+                                          to_script_hash);
     if (ret != 0) {
       debug_print_int("[selfdestruct] load_script_hash_by_eth_address failed",
                       ret);
       context->error_code = ret;
       return;
     }
-    ret = sudt_get_balance(context->gw_ctx, g_sudt_id, POLYJUICE_SHORT_ADDR_LEN,
-                           from_script_hash, &balance);
-  } else {
-    ret = sudt_get_balance(context->gw_ctx, g_sudt_id, POLYJUICE_SHORT_ADDR_LEN,
-                           address->bytes, &balance);
-  }
-  /* g_sudt_id account must exists */
-  if (ret != 0) {
-    ckb_debug("get balance failed");
-    context->error_code = ret;
-    return;
-  }
-  if (balance > 0) {
-    uint8_t to_script_hash[32] = {0};
-    if (g_is_using_native_eth_address) {
-      ret = load_script_hash_by_eth_address(context->gw_ctx, beneficiary->bytes,
-                                            to_script_hash);
-      if (ret != 0) {
-        debug_print_int("[selfdestruct] load_script_hash_by_eth_address failed",
-                        ret);
-        context->error_code = ret;
-        return;
-      }
-      ret = sudt_transfer(context->gw_ctx, g_sudt_id,
-                          POLYJUICE_SHORT_ADDR_LEN,
-                          from_script_hash,
-                          to_script_hash,
-                          balance);
-    }
-    else {
-      ret = sudt_transfer(context->gw_ctx, g_sudt_id,
-                          POLYJUICE_SHORT_ADDR_LEN,
-                          context->destination.bytes,
-                          beneficiary->bytes,
-                          balance);
-    }
+
+    ret = sudt_transfer(context->gw_ctx, g_sudt_id,
+                        DEFAULT_SHORT_SCRIPT_HASH_LEN,
+                        from_script_hash,
+                        to_script_hash,
+                        balance);
     if (ret != 0) {
       ckb_debug("transfer beneficiary failed");
       context->error_code = ret;
@@ -748,6 +717,9 @@ void emit_log(struct evmc_host_context* context, const evmc_address* address,
   return;
 }
 
+/**
+ * @return 0 if the `to_id` account is not destructed
+ */
 int check_destructed(gw_context_t* ctx, uint32_t to_id) {
   int ret;
   uint8_t destructed_raw_key[GW_KEY_BYTES];
@@ -928,7 +900,6 @@ int create_new_account(gw_context_t* ctx,
 int handle_transfer(gw_context_t* ctx,
                     const evmc_message* msg,
                     bool to_address_is_eoa) {
-  int ret;
   uint8_t value_u128_bytes[16];
   for (int i = 0; i < 16; i++) {
     if (msg->value.bytes[i] != 0) {
@@ -941,33 +912,28 @@ int handle_transfer(gw_context_t* ctx,
   debug_print_data("sender", msg->sender.bytes, 20);
   debug_print_data("destination", msg->destination.bytes, 20);
   debug_print_int("transfer value", value_u128);
-  if (g_is_using_native_eth_address) {
-    uint8_t from_script_hash[32] = {0};
-    ret = load_script_hash_by_eth_address(ctx, msg->sender.bytes,
-                                          from_script_hash);
-    if (ret != 0) {
-      debug_print_int("[handle_transfer] load from_script_hash failed", ret);
-      return ret;
-    }
-    uint8_t to_script_hash[32] = {0};
-    ret = load_script_hash_by_eth_address(ctx, msg->destination.bytes,
-                                          to_script_hash);
-    if (ret != 0) {
-      debug_print_int("[handle_transfer] load to_script_hash failed", ret);
-      return ret;
-    }
-    ret = sudt_transfer(ctx, g_sudt_id,
-                        POLYJUICE_SHORT_ADDR_LEN,
-                        from_script_hash,
-                        to_script_hash,
-                        value_u128);
-  } else {
-    ret = sudt_transfer(ctx, g_sudt_id,
-                        POLYJUICE_SHORT_ADDR_LEN,
-                        msg->sender.bytes,
-                        msg->destination.bytes,
-                        value_u128);
+
+  uint8_t from_script_hash[32] = {0};
+  int ret = load_script_hash_by_eth_address(ctx, msg->sender.bytes,
+                                            from_script_hash);
+  if (ret != 0) {
+    debug_print_int("[handle_transfer] load from_script_hash failed", ret);
+    return ret;
   }
+
+  uint8_t to_script_hash[32] = {0};
+  ret = load_script_hash_by_eth_address(ctx, msg->destination.bytes,
+                                        to_script_hash);
+  if (ret != 0) {
+    debug_print_int("[handle_transfer] load to_script_hash failed", ret);
+    return ret;
+  }
+
+  ret = sudt_transfer(ctx, g_sudt_id,
+                      DEFAULT_SHORT_SCRIPT_HASH_LEN,
+                      from_script_hash,
+                      to_script_hash,
+                      value_u128);
   if (ret != 0) {
     ckb_debug("sudt_transfer failed");
     return ret;
@@ -1066,18 +1032,15 @@ int handle_message(gw_context_t* ctx,
   bool to_address_exists = false;
   uint32_t to_id = 0;
   uint32_t from_id;
+
   // TODO: passing this value from function argument
   uint8_t from_script_hash[32] = {0};
   uint8_t to_script_hash[32] = {0};
+
   if (memcmp(zero_address.bytes, msg.destination.bytes, 20) != 0) {
-    if (g_is_using_native_eth_address) {
-      ret = load_script_hash_by_eth_address(ctx,
-                                            msg.destination.bytes,
-                                            to_script_hash);
-    } else { 
-      ret = ctx->sys_get_script_hash_by_prefix(ctx, msg.destination.bytes, 20,
-                                               to_script_hash);
-    }
+    ret = load_script_hash_by_eth_address(ctx,
+                                          msg.destination.bytes,
+                                          to_script_hash);
     if (ret == 0) {
       to_address_exists = true;
       ret = ctx->sys_get_account_id_by_script_hash(ctx, to_script_hash, &to_id);
@@ -1095,13 +1058,9 @@ int handle_message(gw_context_t* ctx,
   }
 
   /** get from_id */
-  if (g_is_using_native_eth_address) {
-    ret = load_script_hash_by_eth_address(ctx,
-                                          msg.sender.bytes,
-                                          from_script_hash);
-  } else {
-    ret = ctx->sys_get_script_hash_by_prefix(ctx, msg.sender.bytes, 20, from_script_hash);
-  }
+  ret = load_script_hash_by_eth_address(ctx,
+                                        msg.sender.bytes,
+                                        from_script_hash);
   if (ret != 0) {
     debug_print_data("[handle_message] get sender script hash failed",
                      msg.sender.bytes, 20);
@@ -1326,16 +1285,13 @@ int run_polyjuice() {
     if (ret != 0) {
       return ret;
     }
-    if (g_is_using_native_eth_address) {
-      ret = load_eth_address_by_script_hash(&context, script_hash,
-                                            msg.destination.bytes);
-      if (ret != 0) {
-        debug_print_int("load eth_address by script hash failed",
-                        context.transaction_context.to_id);
-        return ret;
-      }
-    } else {
-      memcpy(msg.destination.bytes, script_hash, 20);
+
+    ret = load_eth_address_by_script_hash(&context, script_hash,
+                                          msg.destination.bytes);
+    if (ret != 0) {
+      debug_print_int("load eth_address by script hash failed",
+                      context.transaction_context.to_id);
+      return ret;
     }
   }
 
@@ -1396,32 +1352,28 @@ int run_polyjuice() {
   memcpy(&used_memory, res.padding, sizeof(uint32_t));
   debug_print_int("[run_polyjuice] used_memory(Bytes)", used_memory);
 
-  /* g_sudt_id must already exists */
+
   uint8_t sender_script_hash[32] = {0};
-  if (g_is_using_native_eth_address) {
-    ret = load_script_hash_by_eth_address(&context, msg.sender.bytes,
-                                          sender_script_hash);
-    if (ret != 0) {
-      debug_print_int("[run_polyjuice] load_script_hash failed", ret);
-      return clean_evmc_result_and_return(&res, ret);
-    }
-    ret = sudt_pay_fee(&context, g_sudt_id, POLYJUICE_SHORT_ADDR_LEN,
-                       sender_script_hash, fee);
-  } else {
-    ret = sudt_pay_fee(&context, g_sudt_id, POLYJUICE_SHORT_ADDR_LEN,
-                       msg.sender.bytes, fee);
+  ret = load_script_hash_by_eth_address(&context, msg.sender.bytes,
+                                        sender_script_hash);
+  if (ret != 0) {
+    debug_print_int("[run_polyjuice] load_script_hash failed", ret);
+    return clean_evmc_result_and_return(&res, ret);
   }
+
+  ret = sudt_pay_fee(&context,
+                     g_sudt_id, /* g_sudt_id must already exists */
+                     DEFAULT_SHORT_SCRIPT_HASH_LEN,
+                     sender_script_hash, fee);
   if (ret != 0) {
     debug_print_int("[run_polyjuice] pay fee to block_producer failed", ret);
     return clean_evmc_result_and_return(&res, ret);
   }
-  if (g_is_using_native_eth_address) {
-    ret = sys_pay_fee(&context, sender_script_hash, POLYJUICE_SHORT_ADDR_LEN,
-                      g_sudt_id, fee);
-  } else {
-    ret = sys_pay_fee(&context, msg.sender.bytes, POLYJUICE_SHORT_ADDR_LEN,
-                      g_sudt_id, fee);
-  }
+
+  // call the SYS_PAY_FEE syscall to record the fee
+  // NOTICE: this function do not actually execute the transfer of assets
+  ret = sys_pay_fee(&context, sender_script_hash, DEFAULT_SHORT_SCRIPT_HASH_LEN,
+                    g_sudt_id, fee);
   if (ret != 0) {
     debug_print_int("[run_polyjuice] Record fee payment failed", ret);
     return clean_evmc_result_and_return(&res, ret);
