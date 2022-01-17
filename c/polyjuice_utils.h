@@ -304,7 +304,7 @@ int eth_address_register(gw_context_t *ctx,
   if (memcmp(script_code_hash_seg.ptr, polyjuice_code_hash_res.seg.ptr,
              script_code_hash_seg.size) == 0) {
     ckb_debug("[eth_address_registry] Polyjuice contract account");
-    // eth_address is short_godwoken_account_script_hash in this situation
+    // In this situation, "eth_address" is short_godwoken_account_script_hash. 
     return update_eth_address_registry(ctx, script_hash, script_hash);
   }
 

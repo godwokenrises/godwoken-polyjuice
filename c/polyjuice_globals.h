@@ -2,7 +2,8 @@
 #define POLYJUICE_GLOBALS_H
 
 #define POLYJUICE_VERSION "v1.0.0"
-#define POLYJUICE_SHORT_ADDR_LEN 20
+
+#define DEFAULT_SHORT_SCRIPT_HASH_LEN 20
 #define ETH_ADDRESS_LEN 20
 
 #define GW_ETH_ADDRESS_TO_ACCOUNT_SCRIPT_HASH 6
@@ -14,7 +15,6 @@
 static uint8_t g_rollup_script_hash[32] = {0};
 static uint32_t g_sudt_id = UINT32_MAX;
 
-static bool g_is_using_native_eth_address = false;
 /** 
  * Receipt.contractAddress is the created contract,
  * if the transaction was a contract creation, otherwise null

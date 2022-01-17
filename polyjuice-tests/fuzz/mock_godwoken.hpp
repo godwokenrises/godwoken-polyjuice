@@ -241,12 +241,12 @@ void mock_mint_sudt(uint32_t sudt_id, uint32_t account_id, uint128_t balance)
 
   // _sudt_build_key
   uint8_t key[GW_KEY_BYTES + 8] = {0};
-  uint64_t key_len = POLYJUICE_SHORT_ADDR_LEN + 8;
+  uint64_t key_len = DEFAULT_SHORT_SCRIPT_HASH_LEN + 8;
   const uint32_t SUDT_KEY_FLAG_BALANCE = 1;
-  const uint32_t short_addr_len = POLYJUICE_SHORT_ADDR_LEN;
+  const uint32_t short_script_hash_len = DEFAULT_SHORT_SCRIPT_HASH_LEN;
   memcpy(key, (uint8_t *)(&SUDT_KEY_FLAG_BALANCE), sizeof(uint32_t));
-  memcpy(key + 4, (uint8_t *)(&short_addr_len), sizeof(uint32_t));
-  memcpy(key + 8, script_hash, short_addr_len);
+  memcpy(key + 4, (uint8_t *)(&short_script_hash_len), sizeof(uint32_t));
+  memcpy(key + 8, script_hash, short_script_hash_len);
   uint8_t raw_key[GW_KEY_BYTES];
   gw_build_account_key(sudt_id, key, key_len, raw_key);
 
