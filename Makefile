@@ -69,12 +69,15 @@ dist: clean-via-docker all-via-docker patch-generator patch-generator_log
 CKB_BIN_PATCHER := deps/ckb-binary-patcher/target/release/ckb-binary-patcher
 build/ckb-binary-patcher:
 	cd deps && [ -d "ckb-binary-patcher" ] \
-	  || git clone --depth=1 https://github.com/nervosnetwork/ckb-binary-patcher.git
+	  || ( \
+		echo "fetch ckb-binary-patcher with [Remove atomic instructions] feature" && \
+		git clone -b master https://github.com/nervosnetwork/ckb-binary-patcher.git)
 	[ -f ${CKB_BIN_PATCHER} ] \
-	  || (cd deps/ckb-binary-patcher \
-		&& git fetch https://github.com/XuJiandong/ckb-binary-patcher ad6ab1ad29b9b8b465e7e22f5e4e65bec5b8c43f \
-		&& git checkout FETCH_HEAD \
-		&& cargo build --release)
+	  || ( \
+		echo "build ckb-binary-patcher" && \
+		cd deps/ckb-binary-patcher && \
+		git checkout b9489de4b3b9d59bc29bce945279bc6f28413113 && \
+		cargo build --release)
 patch-generator: build/ckb-binary-patcher
 	${CKB_BIN_PATCHER} --remove-a -i build/generator -o build/generator.aot
 	cp build/generator build/generator.asm
