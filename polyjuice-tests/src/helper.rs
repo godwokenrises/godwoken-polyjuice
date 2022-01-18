@@ -1,6 +1,5 @@
 pub use gw_common::{
     blake2b::new_blake2b,
-    builtins::{CKB_SUDT_ACCOUNT_ID, RESERVED_ACCOUNT_ID},
     h256_ext::H256Ext,
     state::{build_data_hash_key, State},
     CKB_SUDT_SCRIPT_ARGS, H256,
@@ -29,6 +28,9 @@ use gw_types::{
 use rlp::RlpStream;
 use std::{fs, io::Read, path::PathBuf};
 
+pub use gw_common::builtins::{CKB_SUDT_ACCOUNT_ID, RESERVED_ACCOUNT_ID};
+pub const ETH_ADDRESS_REGISTRY_ACCOUNT_ID: u32 = 3;
+
 pub const L2TX_MAX_CYCLES: u64 = 7000_0000;
 
 // meta contract
@@ -43,7 +45,7 @@ pub const SECP_DATA: &[u8] = include_bytes!("../../build/secp256k1_data");
 
 pub const BIN_DIR: &str = "../build";
 // polyjuice
-pub const POLYJUICE_GENERATOR_NAME: &str = "generator.aot";
+pub const POLYJUICE_GENERATOR_NAME: &str = "generator_log.aot";
 pub const POLYJUICE_VALIDATOR_NAME: &str = "validator";
 // ETH Address Registry
 pub const ETH_ADDRESS_REGISTRY_GENERATOR_NAME: &str = "eth_addr_reg_generator";
@@ -316,6 +318,8 @@ pub fn new_account_script_with_nonce(
         .hash_type(ScriptHashType::Type.into())
         .args(new_account_args.pack())
         .build()
+
+    // TODO: register the account
 }
 pub fn new_account_script(
     state: &DummyState,
@@ -328,6 +332,8 @@ pub fn new_account_script(
         from_nonce -= 1;
     }
     new_account_script_with_nonce(state, creator_account_id, from_id, from_nonce)
+
+    // TODO: register the account
 }
 
 pub fn contract_script_to_eth_address(script: &Script, ethabi: bool) -> Vec<u8> {
@@ -340,6 +346,7 @@ pub fn contract_script_to_eth_address(script: &Script, ethabi: bool) -> Vec<u8> 
 #[derive(Default, Debug)]
 pub struct PolyjuiceArgsBuilder {
     /// default to false
+    // #[serde(default = "default_withdrawal_unlocker_wallet")]
     is_using_native_eth_address: bool,
     is_create: bool,
     gas_limit: u64,
@@ -348,11 +355,17 @@ pub struct PolyjuiceArgsBuilder {
     input: Vec<u8>,
 }
 
+// impl Default for PolyjuiceArgsBuilder {
+//     fn default() -> Self {
+//         Kind::A
+//     }
+// }
+
 impl PolyjuiceArgsBuilder {
-    pub fn using_native_eth_address(mut self, v: bool) -> Self {
-        self.is_using_native_eth_address = v;
-        self
-    }
+    // pub fn using_native_eth_address(mut self, v: bool) -> Self {
+    //     self.is_using_native_eth_address = v;
+    //     self
+    // }
     pub fn do_create(mut self, value: bool) -> Self {
         self.is_create = value;
         self
@@ -375,11 +388,7 @@ impl PolyjuiceArgsBuilder {
     }
     pub fn build(self) -> Vec<u8> {
         let mut output: Vec<u8> = vec![0u8; 52];
-        if self.is_using_native_eth_address {
-            output[0..3].copy_from_slice(&[b'E', b'T', b'H'][..]);
-        } else {
-            output[0..3].copy_from_slice(&[0xff, 0xff, 0xff][..]);
-        }
+        output[0..3].copy_from_slice(&[b'E', b'T', b'H'][..]);
         let call_kind: u8 = if self.is_create { 3 } else { 0 };
         output[3..8].copy_from_slice(&[b'P', b'O', b'L', b'Y', call_kind][..]);
         output[8..16].copy_from_slice(&self.gas_limit.to_le_bytes()[..]);
@@ -434,6 +443,17 @@ pub fn setup() -> (Store, DummyState, Generator, u32) {
         )
         .expect("create account");
     println!("creator_account_id: {}", creator_account_id);
+
+    // create `ETH Address Registry` layer2 contract
+    let eth_addr_reg_account_id = state
+        .create_account_from_script(
+            Script::new_builder()
+                .code_hash(ETH_ADDRESS_REGISTRY_PROGRAM_CODE_HASH.pack())
+                .hash_type(ScriptHashType::Type.into())
+                .build(),
+        )
+        .expect("create `ETH Address Registry` layer2 contract");
+    assert_eq!(eth_addr_reg_account_id, ETH_ADDRESS_REGISTRY_ACCOUNT_ID);
 
     state.insert_data(*SECP_DATA_HASH, Bytes::from(SECP_DATA));
     state
@@ -585,6 +605,8 @@ pub fn compute_create2_script(
         .hash_type(ScriptHashType::Type.into())
         .args(script_args.pack())
         .build()
+
+    // TODO: register the account
 }
 
 pub fn simple_storage_get(
@@ -634,6 +656,7 @@ pub fn build_l2_sudt_script(args: [u8; 32]) -> Script {
         .code_hash(SUDT_VALIDATOR_SCRIPT_TYPE_HASH.clone().pack())
         .hash_type(ScriptHashType::Type.into())
         .build()
+    // TODO: register the account
 }
 
 pub fn build_eth_l2_script(args: [u8; 20]) -> Script {
@@ -645,6 +668,8 @@ pub fn build_eth_l2_script(args: [u8; 20]) -> Script {
         .code_hash(ETH_ACCOUNT_LOCK_CODE_HASH.clone().pack())
         .hash_type(ScriptHashType::Type.into())
         .build()
+
+    // TODO: register the account
 }
 
 pub fn check_cycles(l2_tx_label: &str, used_cycles: u64, warning_cycles: u64) {
@@ -684,6 +709,7 @@ fn build_script_hash_to_eth_address_key(script_hash: &[u8; 32]) -> H256 {
     key.into()
 }
 
+/// update eth_address_registry by state.update_raw(...)
 pub(crate) fn update_eth_address_registry(
     state: &mut DummyState,
     eth_address: &[u8; 20],
@@ -704,4 +730,74 @@ pub(crate) fn update_eth_address_registry(
             eth_address_abi_format.into(),
         )
         .expect("add GW_ACCOUNT_SCRIPT_HASH_TO_ETH_ADDRESS mapping into state");
+}
+
+#[derive(Default)]
+struct SetMappingArgsBuilder {
+    method: u32,
+    gw_script_hash: [u8; 32],
+    fee_struct: gw_types::packed::Fee,
+}
+impl SetMappingArgsBuilder {
+    /// Set the SetMappingArgs builder's method.
+    fn method(mut self, method: u32) -> Self {
+        self.method = method;
+        self
+    }
+    /// Set the SetMappingArgs builder's gw script hash.
+    fn gw_script_hash(mut self, gw_script_hash: [u8; 32]) -> Self {
+        self.gw_script_hash = gw_script_hash;
+        self
+    }
+    /// Set the SetMappingArgs builder's fee struct.
+    fn fee_struct(mut self, fee_sudt_id: u32, fee_amount: u128) -> Self {
+        self.fee_struct = gw_types::packed::Fee::new_builder()
+            .amount(fee_amount.pack())
+            .sudt_id(fee_sudt_id.pack())
+            .build();
+        self
+    }
+    fn build(self) -> Vec<u8> {
+        let mut output: Vec<u8> = vec![0u8; 4];
+        output[0..4].copy_from_slice(&self.method.to_le_bytes()[..]);
+        output.extend(self.gw_script_hash);
+        output.extend(self.fee_struct.as_slice());
+        output
+    }
+}
+
+/// Set two-ways mappings between `eth_address` and `gw_script_hash`
+/// by `ETH Address Registry` layer2 contract
+pub(crate) fn eth_address_regiser(
+    store: &Store,
+    state: &mut DummyState,
+    generator: &Generator,
+    block_number: u64,
+    from_id: u32,
+    gw_script_hash: H256,
+) {
+    let args = SetMappingArgsBuilder::default()
+        .method(2u32)
+        .gw_script_hash(gw_script_hash.into())
+        .fee_struct(CKB_SUDT_ACCOUNT_ID, 1000)
+        .build();
+    let raw_l2tx = RawL2Transaction::new_builder()
+        .from_id(from_id.pack())
+        .to_id(ETH_ADDRESS_REGISTRY_ACCOUNT_ID.pack())
+        .args(args.pack())
+        .build();
+    let db = store.begin_transaction();
+    let tip_block_hash = store.get_tip_block_hash().unwrap();
+    let block_info = new_block_info(from_id, block_number, block_number);
+    let run_result = generator
+        .execute_transaction(
+            &ChainView::new(&db, tip_block_hash),
+            state,
+            &block_info,
+            &raw_l2tx,
+            L2TX_MAX_CYCLES,
+        )
+        .expect("execute the MSG_SET_MAPPING method of `ETH Address Registry` layer2 contract");
+    state.apply_run_result(&run_result).expect("update state");
+    assert_eq!(run_result.exit_code, 0);
 }
