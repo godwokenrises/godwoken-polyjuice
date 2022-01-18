@@ -8,6 +8,7 @@ use crate::helper::{
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
 use gw_store::chain_view::ChainView;
+use gw_store::traits::chain_store::ChainStore;
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
 
 #[test]
@@ -155,7 +156,6 @@ fn test_transfer_by_metamask() {
         let block_info = new_block_info(block_producer_id, block_number, block_number);
         let input = hex::decode(args_str).unwrap();
         let args = PolyjuiceArgsBuilder::default()
-            .using_native_eth_address(true) // use new L2TX format
             .gas_limit(80000)
             .gas_price(1)
             .value(0)
@@ -167,7 +167,7 @@ fn test_transfer_by_metamask() {
             .args(Bytes::from(args).pack())
             .build();
         let db = store.begin_transaction();
-        let tip_block_hash = store.get_tip_block_hash().unwrap();
+        let tip_block_hash = db.get_tip_block_hash().unwrap();
         let run_result = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
