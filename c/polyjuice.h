@@ -208,6 +208,7 @@ int parse_args(struct evmc_message* msg, uint128_t* gas_price,
     return ret;
   }
 
+  // msg.sender should always be an EOA
   ret = load_eth_address_by_script_hash(ctx, from_script_hash, sender.bytes);
   if (ret != 0) {
     debug_print_int("load eth_address by script hash failed", tx_ctx->from_id);
@@ -884,9 +885,23 @@ int create_new_account(gw_context_t* ctx,
   ret = ctx->sys_create(ctx, new_script_seg.ptr, new_script_seg.size, &new_account_id);
   if (ret != 0) {
     debug_print_int("sys_create error", ret);
-    ckb_debug("create account failed assume account already created by meta_contract");
+
+    // create account failed assume account already created by meta_contract
     ret = ctx->sys_get_account_id_by_script_hash(ctx, script_hash, &new_account_id);
     if (ret != 0) {
+      return ret;
+    }
+
+    // register a created contract account into `ETH Address Registry`
+    // Only set mapping from `gw_script_hash` to "eth_address"
+    // to avoid address conflict.
+    uint8_t raw_key[GW_KEY_BYTES];
+    gw_build_script_hash_to_eth_address_key(script_hash, raw_key);
+    uint8_t value[GW_VALUE_BYTES] = {0};
+    _gw_fast_memcpy(value + 12, script_hash, ETH_ADDRESS_LEN);
+    ret = ctx->_internal_store_raw(ctx, raw_key, value);
+    if (ret != 0) {
+      ckb_debug("[create_new_account] failed to register a contract account");
       return ret;
     }
   }
@@ -912,6 +927,7 @@ int handle_transfer(gw_context_t* ctx,
   debug_print_data("sender", msg->sender.bytes, 20);
   debug_print_data("destination", msg->destination.bytes, 20);
   debug_print_int("transfer value", value_u128);
+  // TODO: if value_u128 == 0
 
   uint8_t from_script_hash[32] = {0};
   int ret = load_script_hash_by_eth_address(ctx, msg->sender.bytes,
@@ -1286,13 +1302,8 @@ int run_polyjuice() {
       return ret;
     }
 
-    ret = load_eth_address_by_script_hash(&context, script_hash,
-                                          msg.destination.bytes);
-    if (ret != 0) {
-      debug_print_int("load eth_address by script hash failed",
-                      context.transaction_context.to_id);
-      return ret;
-    }
+    // msg.destination should always be a contract account
+    _gw_fast_memcpy(msg.destination.bytes, script_hash, ETH_ADDRESS_LEN);
   }
 
   uint8_t evm_memory[MAX_EVM_MEMORY_SIZE];

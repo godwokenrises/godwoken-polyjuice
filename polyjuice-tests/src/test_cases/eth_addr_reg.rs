@@ -1,5 +1,5 @@
 use crate::helper::{
-    build_eth_l2_script, new_block_info, setup, update_eth_address_registry, CKB_SUDT_ACCOUNT_ID,
+    build_eth_l2_script, new_block_info, register_eoa_account, setup, CKB_SUDT_ACCOUNT_ID,
     ETH_ADDRESS_REGISTRY_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
@@ -74,7 +74,7 @@ fn test_eth_to_gw() {
 
     let eth_address = <[u8; 20]>::from_hex("D1667CBf1cc60da94c1cf6C9cfb261e71b6047f7")
         .expect("eth_address hex_string to u8_vec");
-    update_eth_address_registry(
+    register_eoa_account(
         &mut state,
         &eth_address,
         &[
@@ -131,7 +131,7 @@ fn test_gw_to_eth() {
     let gw_account_script_hash = [8u8; 32];
     let eth_address = <[u8; 20]>::from_hex("D1667CBf1cc60da94c1cf6C9cfb261e71b6047f7")
         .expect("eth_address hex_string to u8_vec");
-    update_eth_address_registry(&mut state, &eth_address, &gw_account_script_hash);
+    register_eoa_account(&mut state, &eth_address, &gw_account_script_hash);
 
     let args = GwToEthArgsBuilder::default()
         .method(1u32)
