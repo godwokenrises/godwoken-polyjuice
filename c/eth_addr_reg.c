@@ -4,7 +4,7 @@
  * This contract introduces two-ways mappings between `eth_address` and
  * `gw_script_hash`.
  *   - As the rightmost 160 bits of a Keccak hash of an ECDSA public key,
- *     `eth_address` represents an EOA or contract address on Ethereum.
+ *     `eth_address` represents an EOA.
  *   - Godwoken account script hash(a.k.a. `gw_script_hash`) is a key used for
  *     locating the account lock. Note that Godwoken enforces one-to-one mapping
  *     between layer 2 lock script and account ID.

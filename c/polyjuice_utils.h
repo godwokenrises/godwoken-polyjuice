@@ -1,4 +1,3 @@
-
 #ifndef POLYJUICE_UTILS_H
 #define POLYJUICE_UTILS_H
 
@@ -138,7 +137,7 @@ void gw_build_eth_address_to_script_hash_key(
  */
 int load_script_hash_by_eth_address(gw_context_t *ctx,
                                     const uint8_t eth_address[ETH_ADDRESS_LEN],
-                                    uint8_t script_hash[GW_VALUE_BYTES]) {
+                                    uint8_t script_hash[GW_VALUE_BYTES]) {                                    
   if (ctx == NULL) {
     return GW_FATAL_INVALID_CONTEXT;
   }
@@ -151,11 +150,18 @@ int load_script_hash_by_eth_address(gw_context_t *ctx,
     return ret;
   }
 
-  if (_is_zero_hash(script_hash)) {
-    return GW_ERROR_NOT_FOUND;
+  // not found in `ETH Address Registry`, means that it is not an EOA.
+  if (_is_zero_hash(script_hash)) { 
+    // maybe it is a Polyjuice Contract Account
+    ret = ctx->sys_get_script_hash_by_prefix(ctx, eth_address,
+                                             DEFAULT_SHORT_SCRIPT_HASH_LEN,
+                                             script_hash);
+    if (ret != 0) {
+      return GW_ERROR_NOT_FOUND;
+    }
   }
 
-  // TODO: cache [eth_address <=> script_hash] mapping data
+  // TODO: shall we cache [eth_address <=> script_hash] mapping data?
   return 0;
 }
 
@@ -226,6 +232,13 @@ int update_eth_address_registry(gw_context_t *ctx,
   return 0;
 }
 
+/**
+ * @brief register an account into `ETH Address Registry` by it's script_hash
+ * 
+ * @param ctx 
+ * @param script_hash 
+ * @return int 
+ */
 int eth_address_register(gw_context_t *ctx,
                          uint8_t script_hash[GW_VALUE_BYTES]) {
   debug_print_data("[eth_address_registry] new mapping for account_script_hash",
@@ -292,6 +305,8 @@ int eth_address_register(gw_context_t *ctx,
   }
 
   // Option 2: Polyjuice Contract Account
+  // NOTICE: We should avoid address conflict between
+  //         `eth_native_address` and `short_godwoken_account_script_hash`
   mol_seg_t allowed_contract_list_seg =
       MolReader_RollupConfig_get_allowed_contract_type_hashes(&rollup_config_seg);
   const uint32_t polyjuice_idx = 2;
@@ -303,9 +318,21 @@ int eth_address_register(gw_context_t *ctx,
   }
   if (memcmp(script_code_hash_seg.ptr, polyjuice_code_hash_res.seg.ptr,
              script_code_hash_seg.size) == 0) {
+    // In this situation, "eth_address" is short_godwoken_account_script_hash.
     ckb_debug("[eth_address_registry] Polyjuice contract account");
-    // In this situation, "eth_address" is short_godwoken_account_script_hash. 
-    return update_eth_address_registry(ctx, script_hash, script_hash);
+
+    // Only set mapping from `gw_script_hash` to "eth_address"
+    // to avoid address conflict.
+    uint8_t raw_key[GW_KEY_BYTES];
+    gw_build_script_hash_to_eth_address_key(script_hash, raw_key);
+    /** 
+     * ethabi address format
+     *  e.g. web3.eth.abi.decodeParameter('address',
+     *         '0000000000000000000000001829d79cce6aa43d13e67216b355e81a7fffb220')
+     */
+    uint8_t value[GW_VALUE_BYTES] = {0};
+    _gw_fast_memcpy(value + 12, script_hash, ETH_ADDRESS_LEN);
+    return ctx->_internal_store_raw(ctx, raw_key, value);
   }
 
   // TODO: check selfdestruct?
@@ -313,6 +340,14 @@ int eth_address_register(gw_context_t *ctx,
   return GW_ERROR_UNKNOWN_SCRIPT_CODE_HASH;
 }
 
+/**
+ * @brief 
+ * TODO: test this function
+ * @param ctx 
+ * @param address 
+ * @param account_id 
+ * @return int 
+ */
 // int load_account_id_by_eth_address(gw_context_t *ctx,
 //                               const uint8_t address[20],
 //                               uint32_t *account_id) {
