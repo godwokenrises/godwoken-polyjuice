@@ -29,6 +29,7 @@ use rlp::RlpStream;
 use std::{fs, io::Read, path::PathBuf};
 
 pub use gw_common::builtins::{CKB_SUDT_ACCOUNT_ID, RESERVED_ACCOUNT_ID};
+pub const CREATOR_ACCOUNT_ID: u32 = 2;
 pub const ETH_ADDRESS_REGISTRY_ACCOUNT_ID: u32 = 3;
 
 pub const L2TX_MAX_CYCLES: u64 = 7000_0000;
@@ -404,56 +405,57 @@ pub fn setup() -> (Store, DummyState, Generator, u32) {
     let _ = env_logger::try_init();
     let store = Store::open_tmp().unwrap();
     let mut state = DummyState::default();
-    let reserved_id = state
-        .create_account_from_script(
-            Script::new_builder()
-                .code_hash(META_VALIDATOR_SCRIPT_TYPE_HASH.clone().pack())
-                .hash_type(ScriptHashType::Type.into())
-                .build(),
-        )
-        .unwrap();
+
+    let meta_script = Script::new_builder()
+        .code_hash(META_VALIDATOR_SCRIPT_TYPE_HASH.clone().pack())
+        .hash_type(ScriptHashType::Type.into())
+        .build();
+    let meta_script_hash = meta_script.hash();
+    let reserved_id = state.create_account_from_script(meta_script)
+        .expect("create meta_account");
     assert_eq!(
         reserved_id, RESERVED_ACCOUNT_ID,
         "reserved account id must be zero"
     );
+    register_contract_account(&mut state, &meta_script_hash);
 
     // setup CKB simple UDT contract
     let ckb_sudt_script = build_l2_sudt_script(CKB_SUDT_SCRIPT_ARGS);
-    // assert_eq!(
-    //     ckb_sudt_script.hash(),
-    //     CKB_SUDT_SCRIPT_HASH,
-    //     "ckb simple UDT script hash"
-    // );
-    let ckb_sudt_id = state.create_account_from_script(ckb_sudt_script).unwrap();
+    let ckb_sudt_script_hash = ckb_sudt_script.hash();
+    let ckb_sudt_id = state.create_account_from_script(ckb_sudt_script)
+        .expect("create CKB simple UDT contract account");
     assert_eq!(
         ckb_sudt_id, CKB_SUDT_ACCOUNT_ID,
         "ckb simple UDT account id"
     );
+    register_contract_account(&mut state, &ckb_sudt_script_hash);
 
     let mut args = [0u8; 36];
     args[0..32].copy_from_slice(&ROLLUP_SCRIPT_HASH);
     args[32..36].copy_from_slice(&ckb_sudt_id.to_le_bytes()[..]);
+    let creator_script = Script::new_builder()
+        .code_hash(POLYJUICE_PROGRAM_CODE_HASH.pack())
+        .hash_type(ScriptHashType::Type.into())
+        .args(args.to_vec().pack())
+        .build();
+    let creator_script_hash = creator_script.hash();
     let creator_account_id = state
-        .create_account_from_script(
-            Script::new_builder()
-                .code_hash(POLYJUICE_PROGRAM_CODE_HASH.pack())
-                .hash_type(ScriptHashType::Type.into())
-                .args(args.to_vec().pack())
-                .build(),
-        )
-        .expect("create account");
-    println!("creator_account_id: {}", creator_account_id);
+        .create_account_from_script(creator_script)
+        .expect("create creator_account");
+    assert_eq!(creator_account_id, CREATOR_ACCOUNT_ID);
+    register_contract_account(&mut state, &creator_script_hash);
 
-    // create `ETH Address Registry` layer2 contract
+    // create `ETH Address Registry` layer2 contract account
+    let eth_addr_reg_script = Script::new_builder()
+        .code_hash(ETH_ADDRESS_REGISTRY_PROGRAM_CODE_HASH.pack())
+        .hash_type(ScriptHashType::Type.into())
+        .build();
+    let eth_addr_reg_script_hash = eth_addr_reg_script.hash();
     let eth_addr_reg_account_id = state
-        .create_account_from_script(
-            Script::new_builder()
-                .code_hash(ETH_ADDRESS_REGISTRY_PROGRAM_CODE_HASH.pack())
-                .hash_type(ScriptHashType::Type.into())
-                .build(),
-        )
+        .create_account_from_script(eth_addr_reg_script)
         .expect("create `ETH Address Registry` layer2 contract");
     assert_eq!(eth_addr_reg_account_id, ETH_ADDRESS_REGISTRY_ACCOUNT_ID);
+    register_contract_account(&mut state, &eth_addr_reg_script_hash);
 
     state.insert_data(*SECP_DATA_HASH, Bytes::from(SECP_DATA));
     state
@@ -529,6 +531,7 @@ pub fn setup() -> (Store, DummyState, Generator, u32) {
     )
     .unwrap();
     tx.commit().unwrap();
+
     (store, state, generator, creator_account_id)
 }
 
@@ -710,7 +713,7 @@ fn build_script_hash_to_eth_address_key(script_hash: &[u8; 32]) -> H256 {
 }
 
 /// update eth_address_registry by state.update_raw(...)
-pub(crate) fn update_eth_address_registry(
+pub(crate) fn register_eoa_account(
     state: &mut DummyState,
     eth_address: &[u8; 20],
     script_hash: &[u8; 32],
@@ -724,6 +727,18 @@ pub(crate) fn update_eth_address_registry(
 
     let mut eth_address_abi_format = [0u8; 32];
     eth_address_abi_format[12..].copy_from_slice(eth_address);
+    state
+        .update_raw(
+            build_script_hash_to_eth_address_key(script_hash),
+            eth_address_abi_format.into(),
+        )
+        .expect("add GW_ACCOUNT_SCRIPT_HASH_TO_ETH_ADDRESS mapping into state");
+}
+
+/// register a created contract account into `ETH Address Registry` by its
+pub(crate) fn register_contract_account(state: &mut DummyState, script_hash: &[u8; 32]) {
+    let mut eth_address_abi_format = [0u8; 32];
+    eth_address_abi_format[12..].copy_from_slice(&script_hash[..20]);
     state
         .update_raw(
             build_script_hash_to_eth_address_key(script_hash),

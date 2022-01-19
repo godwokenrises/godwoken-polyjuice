@@ -51,6 +51,7 @@ VALIDATOR_DEPS := c/validator/secp256k1_helper.h $(BIN_DEPS)
 # docker pull nervos/ckb-riscv-gnu-toolchain:bionic-20190702
 BUILDER_DOCKER := nervos/ckb-riscv-gnu-toolchain@sha256:7b168b4b109a0f741078a71b7c4dddaf1d283a5244608f7851f5714fbad273ba
 # TODO: update to BUILDER_DOCKER := nervos/ckb-riscv-gnu-toolchain:bionic-20190702-newlib-debug-symbols
+# TODO: update to nervos/ckb-riscv-gnu-toolchain:bionic-20211214 => need more tests
 
 all: build/blockchain.h build/godwoken.h \
   build/test_contracts build/test_rlp build/test_ripemd160 \
@@ -61,7 +62,7 @@ all: build/blockchain.h build/godwoken.h \
 all-via-docker: generate-protocol
 	mkdir -p build
 	docker run --rm -v `pwd`:/code -w /code ${BUILDER_DOCKER} make
-	make patch-generator
+	make patch-generator && make patch-generator_log
 log-version-via-docker: generate-protocol
 	mkdir -p build
 	docker run --rm -v `pwd`:/code -w /code ${BUILDER_DOCKER} bash -c "make build/generator_log && make build/validator_log"

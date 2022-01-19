@@ -233,10 +233,10 @@ int update_eth_address_registry(gw_context_t *ctx,
 }
 
 /**
- * @brief register an account into `ETH Address Registry` by it's script_hash
+ * @brief register an account into `ETH Address Registry` by its script_hash
  * 
- * @param ctx 
- * @param script_hash 
+ * @param ctx gw_context
+ * @param script_hash this account should be created on Godwoken
  * @return int 
  */
 int eth_address_register(gw_context_t *ctx,
