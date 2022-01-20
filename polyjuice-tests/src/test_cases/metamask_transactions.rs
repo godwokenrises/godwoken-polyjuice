@@ -1,9 +1,9 @@
 //! Test transfer from EoA to EoA using Metamask
 
 use crate::helper::{
-    build_eth_l2_script, deploy, new_account_script, new_block_info, setup,
-    update_eth_address_registry, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, L2TX_MAX_CYCLES,
-    SUDT_ERC20_PROXY_USER_DEFINED_DECIMALS_CODE,
+    _deprecated_new_account_script, build_eth_l2_script, deploy, new_block_info,
+    register_eoa_account, setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, CREATOR_ACCOUNT_ID,
+    L2TX_MAX_CYCLES, SUDT_ERC20_PROXY_USER_DEFINED_DECIMALS_CODE,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
@@ -13,9 +13,9 @@ use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
 
 #[test]
 fn test_transfer_by_metamask() {
-    let (store, mut state, generator, creator_account_id) = setup();
+    let (store, mut state, generator) = setup();
 
-    let block_producer_script = build_eth_l2_script([0x99u8; 20]);
+    let block_producer_script = build_eth_l2_script(&[0x99u8; 20]);
     let block_producer_script_hash = block_producer_script.hash();
     let block_producer_id = state
         .create_account_from_script(block_producer_script)
@@ -29,23 +29,23 @@ fn test_transfer_by_metamask() {
         .unwrap();
 
     let eth_address1 = [1u8; 20];
-    let from_script1 = build_eth_l2_script(eth_address1.clone());
+    let from_script1 = build_eth_l2_script(&eth_address1);
     let from_script_hash1 = from_script1.hash();
     let from_id1 = state.create_account_from_script(from_script1).unwrap();
-    update_eth_address_registry(&mut state, &eth_address1, &from_script_hash1);
+    register_eoa_account(&mut state, &eth_address1, &from_script_hash1);
 
     let eth_address2 = [2u8; 20];
-    let from_script2 = build_eth_l2_script(eth_address2.clone());
+    let from_script2 = build_eth_l2_script(&eth_address2);
     let from_script_hash2 = from_script2.hash();
     let _from_id2 = state.create_account_from_script(from_script2).unwrap();
-    update_eth_address_registry(&mut state, &eth_address2, &from_script_hash2);
+    register_eoa_account(&mut state, &eth_address2, &from_script_hash2);
 
     let eth_address3 = [3u8; 20];
-    let from_script3 = build_eth_l2_script(eth_address3.clone());
+    let from_script3 = build_eth_l2_script(&eth_address3);
     let from_script_hash3 = from_script3.hash();
     let _from_short_address3 = &from_script_hash3[0..20];
     let _from_id3 = state.create_account_from_script(from_script3).unwrap();
-    update_eth_address_registry(&mut state, &eth_address3, &from_script_hash3);
+    register_eoa_account(&mut state, &eth_address3, &from_script_hash3);
 
     state
         .mint_sudt(CKB_SUDT_ACCOUNT_ID, &from_script_hash1[..20], 2000000)
@@ -62,7 +62,7 @@ fn test_transfer_by_metamask() {
         &generator,
         &store,
         &mut state,
-        creator_account_id,
+        CREATOR_ACCOUNT_ID,
         block_producer_id,
         init_code.as_str(),
         122000,
@@ -71,7 +71,7 @@ fn test_transfer_by_metamask() {
         block_number,
     );
     let ckb_proxy_contract_script =
-        new_account_script(&state, creator_account_id, block_producer_id, false);
+        _deprecated_new_account_script(&state, CREATOR_ACCOUNT_ID, block_producer_id, false);
     let script_hash = ckb_proxy_contract_script.hash();
     let ckb_proxy_contract_account_id = state
         .get_account_id_by_script_hash(&script_hash.into())
@@ -79,7 +79,7 @@ fn test_transfer_by_metamask() {
         .unwrap();
     let mut eth_address_of_ckb_proxy_contract = [0u8; 20];
     eth_address_of_ckb_proxy_contract[..20].copy_from_slice(&script_hash[0..20]);
-    update_eth_address_registry(&mut state, &eth_address_of_ckb_proxy_contract, &script_hash);
+    register_eoa_account(&mut state, &eth_address_of_ckb_proxy_contract, &script_hash);
 
     // assume that Ethereum JSON RPC request sent by Metamask is:
     // ```JSON

@@ -2,8 +2,9 @@
 //!   See ./evm-contracts/CreateContract.sol
 
 use crate::helper::{
-    self, build_eth_l2_script, deploy, new_account_script, new_account_script_with_nonce,
-    new_block_info, setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, L2TX_MAX_CYCLES,
+    self, _deprecated_new_account_script, _deprecated_new_account_script_with_nonce,
+    build_eth_l2_script, deploy, new_block_info, setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
+    CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
@@ -15,13 +16,13 @@ const INIT_CODE: &str = include_str!("./evm-contracts/CreateContract.bin");
 
 #[test]
 fn test_contract_create_contract() {
-    let (store, mut state, generator, creator_account_id) = setup();
-    let block_producer_script = build_eth_l2_script([0x99u8; 20]);
+    let (store, mut state, generator) = setup();
+    let block_producer_script = build_eth_l2_script(&[0x99u8; 20]);
     let block_producer_id = state
         .create_account_from_script(block_producer_script)
         .unwrap();
 
-    let from_script = build_eth_l2_script([1u8; 20]);
+    let from_script = build_eth_l2_script(&[1u8; 20]);
     let from_script_hash = from_script.hash();
     let from_short_address = &from_script_hash[0..20];
     let from_id = state.create_account_from_script(from_script).unwrap();
@@ -34,7 +35,7 @@ fn test_contract_create_contract() {
         &generator,
         &store,
         &mut state,
-        creator_account_id,
+        CREATOR_ACCOUNT_ID,
         from_id,
         INIT_CODE,
         122000,
@@ -50,7 +51,7 @@ fn test_contract_create_contract() {
     // );
 
     let contract_account_script =
-        new_account_script(&mut state, creator_account_id, from_id, false);
+        _deprecated_new_account_script(&mut state, CREATOR_ACCOUNT_ID, from_id, false);
     let new_account_id = state
         .get_account_id_by_script_hash(&contract_account_script.hash().into())
         .unwrap()
@@ -60,7 +61,7 @@ fn test_contract_create_contract() {
     // 1 => new SimpleStorage()
     assert_eq!(contract_account_nonce, 1);
     let ss_account_script =
-        new_account_script_with_nonce(&state, creator_account_id, new_account_id, 0);
+        _deprecated_new_account_script_with_nonce(&state, CREATOR_ACCOUNT_ID, new_account_id, 0);
     let ss_account_id = state
         .get_account_id_by_script_hash(&ss_account_script.hash().into())
         .unwrap()

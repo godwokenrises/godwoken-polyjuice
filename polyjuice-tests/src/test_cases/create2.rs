@@ -2,8 +2,9 @@
 //!   See ./evm-contracts/CallContract.sol
 
 use crate::helper::{
-    self, build_eth_l2_script, compute_create2_script, deploy, new_account_script, new_block_info,
-    setup, simple_storage_get, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, L2TX_MAX_CYCLES,
+    self, _deprecated_new_account_script, build_eth_l2_script, compute_create2_script, deploy,
+    new_block_info, setup, simple_storage_get, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
+    CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
@@ -16,13 +17,13 @@ const CREATE2_IMPL_CODE: &str = include_str!("./evm-contracts/Create2Impl.bin");
 
 #[test]
 fn test_create2() {
-    let (store, mut state, generator, creator_account_id) = setup();
-    let block_producer_script = build_eth_l2_script([0x99u8; 20]);
+    let (store, mut state, generator) = setup();
+    let block_producer_script = build_eth_l2_script(&[0x99u8; 20]);
     let block_producer_id = state
         .create_account_from_script(block_producer_script)
         .unwrap();
 
-    let from_script = build_eth_l2_script([1u8; 20]);
+    let from_script = build_eth_l2_script(&[1u8; 20]);
     let from_script_hash = from_script.hash();
     let from_short_address = &from_script_hash[0..20];
     let from_id = state.create_account_from_script(from_script).unwrap();
@@ -36,7 +37,7 @@ fn test_create2() {
         &generator,
         &store,
         &mut state,
-        creator_account_id,
+        CREATOR_ACCOUNT_ID,
         from_id,
         CREATE2_IMPL_CODE,
         122000,
@@ -52,7 +53,7 @@ fn test_create2() {
     //     serde_json::to_string_pretty(&RunResult::from(run_result)).unwrap()
     // );
     let contract_account_script =
-        new_account_script(&mut state, creator_account_id, from_id, false);
+        _deprecated_new_account_script(&mut state, CREATOR_ACCOUNT_ID, from_id, false);
     let new_script_hash = contract_account_script.hash();
     let new_short_address = &new_script_hash[0..20];
     let new_account_id = state
@@ -110,7 +111,7 @@ fn test_create2() {
 
     let create2_script = compute_create2_script(
         &state,
-        creator_account_id,
+        CREATOR_ACCOUNT_ID,
         new_account_id,
         &hex::decode(input_salt).unwrap()[..],
         &hex::decode(SS_INIT_CODE).unwrap()[..],

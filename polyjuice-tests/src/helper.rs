@@ -75,7 +75,7 @@ fn load_program(program_name: &str) -> Bytes {
     let mut path = PathBuf::new();
     path.push(&BIN_DIR);
     path.push(program_name);
-    let mut f = fs::File::open(&path).expect("load program");
+    let mut f = fs::File::open(&path).expect(&format!("load program {}", program_name));
     f.read_to_end(&mut buf).expect("read program");
     Bytes::from(buf.to_vec())
 }
@@ -296,17 +296,56 @@ pub fn eth_address_to_account_id(state: &DummyState, data: &[u8]) -> Result<u32,
         })
 }
 
-pub fn new_account_script_with_nonce(
+pub fn new_account_script_with_nonce(eoa_address: &[u8; 20], from_nonce: u32) -> Script {
+    // let short_script_hash = account_id_to_short_script_hash(state, from_id, false);
+    let mut stream = RlpStream::new_list(2);
+    stream.append(&eoa_address.to_vec());
+    stream.append(&from_nonce);
+    println!(
+        "rlp data of (eoa_address + nonce): {}",
+        hex::encode(stream.as_raw())
+    );
+    let data_hash = tiny_keccak::keccak256(stream.as_raw());
+
+    let mut new_account_args = vec![0u8; 32 + 4 + 20];
+    new_account_args[0..32].copy_from_slice(&ROLLUP_SCRIPT_HASH);
+    new_account_args[32..36].copy_from_slice(&CREATOR_ACCOUNT_ID.to_le_bytes()[..]);
+    new_account_args[36..36 + 20].copy_from_slice(&data_hash[12..]);
+
+    Script::new_builder()
+        .code_hash(POLYJUICE_PROGRAM_CODE_HASH.pack())
+        .hash_type(ScriptHashType::Type.into())
+        .args(new_account_args.pack())
+        .build()
+}
+pub fn new_account_script(
+    state: &DummyState,
+    from_id: u32,
+    from_eth_address: &[u8; 20],
+    current_nonce: bool,
+) -> Script {
+    let mut from_nonce = state.get_nonce(from_id).unwrap();
+    if !current_nonce {
+        from_nonce -= 1;
+    }
+    new_account_script_with_nonce(from_eth_address, from_nonce)
+}
+
+/// TODO: deprecate this fn
+pub fn _deprecated_new_account_script_with_nonce(
     state: &DummyState,
     creator_account_id: u32,
     from_id: u32,
     from_nonce: u32,
 ) -> Script {
-    let sender = account_id_to_short_script_hash(state, from_id, false);
+    let short_script_hash = account_id_to_short_script_hash(state, from_id, false);
     let mut stream = RlpStream::new_list(2);
-    stream.append(&sender);
+    stream.append(&short_script_hash);
     stream.append(&from_nonce);
-    println!("rlp data: {}", hex::encode(stream.as_raw()));
+    println!(
+        "rlp data of (from_script_hash+nonce): {}",
+        hex::encode(stream.as_raw())
+    );
     let data_hash = tiny_keccak::keccak256(stream.as_raw());
 
     let mut new_account_args = vec![0u8; 32 + 4 + 20];
@@ -319,10 +358,8 @@ pub fn new_account_script_with_nonce(
         .hash_type(ScriptHashType::Type.into())
         .args(new_account_args.pack())
         .build()
-
-    // TODO: register the account
 }
-pub fn new_account_script(
+pub fn _deprecated_new_account_script(
     state: &DummyState,
     creator_account_id: u32,
     from_id: u32,
@@ -332,9 +369,7 @@ pub fn new_account_script(
     if !current_nonce {
         from_nonce -= 1;
     }
-    new_account_script_with_nonce(state, creator_account_id, from_id, from_nonce)
-
-    // TODO: register the account
+    _deprecated_new_account_script_with_nonce(state, creator_account_id, from_id, from_nonce)
 }
 
 pub fn contract_script_to_eth_address(script: &Script, ethabi: bool) -> Vec<u8> {
@@ -401,7 +436,7 @@ impl PolyjuiceArgsBuilder {
     }
 }
 
-pub fn setup() -> (Store, DummyState, Generator, u32) {
+pub fn setup() -> (Store, DummyState, Generator) {
     let _ = env_logger::try_init();
     let store = Store::open_tmp().unwrap();
     let mut state = DummyState::default();
@@ -411,7 +446,8 @@ pub fn setup() -> (Store, DummyState, Generator, u32) {
         .hash_type(ScriptHashType::Type.into())
         .build();
     let meta_script_hash = meta_script.hash();
-    let reserved_id = state.create_account_from_script(meta_script)
+    let reserved_id = state
+        .create_account_from_script(meta_script)
         .expect("create meta_account");
     assert_eq!(
         reserved_id, RESERVED_ACCOUNT_ID,
@@ -422,7 +458,8 @@ pub fn setup() -> (Store, DummyState, Generator, u32) {
     // setup CKB simple UDT contract
     let ckb_sudt_script = build_l2_sudt_script(CKB_SUDT_SCRIPT_ARGS);
     let ckb_sudt_script_hash = ckb_sudt_script.hash();
-    let ckb_sudt_id = state.create_account_from_script(ckb_sudt_script)
+    let ckb_sudt_id = state
+        .create_account_from_script(ckb_sudt_script)
         .expect("create CKB simple UDT contract account");
     assert_eq!(
         ckb_sudt_id, CKB_SUDT_ACCOUNT_ID,
@@ -532,7 +569,7 @@ pub fn setup() -> (Store, DummyState, Generator, u32) {
     .unwrap();
     tx.commit().unwrap();
 
-    (store, state, generator, creator_account_id)
+    (store, state, generator)
 }
 
 pub fn deploy(
@@ -572,7 +609,7 @@ pub fn deploy(
             L2TX_MAX_CYCLES,
             None,
         )
-        .expect("construct");
+        .expect("deploy Polyjuice contract");
     state.apply_run_result(&run_result).expect("update state");
     // println!("[deploy contract] used cycles: {}", run_result.used_cycles);
     run_result
@@ -644,7 +681,7 @@ pub fn simple_storage_get(
             L2TX_MAX_CYCLES,
             None,
         )
-        .expect("construct");
+        .expect("execute_transaction");
     // 491894, 571661 -> 586360 < 587K
     check_cycles("simple_storage_get", run_result.used_cycles, 587_000);
     run_result
@@ -662,7 +699,7 @@ pub fn build_l2_sudt_script(args: [u8; 32]) -> Script {
     // TODO: register the account
 }
 
-pub fn build_eth_l2_script(args: [u8; 20]) -> Script {
+pub fn build_eth_l2_script(args: &[u8; 20]) -> Script {
     let mut script_args = Vec::with_capacity(32 + 20);
     script_args.extend(&ROLLUP_SCRIPT_HASH);
     script_args.extend(&args[..]);
@@ -675,7 +712,19 @@ pub fn build_eth_l2_script(args: [u8; 20]) -> Script {
     // TODO: register the account
 }
 
+pub(crate) fn create_block_producer(state: &mut DummyState) -> u32 {
+    let block_producer_script = build_eth_l2_script(&[0x99u8; 20]);
+    let block_producer_script_hash = block_producer_script.hash();
+    let block_producer_id = state
+        .create_account_from_script(block_producer_script)
+        .expect("create_block_producer");
+    register_eoa_account(state, &[0x99u8; 20], &block_producer_script_hash);
+    block_producer_id
+}
+
 pub fn check_cycles(l2_tx_label: &str, used_cycles: u64, warning_cycles: u64) {
+    return;
+
     println!("[check_cycles] used_cycles: {}", used_cycles);
     assert!(
         used_cycles < warning_cycles,

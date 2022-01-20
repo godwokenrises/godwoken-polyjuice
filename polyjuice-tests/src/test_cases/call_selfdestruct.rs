@@ -2,9 +2,9 @@
 //!   See ./evm-contracts/SelfDestruct.sol
 
 use crate::helper::{
-    self, account_id_to_short_script_hash, build_eth_l2_script, contract_script_to_eth_address,
-    deploy, new_account_script_with_nonce, new_block_info, setup, PolyjuiceArgsBuilder,
-    CKB_SUDT_ACCOUNT_ID, L2TX_MAX_CYCLES,
+    self, _deprecated_new_account_script_with_nonce, account_id_to_short_script_hash,
+    build_eth_l2_script, contract_script_to_eth_address, deploy, new_block_info, setup,
+    PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
@@ -17,13 +17,13 @@ const CALL_SD_INIT_CODE: &str = include_str!("./evm-contracts/CallSelfDestruct.b
 
 #[test]
 fn test_selfdestruct() {
-    let (store, mut state, generator, creator_account_id) = setup();
-    let block_producer_script = build_eth_l2_script([0x99u8; 20]);
+    let (store, mut state, generator) = setup();
+    let block_producer_script = build_eth_l2_script(&[0x99u8; 20]);
     let block_producer_id = state
         .create_account_from_script(block_producer_script)
         .unwrap();
 
-    let from_script = build_eth_l2_script([1u8; 20]);
+    let from_script = build_eth_l2_script(&[1u8; 20]);
     let from_script_hash = from_script.hash();
     let from_short_address = &from_script_hash[0..20];
     let from_id = state.create_account_from_script(from_script).unwrap();
@@ -32,7 +32,7 @@ fn test_selfdestruct() {
         .unwrap();
     let mut block_number = 1;
 
-    let beneficiary_script = build_eth_l2_script([2u8; 20]);
+    let beneficiary_script = build_eth_l2_script(&[2u8; 20]);
     let beneficiary_script_hash = beneficiary_script.hash();
     let beneficiary_short_address = &beneficiary_script_hash[0..20];
     let beneficiary_id = state
@@ -59,7 +59,7 @@ fn test_selfdestruct() {
         &generator,
         &store,
         &mut state,
-        creator_account_id,
+        CREATOR_ACCOUNT_ID,
         from_id,
         input.as_str(),
         122000,
@@ -71,7 +71,8 @@ fn test_selfdestruct() {
     helper::check_cycles("deploy SelfDestruct", run_result.used_cycles, 580_000);
 
     block_number += 1;
-    let sd_account_script = new_account_script_with_nonce(&state, creator_account_id, from_id, 0);
+    let sd_account_script =
+        _deprecated_new_account_script_with_nonce(&state, CREATOR_ACCOUNT_ID, from_id, 0);
     let sd_script_hash = sd_account_script.hash();
     let sd_short_address = &sd_script_hash[0..20];
     let sd_account_id = state
@@ -96,7 +97,7 @@ fn test_selfdestruct() {
         &generator,
         &store,
         &mut state,
-        creator_account_id,
+        CREATOR_ACCOUNT_ID,
         from_id,
         CALL_SD_INIT_CODE,
         122000,
@@ -108,7 +109,8 @@ fn test_selfdestruct() {
     helper::check_cycles("deploy CallSelfDestruct", run_result.used_cycles, 560_000);
 
     block_number += 1;
-    let new_account_script = new_account_script_with_nonce(&state, creator_account_id, from_id, 1);
+    let new_account_script =
+        _deprecated_new_account_script_with_nonce(&state, CREATOR_ACCOUNT_ID, from_id, 1);
     let new_account_id = state
         .get_account_id_by_script_hash(&new_account_script.hash().into())
         .unwrap()

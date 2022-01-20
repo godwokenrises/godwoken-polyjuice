@@ -59,7 +59,7 @@ impl GwToEthArgsBuilder {
 
 #[test]
 fn test_eth_to_gw() {
-    let (store, mut state, generator, _creator_account_id) = setup();
+    let (store, mut state, generator) = setup();
 
     // init accounts
     let a_id = state
@@ -115,7 +115,7 @@ fn test_eth_to_gw() {
 
 #[test]
 fn test_gw_to_eth() {
-    let (store, mut state, generator, _creator_account_id) = setup();
+    let (store, mut state, generator) = setup();
 
     // init accounts
     let a_id = state
@@ -160,7 +160,7 @@ fn test_gw_to_eth() {
 
 #[test]
 fn test_set_mapping_by_contract() {
-    let (store, mut state, generator, _creator_account_id) = setup();
+    let (store, mut state, generator) = setup();
 
     // init accounts
     let from_id = state
@@ -174,7 +174,7 @@ fn test_set_mapping_by_contract() {
         .expect("create account a");
 
     let eth_address = [0xeeu8; 20];
-    let eth_eoa_account_script = build_eth_l2_script(eth_address);
+    let eth_eoa_account_script = build_eth_l2_script(&eth_address);
     let eth_eoa_account_script_hash = eth_eoa_account_script.hash();
     let eth_eoa_account_id = state
         .create_account_from_script(eth_eoa_account_script)
@@ -260,6 +260,6 @@ fn test_set_mapping_by_contract() {
     // TODO: test conatract account
     // [contract_account_script_hash <-> short_account_script_hash as eth_address]
     // {
-    //     let creator_script_hash = state.get_script_hash(_creator_account_id);
+    //     let creator_script_hash = state.get_script_hash(_CREATOR_ACCOUNT_ID);
     // }
 }

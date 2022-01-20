@@ -2,9 +2,9 @@
 //!   See ./evm-contracts/SimpleTransfer.sol
 
 use crate::helper::{
-    self, account_id_to_short_script_hash, build_eth_l2_script, contract_script_to_eth_address,
-    deploy, new_account_script, new_block_info, setup, simple_storage_get, PolyjuiceArgsBuilder,
-    CKB_SUDT_ACCOUNT_ID, L2TX_MAX_CYCLES,
+    self, _deprecated_new_account_script, account_id_to_short_script_hash, build_eth_l2_script,
+    contract_script_to_eth_address, deploy, new_block_info, setup, simple_storage_get,
+    PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
@@ -17,13 +17,13 @@ const INIT_CODE: &str = include_str!("./evm-contracts/SimpleTransfer.bin");
 
 #[test]
 fn test_simple_transfer() {
-    let (store, mut state, generator, creator_account_id) = setup();
-    let block_producer_script = build_eth_l2_script([0x99u8; 20]);
+    let (store, mut state, generator) = setup();
+    let block_producer_script = build_eth_l2_script(&[0x99u8; 20]);
     let block_producer_id = state
         .create_account_from_script(block_producer_script)
         .unwrap();
 
-    let from_script = build_eth_l2_script([1u8; 20]);
+    let from_script = build_eth_l2_script(&[1u8; 20]);
     let from_script_hash = from_script.hash();
     let from_short_address = &from_script_hash[0..20];
     let from_id = state.create_account_from_script(from_script).unwrap();
@@ -31,7 +31,7 @@ fn test_simple_transfer() {
     state
         .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_short_address, mint_balance)
         .unwrap();
-    let target_script = build_eth_l2_script([2u8; 20]);
+    let target_script = build_eth_l2_script(&[2u8; 20]);
     let target_script_hash = target_script.hash();
     let target_short_address = &target_script_hash[0..20];
     let target_id = state.create_account_from_script(target_script).unwrap();
@@ -53,7 +53,7 @@ fn test_simple_transfer() {
         &generator,
         &store,
         &mut state,
-        creator_account_id,
+        CREATOR_ACCOUNT_ID,
         from_id,
         SS_INIT_CODE,
         50000,
@@ -66,7 +66,8 @@ fn test_simple_transfer() {
     //     "result {}",
     //     serde_json::to_string_pretty(&RunResult::from(run_result)).unwrap()
     // );
-    let ss_account_script = new_account_script(&mut state, creator_account_id, from_id, false);
+    let ss_account_script =
+        _deprecated_new_account_script(&mut state, CREATOR_ACCOUNT_ID, from_id, false);
     let ss_script_hash = ss_account_script.hash();
     let ss_short_address = &ss_script_hash[0..20];
     let ss_account_id = state
@@ -98,7 +99,7 @@ fn test_simple_transfer() {
         &generator,
         &store,
         &mut state,
-        creator_account_id,
+        CREATOR_ACCOUNT_ID,
         from_id,
         INIT_CODE,
         50000,
@@ -111,7 +112,7 @@ fn test_simple_transfer() {
 
     block_number += 1;
     let contract_account_script =
-        new_account_script(&mut state, creator_account_id, from_id, false);
+        _deprecated_new_account_script(&mut state, CREATOR_ACCOUNT_ID, from_id, false);
     let new_script_hash = contract_account_script.hash();
     let new_short_address = &new_script_hash[0..20];
     let new_account_id = state

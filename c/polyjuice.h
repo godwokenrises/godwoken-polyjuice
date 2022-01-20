@@ -1258,7 +1258,7 @@ int clean_evmc_result_and_return(evmc_result *res, int code) {
 }
 
 int run_polyjuice() {
-#ifdef CKB_C_STDLIB_PRINTF
+#ifdef POLYJUICE_DEBUG_LOG
   // init buffer for debug_print
   char buffer[DEBUG_BUFFER_SIZE];
   g_debug_buffer = buffer;
