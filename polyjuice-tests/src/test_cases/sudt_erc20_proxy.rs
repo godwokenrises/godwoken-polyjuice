@@ -301,6 +301,7 @@ fn test_sudt_erc20_proxy_inner(
             &block_info,
             &raw_tx,
             L2TX_MAX_CYCLES,
+            None,
         )?;
         println!(
             "[execute_transaction] {} {}ms",
@@ -346,6 +347,7 @@ fn test_sudt_erc20_proxy_inner(
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .expect_err("err");
         // by: `revert(0, 0)`
@@ -382,6 +384,7 @@ fn test_sudt_erc20_proxy_inner(
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .expect_err("err");
         // by: `revert(0, 0)`

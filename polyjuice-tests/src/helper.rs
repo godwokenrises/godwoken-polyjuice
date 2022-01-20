@@ -447,12 +447,7 @@ pub fn setup() -> (Store, DummyState, Generator, u32) {
         rollup_script_hash: ROLLUP_SCRIPT_HASH.clone().into(),
         rollup_config,
     };
-    let generator = Generator::new(
-        backend_manage,
-        account_lock_manage,
-        rollup_context,
-        Default::default(),
-    );
+    let generator = Generator::new(backend_manage, account_lock_manage, rollup_context);
 
     let tx = store.begin_transaction();
     let tip_block_number: Uint64 = 8.pack();
@@ -510,6 +505,7 @@ pub fn deploy(
             &block_info,
             &raw_tx,
             L2TX_MAX_CYCLES,
+            None,
         )
         .expect("construct");
     state.apply_run_result(&run_result).expect("update state");
@@ -579,6 +575,7 @@ pub fn simple_storage_get(
             &block_info,
             &raw_tx,
             L2TX_MAX_CYCLES,
+            None,
         )
         .expect("construct");
     // 491894, 571661 -> 586360 < 587K

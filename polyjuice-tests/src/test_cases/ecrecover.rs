@@ -92,6 +92,7 @@ fn test_ecrecover() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .expect("construct");
         // [recover] used cycles: 2604412 < 2660K

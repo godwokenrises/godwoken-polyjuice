@@ -68,6 +68,7 @@ fn test_selfdestruct() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .expect("construct");
         // [Deploy SelfDestruct] used cycles: 570570 < 580K
@@ -119,6 +120,7 @@ fn test_selfdestruct() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .expect("construct");
         // [call SelfDestruct.done()] used cycles: 589657 < 600K
@@ -161,6 +163,7 @@ fn test_selfdestruct() {
             &block_info,
             &raw_tx,
             L2TX_MAX_CYCLES,
+            None,
         );
         println!("result {:?}", result);
         assert!(result.is_err());
