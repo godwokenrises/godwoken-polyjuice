@@ -76,6 +76,7 @@ fn test_recursion_contract_call() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .expect("recursive call depth to 32");
         state.apply_run_result(&run_result).expect("update state");
@@ -145,6 +146,7 @@ fn test_recursion_contract_call() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .expect_err("EVMC_REVERT = 2");
         assert_eq!(err, TransactionError::InvalidExitCode(2));
@@ -177,6 +179,7 @@ fn test_recursion_contract_call() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .expect_err("EVMC_OUT_OF_GAS = 3");
         assert_eq!(err, TransactionError::InvalidExitCode(3));

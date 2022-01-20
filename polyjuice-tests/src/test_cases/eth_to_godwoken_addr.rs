@@ -90,6 +90,7 @@ fn test_eth_to_godwoken_addr() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .expect("construct");
         // [EthToGodwokenAddr.convert(addr)] used cycles: 573228 < 580K
