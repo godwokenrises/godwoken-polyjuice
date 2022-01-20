@@ -6,6 +6,7 @@
 #include "polyjuice_utils.h"
 
 #define BALANCE_OF_ANY_SUDT_GAS 150
+#define TOTAL_SUPPLY_OF_ANY_SUDT_GAS 150
 #define TRANSFER_TO_ANY_SUDT_GAS 300
 
 int balance_of_any_sudt_gas(const uint8_t* input_src, const size_t input_size,
@@ -75,6 +76,67 @@ int balance_of_any_sudt(gw_context_t* ctx, const uint8_t* code_data,
   return 0;
 }
 
+int total_supply_of_any_sudt_gas(const uint8_t* input_src,
+                                 const size_t input_size, uint64_t* gas) {
+  *gas = TOTAL_SUPPLY_OF_ANY_SUDT_GAS;
+  return 0;
+}
+
+/*
+  Query the total supply of `sudt_id` token.
+
+   input:
+   ======
+     input[ 0..32] => sudt_id (big endian)
+
+   output:
+   =======
+     output[0..32] => amount
+ */
+int total_supply_of_any_sudt(gw_context_t* ctx, const uint8_t* code_data,
+                             const size_t code_size, bool is_static_call,
+                             const uint8_t* input_src, const size_t input_size,
+                             uint8_t** output, size_t* output_size) {
+  int ret;
+  if (input_size != 32) {
+    return ERROR_TOTAL_SUPPLY_OF_ANY_SUDT;
+  }
+
+  uint32_t sudt_id = 0;
+  ret = parse_u32(input_src, &sudt_id);
+  if (ret != 0) {
+    return ERROR_TOTAL_SUPPLY_OF_ANY_SUDT;
+  }
+
+  // Default return zero total supply
+  *output = (uint8_t*)malloc(32);
+  if (*output == NULL) {
+    ckb_debug("malloc failed");
+    return FATAL_PRECOMPILED_CONTRACTS;
+  }
+  *output_size = 32;
+  memset(*output, 0, 32);
+
+  uint8_t total_supply_le[32] = {0};
+  ret = sudt_get_total_supply(ctx, sudt_id, total_supply_le);
+  if (ret == GW_ERROR_NOT_FOUND) {
+    debug_print_int("sudt account not found", sudt_id);
+    return 0;
+  } else if (ret != 0) {
+    debug_print_int("sudt_get_total_supply failed", ret);
+    if (is_fatal_error(ret)) {
+      return FATAL_PRECOMPILED_CONTRACTS;
+    } else {
+      return ERROR_TOTAL_SUPPLY_OF_ANY_SUDT;
+    }
+  }
+
+  for (size_t i = 0; i < 32; i++) {
+    (*output)[31 - i] = total_supply_le[i];
+  }
+  return 0;
+}
+
 int transfer_to_any_sudt_gas(const uint8_t* input_src, const size_t input_size,
                              uint64_t* gas) {
   *gas = TRANSFER_TO_ANY_SUDT_GAS;
@@ -109,12 +171,12 @@ int transfer_to_any_sudt(gw_context_t* ctx, const uint8_t* code_data,
       0xda, 0xd0, 0x46, 0xc9, 0x48, 0xb0, 0x0a, 0xa8, 0x66, 0xaa,
   };
   /* Contract code hash of `SudtERC20Proxy_UserDefinedDecimals.ContractCode`
-     => 0xa816b946a890cd593f780e8b6859a9b82314c5df4c8270d66f7c502e818345dc */
+     => 0xde4542f5a5bd32c09cd98e9752281f88900a059aab7ac103edd9df214f136c52 */
   static const uint8_t
       sudt_erc20_proxy_user_defined_decimals_contract_code_hash[32] = {
-          0xa8, 0x16, 0xb9, 0x46, 0xa8, 0x90, 0xcd, 0x59, 0x3f, 0x78, 0x0e,
-          0x8b, 0x68, 0x59, 0xa9, 0xb8, 0x23, 0x14, 0xc5, 0xdf, 0x4c, 0x82,
-          0x70, 0xd6, 0x6f, 0x7c, 0x50, 0x2e, 0x81, 0x83, 0x45, 0xdc};
+          0xde, 0x45, 0x42, 0xf5, 0xa5, 0xbd, 0x32, 0xc0, 0x9c, 0xd9, 0x8e,
+          0x97, 0x52, 0x28, 0x1f, 0x88, 0x90, 0x0a, 0x05, 0x9a, 0xab, 0x7a,
+          0xc1, 0x03, 0xed, 0xd9, 0xdf, 0x21, 0x4f, 0x13, 0x6c, 0x52};
   if (code_data == NULL || code_size == 0) {
     ckb_debug("Invalid caller contract code");
     return ERROR_TRANSFER_TO_ANY_SUDT;

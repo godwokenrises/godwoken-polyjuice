@@ -963,6 +963,10 @@ bool match_precompiled_address(const evmc_address* destination,
     *contract_gas = eth_to_godwoken_addr_gas;
     *contract = eth_to_godwoken_addr;
     break;
+  case 0xf4:
+    *contract_gas = total_supply_of_any_sudt_gas;
+    *contract = total_supply_of_any_sudt;
+    break;
   default:
     *contract_gas = NULL;
     *contract = NULL;
