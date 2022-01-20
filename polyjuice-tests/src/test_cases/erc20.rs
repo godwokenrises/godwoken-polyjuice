@@ -2,8 +2,9 @@
 //!   See ./evm-contracts/ERC20.bin
 
 use crate::helper::{
-    self, account_id_to_short_script_hash, build_eth_l2_script, deploy, new_account_script,
-    new_block_info, setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, L2TX_MAX_CYCLES,
+    self, _deprecated_new_account_script, account_id_to_short_script_hash, build_eth_l2_script,
+    deploy, new_block_info, setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, CREATOR_ACCOUNT_ID,
+    L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
@@ -15,21 +16,21 @@ const INIT_CODE: &str = include_str!("./evm-contracts/ERC20.bin");
 
 #[test]
 fn test_erc20() {
-    let (store, mut state, generator, creator_account_id) = setup();
-    let block_producer_script = build_eth_l2_script([0x99u8; 20]);
+    let (store, mut state, generator) = setup();
+    let block_producer_script = build_eth_l2_script(&[0x99u8; 20]);
     let block_producer_id = state
         .create_account_from_script(block_producer_script)
         .unwrap();
 
-    let from_script1 = build_eth_l2_script([1u8; 20]);
+    let from_script1 = build_eth_l2_script(&[1u8; 20]);
     let from_script_hash1 = from_script1.hash();
     let from_short_address1 = &from_script_hash1[0..20];
     let from_id1 = state.create_account_from_script(from_script1).unwrap();
 
-    let from_script2 = build_eth_l2_script([2u8; 20]);
+    let from_script2 = build_eth_l2_script(&[2u8; 20]);
     let from_id2 = state.create_account_from_script(from_script2).unwrap();
 
-    let from_script3 = build_eth_l2_script([3u8; 20]);
+    let from_script3 = build_eth_l2_script(&[3u8; 20]);
     let from_script_hash3 = from_script3.hash();
     let from_short_address3 = &from_script_hash3[0..20];
     let from_id3 = state.create_account_from_script(from_script3).unwrap();
@@ -45,7 +46,7 @@ fn test_erc20() {
         &generator,
         &store,
         &mut state,
-        creator_account_id,
+        CREATOR_ACCOUNT_ID,
         from_id1,
         INIT_CODE,
         122000,
@@ -57,7 +58,7 @@ fn test_erc20() {
     helper::check_cycles("Deploy ERC20", run_result.used_cycles, 1_020_000);
 
     let contract_account_script =
-        new_account_script(&mut state, creator_account_id, from_id1, false);
+        _deprecated_new_account_script(&mut state, CREATOR_ACCOUNT_ID, from_id1, false);
     let new_account_id = state
         .get_account_id_by_script_hash(&contract_account_script.hash().into())
         .unwrap()

@@ -9,7 +9,7 @@
 #include "polyjuice_globals.h"
 #include "polyjuice_errors.h"
 
-#ifdef CKB_C_STDLIB_PRINTF
+#ifdef POLYJUICE_DEBUG_LOG
 /* 64 KB */
 #define DEBUG_BUFFER_SIZE 65536
 static char *g_debug_buffer;
@@ -36,6 +36,8 @@ void debug_print_int(const char* prefix, int64_t ret) {
   sprintf(g_debug_buffer, "%s => %ld", prefix, ret);
   ckb_debug(g_debug_buffer);
 }
+// avoid VM(InvalidEcall(80))
+int printf(const char *format, ...) { return 0; }
 #else
 #undef ckb_debug
 #define ckb_debug(s) do {} while (0)
@@ -43,7 +45,7 @@ void debug_print_int(const char* prefix, int64_t ret) {
 #define debug_print_int(prefix, value) do {} while (0)
 #define debug_print_data(prefix, data, data_len) do {} while (0)
 int printf(const char *format, ...) { return 0; }
-#endif /* CKB_C_STDLIB_PRINTF */
+#endif /* POLYJUICE_DEBUG_LOG */
 
 #define memset(dest, c, n) _smt_fast_memset(dest, c, n)
 

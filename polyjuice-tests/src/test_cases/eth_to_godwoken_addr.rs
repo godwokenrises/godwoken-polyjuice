@@ -1,9 +1,9 @@
 //! See ./evm-contracts/EthToGodwokenAddr.sol
 
 use crate::helper::{
-    self, build_eth_l2_script, deploy, new_account_script, new_block_info, setup,
-    PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, L2TX_MAX_CYCLES, POLYJUICE_PROGRAM_CODE_HASH,
-    ROLLUP_SCRIPT_HASH,
+    self, _deprecated_new_account_script, build_eth_l2_script, deploy, new_block_info, setup,
+    PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
+    POLYJUICE_PROGRAM_CODE_HASH, ROLLUP_SCRIPT_HASH,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
@@ -20,14 +20,14 @@ const INIT_CODE: &str = include_str!("./evm-contracts/EthToGodwokenAddr.bin");
 
 #[test]
 fn test_eth_to_godwoken_addr() {
-    let (store, mut state, generator, creator_account_id) = setup();
-    let block_producer_script = build_eth_l2_script([0x99u8; 20]);
+    let (store, mut state, generator) = setup();
+    let block_producer_script = build_eth_l2_script(&[0x99u8; 20]);
     let block_producer_id = state
         .create_account_from_script(block_producer_script)
         .unwrap();
 
     let from_args = [1u8; 20];
-    let from_script = build_eth_l2_script(from_args.clone());
+    let from_script = build_eth_l2_script(&from_args);
     let from_script_hash = from_script.hash();
     let from_short_address = &from_script_hash[0..20];
     let from_id = state.create_account_from_script(from_script).unwrap();
@@ -39,7 +39,7 @@ fn test_eth_to_godwoken_addr() {
         &generator,
         &store,
         &mut state,
-        creator_account_id,
+        CREATOR_ACCOUNT_ID,
         from_id,
         INIT_CODE,
         122000,
@@ -55,7 +55,7 @@ fn test_eth_to_godwoken_addr() {
     );
 
     let contract_account_script =
-        new_account_script(&mut state, creator_account_id, from_id, false);
+        _deprecated_new_account_script(&mut state, CREATOR_ACCOUNT_ID, from_id, false);
     let new_account_id = state
         .get_account_id_by_script_hash(&contract_account_script.hash().into())
         .unwrap()
@@ -102,7 +102,7 @@ fn test_eth_to_godwoken_addr() {
         state.apply_run_result(&run_result).expect("update state");
         let mut script_args = vec![0u8; 32 + 4 + 20];
         script_args[0..32].copy_from_slice(&ROLLUP_SCRIPT_HASH);
-        script_args[32..36].copy_from_slice(&creator_account_id.to_le_bytes()[..]);
+        script_args[32..36].copy_from_slice(&CREATOR_ACCOUNT_ID.to_le_bytes()[..]);
         script_args[36..56].copy_from_slice(&hex::decode(hex_eth_address).unwrap());
         let script_hash = Script::new_builder()
             .code_hash(POLYJUICE_PROGRAM_CODE_HASH.pack())

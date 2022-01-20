@@ -121,7 +121,7 @@ build/validator: c/validator.c $(VALIDATOR_DEPS)
 
 build/generator_log: c/generator.c $(GENERATOR_DEPS)
 	cd $(SECP_DIR) && (git apply workaround-fix-g++-linking.patch || true) && cd - # apply patch
-	$(CXX) $(CFLAGS) $(LDFLAGS) -Ibuild -o $@ c/generator.c $(ALL_OBJS) -DCKB_C_STDLIB_PRINTF
+	$(CXX) $(CFLAGS) $(LDFLAGS) -Ibuild -o $@ c/generator.c $(ALL_OBJS) -DPOLYJUICE_DEBUG_LOG
 #	If we need the whole one for performance analysis, don't separate the executable here
 	$(OBJCOPY) --only-keep-debug $@ $@.debug
 	$(OBJCOPY) --strip-debug --strip-all $@
@@ -129,7 +129,7 @@ build/generator_log: c/generator.c $(GENERATOR_DEPS)
 
 build/validator_log: c/validator.c $(VALIDATOR_DEPS)
 	cd $(SECP_DIR) && (git apply workaround-fix-g++-linking.patch || true) && cd - # apply patch
-	$(CXX) $(CFLAGS) $(LDFLAGS) -Ibuild -o $@ c/validator.c $(ALL_OBJS) -DCKB_C_STDLIB_PRINTF
+	$(CXX) $(CFLAGS) $(LDFLAGS) -Ibuild -o $@ c/validator.c $(ALL_OBJS) -DPOLYJUICE_DEBUG_LOG
 #	If we need the whole one for performance analysis, don't separate the executable here
 	$(OBJCOPY) --only-keep-debug $@ $@.debug
 	$(OBJCOPY) --strip-debug --strip-all $@
