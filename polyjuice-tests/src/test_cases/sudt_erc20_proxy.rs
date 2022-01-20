@@ -56,8 +56,8 @@ fn test_sudt_erc20_proxy_inner(
             let args = format!("000000000000000000000000000000000000000000000000000000000000008000000000000000000000000000000000000000000000000000000000000000c0000000000000000000000000000000000000000204fce5e3e25026110000000000000000000000000000000000000000000000000000000000000000000000{:02x}0000000000000000000000000000000000000000000000000000000000000004746573740000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000027474000000000000000000000000000000000000000000000000000000000000", new_sudt_id);
             let init_code = format!("{}{}", SUDT_ERC20_PROXY_CODE, args);
             let _run_result = deploy(
-                &generator,
-                &store,
+                generator,
+                store,
                 state,
                 creator_account_id,
                 from_id1,
@@ -80,8 +80,8 @@ fn test_sudt_erc20_proxy_inner(
             let args = format!("00000000000000000000000000000000000000000000000000000000000000a000000000000000000000000000000000000000000000000000000000000000e0000000000000000000000000000000000000000000000000000000024cb016ea00000000000000000000000000000000000000000000000000000000000000{:02x}00000000000000000000000000000000000000000000000000000000000000{:02x}000000000000000000000000000000000000000000000000000000000000000e65726332305f646563696d616c7300000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000000034445430000000000000000000000000000000000000000000000000000000000", new_sudt_id, decimals);
             let init_code = format!("{}{}", SUDT_ERC20_PROXY_USER_DEFINED_DECIMALS_CODE, args);
             let _run_result = deploy(
-                &generator,
-                &store,
+                generator,
+                store,
                 state,
                 creator_account_id,
                 from_id1,
@@ -138,6 +138,13 @@ fn test_sudt_erc20_proxy_inner(
             .unwrap(),
         0
     );
+
+    let total_supply = {
+        let mut buf = [0u8; 32];
+        let total_supply = state.get_sudt_total_supply(new_sudt_id).unwrap();
+        total_supply.to_big_endian(&mut buf);
+        hex::encode(&buf)
+    };
     for (idx, (action, from_id, args_str, return_data_str)) in [
         // balanceOf(eoa1)
         (
@@ -258,6 +265,13 @@ fn test_sudt_erc20_proxy_inner(
                 "00000000000000000000000000000000000000000000000000000000000000{:02x}",
                 decimals.unwrap_or(18)
             ),
+        ),
+        // totalSupply()
+        (
+            "totalSupply()",
+            from_id1,
+            "18160ddd".to_string(),
+            &total_supply,
         ),
     ]
     .iter()
