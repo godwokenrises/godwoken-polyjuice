@@ -160,6 +160,7 @@ fn test_simple_transfer() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .expect("construct");
         // [SimpleTransfer to EoA] used cycles: 725217 < 736K
@@ -208,6 +209,7 @@ fn test_simple_transfer() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .expect("construct");
         // [SimpleTransfer to zero address] used cycles: 699554 < 710K
@@ -262,6 +264,7 @@ fn test_simple_transfer() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .expect("construct");
         // [SimpleTransfer.transferToSimpleStorage1] used cycles: 1203332 < 1210K
@@ -328,6 +331,7 @@ fn test_simple_transfer() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .expect("construct");
         state.apply_run_result(&run_result).expect("update state");

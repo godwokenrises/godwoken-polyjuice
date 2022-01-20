@@ -166,6 +166,7 @@ fn test_invalid_sudt_erc20_proxy() {
             &block_info,
             &raw_tx,
             L2TX_MAX_CYCLES,
+            None,
         );
 
         if *success {
