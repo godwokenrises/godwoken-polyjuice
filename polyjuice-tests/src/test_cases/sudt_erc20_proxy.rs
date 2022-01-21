@@ -2,7 +2,7 @@
 //!   See ./evm-contracts/ERC20.bin
 
 use crate::helper::{
-    _deprecated_new_account_script, account_id_to_short_script_hash, build_eth_l2_script,
+    _deprecated_new_contract_account_script, account_id_to_short_script_hash, build_eth_l2_script,
     build_l2_sudt_script, deploy, new_block_info, setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
     CREATOR_ACCOUNT_ID, FATAL_PRECOMPILED_CONTRACTS, L2TX_MAX_CYCLES,
     SUDT_ERC20_PROXY_USER_DEFINED_DECIMALS_CODE,
@@ -74,7 +74,7 @@ fn test_sudt_erc20_proxy_inner(
     println!();
 
     let contract_account_script =
-        _deprecated_new_account_script(state, CREATOR_ACCOUNT_ID, from_id1, false);
+        _deprecated_new_contract_account_script(state, CREATOR_ACCOUNT_ID, from_id1, false);
     let script_hash = contract_account_script.hash().into();
     let new_account_id = state
         .get_account_id_by_script_hash(&script_hash)

@@ -2,8 +2,8 @@
 //!   See ./evm-contracts/CallContract.sol
 
 use crate::helper::{
-    self, _deprecated_new_account_script, _deprecated_new_account_script_with_nonce,
-    build_eth_l2_script, contract_script_to_eth_address, deploy, new_block_info, setup,
+    self, _deprecated_new_account_script_with_nonce, _deprecated_new_contract_account_script,
+    build_eth_l2_script, contract_script_to_short_script_hash, deploy, new_block_info, setup,
     simple_storage_get, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, CREATOR_ACCOUNT_ID,
     L2TX_MAX_CYCLES,
 };
@@ -75,7 +75,7 @@ fn test_delegatecall() {
     //     serde_json::to_string_pretty(&RunResult::from(run_result)).unwrap()
     // );
     let contract_account_script =
-        _deprecated_new_account_script(&mut state, CREATOR_ACCOUNT_ID, from_id, false);
+        _deprecated_new_contract_account_script(&mut state, CREATOR_ACCOUNT_ID, from_id, false);
     let new_account_id = state
         .get_account_id_by_script_hash(&contract_account_script.hash().into())
         .unwrap()
@@ -108,7 +108,10 @@ fn test_delegatecall() {
         let input = hex::decode(format!(
             "{}{}{}",
             fn_sighash,
-            hex::encode(contract_script_to_eth_address(&ss_account_script, true)),
+            hex::encode(contract_script_to_short_script_hash(
+                &ss_account_script,
+                true
+            )),
             "0000000000000000000000000000000000000000000000000000000000000022",
         ))
         .unwrap();

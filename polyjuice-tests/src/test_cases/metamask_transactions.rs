@@ -1,7 +1,7 @@
 //! Test transfer from EoA to EoA using Metamask
 
 use crate::helper::{
-    _deprecated_new_account_script, build_eth_l2_script, deploy, new_block_info,
+    _deprecated_new_contract_account_script, build_eth_l2_script, deploy, new_block_info,
     register_eoa_account, setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, CREATOR_ACCOUNT_ID,
     L2TX_MAX_CYCLES, SUDT_ERC20_PROXY_USER_DEFINED_DECIMALS_CODE,
 };
@@ -70,8 +70,12 @@ fn test_transfer_by_metamask() {
         block_producer_id,
         block_number,
     );
-    let ckb_proxy_contract_script =
-        _deprecated_new_account_script(&state, CREATOR_ACCOUNT_ID, block_producer_id, false);
+    let ckb_proxy_contract_script = _deprecated_new_contract_account_script(
+        &state,
+        CREATOR_ACCOUNT_ID,
+        block_producer_id,
+        false,
+    );
     let script_hash = ckb_proxy_contract_script.hash();
     let ckb_proxy_contract_account_id = state
         .get_account_id_by_script_hash(&script_hash.into())

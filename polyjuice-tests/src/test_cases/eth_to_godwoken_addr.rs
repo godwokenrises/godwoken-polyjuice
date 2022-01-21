@@ -1,8 +1,8 @@
 //! See ./evm-contracts/EthToGodwokenAddr.sol
 
 use crate::helper::{
-    self, _deprecated_new_account_script, build_eth_l2_script, deploy, new_block_info, setup,
-    PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
+    self, _deprecated_new_contract_account_script, build_eth_l2_script, deploy, new_block_info,
+    setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
     POLYJUICE_PROGRAM_CODE_HASH, ROLLUP_SCRIPT_HASH,
 };
 use gw_common::state::State;
@@ -55,7 +55,7 @@ fn test_eth_to_godwoken_addr() {
     );
 
     let contract_account_script =
-        _deprecated_new_account_script(&mut state, CREATOR_ACCOUNT_ID, from_id, false);
+        _deprecated_new_contract_account_script(&mut state, CREATOR_ACCOUNT_ID, from_id, false);
     let new_account_id = state
         .get_account_id_by_script_hash(&contract_account_script.hash().into())
         .unwrap()
