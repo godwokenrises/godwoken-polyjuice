@@ -41,8 +41,12 @@ fn test_simple_wallet() {
     // [Deploy SimpleWallet Contract] used cycles: 1803600 < 1810K
     helper::check_cycles("Deploy SimpleWallet", run_result.used_cycles, 1_810_000);
 
-    let account_script =
-        helper::_deprecated_new_account_script(&mut state, CREATOR_ACCOUNT_ID, from_id, false);
+    let account_script = helper::_deprecated_new_contract_account_script(
+        &mut state,
+        CREATOR_ACCOUNT_ID,
+        from_id,
+        false,
+    );
     let _contract_account_id = state
         .get_account_id_by_script_hash(&account_script.hash().into())
         .unwrap()

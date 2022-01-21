@@ -2,9 +2,9 @@
 //!   See ./evm-contracts/CallContract.sol
 
 use crate::helper::{
-    build_eth_l2_script, contract_script_to_eth_address, deploy, new_account_script,
-    new_account_script_with_nonce, new_block_info, register_eoa_account, setup, simple_storage_get,
-    PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
+    contract_script_to_short_script_hash, create_eth_eoa_account, deploy, new_block_info,
+    new_contract_account_script, new_contract_account_script_with_nonce, setup, simple_storage_get,
+    PolyjuiceArgsBuilder, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
@@ -21,14 +21,7 @@ fn test_call_multiple_times() {
     let block_producer_id = crate::helper::create_block_producer(&mut state);
 
     let from_eth_address = [1u8; 20];
-    let from_script = build_eth_l2_script(&from_eth_address);
-    let from_script_hash = from_script.hash();
-    let from_short_address = &from_script_hash[0..20];
-    let from_id = state.create_account_from_script(from_script).unwrap();
-    register_eoa_account(&mut state, &from_eth_address, &from_script_hash);
-    state
-        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_short_address, 280000)
-        .unwrap();
+    let (from_id, _) = create_eth_eoa_account(&mut state, &from_eth_address, 300000);
 
     // Deploy two SimpleStorage
     let mut block_number = 1;
@@ -48,12 +41,12 @@ fn test_call_multiple_times() {
         // state.apply_run_result(&_run_result).expect("update state");
         block_number += 1;
     }
-    let ss1_account_script = new_account_script_with_nonce(&from_eth_address, 0);
+    let ss1_account_script = new_contract_account_script_with_nonce(&from_eth_address, 0);
     let ss1_account_id = state
         .get_account_id_by_script_hash(&ss1_account_script.hash().into())
         .unwrap()
         .unwrap();
-    let ss2_account_script = new_account_script_with_nonce(&from_eth_address, 1);
+    let ss2_account_script = new_contract_account_script_with_nonce(&from_eth_address, 1);
     let ss2_account_id = state
         .get_account_id_by_script_hash(&ss2_account_script.hash().into())
         .unwrap()
@@ -63,7 +56,10 @@ fn test_call_multiple_times() {
     let input = format!(
         "{}{}",
         INIT_CODE,
-        hex::encode(contract_script_to_eth_address(&ss1_account_script, true)),
+        hex::encode(contract_script_to_short_script_hash(
+            &ss1_account_script,
+            true
+        )),
     );
     let _run_result = deploy(
         &generator,
@@ -84,7 +80,7 @@ fn test_call_multiple_times() {
     //     serde_json::to_string_pretty(&RunResult::from(run_result)).unwrap()
     // );
     let cm_contract_account_script =
-        new_account_script(&mut state, from_id, &from_eth_address, false);
+        new_contract_account_script(&mut state, from_id, &from_eth_address, false);
     let new_account_id = state
         .get_account_id_by_script_hash(&cm_contract_account_script.hash().into())
         .unwrap()
@@ -126,7 +122,10 @@ fn test_call_multiple_times() {
         let block_info = new_block_info(0, block_number, block_number);
         let input = hex::decode(format!(
             "bca0b9c2{}{}",
-            hex::encode(contract_script_to_eth_address(&ss2_account_script, true)),
+            hex::encode(contract_script_to_short_script_hash(
+                &ss2_account_script,
+                true
+            )),
             "0000000000000000000000000000000000000000000000000000000000000014",
         ))
         .unwrap();

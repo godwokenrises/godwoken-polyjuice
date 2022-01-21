@@ -2,8 +2,8 @@
 //!   See ./evm-contracts/LogEvents.sol
 
 use crate::helper::{
-    _deprecated_new_account_script, account_id_to_short_script_hash, build_eth_l2_script, deploy,
-    new_block_info, parse_log, setup, Log, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
+    _deprecated_new_contract_account_script, account_id_to_short_script_hash, build_eth_l2_script,
+    deploy, new_block_info, parse_log, setup, Log, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
     CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
@@ -52,7 +52,7 @@ fn test_parse_log_event() {
         block_number,
     );
     let contract_account_script =
-        _deprecated_new_account_script(&mut state, CREATOR_ACCOUNT_ID, from_id, false);
+        _deprecated_new_contract_account_script(&mut state, CREATOR_ACCOUNT_ID, from_id, false);
     let new_script_hash = contract_account_script.hash();
     let new_short_address = &new_script_hash[0..20];
     let new_account_id = state

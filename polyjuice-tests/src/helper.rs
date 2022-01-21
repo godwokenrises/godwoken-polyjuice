@@ -273,6 +273,12 @@ pub(crate) fn account_id_to_short_script_hash(
     data
 }
 
+pub(crate) fn eth_addr_to_ethabi_addr(eth_addr: &[u8; 20]) -> [u8; 32] {
+    let mut ethabi_addr = [0; 32];
+    ethabi_addr[12..32].copy_from_slice(eth_addr);
+    ethabi_addr
+}
+
 #[allow(dead_code)]
 pub fn eth_address_to_account_id(state: &DummyState, data: &[u8]) -> Result<u32, String> {
     if data.len() != 20 {
@@ -296,7 +302,7 @@ pub fn eth_address_to_account_id(state: &DummyState, data: &[u8]) -> Result<u32,
         })
 }
 
-pub fn new_account_script_with_nonce(eoa_address: &[u8; 20], from_nonce: u32) -> Script {
+pub fn new_contract_account_script_with_nonce(eoa_address: &[u8; 20], from_nonce: u32) -> Script {
     // let short_script_hash = account_id_to_short_script_hash(state, from_id, false);
     let mut stream = RlpStream::new_list(2);
     stream.append(&eoa_address.to_vec());
@@ -318,7 +324,7 @@ pub fn new_account_script_with_nonce(eoa_address: &[u8; 20], from_nonce: u32) ->
         .args(new_account_args.pack())
         .build()
 }
-pub fn new_account_script(
+pub fn new_contract_account_script(
     state: &DummyState,
     from_id: u32,
     from_eth_address: &[u8; 20],
@@ -328,7 +334,7 @@ pub fn new_account_script(
     if !current_nonce {
         from_nonce -= 1;
     }
-    new_account_script_with_nonce(from_eth_address, from_nonce)
+    new_contract_account_script_with_nonce(from_eth_address, from_nonce)
 }
 
 /// TODO: deprecate this fn
@@ -359,7 +365,7 @@ pub fn _deprecated_new_account_script_with_nonce(
         .args(new_account_args.pack())
         .build()
 }
-pub fn _deprecated_new_account_script(
+pub fn _deprecated_new_contract_account_script(
     state: &DummyState,
     creator_account_id: u32,
     from_id: u32,
@@ -372,7 +378,7 @@ pub fn _deprecated_new_account_script(
     _deprecated_new_account_script_with_nonce(state, creator_account_id, from_id, from_nonce)
 }
 
-pub fn contract_script_to_eth_address(script: &Script, ethabi: bool) -> Vec<u8> {
+pub fn contract_script_to_short_script_hash(script: &Script, ethabi: bool) -> Vec<u8> {
     let offset = if ethabi { 12 } else { 0 };
     let mut data = vec![0u8; offset + 20];
     data[offset..].copy_from_slice(&script.hash()[0..20]);
@@ -722,24 +728,39 @@ pub(crate) fn create_block_producer(state: &mut DummyState) -> u32 {
     block_producer_id
 }
 
-pub fn check_cycles(l2_tx_label: &str, used_cycles: u64, warning_cycles: u64) {
-    return;
-
-    println!("[check_cycles] used_cycles: {}", used_cycles);
-    assert!(
-        used_cycles < warning_cycles,
-        "[Warning: {} used too many cycles = {}]",
-        l2_tx_label,
-        used_cycles
-    );
-    let cycles_left = warning_cycles - used_cycles;
-    println!(
-        "[{}] cycles left: {}({}%)",
-        l2_tx_label,
-        cycles_left,
-        cycles_left * 100 / warning_cycles
-    );
+pub(crate) fn create_eth_eoa_account(
+    state: &mut DummyState,
+    eth_address: &[u8; 20],
+    mint_ckb: u128,
+) -> (u32, [u8; 32]) {
+    let script = build_eth_l2_script(&eth_address);
+    let script_hash = script.hash();
+    let account_id = state.create_account_from_script(script).unwrap();
+    register_eoa_account(state, &eth_address, &script_hash);
+    state
+        .mint_sudt(CKB_SUDT_ACCOUNT_ID, &script_hash[0..20], mint_ckb)
+        .unwrap();
+    (account_id, script_hash)
 }
+
+// TODO:
+pub fn check_cycles(_l2_tx_label: &str, _used_cycles: u64, _warning_cycles: u64) {}
+// pub(crate) fn check_cycles(l2_tx_label: &str, used_cycles: u64, warning_cycles: u64) {
+//     println!("[check_cycles] used_cycles: {}", used_cycles);
+//     assert!(
+//         used_cycles < warning_cycles,
+//         "[Warning: {} used too many cycles = {}]",
+//         l2_tx_label,
+//         used_cycles
+//     );
+//     let cycles_left = warning_cycles - used_cycles;
+//     println!(
+//         "[{}] cycles left: {}({}%)",
+//         l2_tx_label,
+//         cycles_left,
+//         cycles_left * 100 / warning_cycles
+//     );
+// }
 
 fn build_eth_address_to_script_hash_key(eth_address: &[u8; 20]) -> H256 {
     let mut key: [u8; 32] = H256::zero().into();

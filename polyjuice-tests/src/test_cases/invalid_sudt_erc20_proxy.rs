@@ -2,9 +2,9 @@
 //!   See ./evm-contracts/ERC20.bin
 
 use crate::helper::{
-    self, _deprecated_new_account_script, account_id_to_short_script_hash, build_eth_l2_script,
-    build_l2_sudt_script, deploy, new_block_info, setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
-    CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
+    self, _deprecated_new_contract_account_script, account_id_to_short_script_hash,
+    build_eth_l2_script, build_l2_sudt_script, deploy, new_block_info, setup, PolyjuiceArgsBuilder,
+    CKB_SUDT_ACCOUNT_ID, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
 use gw_generator::{error::TransactionError, traits::StateExt};
@@ -76,7 +76,7 @@ fn test_invalid_sudt_erc20_proxy() {
         1_460_000,
     );
     let contract_account_script =
-        _deprecated_new_account_script(&mut state, CREATOR_ACCOUNT_ID, from_id1, false);
+        _deprecated_new_contract_account_script(&mut state, CREATOR_ACCOUNT_ID, from_id1, false);
     let invalid_proxy_account_id = state
         .get_account_id_by_script_hash(&contract_account_script.hash().into())
         .unwrap()

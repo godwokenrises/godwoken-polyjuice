@@ -918,16 +918,22 @@ int handle_transfer(gw_context_t* ctx,
   uint8_t value_u128_bytes[16];
   for (int i = 0; i < 16; i++) {
     if (msg->value.bytes[i] != 0) {
-      ckb_debug("transfer value can not larger than u128::max()");
+      ckb_debug("[handle_transfer] transfer value can not larger than u128::max()");
       return FATAL_POLYJUICE;
     }
     value_u128_bytes[i] = msg->value.bytes[31 - i];
   }
   uint128_t value_u128 = *(uint128_t*)value_u128_bytes;
-  debug_print_data("sender", msg->sender.bytes, 20);
-  debug_print_data("destination", msg->destination.bytes, 20);
-  debug_print_int("transfer value", value_u128);
-  // TODO: if value_u128 == 0
+  debug_print_data("[handle_transfer] sender", msg->sender.bytes, 20);
+  debug_print_data("[handle_transfer] destination", msg->destination.bytes, 20);
+  debug_print_int("[handle_transfer] msg->value", value_u128);
+
+  if (msg->kind == EVMC_CALL
+   && memcmp(msg->sender.bytes, g_tx_origin.bytes, 20) == 0
+   && to_address_is_eoa) {
+    ckb_debug("warning: transfer value from eoa to eoa");
+    return FATAL_POLYJUICE;
+  }
 
   uint8_t from_script_hash[32] = {0};
   int ret = load_script_hash_by_eth_address(ctx, msg->sender.bytes,
@@ -945,21 +951,17 @@ int handle_transfer(gw_context_t* ctx,
     return ret;
   }
 
+  if (value_u128 == 0) {
+    return 0;
+  }
   ret = sudt_transfer(ctx, g_sudt_id,
                       DEFAULT_SHORT_SCRIPT_HASH_LEN,
                       from_script_hash,
                       to_script_hash,
                       value_u128);
   if (ret != 0) {
-    ckb_debug("sudt_transfer failed");
+    ckb_debug("[handle_transfer] sudt_transfer failed");
     return ret;
-  }
-
-  if (msg->kind == EVMC_CALL
-   && memcmp(msg->sender.bytes, g_tx_origin.bytes, 20) == 0
-   && to_address_is_eoa) {
-    ckb_debug("warning: transfer value from eoa to eoa");
-    return FATAL_POLYJUICE;
   }
 
   return 0;
