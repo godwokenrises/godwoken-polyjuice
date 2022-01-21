@@ -2,9 +2,9 @@
 //!   See ./evm-contracts/CallContract.sol
 
 use crate::helper::{
-    self, _deprecated_new_contract_account_script, build_eth_l2_script, compute_create2_script,
-    deploy, new_block_info, setup, simple_storage_get, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
-    CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
+    self, compute_create2_script, create_eth_eoa_account, deploy, new_block_info,
+    new_contract_account_script, setup, simple_storage_get, PolyjuiceArgsBuilder,
+    CKB_SUDT_ACCOUNT_ID, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
@@ -18,21 +18,14 @@ const CREATE2_IMPL_CODE: &str = include_str!("./evm-contracts/Create2Impl.bin");
 #[test]
 fn test_create2() {
     let (store, mut state, generator) = setup();
-    let block_producer_script = build_eth_l2_script(&[0x99u8; 20]);
-    let block_producer_id = state
-        .create_account_from_script(block_producer_script)
-        .unwrap();
+    let block_producer_id = crate::helper::create_block_producer(&mut state);
 
-    let from_script = build_eth_l2_script(&[1u8; 20]);
-    let from_script_hash = from_script.hash();
-    let from_short_address = &from_script_hash[0..20];
-    let from_id = state.create_account_from_script(from_script).unwrap();
-    state
-        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_short_address, 2000000)
-        .unwrap();
-    let mut block_number = 1;
+    let from_eth_address = [1u8; 20];
+    let (from_id, _from_script_hash) =
+        create_eth_eoa_account(&mut state, &from_eth_address, 2000000);
 
     // Deploy CREATE2_IMPL_CODE
+    let mut block_number = 1;
     let run_result = deploy(
         &generator,
         &store,
@@ -45,35 +38,34 @@ fn test_create2() {
         block_producer_id,
         block_number,
     );
-    block_number += 1;
     // [Deploy Create2Impl] used cycles: 819215 < 820K
     helper::check_cycles("Deploy Create2Impl", run_result.used_cycles, 820_000);
     // println!(
     //     "result {}",
     //     serde_json::to_string_pretty(&RunResult::from(run_result)).unwrap()
     // );
-    let contract_account_script =
-        _deprecated_new_contract_account_script(&mut state, CREATOR_ACCOUNT_ID, from_id, false);
-    let new_script_hash = contract_account_script.hash();
-    let new_short_address = &new_script_hash[0..20];
-    let new_account_id = state
-        .get_account_id_by_script_hash(&contract_account_script.hash().into())
+    let create2_contract_script =
+        new_contract_account_script(&state, from_id, &from_eth_address, false);
+    let create2_contract_script_hash = create2_contract_script.hash();
+    let create2_contract_id = state
+        .get_account_id_by_script_hash(&create2_contract_script_hash.into())
         .unwrap()
         .unwrap();
-
-    let new_account_balance = state
-        .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, new_short_address)
+    println!("create2_contract account id = {}", create2_contract_id);
+    let create2_contract_balance = state
+        .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &create2_contract_script_hash[0..20])
         .unwrap();
-    assert_eq!(new_account_balance, 0);
-
-    println!("======================== account id = {}", new_account_id);
+    assert_eq!(create2_contract_balance, 0);
 
     let input_value_u128: u128 = 0x9a;
+    // bytes32 salt
     let input_salt = "1111111111111111111111111111111111111111111111111111111111111111";
-    let run_result = {
-        let block_info = new_block_info(0, block_number, block_number);
 
-        // Create2Impl.deploy()
+    // Create2Impl.deploy(uint256 value, bytes32 salt, bytes memory code)
+    let run_result = {
+        block_number += 1;
+        let block_info = new_block_info(0, block_number, block_number);
+        // uint256 value: 0x000000000000000000000000000000000000000000000000000000000000009a
         let input_value = format!(
             "00000000000000000000000000000000000000000000000000000000000000{:2x}",
             input_value_u128
@@ -88,7 +80,7 @@ fn test_create2() {
             .build();
         let raw_tx = RawL2Transaction::new_builder()
             .from_id(from_id.pack())
-            .to_id(new_account_id.pack())
+            .to_id(create2_contract_id.pack())
             .args(Bytes::from(args).pack())
             .build();
         let db = store.begin_transaction();
@@ -102,7 +94,7 @@ fn test_create2() {
                 L2TX_MAX_CYCLES,
                 None,
             )
-            .expect("construct");
+            .expect("Create2Impl.deploy(uint256 value, bytes32 salt, bytes memory code)");
         // [Create2Impl.deploy(...)] used cycles: 1197555 < 1230K
         helper::check_cycles("Create2Impl.deploy(...)", run_result.used_cycles, 1230_000);
         state.apply_run_result(&run_result).expect("update state");
@@ -111,22 +103,20 @@ fn test_create2() {
 
     let create2_script = compute_create2_script(
         &state,
-        CREATOR_ACCOUNT_ID,
-        new_account_id,
+        create2_contract_id,
         &hex::decode(input_salt).unwrap()[..],
         &hex::decode(SS_INIT_CODE).unwrap()[..],
     );
     let create2_script_hash = create2_script.hash();
-    let create2_short_address = &create2_script_hash[0..20];
+    let create2_short_script_hash = &create2_script_hash[0..20];
     println!("create2_address: {}", hex::encode(&run_result.return_data));
-    assert_eq!(&run_result.return_data[12..32], create2_short_address,);
+    assert_eq!(&run_result.return_data[12..32], create2_short_script_hash);
     let create2_account_id = state
-        .get_account_id_by_script_hash(&create2_script.hash().into())
+        .get_account_id_by_script_hash(&create2_script_hash.into())
         .unwrap()
         .unwrap();
-
     let create2_account_balance = state
-        .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, create2_short_address)
+        .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, create2_short_script_hash)
         .unwrap();
     assert_eq!(create2_account_balance, input_value_u128);
 

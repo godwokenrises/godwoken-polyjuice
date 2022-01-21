@@ -816,7 +816,7 @@ int create_new_account(gw_context_t* ctx,
                        uint8_t* code_data,
                        size_t code_size) {
   if (code_size == 0) {
-    ckb_debug("can't create new account by empty code data");
+    ckb_debug("[create_new_account] can't create new account by empty code data");
     return FATAL_POLYJUICE;
   }
 
@@ -832,6 +832,7 @@ int create_new_account(gw_context_t* ctx,
 
        Above data will be RLP encoded.
     */
+    ckb_debug("[create_new_account] msg->kind == EVMC_CREATE");
     uint32_t nonce;
     /* from_id must already exists */
     ret = ctx->sys_get_account_nonce(ctx, from_id, &nonce);
@@ -851,6 +852,7 @@ int create_new_account(gw_context_t* ctx,
        - [32 bytes] create2_salt
        - [32 bytes] keccak256(init_code)
     */
+    ckb_debug("[create_new_account] msg->kind == EVMC_CREATE2");
     union ethash_hash256 hash_result = ethash::keccak256(code_data, code_size);
     data[0] = 0xff;
     memcpy(data + 1, msg->sender.bytes, 20);

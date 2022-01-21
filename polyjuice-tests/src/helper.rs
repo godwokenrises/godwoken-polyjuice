@@ -621,38 +621,40 @@ pub fn deploy(
     run_result
 }
 
+/// https://eips.ethereum.org/EIPS/eip-1014#specification
 pub fn compute_create2_script(
     state: &DummyState,
-    creator_account_id: u32,
     sender_account_id: u32,
     create2_salt: &[u8],
     init_code: &[u8],
 ) -> Script {
     assert_eq!(create2_salt.len(), 32);
 
-    let sender = account_id_to_short_script_hash(state, sender_account_id, false);
+    let sender_shoort_script_hash =
+        account_id_to_short_script_hash(state, sender_account_id, false);
     let init_code_hash = tiny_keccak::keccak256(init_code);
     let mut data = [0u8; 1 + 20 + 32 + 32];
     data[0] = 0xff;
-    data[1..1 + 20].copy_from_slice(&sender);
+    data[1..1 + 20].copy_from_slice(&sender_shoort_script_hash);
     data[1 + 20..1 + 20 + 32].copy_from_slice(create2_salt);
     data[1 + 20 + 32..1 + 20 + 32 + 32].copy_from_slice(&init_code_hash[..]);
     let data_hash = tiny_keccak::keccak256(&data);
 
     let mut script_args = vec![0u8; 32 + 4 + 20];
     script_args[0..32].copy_from_slice(&ROLLUP_SCRIPT_HASH[..]);
-    script_args[32..32 + 4].copy_from_slice(&creator_account_id.to_le_bytes()[..]);
+    script_args[32..32 + 4].copy_from_slice(&CREATOR_ACCOUNT_ID.to_le_bytes()[..]);
     script_args[32 + 4..32 + 4 + 20].copy_from_slice(&data_hash[12..]);
 
-    println!("init_code: {}", hex::encode(init_code));
+    println!(
+        "[compute_create2_script] init_code: {}",
+        hex::encode(init_code)
+    );
     println!("create2_script_args: {}", hex::encode(&script_args[..]));
     Script::new_builder()
         .code_hash(POLYJUICE_PROGRAM_CODE_HASH.pack())
         .hash_type(ScriptHashType::Type.into())
         .args(script_args.pack())
         .build()
-
-    // TODO: register the account
 }
 
 pub fn simple_storage_get(
