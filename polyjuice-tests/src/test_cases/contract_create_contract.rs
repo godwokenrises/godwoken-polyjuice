@@ -2,7 +2,7 @@
 //!   See ./evm-contracts/CreateContract.sol
 
 use crate::helper::{
-    self, create_eth_eoa_account, deploy, new_block_info, new_contract_account_script,
+    self, deploy, new_block_info, new_contract_account_script,
     new_contract_account_script_with_nonce, setup, PolyjuiceArgsBuilder, CREATOR_ACCOUNT_ID,
     L2TX_MAX_CYCLES,
 };
@@ -17,11 +17,11 @@ const INIT_CODE: &str = include_str!("./evm-contracts/CreateContract.bin");
 #[test]
 fn test_contract_create_contract() {
     let (store, mut state, generator) = setup();
-    let block_producer_id = crate::helper::create_block_producer(&mut state);
+    let block_producer_id = helper::create_block_producer(&mut state);
 
     let from_eth_address = [1u8; 20];
     let (from_id, _from_script_hash) =
-        create_eth_eoa_account(&mut state, &from_eth_address, 200000);
+        helper::create_eth_eoa_account(&mut state, &from_eth_address, 200000);
 
     // Deploy CreateContract
     let run_result = deploy(

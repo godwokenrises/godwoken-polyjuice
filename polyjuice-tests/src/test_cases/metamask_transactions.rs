@@ -1,9 +1,9 @@
 //! Test transfer from EoA to EoA using Metamask
 
-use crate::helper::{
+use crate::helper::{self,
     _deprecated_new_contract_account_script, build_eth_l2_script, deploy, new_block_info,
     register_eoa_account, setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, CREATOR_ACCOUNT_ID,
-    L2TX_MAX_CYCLES, SUDT_ERC20_PROXY_USER_DEFINED_DECIMALS_CODE,
+    L2TX_MAX_CYCLES, SUDT_ERC20_PROXY_USER_DEFINED_DECIMALS_CODE, new_contract_account_script,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
@@ -14,19 +14,18 @@ use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
 #[test]
 fn test_transfer_by_metamask() {
     let (store, mut state, generator) = setup();
+    let block_producer_id = helper::create_block_producer(&mut state);
 
-    let block_producer_script = build_eth_l2_script(&[0x99u8; 20]);
-    let block_producer_script_hash = block_producer_script.hash();
-    let block_producer_id = state
-        .create_account_from_script(block_producer_script)
-        .unwrap();
-    state
-        .mint_sudt(
-            CKB_SUDT_ACCOUNT_ID,
-            &block_producer_script_hash[..20],
-            2000000,
-        )
-        .unwrap();
+    // let block_producer_script = build_eth_l2_script(&[0x99u8; 20]);
+    // let block_producer_script_hash = block_producer_script.hash();
+    // let block_producer_id = state
+    //     .create_account_from_script(block_producer_script)
+    //     .unwrap();
+
+        let from_eth_address = [1u8; 20];
+        let (from_id, _from_script_hash) =
+            helper::create_eth_eoa_account(&mut state, &from_eth_address, 2000000);
+    
 
     let eth_address1 = [1u8; 20];
     let from_script1 = build_eth_l2_script(&eth_address1);
@@ -63,14 +62,17 @@ fn test_transfer_by_metamask() {
         &store,
         &mut state,
         CREATOR_ACCOUNT_ID,
-        block_producer_id,
+        from_id,
         init_code.as_str(),
         122000,
         0,
         block_producer_id,
         block_number,
     );
-    let ckb_proxy_contract_script = _deprecated_new_contract_account_script(
+    let ckb_proxy_contract_script = 
+    new_contract_account_script(&state, from_id, &[0x99u8; 20])
+    
+    _deprecated_new_contract_account_script(
         &state,
         CREATOR_ACCOUNT_ID,
         block_producer_id,
