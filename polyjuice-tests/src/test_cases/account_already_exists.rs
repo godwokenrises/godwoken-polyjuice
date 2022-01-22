@@ -2,8 +2,8 @@
 //!   See ./evm-contracts/SimpleTransfer.sol
 
 use crate::helper::{
-    create_eth_eoa_account, deploy, new_contract_account_script,
-    new_contract_account_script_with_nonce, setup, CREATOR_ACCOUNT_ID,
+    self, deploy, new_contract_account_script, new_contract_account_script_with_nonce, setup,
+    CREATOR_ACCOUNT_ID,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
@@ -13,11 +13,11 @@ const SS_INIT_CODE: &str = include_str!("./evm-contracts/SimpleStorage.bin");
 #[test]
 fn test_account_already_exists() {
     let (store, mut state, generator) = setup();
-    let block_producer_id = crate::helper::create_block_producer(&mut state);
+    let block_producer_id = helper::create_block_producer(&mut state);
 
     let from_eth_address = [1u8; 20];
     let (from_id, _from_script_hash) =
-        create_eth_eoa_account(&mut state, &from_eth_address, 400000);
+        helper::create_eth_eoa_account(&mut state, &from_eth_address, 400000);
 
     let created_ss_account_script = new_contract_account_script_with_nonce(&from_eth_address, 0);
     let created_ss_account_id = state

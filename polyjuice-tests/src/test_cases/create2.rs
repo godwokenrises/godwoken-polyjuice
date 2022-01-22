@@ -2,9 +2,9 @@
 //!   See ./evm-contracts/CallContract.sol
 
 use crate::helper::{
-    self, compute_create2_script, create_eth_eoa_account, deploy, new_block_info,
-    new_contract_account_script, setup, simple_storage_get, PolyjuiceArgsBuilder,
-    CKB_SUDT_ACCOUNT_ID, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
+    self, compute_create2_script, deploy, new_block_info, new_contract_account_script, setup,
+    simple_storage_get, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, CREATOR_ACCOUNT_ID,
+    L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
@@ -18,11 +18,11 @@ const CREATE2_IMPL_CODE: &str = include_str!("./evm-contracts/Create2Impl.bin");
 #[test]
 fn test_create2() {
     let (store, mut state, generator) = setup();
-    let block_producer_id = crate::helper::create_block_producer(&mut state);
+    let block_producer_id = helper::create_block_producer(&mut state);
 
     let from_eth_address = [1u8; 20];
     let (from_id, _from_script_hash) =
-        create_eth_eoa_account(&mut state, &from_eth_address, 2000000);
+        helper::create_eth_eoa_account(&mut state, &from_eth_address, 2000000);
 
     // Deploy CREATE2_IMPL_CODE
     let mut block_number = 1;

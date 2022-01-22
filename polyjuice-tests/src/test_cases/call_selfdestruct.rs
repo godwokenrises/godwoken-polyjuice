@@ -4,9 +4,8 @@
 use std::convert::TryInto;
 
 use crate::helper::{
-    self, create_eth_eoa_account, deploy, eth_addr_to_ethabi_addr, new_block_info,
-    new_contract_account_script_with_nonce, setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
-    CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
+    self, deploy, eth_addr_to_ethabi_addr, new_block_info, new_contract_account_script_with_nonce,
+    setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
@@ -20,15 +19,15 @@ const CALL_SD_INIT_CODE: &str = include_str!("./evm-contracts/CallSelfDestruct.b
 #[test]
 fn test_selfdestruct() {
     let (store, mut state, generator) = setup();
-    let block_producer_id = crate::helper::create_block_producer(&mut state);
+    let block_producer_id = helper::create_block_producer(&mut state);
 
     let from_eth_address = [1u8; 20];
-    let (from_id, _) = create_eth_eoa_account(&mut state, &from_eth_address, 300000);
+    let (from_id, _) = helper::create_eth_eoa_account(&mut state, &from_eth_address, 300000);
 
     let beneficiary_eth_addr = [2u8; 20];
     let beneficiary_ethabi_addr = eth_addr_to_ethabi_addr(&beneficiary_eth_addr);
     let (_beneficiary_id, beneficiary_script_hash) =
-        create_eth_eoa_account(&mut state, &beneficiary_eth_addr, 0);
+        helper::create_eth_eoa_account(&mut state, &beneficiary_eth_addr, 0);
     assert_eq!(
         state
             .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &beneficiary_script_hash[..20])

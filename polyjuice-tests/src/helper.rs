@@ -261,7 +261,7 @@ pub fn new_block_info(block_producer_id: u32, number: u64, timestamp: u64) -> Bl
         .build()
 }
 
-pub(crate) fn account_id_to_short_script_hash(
+pub(crate) fn contract_id_to_short_script_hash(
     state: &DummyState,
     id: u32,
     ethabi: bool,
@@ -337,47 +337,6 @@ pub fn new_contract_account_script(
     new_contract_account_script_with_nonce(from_eth_address, from_nonce)
 }
 
-/// TODO: deprecate this fn
-pub fn _deprecated_new_account_script_with_nonce(
-    state: &DummyState,
-    creator_account_id: u32,
-    from_id: u32,
-    from_nonce: u32,
-) -> Script {
-    let short_script_hash = account_id_to_short_script_hash(state, from_id, false);
-    let mut stream = RlpStream::new_list(2);
-    stream.append(&short_script_hash);
-    stream.append(&from_nonce);
-    println!(
-        "rlp data of (from_script_hash+nonce): {}",
-        hex::encode(stream.as_raw())
-    );
-    let data_hash = tiny_keccak::keccak256(stream.as_raw());
-
-    let mut new_account_args = vec![0u8; 32 + 4 + 20];
-    new_account_args[0..32].copy_from_slice(&ROLLUP_SCRIPT_HASH);
-    new_account_args[32..36].copy_from_slice(&creator_account_id.to_le_bytes()[..]);
-    new_account_args[36..36 + 20].copy_from_slice(&data_hash[12..]);
-
-    Script::new_builder()
-        .code_hash(POLYJUICE_PROGRAM_CODE_HASH.pack())
-        .hash_type(ScriptHashType::Type.into())
-        .args(new_account_args.pack())
-        .build()
-}
-pub fn _deprecated_new_contract_account_script(
-    state: &DummyState,
-    creator_account_id: u32,
-    from_id: u32,
-    current_nonce: bool,
-) -> Script {
-    let mut from_nonce = state.get_nonce(from_id).unwrap();
-    if !current_nonce {
-        from_nonce -= 1;
-    }
-    _deprecated_new_account_script_with_nonce(state, creator_account_id, from_id, from_nonce)
-}
-
 pub fn contract_script_to_short_script_hash(script: &Script, ethabi: bool) -> Vec<u8> {
     let offset = if ethabi { 12 } else { 0 };
     let mut data = vec![0u8; offset + 20];
@@ -387,9 +346,6 @@ pub fn contract_script_to_short_script_hash(script: &Script, ethabi: bool) -> Ve
 
 #[derive(Default, Debug)]
 pub struct PolyjuiceArgsBuilder {
-    /// default to false
-    // #[serde(default = "default_withdrawal_unlocker_wallet")]
-    is_using_native_eth_address: bool,
     is_create: bool,
     gas_limit: u64,
     gas_price: u128,
@@ -397,17 +353,7 @@ pub struct PolyjuiceArgsBuilder {
     input: Vec<u8>,
 }
 
-// impl Default for PolyjuiceArgsBuilder {
-//     fn default() -> Self {
-//         Kind::A
-//     }
-// }
-
 impl PolyjuiceArgsBuilder {
-    // pub fn using_native_eth_address(mut self, v: bool) -> Self {
-    //     self.is_using_native_eth_address = v;
-    //     self
-    // }
     pub fn do_create(mut self, value: bool) -> Self {
         self.is_create = value;
         self
@@ -624,14 +570,14 @@ pub fn deploy(
 /// https://eips.ethereum.org/EIPS/eip-1014#specification
 pub fn compute_create2_script(
     state: &DummyState,
-    sender_account_id: u32,
+    sender_contract_id: u32,
     create2_salt: &[u8],
     init_code: &[u8],
 ) -> Script {
     assert_eq!(create2_salt.len(), 32);
 
     let sender_shoort_script_hash =
-        account_id_to_short_script_hash(state, sender_account_id, false);
+        contract_id_to_short_script_hash(state, sender_contract_id, false);
     let init_code_hash = tiny_keccak::keccak256(init_code);
     let mut data = [0u8; 1 + 20 + 32 + 32];
     data[0] = 0xff;

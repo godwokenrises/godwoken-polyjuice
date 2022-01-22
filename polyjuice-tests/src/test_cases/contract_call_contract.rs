@@ -19,11 +19,11 @@ const CALL_NON_EXISTS_INIT_CODE: &str = include_str!("./evm-contracts/CallNonExi
 #[test]
 fn test_contract_call_contract() {
     let (store, mut state, generator) = setup();
-    let block_producer_id = crate::helper::create_block_producer(&mut state);
+    let block_producer_id = helper::create_block_producer(&mut state);
 
     let from_eth_address = [1u8; 20];
     let (from_id, _from_script_hash) =
-        create_eth_eoa_account(&mut state, &from_eth_address, 200000);
+        helper::create_eth_eoa_account(&mut state, &from_eth_address, 200000);
 
     // Deploy SimpleStorage
     let mut block_number = 1;
@@ -151,11 +151,11 @@ fn test_contract_call_contract() {
 #[test]
 fn test_contract_call_non_exists_contract() {
     let (store, mut state, generator) = setup();
-    let block_producer_id = crate::helper::create_block_producer(&mut state);
+    let block_producer_id = helper::create_block_producer(&mut state);
 
     let from_eth_address = [1u8; 20];
     let (from_id, _from_script_hash) =
-        create_eth_eoa_account(&mut state, &from_eth_address, 200000);
+        helper::create_eth_eoa_account(&mut state, &from_eth_address, 200000);
 
     // Deploy CallNonExistsContract
     let block_number = 1;

@@ -1,10 +1,11 @@
 //! Test get block info
 //!   See ./evm-contracts/BlockInfo.sol
 
+use std::convert::TryInto;
+
 use crate::helper::{
-    _deprecated_new_contract_account_script, account_id_to_short_script_hash, build_eth_l2_script,
-    new_block_info, setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, CREATOR_ACCOUNT_ID,
-    L2TX_MAX_CYCLES,
+    eth_addr_to_ethabi_addr, new_block_info, new_contract_account_script, setup,
+    PolyjuiceArgsBuilder, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
 use gw_db::schema::COLUMN_INDEX;
@@ -23,10 +24,6 @@ const INIT_CODE: &str = include_str!("./evm-contracts/BlockInfo.bin");
 #[test]
 fn test_get_block_info() {
     let (store, mut state, generator) = setup();
-    let block_producer_script = build_eth_l2_script(&[0x99u8; 20]);
-    let _block_producer_id = state
-        .create_account_from_script(block_producer_script)
-        .unwrap();
 
     {
         let genesis_number: Uint64 = 0.pack();
@@ -39,20 +36,16 @@ fn test_get_block_info() {
         println!("block_hash(0): {:?}", tx.get_block_hash_by_number(0));
     }
 
-    let from_script = build_eth_l2_script(&[1u8; 20]);
-    let from_script_hash = from_script.hash();
-    let from_short_address = &from_script_hash[0..20];
-    let from_id = state.create_account_from_script(from_script).unwrap();
-    state
-        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_short_address, 400000)
-        .unwrap();
-    let aggregator_script = build_eth_l2_script(&[2u8; 20]);
-    let aggregator_id = state.create_account_from_script(aggregator_script).unwrap();
-    assert_eq!(aggregator_id, 5);
-    let coinbase_hex = hex::encode(&account_id_to_short_script_hash(
-        &state,
-        aggregator_id,
-        true,
+    let from_eth_address = [1u8; 20];
+    let (from_id, _from_script_hash) =
+        crate::helper::create_eth_eoa_account(&mut state, &from_eth_address, 400000);
+
+    let aggregator_eth_addr = [2u8; 20];
+    let (aggregator_id, aggregator_script_hash) =
+        crate::helper::create_eth_eoa_account(&mut state, &aggregator_eth_addr, 0);
+    // FIXME(Godwoken): coinbase_hex => eth_addr_to_ethabi_addr(&aggregator_eth_addr)
+    let coinbase_hex = hex::encode(eth_addr_to_ethabi_addr(
+        &aggregator_script_hash[..20].try_into().unwrap(),
     ));
     println!("coinbase_hex: {}", coinbase_hex);
 
@@ -84,7 +77,7 @@ fn test_get_block_info() {
             L2TX_MAX_CYCLES,
             None,
         )
-        .expect("construct");
+        .expect("Deploy BlockInfo");
     state.apply_run_result(&run_result).expect("update state");
     block_number += 1;
     // println!(
@@ -93,41 +86,40 @@ fn test_get_block_info() {
     // );
 
     let contract_account_script =
-        _deprecated_new_contract_account_script(&mut state, CREATOR_ACCOUNT_ID, from_id, false);
+        new_contract_account_script(&mut state, from_id, &from_eth_address, false);
     let new_account_id = state
         .get_account_id_by_script_hash(&contract_account_script.hash().into())
         .unwrap()
         .unwrap();
-    assert_eq!(new_account_id, 6);
 
-    for (fn_sighash, expected_return_data) in [
-        // getGenesisHash()
+    for (operation, fn_sighash, expected_return_data) in [
         (
+            "getGenesisHash()",
             "f6c99388",
             "0707070707070707070707070707070707070707070707070707070707070707",
         ),
-        // getDifficulty() => 2500000000000000
         (
+            "getDifficulty() => 2500000000000000",
             "b6baffe3",
             "0000000000000000000000000000000000000000000000000008e1bc9bf04000",
         ),
-        // getGasLimit()
         (
+            "getGasLimit()",
             "1a93d1c3",
             "0000000000000000000000000000000000000000000000000000000000bebc20",
         ),
-        // getNumber()
         (
+            "getNumber()",
             "f2c9ecd8",
             "0000000000000000000000000000000000000000000000000000000000000005",
         ),
-        // getTimestamp()
         (
+            "getTimestamp()",
             "188ec356",
             "000000000000000000000000000000000000000000000000000000000000ff33",
         ),
-        // getCoinbase()
-        ("d1a82a9d", coinbase_hex.as_str()),
+        // FIXME(Godwoken): coinbase_hex => eth_addr_to_ethabi_addr(&aggregator_eth_addr)
+        ("getCoinbase()", "d1a82a9d", coinbase_hex.as_str()),
     ]
     .iter()
     {
@@ -155,10 +147,12 @@ fn test_get_block_info() {
                 L2TX_MAX_CYCLES,
                 None,
             )
-            .expect("construct");
+            .expect(&operation);
         assert_eq!(
             run_result.return_data,
-            hex::decode(expected_return_data).unwrap()
+            hex::decode(expected_return_data).unwrap(),
+            "return data of {}",
+            operation
         );
     }
 }

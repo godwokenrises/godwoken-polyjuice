@@ -2,12 +2,12 @@
 //!   See ./evm-contracts/Memory.sol
 
 use crate::helper::{
-    self, _deprecated_new_contract_account_script, build_eth_l2_script, deploy, new_block_info,
-    setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
+    self, deploy, new_block_info, new_contract_account_script, setup, PolyjuiceArgsBuilder,
+    CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 
 use gw_common::state::State;
-use gw_generator::traits::StateExt;
+
 use gw_store::chain_view::ChainView;
 use gw_store::traits::chain_store::ChainStore;
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
@@ -17,18 +17,11 @@ const MEMORY_INIT_CODE: &str = include_str!("./evm-contracts/Memory.bin");
 #[test]
 fn test_heap_momory() {
     let (store, mut state, generator) = setup();
-    let block_producer_script = build_eth_l2_script(&[0x99u8; 20]);
-    let block_producer_id = state
-        .create_account_from_script(block_producer_script)
-        .unwrap();
+    let block_producer_id = helper::create_block_producer(&mut state);
 
-    let from_script = build_eth_l2_script(&[1u8; 20]);
-    let from_script_hash = from_script.hash();
-    let from_short_address = &from_script_hash[0..20];
-    let from_id = state.create_account_from_script(from_script).unwrap();
-    state
-        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_short_address, 20000000)
-        .unwrap();
+    let from_eth_address = [1u8; 20];
+    let (from_id, _from_script_hash) =
+        helper::create_eth_eoa_account(&mut state, &from_eth_address, 20000000);
     let mut block_number = 1;
 
     // Deploy Memory Contract
@@ -44,8 +37,7 @@ fn test_heap_momory() {
         block_producer_id,
         block_number,
     );
-    let account_script =
-        _deprecated_new_contract_account_script(&mut state, CREATOR_ACCOUNT_ID, from_id, false);
+    let account_script = new_contract_account_script(&mut state, from_id, &from_eth_address, false);
     let contract_account_id = state
         .get_account_id_by_script_hash(&account_script.hash().into())
         .unwrap()
