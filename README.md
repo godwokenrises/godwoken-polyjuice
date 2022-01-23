@@ -25,7 +25,10 @@ Polyjuice aims at 100% EVM compatibility as a goal, meaning we plan to support a
 
 ### Polyjuice arguments
 ```
-header     : [u8; 8]  (header[0..7] = "ETHPOLY",
+header     : [u8; 8]  (header[0]    = 0xff, 
+                       header[1]    = 0xff, 
+                       header[2]    = 0xff, 
+                       header[3..7] = "POLY"
                        header[7]    = call_kind { 0: CALL, 3: CREATE })
 gas_limit  : u64      (little endian)
 gas_price  : u128     (little endian)
@@ -81,17 +84,12 @@ info_data:
 ```
 
 ### Address used in Polyjuice
-In the latest version of Polyjuice, the [EOA](https://ethereum.org/en/glossary/#eoa) addresses are native `eth_address`, which is the rightmost 160 bits of a Keccak hash of an ECDSA public key.
+In the latest version of Polyjuice, the [EOA](https://ethereum.org/en/glossary/#eoa) address is native `eth_address`, which is the rightmost 160 bits of a Keccak hash of an ECDSA public key. While the address for an Polyjuice contract is deterministically computed from the address of its creator (sender) and how many transactions the creator has sent (nonce). The sender and nonce are RLP encoded and then hashed with Keccak-256.
 
-In the previous version of Polyjuice, all the addresses are `short_godwoken_account_script_hash`, which is:
+> In the previous version of Polyjuice, all the addresses are `short_godwoken_account_script_hash`, which is:
 ``` rust
 short_godwoken_account_script_hash = blake2b(script.as_slice())[0..20]
 ```
-
-| polyjuice_args_header | EOA address type |
-| - | - |
-| `header[0..7] = "ETHPOLY"` | native `eth_address` |
-| `header[0] = 0xff,`<br>`header[1] = 0xff,`<br>`header[2] = 0xff,`<br>`header[3..7] = "POLY"`| short_godwoken_account_script_hash |
 
 
 [rawl2tx-args]: https://github.com/nervosnetwork/godwoken/blob/9a3d921/crates/types/schemas/godwoken.mol#L60

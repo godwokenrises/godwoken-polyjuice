@@ -2,9 +2,9 @@
 //!   See ./evm-contracts/CallContract.sol
 
 use crate::helper::{
-    self, contract_script_to_short_script_hash, create_eth_eoa_account, deploy,
-    eth_addr_to_ethabi_addr, new_block_info, new_contract_account_script, setup,
-    simple_storage_get, PolyjuiceArgsBuilder, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
+    self, contract_script_to_eth_addr, create_eth_eoa_account, deploy, eth_addr_to_ethabi_addr,
+    new_block_info, new_contract_account_script, setup, simple_storage_get, PolyjuiceArgsBuilder,
+    CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
 use gw_generator::{error::TransactionError, traits::StateExt};
@@ -51,10 +51,7 @@ fn test_contract_call_contract() {
     let input = format!(
         "{}{}",
         INIT_CODE,
-        hex::encode(contract_script_to_short_script_hash(
-            &ss_account_script,
-            true
-        )),
+        hex::encode(contract_script_to_eth_addr(&ss_account_script, true)),
     );
     let run_result = deploy(
         &generator,

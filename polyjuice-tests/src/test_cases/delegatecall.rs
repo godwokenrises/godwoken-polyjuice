@@ -2,9 +2,9 @@
 //!   See ./evm-contracts/CallContract.sol
 
 use crate::helper::{
-    self, contract_script_to_short_script_hash, deploy, new_block_info,
-    new_contract_account_script, new_contract_account_script_with_nonce, setup, simple_storage_get,
-    PolyjuiceArgsBuilder, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
+    self, contract_script_to_eth_addr, deploy, new_block_info, new_contract_account_script,
+    new_contract_account_script_with_nonce, setup, simple_storage_get, PolyjuiceArgsBuilder,
+    CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
@@ -105,10 +105,7 @@ fn test_delegatecall() {
         let input = hex::decode(format!(
             "{}{}{}",
             fn_sighash,
-            hex::encode(contract_script_to_short_script_hash(
-                &ss_account_script,
-                true
-            )),
+            hex::encode(contract_script_to_eth_addr(&ss_account_script, true)),
             "0000000000000000000000000000000000000000000000000000000000000022",
         ))
         .unwrap();

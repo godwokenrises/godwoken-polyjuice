@@ -4,8 +4,9 @@
 use std::convert::TryInto;
 
 use crate::helper::{
-    self, deploy, eth_addr_to_ethabi_addr, new_block_info, new_contract_account_script_with_nonce,
-    setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
+    self, contract_script_to_eth_addr, deploy, eth_addr_to_ethabi_addr, new_block_info,
+    new_contract_account_script_with_nonce, setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
+    CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
@@ -61,7 +62,7 @@ fn test_selfdestruct() {
     let sd_account_script = new_contract_account_script_with_nonce(&from_eth_address, 0);
     let sd_script_hash = sd_account_script.hash();
     let sd_short_script_hash: &[u8; 20] = &sd_script_hash[0..20].try_into().unwrap();
-    let sd_ethabi_addr: [u8; 32] = eth_addr_to_ethabi_addr(sd_short_script_hash);
+    let sd_ethabi_addr = contract_script_to_eth_addr(&sd_account_script, true);
     let sd_account_id = state
         .get_account_id_by_script_hash(&sd_account_script.hash().into())
         .unwrap()
@@ -107,10 +108,10 @@ fn test_selfdestruct() {
     assert_eq!(state.get_nonce(csd_account_id).unwrap(), 0);
 
     {
-        // call CallSelfDestruct.proxyDone(sd_account_id);
+        // call CallSelfDestruct.proxyDone(sd_account_id)
         block_number += 1;
         let block_info = new_block_info(0, block_number, block_number);
-        let input = hex::decode(format!("9a33d968{}", hex::encode(sd_ethabi_addr),)).unwrap();
+        let input = hex::decode(format!("9a33d968{}", hex::encode(&sd_ethabi_addr))).unwrap();
         let args = PolyjuiceArgsBuilder::default()
             .gas_limit(100000)
             .gas_price(1)
@@ -133,7 +134,7 @@ fn test_selfdestruct() {
                 L2TX_MAX_CYCLES,
                 None,
             )
-            .expect("construct");
+            .expect("call CallSelfDestruct.proxyDone(sd_account_id)");
         state.apply_run_result(&run_result).expect("update state");
         // [call CallSelfDestruct.proxyDone(sd_account_id)] used cycles: 1043108 < 1100K
         helper::check_cycles(
@@ -194,7 +195,7 @@ fn test_selfdestruct() {
         // call CallSelfDestruct.proxyDone(sd_account_id)
         // target contract of the proxy was already destructed
         let block_info = new_block_info(0, block_number, block_number);
-        let input = hex::decode(format!("9a33d968{}", hex::encode(sd_ethabi_addr),)).unwrap();
+        let input = hex::decode(format!("9a33d968{}", hex::encode(&sd_ethabi_addr))).unwrap();
         let args = PolyjuiceArgsBuilder::default()
             .gas_limit(31000)
             .gas_price(1)

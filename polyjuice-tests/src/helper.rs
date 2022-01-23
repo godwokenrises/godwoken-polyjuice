@@ -51,6 +51,10 @@ pub const POLYJUICE_VALIDATOR_NAME: &str = "validator";
 // ETH Address Registry
 pub const ETH_ADDRESS_REGISTRY_GENERATOR_NAME: &str = "eth_addr_reg_generator";
 pub const ETH_ADDRESS_REGISTRY_VALIDATOR_NAME: &str = "eth_addr_reg_validator";
+// Key type for ETH Address Registry
+const GW_ACCOUNT_SCRIPT_HASH_TO_ETH_ADDR: u8 = 200;
+const ETH_EOA_ADDR_TO_GW_ACCOUNT_SCRIPT_HASH: u8 = 201;
+const _ETH_CONTRACT_ADDR_TO_GW_ACCOUNT_SCRIPT_HASH: u8 = 202;
 
 pub const ROLLUP_SCRIPT_HASH: [u8; 32] = [0xa9u8; 32];
 pub const ETH_ACCOUNT_LOCK_CODE_HASH: [u8; 32] = [0xaau8; 32];
@@ -63,9 +67,6 @@ pub const GW_LOG_POLYJUICE_USER: u8 = 0x3;
 
 // pub const FATAL_POLYJUICE: i8 = -50;
 pub const FATAL_PRECOMPILED_CONTRACTS: i8 = -51;
-
-const GW_ETH_ADDRESS_TO_ACCOUNT_SCRIPT_HASH: u8 = 6;
-const GW_ACCOUNT_SCRIPT_HASH_TO_ETH_ADDRESS: u8 = 7;
 
 pub(crate) const SUDT_ERC20_PROXY_USER_DEFINED_DECIMALS_CODE: &str =
     include_str!("../../solidity/erc20/SudtERC20Proxy_UserDefinedDecimals.bin");
@@ -261,17 +262,17 @@ pub fn new_block_info(block_producer_id: u32, number: u64, timestamp: u64) -> Bl
         .build()
 }
 
-pub(crate) fn contract_id_to_short_script_hash(
-    state: &DummyState,
-    id: u32,
-    ethabi: bool,
-) -> Vec<u8> {
-    let offset = if ethabi { 12 } else { 0 };
-    let mut data = vec![0u8; offset + 20];
-    let account_script_hash = state.get_script_hash(id).unwrap();
-    data[offset..offset + 20].copy_from_slice(&account_script_hash.as_slice()[0..20]);
-    data
-}
+// pub(crate) fn contract_id_to_short_script_hash(
+//     state: &DummyState,
+//     id: u32,
+//     ethabi: bool,
+// ) -> Vec<u8> {
+//     let offset = if ethabi { 12 } else { 0 };
+//     let mut data = vec![0u8; offset + 20];
+//     let account_script_hash = state.get_script_hash(id).unwrap();
+//     data[offset..offset + 20].copy_from_slice(&account_script_hash.as_slice()[0..20]);
+//     data
+// }
 
 pub(crate) fn eth_addr_to_ethabi_addr(eth_addr: &[u8; 20]) -> [u8; 32] {
     let mut ethabi_addr = [0; 32];
@@ -302,10 +303,9 @@ pub fn eth_address_to_account_id(state: &DummyState, data: &[u8]) -> Result<u32,
         })
 }
 
-pub fn new_contract_account_script_with_nonce(eoa_address: &[u8; 20], from_nonce: u32) -> Script {
-    // let short_script_hash = account_id_to_short_script_hash(state, from_id, false);
+pub fn new_contract_account_script_with_nonce(from_addr: &[u8; 20], from_nonce: u32) -> Script {
     let mut stream = RlpStream::new_list(2);
-    stream.append(&eoa_address.to_vec());
+    stream.append(&from_addr.to_vec());
     stream.append(&from_nonce);
     println!(
         "rlp data of (eoa_address + nonce): {}",
@@ -313,15 +313,16 @@ pub fn new_contract_account_script_with_nonce(eoa_address: &[u8; 20], from_nonce
     );
     let data_hash = tiny_keccak::keccak256(stream.as_raw());
 
-    let mut new_account_args = vec![0u8; 32 + 4 + 20];
-    new_account_args[0..32].copy_from_slice(&ROLLUP_SCRIPT_HASH);
-    new_account_args[32..36].copy_from_slice(&CREATOR_ACCOUNT_ID.to_le_bytes()[..]);
-    new_account_args[36..36 + 20].copy_from_slice(&data_hash[12..]);
+    let mut new_script_args = vec![0u8; 32 + 4 + 20];
+    new_script_args[0..32].copy_from_slice(&ROLLUP_SCRIPT_HASH);
+    new_script_args[32..36].copy_from_slice(&CREATOR_ACCOUNT_ID.to_le_bytes()[..]);
+    new_script_args[36..36 + 20].copy_from_slice(&data_hash[12..]);
+    // println!("eth_address: {:?}", &data_hash[12..32]);
 
     Script::new_builder()
         .code_hash(POLYJUICE_PROGRAM_CODE_HASH.pack())
         .hash_type(ScriptHashType::Type.into())
-        .args(new_account_args.pack())
+        .args(new_script_args.pack())
         .build()
 }
 pub fn new_contract_account_script(
@@ -337,11 +338,11 @@ pub fn new_contract_account_script(
     new_contract_account_script_with_nonce(from_eth_address, from_nonce)
 }
 
-pub fn contract_script_to_short_script_hash(script: &Script, ethabi: bool) -> Vec<u8> {
+pub(crate) fn contract_script_to_eth_addr(script: &Script, ethabi: bool) -> Vec<u8> {
     let offset = if ethabi { 12 } else { 0 };
-    let mut data = vec![0u8; offset + 20];
-    data[offset..].copy_from_slice(&script.hash()[0..20]);
-    data
+    let mut eth_addr = vec![0u8; offset + 20];
+    eth_addr[offset..].copy_from_slice(&script.args().raw_data().as_ref()[36..56]);
+    eth_addr
 }
 
 #[derive(Default, Debug)]
@@ -397,7 +398,6 @@ pub fn setup() -> (Store, DummyState, Generator) {
         .code_hash(META_VALIDATOR_SCRIPT_TYPE_HASH.clone().pack())
         .hash_type(ScriptHashType::Type.into())
         .build();
-    let meta_script_hash = meta_script.hash();
     let reserved_id = state
         .create_account_from_script(meta_script)
         .expect("create meta_account");
@@ -405,11 +405,9 @@ pub fn setup() -> (Store, DummyState, Generator) {
         reserved_id, RESERVED_ACCOUNT_ID,
         "reserved account id must be zero"
     );
-    register_contract_account(&mut state, &meta_script_hash);
 
     // setup CKB simple UDT contract
     let ckb_sudt_script = build_l2_sudt_script(CKB_SUDT_SCRIPT_ARGS);
-    let ckb_sudt_script_hash = ckb_sudt_script.hash();
     let ckb_sudt_id = state
         .create_account_from_script(ckb_sudt_script)
         .expect("create CKB simple UDT contract account");
@@ -417,7 +415,6 @@ pub fn setup() -> (Store, DummyState, Generator) {
         ckb_sudt_id, CKB_SUDT_ACCOUNT_ID,
         "ckb simple UDT account id"
     );
-    register_contract_account(&mut state, &ckb_sudt_script_hash);
 
     let mut args = [0u8; 36];
     args[0..32].copy_from_slice(&ROLLUP_SCRIPT_HASH);
@@ -427,24 +424,20 @@ pub fn setup() -> (Store, DummyState, Generator) {
         .hash_type(ScriptHashType::Type.into())
         .args(args.to_vec().pack())
         .build();
-    let creator_script_hash = creator_script.hash();
     let creator_account_id = state
         .create_account_from_script(creator_script)
         .expect("create creator_account");
     assert_eq!(creator_account_id, CREATOR_ACCOUNT_ID);
-    register_contract_account(&mut state, &creator_script_hash);
 
     // create `ETH Address Registry` layer2 contract account
     let eth_addr_reg_script = Script::new_builder()
         .code_hash(ETH_ADDRESS_REGISTRY_PROGRAM_CODE_HASH.pack())
         .hash_type(ScriptHashType::Type.into())
         .build();
-    let eth_addr_reg_script_hash = eth_addr_reg_script.hash();
     let eth_addr_reg_account_id = state
         .create_account_from_script(eth_addr_reg_script)
         .expect("create `ETH Address Registry` layer2 contract");
     assert_eq!(eth_addr_reg_account_id, ETH_ADDRESS_REGISTRY_ACCOUNT_ID);
-    register_contract_account(&mut state, &eth_addr_reg_script_hash);
 
     state.insert_data(*SECP_DATA_HASH, Bytes::from(SECP_DATA));
     state
@@ -569,19 +562,16 @@ pub fn deploy(
 
 /// https://eips.ethereum.org/EIPS/eip-1014#specification
 pub fn compute_create2_script(
-    state: &DummyState,
-    sender_contract_id: u32,
+    sender_contract_addr: &[u8],
     create2_salt: &[u8],
     init_code: &[u8],
 ) -> Script {
     assert_eq!(create2_salt.len(), 32);
 
-    let sender_shoort_script_hash =
-        contract_id_to_short_script_hash(state, sender_contract_id, false);
     let init_code_hash = tiny_keccak::keccak256(init_code);
     let mut data = [0u8; 1 + 20 + 32 + 32];
     data[0] = 0xff;
-    data[1..1 + 20].copy_from_slice(&sender_shoort_script_hash);
+    data[1..1 + 20].copy_from_slice(sender_contract_addr);
     data[1 + 20..1 + 20 + 32].copy_from_slice(create2_salt);
     data[1 + 20 + 32..1 + 20 + 32 + 32].copy_from_slice(&init_code_hash[..]);
     let data_hash = tiny_keccak::keccak256(&data);
@@ -650,7 +640,6 @@ pub fn build_l2_sudt_script(args: [u8; 32]) -> Script {
         .code_hash(SUDT_VALIDATOR_SCRIPT_TYPE_HASH.clone().pack())
         .hash_type(ScriptHashType::Type.into())
         .build()
-    // TODO: register the account
 }
 
 pub fn build_eth_l2_script(args: &[u8; 20]) -> Script {
@@ -662,8 +651,6 @@ pub fn build_eth_l2_script(args: &[u8; 20]) -> Script {
         .code_hash(ETH_ACCOUNT_LOCK_CODE_HASH.clone().pack())
         .hash_type(ScriptHashType::Type.into())
         .build()
-
-    // TODO: register the account
 }
 
 pub(crate) fn create_block_producer(state: &mut DummyState) -> u32 {
@@ -714,11 +701,11 @@ pub(crate) fn check_cycles(l2_tx_label: &str, used_cycles: u64, warning_cycles: 
     );
 }
 
-fn build_eth_address_to_script_hash_key(eth_address: &[u8; 20]) -> H256 {
+fn build_eth_address_to_script_hash_key(key_type: u8, eth_address: &[u8; 20]) -> H256 {
     let mut key: [u8; 32] = H256::zero().into();
     let mut hasher = new_blake2b();
     hasher.update(&gw_common::state::GW_NON_ACCOUNT_PLACEHOLDER);
-    hasher.update(&[GW_ETH_ADDRESS_TO_ACCOUNT_SCRIPT_HASH]);
+    hasher.update(&[key_type]);
     hasher.update(eth_address);
     hasher.finalize(&mut key);
     key.into()
@@ -728,7 +715,7 @@ fn build_script_hash_to_eth_address_key(script_hash: &[u8; 32]) -> H256 {
     let mut key: [u8; 32] = H256::zero().into();
     let mut hasher = new_blake2b();
     hasher.update(&gw_common::state::GW_NON_ACCOUNT_PLACEHOLDER);
-    hasher.update(&[GW_ACCOUNT_SCRIPT_HASH_TO_ETH_ADDRESS]);
+    hasher.update(&[GW_ACCOUNT_SCRIPT_HASH_TO_ETH_ADDR]);
     hasher.update(script_hash);
     hasher.finalize(&mut key);
     key.into()
@@ -742,7 +729,10 @@ pub(crate) fn register_eoa_account(
 ) {
     state
         .update_raw(
-            build_eth_address_to_script_hash_key(eth_address),
+            build_eth_address_to_script_hash_key(
+                ETH_EOA_ADDR_TO_GW_ACCOUNT_SCRIPT_HASH,
+                eth_address,
+            ),
             script_hash.clone().into(),
         )
         .expect("add GW_ETH_ADDRESS_TO_SCRIPT_HASH mapping into state");
@@ -754,19 +744,7 @@ pub(crate) fn register_eoa_account(
             build_script_hash_to_eth_address_key(script_hash),
             eth_address_abi_format.into(),
         )
-        .expect("add GW_ACCOUNT_SCRIPT_HASH_TO_ETH_ADDRESS mapping into state");
-}
-
-/// register a created contract account into `ETH Address Registry` by its
-pub(crate) fn register_contract_account(state: &mut DummyState, script_hash: &[u8; 32]) {
-    let mut eth_address_abi_format = [0u8; 32];
-    eth_address_abi_format[12..].copy_from_slice(&script_hash[..20]);
-    state
-        .update_raw(
-            build_script_hash_to_eth_address_key(script_hash),
-            eth_address_abi_format.into(),
-        )
-        .expect("add GW_ACCOUNT_SCRIPT_HASH_TO_ETH_ADDRESS mapping into state");
+        .expect("add GW_ACCOUNT_SCRIPT_HASH_TO_ETH_ADDR mapping into state");
 }
 
 #[derive(Default)]
