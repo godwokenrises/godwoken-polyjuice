@@ -691,24 +691,28 @@ pub(crate) fn create_eth_eoa_account(
     (account_id, script_hash)
 }
 
-// TODO:
-pub fn check_cycles(_l2_tx_label: &str, _used_cycles: u64, _warning_cycles: u64) {}
-// pub(crate) fn check_cycles(l2_tx_label: &str, used_cycles: u64, warning_cycles: u64) {
-//     println!("[check_cycles] used_cycles: {}", used_cycles);
-//     assert!(
-//         used_cycles < warning_cycles,
-//         "[Warning: {} used too many cycles = {}]",
-//         l2_tx_label,
-//         used_cycles
-//     );
-//     let cycles_left = warning_cycles - used_cycles;
-//     println!(
-//         "[{}] cycles left: {}({}%)",
-//         l2_tx_label,
-//         cycles_left,
-//         cycles_left * 100 / warning_cycles
-//     );
-// }
+pub(crate) fn check_cycles(l2_tx_label: &str, used_cycles: u64, warning_cycles: u64) {
+    if POLYJUICE_GENERATOR_NAME == "generator_log.aot" {
+        return; // disable cycles check
+    }
+
+    let overflow_cycles = used_cycles - warning_cycles;
+    println!("[check_cycles] used_cycles: {}", used_cycles);
+    assert!(
+        used_cycles < warning_cycles,
+        "[Warning: {} used too many cycles({})] overflow_cycles: {}({}%)",
+        l2_tx_label,
+        used_cycles,
+        overflow_cycles,
+        overflow_cycles * 100 / warning_cycles
+    );
+    println!(
+        "[{}] overflow_cycles: {}({}%)",
+        l2_tx_label,
+        overflow_cycles,
+        overflow_cycles * 100 / warning_cycles
+    );
+}
 
 fn build_eth_address_to_script_hash_key(eth_address: &[u8; 20]) -> H256 {
     let mut key: [u8; 32] = H256::zero().into();
