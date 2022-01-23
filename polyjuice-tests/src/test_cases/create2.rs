@@ -2,9 +2,9 @@
 //!   See ./evm-contracts/CallContract.sol
 
 use crate::helper::{
-    self, compute_create2_script, deploy, new_block_info, new_contract_account_script, setup,
-    simple_storage_get, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, CREATOR_ACCOUNT_ID,
-    L2TX_MAX_CYCLES,
+    self, compute_create2_script, contract_script_to_eth_addr, deploy, new_block_info,
+    new_contract_account_script, setup, simple_storage_get, PolyjuiceArgsBuilder,
+    CKB_SUDT_ACCOUNT_ID, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
@@ -46,6 +46,7 @@ fn test_create2() {
     // );
     let create2_contract_script =
         new_contract_account_script(&state, from_id, &from_eth_address, false);
+    let create2_contract_addr = contract_script_to_eth_addr(&create2_contract_script, false);
     let create2_contract_script_hash = create2_contract_script.hash();
     let create2_contract_id = state
         .get_account_id_by_script_hash(&create2_contract_script_hash.into())
@@ -102,15 +103,18 @@ fn test_create2() {
     };
 
     let create2_script = compute_create2_script(
-        &state,
-        create2_contract_id,
+        create2_contract_addr.as_slice(),
         &hex::decode(input_salt).unwrap()[..],
         &hex::decode(SS_INIT_CODE).unwrap()[..],
     );
     let create2_script_hash = create2_script.hash();
+    let create2_ethabi_addr = contract_script_to_eth_addr(&create2_script, true);
     let create2_short_script_hash = &create2_script_hash[0..20];
-    println!("create2_address: {}", hex::encode(&run_result.return_data));
-    assert_eq!(&run_result.return_data[12..32], create2_short_script_hash);
+    println!(
+        "create2_address: 0x{}",
+        hex::encode(&run_result.return_data)
+    );
+    assert_eq!(run_result.return_data, create2_ethabi_addr);
     let create2_account_id = state
         .get_account_id_by_script_hash(&create2_script_hash.into())
         .unwrap()

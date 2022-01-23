@@ -2,7 +2,7 @@
 //!   See ./evm-contracts/LogEvents.sol
 
 use crate::helper::{
-    build_eth_l2_script, contract_id_to_short_script_hash, deploy, eth_addr_to_ethabi_addr,
+    build_eth_l2_script, contract_script_to_eth_addr, deploy, eth_addr_to_ethabi_addr,
     new_block_info, new_contract_account_script, parse_log, register_eoa_account, setup, Log,
     PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
@@ -49,12 +49,13 @@ fn test_parse_log_event() {
         block_producer_id,
         block_number,
     );
-    let contract_account_script =
+    let contract_script =
         new_contract_account_script(&mut state, from_id, &from_eth_address, false);
-    let contract_script_hash = contract_account_script.hash();
+    let contract_addr = contract_script_to_eth_addr(&contract_script, false);
+    let contract_script_hash = contract_script.hash();
     let contract_short_script_hash = &contract_script_hash[0..20];
     let contract_id = state
-        .get_account_id_by_script_hash(&contract_account_script.hash().into())
+        .get_account_id_by_script_hash(&contract_script.hash().into())
         .unwrap()
         .unwrap();
     assert_eq!(run_result.logs.len(), 4);
@@ -93,10 +94,7 @@ fn test_parse_log_event() {
             topics,
         } = log
         {
-            assert_eq!(
-                &address[..],
-                &contract_id_to_short_script_hash(&state, contract_id, false)[..]
-            );
+            assert_eq!(&address[..], &contract_addr[..]);
             assert_eq!(data[31], deploy_value as u8);
             assert_eq!(data[63], 1); // true
             assert_eq!(
@@ -122,7 +120,7 @@ fn test_parse_log_event() {
         } = log
         {
             assert_eq!(gas_used, cumulative_gas_used);
-            assert_eq!(created_address, contract_short_script_hash);
+            assert_eq!(created_address, contract_addr[..]);
             assert_eq!(status_code, 0);
         } else {
             panic!("unexpected polyjuice log");
@@ -195,10 +193,7 @@ fn test_parse_log_event() {
                 topics,
             } = log
             {
-                assert_eq!(
-                    &address[..],
-                    &contract_id_to_short_script_hash(&state, contract_id, false)[..]
-                );
+                assert_eq!(address[..], contract_addr[..]);
                 assert_eq!(data[31], call_value as u8);
                 assert_eq!(data[63], 0); // false
                 assert_eq!(

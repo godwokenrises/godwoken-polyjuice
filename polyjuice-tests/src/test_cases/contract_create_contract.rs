@@ -36,6 +36,7 @@ fn test_contract_create_contract() {
         block_producer_id,
         1,
     );
+    state.apply_run_result(&run_result).expect("update state");
     // [Deploy CreateContract] used cycles: 2109521 < 2120K
     helper::check_cycles("Deploy CreateContract", run_result.used_cycles, 2120_000);
     // println!(
@@ -52,15 +53,26 @@ fn test_contract_create_contract() {
         .unwrap(); // mom_contract_id = 6
     let mom_contract_nonce = state.get_nonce(mom_contract_id).unwrap();
     assert_eq!(mom_contract_nonce, 1); // 1 => new SimpleStorage()
-
-    let ss_contract_script = new_contract_account_script_with_nonce(
-        &mom_contract_script_hash[..20].try_into().unwrap(),
-        0,
+    assert_eq!(32 + 4 + 20, mom_contract_script.args().len());
+    let mom_contract_address: [u8; 20] = mom_contract_script.args().raw_data().as_ref()[36..56]
+        .try_into()
+        .unwrap();
+    assert_eq!(
+        mom_contract_address,
+        [
+            28, 129, 166, 26, 64, 112, 23, 197, 131, 151, 164, 125, 42, 178, 129, 145, 185, 184,
+            236, 155
+        ]
     );
+
+    // mom_contract create SimpleStorage contract
+    let ss_contract_script = new_contract_account_script_with_nonce(&mom_contract_address, 0);
+    let ss_contract_script_hash = ss_contract_script.hash();
     let ss_account_id = state
-        .get_account_id_by_script_hash(&ss_contract_script.hash().into())
+        .get_account_id_by_script_hash(&ss_contract_script_hash.into())
         .unwrap()
         .unwrap(); // ss_account_id = 7
+    assert_eq!(ss_account_id, 7);
 
     {
         // SimpleStorage.get();

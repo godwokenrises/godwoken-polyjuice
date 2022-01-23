@@ -92,34 +92,19 @@ int build_script(const uint8_t code_hash[32], const uint8_t hash_type,
   return 0;
 }
 
-/**
- * @param address eth_address of a contract account is also short_script_hash
- */
-int short_script_hash_to_account_id(gw_context_t *ctx,
-                                    const uint8_t address[20],
-                                    uint32_t *account_id) {
-  uint8_t script_hash[32] = {0};
-  int ret = ctx->sys_get_script_hash_by_prefix(ctx, (uint8_t *)address, 20,
-                                               script_hash);
-  if (ret != 0) {
-    return ret;
-  }
-  return ctx->sys_get_account_id_by_script_hash(ctx, script_hash, account_id);
-}
-
 void gw_build_script_hash_to_eth_address_key(
     const uint8_t script_hash[GW_KEY_BYTES], uint8_t raw_key[GW_KEY_BYTES]) {
   blake2b_state blake2b_ctx;
   blake2b_init(&blake2b_ctx, GW_KEY_BYTES);
   uint32_t placeholder = 0;
   blake2b_update(&blake2b_ctx, (uint8_t *)&placeholder, sizeof(uint32_t));
-  uint8_t type = GW_ACCOUNT_SCRIPT_HASH_TO_ETH_ADDRESS;
+  uint8_t type = GW_ACCOUNT_SCRIPT_HASH_TO_ETH_ADDR;
   blake2b_update(&blake2b_ctx, (uint8_t *)&type, 1);
   blake2b_update(&blake2b_ctx, script_hash, GW_KEY_BYTES);
   blake2b_final(&blake2b_ctx, raw_key, GW_KEY_BYTES);
 }
 
-void gw_build_eth_address_to_script_hash_key(
+void gw_build_eth_addr_to_script_hash_key(const uint8_t type,
     const uint8_t eth_address[ETH_ADDRESS_LEN], uint8_t raw_key[GW_KEY_BYTES]) {
   blake2b_state blake2b_ctx;
   blake2b_init(&blake2b_ctx, GW_KEY_BYTES);
@@ -127,7 +112,6 @@ void gw_build_eth_address_to_script_hash_key(
   uint32_t placeholder = 0;
   blake2b_update(&blake2b_ctx, (uint8_t *)&placeholder, sizeof(uint32_t));
   /* type */
-  uint8_t type = GW_ETH_ADDRESS_TO_ACCOUNT_SCRIPT_HASH;
   blake2b_update(&blake2b_ctx, (uint8_t *)&type, 1);
   /* eth_address */
   blake2b_update(&blake2b_ctx, eth_address, ETH_ADDRESS_LEN);
@@ -136,6 +120,8 @@ void gw_build_eth_address_to_script_hash_key(
 
 /**
  * @param script_hash should have been initialed as zero_hash = {0}
+ * 
+ * TODO: shall we cache the mapping data in Polyjuice mem?
  */
 int load_script_hash_by_eth_address(gw_context_t *ctx,
                                     const uint8_t eth_address[ETH_ADDRESS_LEN],
@@ -144,26 +130,30 @@ int load_script_hash_by_eth_address(gw_context_t *ctx,
     return GW_FATAL_INVALID_CONTEXT;
   }
 
+  // maybe the eth_address is an EOA
   uint8_t raw_key[GW_KEY_BYTES] = {0};
-  gw_build_eth_address_to_script_hash_key(eth_address, raw_key);
-
+  gw_build_eth_addr_to_script_hash_key(ETH_EOA_ADDR_TO_GW_ACCOUNT_SCRIPT_HASH,
+                                       eth_address, raw_key);
   int ret = ctx->_internal_load_raw(ctx, raw_key, script_hash);
   if (ret != 0) {
     return ret;
   }
-
-  // not found in `ETH Address Registry`, means that it is not an EOA.
-  if (_is_zero_hash(script_hash)) { 
-    // maybe it is a Polyjuice Contract Account
-    ret = ctx->sys_get_script_hash_by_prefix(ctx, eth_address,
-                                             DEFAULT_SHORT_SCRIPT_HASH_LEN,
-                                             script_hash);
-    if (ret != 0) {
-      return GW_ERROR_NOT_FOUND;
-    }
+  if (!_is_zero_hash(script_hash)) {
+    ckb_debug("load_script_hash_by_eth_eoa_address success");
+    return 0;
   }
 
-  // TODO: shall we cache [eth_address <=> script_hash] mapping data?
+  // maybe it is a Polyjuice Contract Account
+  gw_build_eth_addr_to_script_hash_key(
+    ETH_CONTRACT_ADDR_TO_GW_ACCOUNT_SCRIPT_HASH, eth_address, raw_key);
+  ret = ctx->_internal_load_raw(ctx, raw_key, script_hash);
+  if (ret != 0) {
+    return ret;
+  }
+  if (_is_zero_hash(script_hash)) { 
+    return GW_ERROR_NOT_FOUND;
+  }
+  ckb_debug("load_script_hash_by_eth_contract_address success");
   return 0;
 }
 
@@ -195,23 +185,46 @@ int load_eth_address_by_script_hash(gw_context_t *ctx,
   return 0;
 }
 
-int update_eth_address_registry(gw_context_t *ctx,
+/**
+ * @brief register a created contract account into `ETH Address Registry`
+ * 
+ * @param ctx gw_context
+ * @param type ETH_EOA_ADDR_TO_GW_ACCOUNT_SCRIPT_HASH
+ *          or ETH_CONTRACT_ADDR_TO_GW_ACCOUNT_SCRIPT_HASH
+ * @param eth_address the rightmost 160 bits of a Keccak hash of an ECDSA public
+ * key, there are two account types:
+ * 1. Externally-owned – controlled by anyone with the private keys
+ * 2. Contract – a smart contract deployed to the network, controlled by code
+ * @param script_hash Godwoken account script hash
+ * @return int: 0 means success
+ */
+int update_eth_address_register(gw_context_t *ctx, const uint8_t type,
                                 const uint8_t eth_address[ETH_ADDRESS_LEN],
-                                const uint8_t script_hash[GW_VALUE_BYTES]) {
-  debug_print_data("[eth_address_registry] update eth_address",
-                     eth_address, ETH_ADDRESS_LEN);
-  debug_print_data("[eth_address_registry] update godwoken_account_script_hash",
-                     script_hash, GW_VALUE_BYTES);
-
+                                const uint8_t script_hash[GW_VALUE_BYTES]) {  
   if (ctx == NULL) {
     return GW_FATAL_INVALID_CONTEXT;
   }
-  int ret;
-  uint8_t raw_key[GW_KEY_BYTES];
+
+  switch (type) {
+    case ETH_EOA_ADDR_TO_GW_ACCOUNT_SCRIPT_HASH:
+      debug_print_data("[eth_address_registry] Add EOA Address",
+        eth_address, ETH_ADDRESS_LEN);
+      break;
+    case ETH_CONTRACT_ADDR_TO_GW_ACCOUNT_SCRIPT_HASH:
+      debug_print_data("[eth_address_registry] Add Contract Address",
+        eth_address, ETH_ADDRESS_LEN);
+      break;
+    default:
+      ckb_debug("[eth_address_registry] unsupported address type");
+      return ERROR_UNSUPPORTED_ETH_ADDRESS_TYPE;
+  }                     
+  debug_print_data("[eth_address_registry] Add godwoken_account_script_hash",
+                     script_hash, GW_VALUE_BYTES);
 
   // eth_address -> gw_script_hash
-  gw_build_eth_address_to_script_hash_key(eth_address, raw_key);
-  ret = ctx->_internal_store_raw(ctx, raw_key, script_hash);
+  uint8_t raw_key[GW_KEY_BYTES];
+  gw_build_eth_addr_to_script_hash_key(type, eth_address, raw_key);
+  int ret = ctx->_internal_store_raw(ctx, raw_key, script_hash);
   if (ret != 0) {
     return ret;
   }
@@ -239,11 +252,20 @@ int update_eth_address_registry(gw_context_t *ctx,
  * 
  * @param ctx gw_context
  * @param script_hash this account should be created on Godwoken
- * @return int 
+ * @return int: 0 means success
+ * 
+ * NOTICE: We should avoid address conflict between EOA and contract.
+ * 
+ * Ethereum addresses are currently only 160 bits long. This means it is 
+ * possible to create a collision between a contract account and an Externally
+ * Owned Account (EOA) using an estimated 2**80 computing operations, which is 
+ * feasible now given a large budget (ca. 10 billion USD).
+ * 
+ * See https://eips.ethereum.org/EIPS/eip-3607
  */
 int eth_address_register(gw_context_t *ctx,
                          uint8_t script_hash[GW_VALUE_BYTES]) {
-  debug_print_data("[eth_address_registry] new mapping for account_script_hash",
+  debug_print_data("[eth_address_register] new mapping for account_script_hash",
                    script_hash, GW_VALUE_BYTES);
   if (ctx == NULL) {
     return GW_FATAL_INVALID_CONTEXT;
@@ -254,7 +276,7 @@ int eth_address_register(gw_context_t *ctx,
   uint32_t account_id;
   ret = ctx->sys_get_account_id_by_script_hash(ctx, script_hash, &account_id);
   if (ret != 0) {
-    debug_print_int("[eth_address_registry] account not found", ret);
+    debug_print_int("[eth_address_register] account not found", ret);
     return GW_ERROR_ACCOUNT_NOT_EXISTS;
   }
 
@@ -264,7 +286,7 @@ int eth_address_register(gw_context_t *ctx,
   ret = ctx->sys_get_account_script(ctx, account_id, &script_len, 0,
                                     script_buffer);
   if (ret != 0) {
-    debug_print_int("[eth_address_registry] get_account_script failed", ret);
+    debug_print_int("[eth_address_register] get_account_script failed", ret);
     return ret;
   }
   mol_seg_t script_seg;
@@ -281,63 +303,67 @@ int eth_address_register(gw_context_t *ctx,
   mol_seg_t rollup_config_seg;
   rollup_config_seg.ptr = ctx->rollup_config;
   rollup_config_seg.size = ctx->rollup_config_size;
+
+  mol_seg_t args_seg = MolReader_Script_get_args(&script_seg);
+  mol_seg_t raw_bytes_seg = MolReader_Bytes_raw_bytes(&args_seg);
   uint8_t eth_address[ETH_ADDRESS_LEN];
 
-  // Option 1: EOA account with native eth_address
+  /**
+   * Option 1: ETH EOA (externally owned account) account
+   */
   mol_seg_t allowed_eoa_list_seg =
       MolReader_RollupConfig_get_allowed_eoa_type_hashes(&rollup_config_seg);
   const uint32_t eth_eoa_idx = 0;
   mol_seg_res_t eth_lock_code_hash_res =
       MolReader_Byte32Vec_get(&allowed_eoa_list_seg, eth_eoa_idx);
   if (!is_errno_ok(&eth_lock_code_hash_res)) {
-    ckb_debug("[eth_address_registry] failed to get eth_lock EOA code_hash");
+    ckb_debug("[eth_address_register] failed to get eth_lock EOA code_hash");
     return GW_FATAL_INVALID_DATA;
   }
   if (memcmp(script_code_hash_seg.ptr, eth_lock_code_hash_res.seg.ptr, 
              script_code_hash_seg.size) == 0) {
-    ckb_debug("[eth_address_registry] EOA account with native eth_address");
-    mol_seg_t args_seg = MolReader_Script_get_args(&script_seg);
-    mol_seg_t raw_bytes_seg = MolReader_Bytes_raw_bytes(&args_seg);
-    if (raw_bytes_seg.size != 52 ) {
-      ckb_debug("[eth_address_registry] not eth_account_lock");
+    ckb_debug("[eth_address_register] This is an ETH externally owned account");
+    if (raw_bytes_seg.size != 52) {
+      ckb_debug("[eth_address_register] not eth_account_lock");
       return GW_FATAL_UNKNOWN_ARGS;
     }
     _gw_fast_memcpy(eth_address, raw_bytes_seg.ptr + 32, ETH_ADDRESS_LEN);
-    return update_eth_address_registry(ctx, eth_address, script_hash);
+    return update_eth_address_register(ctx,
+                                       ETH_EOA_ADDR_TO_GW_ACCOUNT_SCRIPT_HASH,
+                                       eth_address, script_hash);
   }
-
-  // Option 2: Polyjuice Contract Account
-  // NOTICE: We should avoid address conflict between
-  //         `eth_native_address` and `short_godwoken_account_script_hash`
+   
+  /**
+   * Option 2: Polyjuice Contract Account
+   * 
+   * The address for an Polyjuice contract is deterministically computed from the
+   * address of its creator (sender) and how many transactions the creator has
+   * sent (nonce). The sender and nonce are RLP encoded and then hashed with 
+   * Keccak-256.
+   * 
+   * See {create_new_account} in polyjuice.h
+   */
   mol_seg_t allowed_contract_list_seg =
       MolReader_RollupConfig_get_allowed_contract_type_hashes(&rollup_config_seg);
   const uint32_t polyjuice_idx = 2;
   mol_seg_res_t polyjuice_code_hash_res =
       MolReader_Byte32Vec_get(&allowed_contract_list_seg, polyjuice_idx);
   if (!is_errno_ok(&polyjuice_code_hash_res)) {
-    ckb_debug("[eth_address_registry] failed to get Polyjuice code_hash");
+    ckb_debug("[eth_address_register] failed to get Polyjuice code_hash");
     return GW_FATAL_INVALID_DATA;
   }
   if (memcmp(script_code_hash_seg.ptr, polyjuice_code_hash_res.seg.ptr,
              script_code_hash_seg.size) == 0) {
-    // In this situation, "eth_address" is short_godwoken_account_script_hash.
-    ckb_debug("[eth_address_registry] Polyjuice contract account");
-
-    // Only set mapping from `gw_script_hash` to "eth_address"
-    // to avoid address conflict.
-    uint8_t raw_key[GW_KEY_BYTES];
-    gw_build_script_hash_to_eth_address_key(script_hash, raw_key);
-    /** 
-     * ethabi address format
-     *  e.g. web3.eth.abi.decodeParameter('address',
-     *         '0000000000000000000000001829d79cce6aa43d13e67216b355e81a7fffb220')
-     */
-    uint8_t value[GW_VALUE_BYTES] = {0};
-    _gw_fast_memcpy(value + 12, script_hash, ETH_ADDRESS_LEN);
-    return ctx->_internal_store_raw(ctx, raw_key, value);
+    ckb_debug("[eth_address_register] This is a Polyjuice contract account");
+    if (raw_bytes_seg.size != CONTRACT_ACCOUNT_SCRIPT_ARGS_LEN ) {
+      ckb_debug("[eth_address_register] not Polyjuice contract script_args");
+      return GW_FATAL_UNKNOWN_ARGS;
+    }
+    _gw_fast_memcpy(eth_address, raw_bytes_seg.ptr + 36, ETH_ADDRESS_LEN);
+    return update_eth_address_register(
+      ctx, ETH_CONTRACT_ADDR_TO_GW_ACCOUNT_SCRIPT_HASH,
+      eth_address, script_hash);
   }
-
-  // TODO: check selfdestruct?
 
   return GW_ERROR_UNKNOWN_SCRIPT_CODE_HASH;
 }
@@ -350,20 +376,20 @@ int eth_address_register(gw_context_t *ctx,
  * @param account_id 
  * @return int 
  */
-// int load_account_id_by_eth_address(gw_context_t *ctx,
-//                               const uint8_t address[20],
-//                               uint32_t *account_id) {
-//   if (ctx == NULL) {
-//     return GW_FATAL_INVALID_CONTEXT;
-//   }
-//   uint8_t script_hash[32] = {0};
-//   int ret = load_script_hash_by_eth_address(ctx, address, script_hash);
-//   if (ret != 0) {
-//     debug_print_int("load_script_hash_by_eth_address failed", ret);
-//     return ret;
-//   }
-//   return ctx->sys_get_account_id_by_script_hash(ctx, script_hash, account_id);
-// }
+int load_account_id_by_eth_address(
+    gw_context_t *ctx, const uint8_t address[20], uint32_t *account_id) {
+  if (ctx == NULL) {
+    return GW_FATAL_INVALID_CONTEXT;
+  }
+  uint8_t script_hash[32] = {0};
+  int ret = load_script_hash_by_eth_address(ctx, address, script_hash);
+  if (ret != 0) {
+    debug_print_data("[load_account_id_by_eth_address] load_script_hash failed",
+                     address, ETH_ADDRESS_LEN);
+    return ret;
+  }
+  return ctx->sys_get_account_id_by_script_hash(ctx, script_hash, account_id);
+}
 
 void rlp_encode_sender_and_nonce(const evmc_address *sender, uint32_t nonce,
                                  uint8_t *data, uint32_t *data_len) {

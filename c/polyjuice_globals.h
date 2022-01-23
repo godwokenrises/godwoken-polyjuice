@@ -6,8 +6,10 @@
 #define DEFAULT_SHORT_SCRIPT_HASH_LEN 20
 #define ETH_ADDRESS_LEN 20
 
-#define GW_ETH_ADDRESS_TO_ACCOUNT_SCRIPT_HASH 6
-#define GW_ACCOUNT_SCRIPT_HASH_TO_ETH_ADDRESS 7
+/* Key type for ETH Address Registry */
+#define GW_ACCOUNT_SCRIPT_HASH_TO_ETH_ADDR          200
+#define ETH_EOA_ADDR_TO_GW_ACCOUNT_SCRIPT_HASH      201
+#define ETH_CONTRACT_ADDR_TO_GW_ACCOUNT_SCRIPT_HASH 202
 
 /** Polyjuice contract account (normal/create2) script args size */
 #define CONTRACT_ACCOUNT_SCRIPT_ARGS_LEN 56       /* 32 + 4 + 20 */

@@ -2,9 +2,9 @@
 //!   See ./evm-contracts/SimpleTransfer.sol
 
 use crate::helper::{
-    self, contract_script_to_short_script_hash, deploy, eth_addr_to_ethabi_addr, new_block_info,
-    new_contract_account_script, setup, simple_storage_get, PolyjuiceArgsBuilder,
-    CKB_SUDT_ACCOUNT_ID, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
+    self, deploy, eth_addr_to_ethabi_addr, new_block_info, new_contract_account_script, setup,
+    simple_storage_get, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, CREATOR_ACCOUNT_ID,
+    L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
@@ -65,6 +65,10 @@ fn test_simple_transfer() {
     let ss_account_script =
         new_contract_account_script(&mut state, from_id, &from_eth_address, false);
     let ss_script_hash = ss_account_script.hash();
+    let simple_storage_contract_addr: [u8; 20] = ss_account_script.args().raw_data().as_ref()
+        [36..56]
+        .try_into()
+        .unwrap();
     let ss_short_address = &ss_script_hash[0..20];
     let ss_account_id = state
         .get_account_id_by_script_hash(&ss_account_script.hash().into())
@@ -227,19 +231,16 @@ fn test_simple_transfer() {
     //     assert_eq!(zero_account_balance, 1);
     // }
 
-    println!("================");
     {
         // SimpleTransfer.transferToSimpleStorage1();
         let old_balance = state
             .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, st_contract_short_script_hash)
             .unwrap();
         let block_info = new_block_info(0, block_number, block_number);
+
         let input = hex::decode(format!(
             "f10c7360{}",
-            hex::encode(contract_script_to_short_script_hash(
-                &ss_account_script,
-                true
-            )),
+            hex::encode(eth_addr_to_ethabi_addr(&simple_storage_contract_addr)),
         ))
         .unwrap();
         let args = PolyjuiceArgsBuilder::default()
@@ -264,7 +265,7 @@ fn test_simple_transfer() {
                 L2TX_MAX_CYCLES,
                 None,
             )
-            .expect("construct");
+            .expect("SimpleTransfer.transferToSimpleStorage1()");
         // [SimpleTransfer.transferToSimpleStorage1] used cycles: 1203332 < 1210K
         helper::check_cycles(
             "SimpleTransfer.transferToSimpleStorage1()",
@@ -296,8 +297,6 @@ fn test_simple_transfer() {
                 .unwrap()
         );
     }
-
-    println!("================");
     {
         // SimpleTransfer.transferToSimpleStorage2();
         let old_balance = state
@@ -306,10 +305,7 @@ fn test_simple_transfer() {
         let block_info = new_block_info(0, block_number, block_number);
         let input = hex::decode(format!(
             "2a5eb963{}",
-            hex::encode(contract_script_to_short_script_hash(
-                &ss_account_script,
-                true
-            )),
+            hex::encode(eth_addr_to_ethabi_addr(&simple_storage_contract_addr)),
         ))
         .unwrap();
         let args = PolyjuiceArgsBuilder::default()
