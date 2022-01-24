@@ -17,7 +17,7 @@ use gw_types::{
 const INIT_CODE: &str = include_str!("./evm-contracts/EthToGodwokenAddr.bin");
 
 #[test]
-fn test_eth_to_godwoken_addr() {
+fn test_eth_addr_to_gw_short_script_hash() {
     let (store, mut state, generator) = setup();
     let block_producer_id = crate::helper::create_block_producer(&mut state);
 
