@@ -147,10 +147,10 @@ int parse_args(struct evmc_message* msg, uint128_t* gas_price,
 
   /**
    * args[0..8] magic header + call kind
-   * Only access native eth_address in this kind of L2TX
+   * Only access native eth_address after Polyjuice v1.0.0
    */
   static const uint8_t eth_polyjuice_args_header[7]
-    = {'E', 'T', 'H', 'P', 'O', 'L', 'Y'};
+    = {0xff, 0xff, 0xff, 'P', 'O', 'L', 'Y'};
   if (memcmp(eth_polyjuice_args_header, args, 7) != 0) {
     debug_print_data("invalid polyjuice args header", args, 7);
     return -1;
