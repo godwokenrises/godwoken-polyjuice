@@ -147,8 +147,8 @@ int transfer_to_any_sudt_gas(const uint8_t* input_src, const size_t input_size,
   Transfer `sudt_id` token from `from_id` to `to_id` with `amount` balance.
 
   NOTE: This pre-compiled contract need caller to check permission of `from_id`,
-  currently only `solidity/erc20/SudtERC20Proxy.sol` is allowed to call this
-  contract.
+  currently only `solidity/erc20/SudtERC20Proxy_UserDefinedDecimals.sol` is
+  allowed to call this contract.
 
    input:
    ======
@@ -163,13 +163,6 @@ int transfer_to_any_sudt(gw_context_t* ctx, const uint8_t* code_data,
                          const size_t code_size, bool is_static_call,
                          const uint8_t* input_src, const size_t input_size,
                          uint8_t** output, size_t* output_size) {
-  /* Contract code hash of `SudtERC20Proxy.ContractCode`
-     => 0x43a008ec973b648bd71ad67e6b66f2be8a6fa88e89c7dad046c948b00aa866aa */
-  static const uint8_t sudt_erc20_proxy_contract_code_hash[32] = {
-      0x43, 0xa0, 0x08, 0xec, 0x97, 0x3b, 0x64, 0x8b, 0xd7, 0x1a, 0xd6,
-      0x7e, 0x6b, 0x66, 0xf2, 0xbe, 0x8a, 0x6f, 0xa8, 0x8e, 0x89, 0xc7,
-      0xda, 0xd0, 0x46, 0xc9, 0x48, 0xb0, 0x0a, 0xa8, 0x66, 0xaa,
-  };
   /* Contract code hash of `SudtERC20Proxy_UserDefinedDecimals.ContractCode`
      => 0xde4542f5a5bd32c09cd98e9752281f88900a059aab7ac103edd9df214f136c52 */
   static const uint8_t
@@ -183,13 +176,13 @@ int transfer_to_any_sudt(gw_context_t* ctx, const uint8_t* code_data,
   }
   uint8_t code_hash[32] = {0};
   blake2b_hash(code_hash, (uint8_t*)code_data, code_size);
-  if (memcmp(code_hash, sudt_erc20_proxy_contract_code_hash, 32) != 0 &&
-      memcmp(code_hash,
+  if (memcmp(code_hash,
              sudt_erc20_proxy_user_defined_decimals_contract_code_hash,
              32) != 0) {
     ckb_debug("The contract is not allowed to call transfer_to_any_sudt");
     debug_print_data("     got code hash", code_hash, 32);
-    debug_print_data("expected code hash", sudt_erc20_proxy_contract_code_hash,
+    debug_print_data("expected code hash",
+                     sudt_erc20_proxy_user_defined_decimals_contract_code_hash,
                      32);
     return ERROR_TRANSFER_TO_ANY_SUDT;
   }

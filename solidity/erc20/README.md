@@ -1,7 +1,5 @@
 For security reason, developers should only use this [SudtERC20Proxy_UserDefinedDecimals bytecode](./SudtERC20Proxy_UserDefinedDecimals.bin) which code hash will be checked in `transfer_to_any_sudt` pre-compiled contract.
 
-Note: SudtERC20Proxy.sol will be deprecated.
-
 ## Compile Solidity Contract in ethereum/solc:0.8.7 docker image
 Here is the method that we compile SudtERC20Proxy_UserDefinedDecimals.sol.
 ```sh
