@@ -5,8 +5,8 @@
 #include "polyjuice_utils.h"
 
 /* Gas fee */
-#define RECOVER_ACCOUNT_GAS 3600 /* more than ecrecover */
-#define ETH_TO_GODWOKEN_ADDR_GAS 300
+#define RECOVER_ACCOUNT_GAS                    3600 /* more than ecrecover */
+#define ETH_ADDR_TO_GW_SHORT_SCRIPT_HASH_GAS   300
 
 int recover_account_gas(const uint8_t* input_src,
                         const size_t input_size,
@@ -76,14 +76,14 @@ int recover_account(gw_context_t* ctx,
   return 0;
 }
 
-int eth_to_godwoken_addr_gas(const uint8_t* input_src,
-                           const size_t input_size,
-                           uint64_t* gas) {
-  *gas = ETH_TO_GODWOKEN_ADDR_GAS;
+int eth_addr_to_gw_short_script_hash_gas(const uint8_t* input_src,
+                                         const size_t input_size,
+                                         uint64_t* gas) {
+  *gas = ETH_ADDR_TO_GW_SHORT_SCRIPT_HASH_GAS;
   return 0;
 }
 
-/* Calculate godwoken short address of an contract account by it's corresponding ETH address
+/* Calculate Godwoken short script hash of a contract account by it's corresponding ETH address
 
  input:
  ======
@@ -92,7 +92,7 @@ int eth_to_godwoken_addr_gas(const uint8_t* input_src,
  output:
    output[12..32] => short_gw_script_hash, a.k.a. godwoken short address
  */
-int eth_to_godwoken_addr(gw_context_t* ctx,
+int eth_addr_to_gw_short_script_hash(gw_context_t* ctx,
                          const uint8_t* code_data,
                          const size_t code_size,
                          bool is_static_call,
@@ -101,12 +101,12 @@ int eth_to_godwoken_addr(gw_context_t* ctx,
                          uint8_t** output, size_t* output_size) {
   if (input_size < 32) {
     debug_print_int("input size too small", input_size);
-    return ERROR_ETH_TO_GODWOKEN_ADDR;
+    return ERROR_ETH_ADDR_TO_GW_SHORT_SCRIPT_HASH;
   }
   for (int i = 0; i < 12; i++) {
     if (input_src[i] != 0) {
       ckb_debug("invalid ETH address");
-      return ERROR_ETH_TO_GODWOKEN_ADDR;
+      return ERROR_ETH_ADDR_TO_GW_SHORT_SCRIPT_HASH;
     }
   }
   int ret;

@@ -1,10 +1,10 @@
 
 ## Addition Features
-* pre-compiled contract
-  - Add `recover_account` for recover any supported signature
-  - Add `balance_of_any_sudt` for query the balance of any sudt_id account
-  - Add `transfer_to_any_sudt` for transfer value by sudt_id (Must collaborate with SudtERC20Proxy_UserDefinedDecimals.sol contract)
-  - Add `eth_to_godwoken_addr` for convert ETH address to polyjuice contract address (godwoken short address)
+* pre-compiled contracts
+  - Add `recover_account` to recover any supported signature
+  - Add `balance_of_any_sudt` to query the balance of any sudt_id account
+  - Add `transfer_to_any_sudt` to transfer value by sudt_id (Must collaborate with SudtERC20Proxy_UserDefinedDecimals.sol contract)
+  - Add `eth_addr_to_gw_short_script_hash` to convert ETH address to Godwoken short script hash of the corresponding account
 
 ### `recover_account` Spec
 
@@ -63,10 +63,10 @@ See: [Example](../solidity/erc20/SudtERC20Proxy_UserDefinedDecimals.sol)
 
 See: [Example](../solidity/erc20/SudtERC20Proxy_UserDefinedDecimals.sol)
 
-### `eth_to_godwoken_addr` Spec
+### `eth_addr_to_gw_short_script_hash` Spec
 
 ```
- Calculate godwoken short address of an contract account by it's corresponding ETH address
+ Calculate Godwoken short script hash of a contract account by it's corresponding ETH address
 
  input:
  ======
