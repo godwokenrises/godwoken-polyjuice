@@ -180,8 +180,8 @@ fn test_transfer_by_metamask() {
                 &state,
                 &block_info,
                 &raw_tx,
-                L2TX_MAX_CYCLES,
-            )
+                L2TX_MAX_CYCLES, None
+        )
             .expect("transfer from EoA to EoA, using native_eth_address");
         state.apply_run_result(&run_result).expect("update state");
         assert_eq!(

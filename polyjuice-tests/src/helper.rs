@@ -810,6 +810,7 @@ pub(crate) fn eth_address_regiser(
             &block_info,
             &raw_l2tx,
             L2TX_MAX_CYCLES,
+            None,
         )
         .expect("execute the MSG_SET_MAPPING method of `ETH Address Registry` layer2 contract");
     state.apply_run_result(&run_result).expect("update state");

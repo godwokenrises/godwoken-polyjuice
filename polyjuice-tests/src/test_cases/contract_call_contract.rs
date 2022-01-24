@@ -211,6 +211,7 @@ fn test_contract_call_non_exists_contract() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .expect_err("non_existing_account_address => load to_script_hash failed");
         assert_eq!(err, TransactionError::InvalidExitCode(2));
