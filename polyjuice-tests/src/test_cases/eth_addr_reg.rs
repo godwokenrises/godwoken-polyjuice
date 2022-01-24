@@ -118,6 +118,7 @@ fn test_set_mapping_by_contract() {
             &block_info,
             &raw_l2tx,
             L2TX_MAX_CYCLES,
+            None,
         )
         .expect("execute Godwoken contract");
     assert_eq!(run_result.return_data, eth_eoa_account_script_hash);
@@ -142,6 +143,7 @@ fn test_set_mapping_by_contract() {
             &block_info,
             &raw_l2tx,
             L2TX_MAX_CYCLES,
+            None,
         )
         .expect("execute Godwoken contract");
     assert_eq!(run_result.return_data, eth_eoa_address);

@@ -13,9 +13,6 @@ use gw_store::traits::chain_store::ChainStore;
 use gw_store::{chain_view::ChainView, Store};
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
 
-const SUDT_ERC20_PROXY_USER_DEFINED_DECIMALS_CODE: &str =
-    include_str!("../../../solidity/erc20/SudtERC20Proxy_UserDefinedDecimals.bin");
-
 fn test_sudt_erc20_proxy_inner(
     generator: &Generator,
     store: &Store,
@@ -50,7 +47,7 @@ fn test_sudt_erc20_proxy_inner(
         generator,
         store,
         state,
-        creator_account_id,
+        CREATOR_ACCOUNT_ID,
         from_id1,
         init_code.as_str(),
         122000,
