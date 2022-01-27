@@ -1,4 +1,3 @@
-
 // --- ETH Address Registry ---
 array Byte20 [byte; 20];
 
@@ -6,6 +5,7 @@ union ETHAddrRegArgs {
     EthToGw,
     GwToEth,
     SetMapping,
+    BatchSetMapping,
 }
 
 struct EthToGw {
@@ -20,4 +20,10 @@ struct SetMapping {
     gw_script_hash: Byte32,
     fee: Uint64, // tx fee in CKB shannon
 }
+
+table BatchSetMapping {
+    gw_script_hashes: Byte32Vec,
+    fee: Uint64, // tx fee in CKB shannon
+}
+
 // --- end of ETH Address Registry ---
