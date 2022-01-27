@@ -20,6 +20,7 @@
 #define MSG_QUERY_GW_BY_ETH 0
 #define MSG_QUERY_ETH_BY_GW 1
 #define MSG_SET_MAPPING 2
+#define MSG_BATCH_SET_MAPPING 3
 
 int handle_fee(gw_context_t *ctx, uint64_t fee) {
   if (ctx == NULL) {
@@ -103,6 +104,32 @@ int main() {
     ret = eth_address_register(&ctx, script_hash_seg.ptr);
     if (ret != 0) {
       return ret;
+    }
+  } else if (msg.item_id == MSG_BATCH_SET_MAPPING) {
+    /* charge fee */
+    mol_seg_t fee_seg = MolReader_BatchSetMapping_get_fee(&msg.seg);
+    uint64_t fee = *(uint64_t *)fee_seg.ptr;
+    ret = handle_fee(&ctx, fee);
+    if (ret != 0) {
+      return ret;
+    }
+
+    mol_seg_t script_hashes_seg =
+        MolReader_BatchSetMapping_get_gw_script_hashes(&msg.seg);
+    uint32_t script_hashes_size =
+        MolReader_Byte32Vec_length(&script_hashes_seg);
+
+    for (uint32_t i = 0; i < script_hashes_size; i++) {
+      mol_seg_res_t script_hash_res =
+          MolReader_Byte32Vec_get(&script_hashes_seg, i);
+      if (script_hash_res.errno != MOL_OK) {
+        ckb_debug("invalid script hash");
+        return GW_FATAL_INVALID_DATA;
+      }
+      ret = eth_address_register(&ctx, script_hash_res.seg.ptr);
+      if (ret != 0) {
+        return ret;
+      }
     }
   } else {
     return GW_FATAL_UNKNOWN_ARGS;
