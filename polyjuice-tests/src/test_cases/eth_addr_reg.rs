@@ -93,9 +93,15 @@ fn test_update_eth_addr_reg_by_contract() {
         &store,
         &mut state,
         &generator,
-        1,
         eth_eoa_account_id,
         eth_eoa_account_script_hash.into(),
+        new_block_info(block_producer_id, 1, 1)
+    );
+    assert_eq!( // make sure the fee was paid
+        state
+            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &eth_eoa_account_script_hash[..20])
+            .unwrap(),
+        0u128
     );
 
     // check result: eth_address -> gw_script_hash

@@ -780,9 +780,9 @@ pub(crate) fn eth_address_regiser(
     store: &Store,
     state: &mut DummyState,
     generator: &Generator,
-    block_number: u64,
     from_id: u32,
     gw_script_hash: H256,
+    block_info: BlockInfo,
 ) {
     let args = SetMappingArgsBuilder::default()
         .method(2u32)
@@ -796,7 +796,6 @@ pub(crate) fn eth_address_regiser(
         .build();
     let db = store.begin_transaction();
     let tip_block_hash = store.get_tip_block_hash().unwrap();
-    let block_info = new_block_info(from_id, block_number, block_number);
     let run_result = generator
         .execute_transaction(
             &ChainView::new(&db, tip_block_hash),
