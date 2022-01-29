@@ -890,8 +890,7 @@ int create_new_account(gw_context_t* ctx,
   debug_print_int(">> new to id", *to_id);
 
   // register a created contract account into `ETH Address Registry`
-  ret = update_eth_address_register(
-    ctx, ETH_CONTRACT_ADDR_TO_GW_ACCOUNT_SCRIPT_HASH, eth_addr, script_hash);
+  ret = update_eth_address_register(ctx, eth_addr, script_hash);
   if (ret != 0) {
     ckb_debug("[create_new_account] failed to register a contract account");
     return ret;
