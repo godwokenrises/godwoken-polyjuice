@@ -53,8 +53,7 @@ pub const ETH_ADDRESS_REGISTRY_GENERATOR_NAME: &str = "eth_addr_reg_generator";
 pub const ETH_ADDRESS_REGISTRY_VALIDATOR_NAME: &str = "eth_addr_reg_validator";
 // Key type for ETH Address Registry
 const GW_ACCOUNT_SCRIPT_HASH_TO_ETH_ADDR: u8 = 200;
-const ETH_EOA_ADDR_TO_GW_ACCOUNT_SCRIPT_HASH: u8 = 201;
-const _ETH_CONTRACT_ADDR_TO_GW_ACCOUNT_SCRIPT_HASH: u8 = 202;
+const ETH_ADDR_TO_GW_ACCOUNT_SCRIPT_HASH: u8 = 201;
 
 pub const ROLLUP_SCRIPT_HASH: [u8; 32] = [0xa9u8; 32];
 pub const ETH_ACCOUNT_LOCK_CODE_HASH: [u8; 32] = [0xaau8; 32];
@@ -701,11 +700,11 @@ pub(crate) fn check_cycles(l2_tx_label: &str, used_cycles: u64, warning_cycles: 
     );
 }
 
-fn build_eth_address_to_script_hash_key(key_type: u8, eth_address: &[u8; 20]) -> H256 {
+fn build_eth_address_to_script_hash_key(eth_address: &[u8; 20]) -> H256 {
     let mut key: [u8; 32] = H256::zero().into();
     let mut hasher = new_blake2b();
     hasher.update(&gw_common::state::GW_NON_ACCOUNT_PLACEHOLDER);
-    hasher.update(&[key_type]);
+    hasher.update(&[ETH_ADDR_TO_GW_ACCOUNT_SCRIPT_HASH]);
     hasher.update(eth_address);
     hasher.finalize(&mut key);
     key.into()
@@ -729,10 +728,7 @@ pub(crate) fn register_eoa_account(
 ) {
     state
         .update_raw(
-            build_eth_address_to_script_hash_key(
-                ETH_EOA_ADDR_TO_GW_ACCOUNT_SCRIPT_HASH,
-                eth_address,
-            ),
+            build_eth_address_to_script_hash_key(eth_address),
             script_hash.clone().into(),
         )
         .expect("add GW_ETH_ADDRESS_TO_SCRIPT_HASH mapping into state");
