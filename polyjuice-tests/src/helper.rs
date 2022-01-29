@@ -6,6 +6,7 @@ pub use gw_common::{
 };
 use gw_config::{BackendConfig, BackendType};
 use gw_db::schema::{COLUMN_INDEX, COLUMN_META, META_TIP_BLOCK_HASH_KEY};
+use gw_generator::error::TransactionError;
 pub use gw_generator::{
     account_lock_manage::{secp256k1::Secp256k1, AccountLockManage},
     backend_manage::{Backend, BackendManage},
@@ -783,7 +784,7 @@ pub(crate) fn eth_address_regiser(
     from_id: u32,
     gw_script_hash: H256,
     block_info: BlockInfo,
-) {
+) -> Result<RunResult, TransactionError> {
     let args = SetMappingArgsBuilder::default()
         .method(2u32)
         .gw_script_hash(gw_script_hash.into())
@@ -796,19 +797,12 @@ pub(crate) fn eth_address_regiser(
         .build();
     let db = store.begin_transaction();
     let tip_block_hash = store.get_tip_block_hash().unwrap();
-    let run_result = generator
-        .execute_transaction(
-            &ChainView::new(&db, tip_block_hash),
-            state,
-            &block_info,
-            &raw_l2tx,
-            L2TX_MAX_CYCLES,
-            None,
-        )
-        .expect("execute the MSG_SET_MAPPING method of `ETH Address Registry` layer2 contract");
-    state.apply_run_result(&run_result).expect("update state");
-    assert_eq!(run_result.exit_code, 0);
-
-    // cycles(1176198)] < 1200k cycles
-    check_cycles("eth_address_regiser", run_result.used_cycles, 1_200_000);
+    generator.execute_transaction(
+        &ChainView::new(&db, tip_block_hash),
+        state,
+        &block_info,
+        &raw_l2tx,
+        L2TX_MAX_CYCLES,
+        None,
+    )
 }
