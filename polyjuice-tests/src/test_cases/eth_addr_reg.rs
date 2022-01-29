@@ -52,7 +52,7 @@ impl GwToEthArgsBuilder {
 }
 
 #[test]
-fn test_set_mapping_by_contract() {
+fn test_update_eth_addr_reg_by_contract() {
     let (store, mut state, generator) = setup();
     let block_producer_id = helper::create_block_producer(&mut state);
 

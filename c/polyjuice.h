@@ -829,7 +829,6 @@ int create_new_account(gw_context_t* ctx,
     if (ret != 0) {
       return ret;
     }
-    // TODO: Is sender.bytes native eth_address or short_script_hash?
     debug_print_data("sender", msg->sender.bytes, 20);
     debug_print_int("from_id", from_id);
     debug_print_int("nonce", nonce);
