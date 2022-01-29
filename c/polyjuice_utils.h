@@ -250,6 +250,9 @@ int update_eth_address_register(gw_context_t *ctx, const uint8_t type,
 /**
  * @brief register an account into `ETH Address Registry` by its script_hash
  * 
+ * Option 1: ETH EOA (externally owned account)
+ * Option 2: Polyjuice Contract Account
+ * 
  * @param ctx gw_context
  * @param script_hash this account should be created on Godwoken
  * @return int: 0 means success
@@ -336,10 +339,19 @@ int eth_address_register(gw_context_t *ctx,
   /**
    * Option 2: Polyjuice Contract Account
    * 
-   * The address for an Polyjuice contract is deterministically computed from the
-   * address of its creator (sender) and how many transactions the creator has
-   * sent (nonce). The sender and nonce are RLP encoded and then hashed with 
+   * There are 2 major ways in which a Polyjuice smart contract can be deployed:
+   * 
+   * 1. CREATE Flow:
+   *   The address of an normal contract is deterministically computed from 
+   * the address of its creator (sender) and how many transactions the creator 
+   * has sent (nonce). The sender and nonce are RLP encoded and then hashed with 
    * Keccak-256.
+   *   `eth_address = hash(sender, nonce)`
+   * 
+   * 2. CREATE2 Flow (EIP-1014):
+   *   This is a way to say: “I'll deploy this contract at this address in the 
+   * future."
+   *   `eth_address = hash(0xFF, sender, salt, bytecode)`
    * 
    * See {create_new_account} in polyjuice.h
    */

@@ -3,14 +3,13 @@
  * 
  * This contract introduces two-ways mappings between `eth_address` and
  * `gw_script_hash`.
- *   - As the rightmost 160 bits of a Keccak hash of an ECDSA public key
- *   - Godwoken account script hash(a.k.a. `gw_script_hash`) is a key used for
- *     locating the account lock. Godwoken enforces one-to-one mapping
- *     between layer 2 lock script and account ID.
  * 
- * There are 2 kinds of accounts in Godwoken: 
- *   1) Typical user accounts denoted by an account lock
- *   2) Contract accounts denoted by a backend script
+ *   - `eth_address` is the address of an Ethereum EOA (externally owned account
+ *     ) or a Polyjuice contract account.
+ * 
+ *   - Godwoken account script hash(a.k.a. `gw_script_hash`) is a key used for
+ *     locating the account lock. Godwoken enforces one-to-one mapping between 
+ *     layer 2 lock script and accountID.
  */
 
 #include "gw_syscalls.h"
