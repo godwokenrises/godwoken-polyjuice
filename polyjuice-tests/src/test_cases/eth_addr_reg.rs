@@ -3,7 +3,7 @@ use crate::helper::{
     ETH_ADDRESS_REGISTRY_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
-use gw_generator::traits::StateExt;
+use gw_generator::{error::TransactionError, traits::StateExt};
 use gw_store::{chain_view::ChainView, traits::chain_store::ChainStore};
 use gw_types::{packed::RawL2Transaction, prelude::*};
 
@@ -78,30 +78,52 @@ fn test_update_eth_addr_reg_by_contract() {
         .mint_sudt(
             CKB_SUDT_ACCOUNT_ID,
             &eth_eoa_account_script_hash[..20],
-            1000,
+            2000,
         )
         .unwrap();
     assert_eq!(
         state
             .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &eth_eoa_account_script_hash[..20])
             .unwrap(),
-        1000u128
+        2000u128
     );
 
     // update_eth_address_registry by `ETH Address Registry` layer2 contract
-    crate::helper::eth_address_regiser(
+    let run_result = crate::helper::eth_address_regiser(
         &store,
         &mut state,
         &generator,
         eth_eoa_account_id,
         eth_eoa_account_script_hash.into(),
-        new_block_info(block_producer_id, 1, 1)
-    );
-    assert_eq!( // make sure the fee was paid
+        new_block_info(block_producer_id, 1, 1),
+    )
+    .expect("execute the MSG_SET_MAPPING method of `ETH Address Registry` layer2 contract");
+    assert_eq!(run_result.exit_code, 0);
+    state.apply_run_result(&run_result).expect("update state");
+    // cycles(1176198)] < 1200k cycles
+    helper::check_cycles("eth_address_regiser", run_result.used_cycles, 1_200_000);
+    assert_eq!(
+        // make sure the fee was paid
         state
             .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &eth_eoa_account_script_hash[..20])
             .unwrap(),
-        0u128
+        1000u128
+    );
+
+    // try to register the same account again
+    let run_err = crate::helper::eth_address_regiser(
+        &store,
+        &mut state,
+        &generator,
+        eth_eoa_account_id,
+        eth_eoa_account_script_hash.into(),
+        new_block_info(block_producer_id, 2, 2),
+    )
+    .expect_err("try to register the same account again");
+    assert_eq!(
+        run_err,
+        TransactionError::InvalidExitCode(-92),
+        "ERROR_ETH_ADDRESS_REGISTRY_DUPLICATE"
     );
 
     // check result: eth_address -> gw_script_hash
@@ -114,14 +136,13 @@ fn test_update_eth_addr_reg_by_contract() {
         .to_id(ETH_ADDRESS_REGISTRY_ACCOUNT_ID.pack())
         .args(args.pack())
         .build();
-    let block_info = new_block_info(block_producer_id, 2, 0);
     let tip_block_hash = store.get_tip_block_hash().unwrap();
     let db = store.begin_transaction();
     let run_result = generator
         .execute_transaction(
             &ChainView::new(&db, tip_block_hash),
             &state,
-            &block_info,
+            &new_block_info(block_producer_id, 3, 3),
             &raw_l2tx,
             L2TX_MAX_CYCLES,
             None,
