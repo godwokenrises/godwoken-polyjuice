@@ -682,21 +682,22 @@ pub(crate) fn check_cycles(l2_tx_label: &str, used_cycles: u64, warning_cycles: 
         return; // disable cycles check
     }
 
-    let overflow_cycles = used_cycles - warning_cycles;
+    if used_cycles > warning_cycles {
+        let overflow_cycles = used_cycles - warning_cycles;
+        println!(
+            "[{}] overflow_cycles: {}({}%)",
+            l2_tx_label,
+            overflow_cycles,
+            overflow_cycles * 100 / warning_cycles
+        );
+    }
+
     println!("[check_cycles] used_cycles: {}", used_cycles);
     assert!(
         used_cycles < warning_cycles,
-        "[Warning: {} used too many cycles({})] overflow_cycles: {}({}%)",
+        "[Warning: {} used too many cycles({})]",
         l2_tx_label,
-        used_cycles,
-        overflow_cycles,
-        overflow_cycles * 100 / warning_cycles
-    );
-    println!(
-        "[{}] overflow_cycles: {}({}%)",
-        l2_tx_label,
-        overflow_cycles,
-        overflow_cycles * 100 / warning_cycles
+        used_cycles
     );
 }
 
@@ -750,7 +751,7 @@ pub(crate) fn register_eoa_account(
 struct SetMappingArgsBuilder {
     method: u32,
     gw_script_hash: [u8; 32],
-    fee_struct: gw_types::packed::Fee,
+    fee: u64,
 }
 impl SetMappingArgsBuilder {
     /// Set the SetMappingArgs builder's method.
@@ -763,19 +764,16 @@ impl SetMappingArgsBuilder {
         self.gw_script_hash = gw_script_hash;
         self
     }
-    /// Set the SetMappingArgs builder's fee struct.
-    fn fee_struct(mut self, fee_sudt_id: u32, fee_amount: u128) -> Self {
-        self.fee_struct = gw_types::packed::Fee::new_builder()
-            .amount(fee_amount.pack())
-            .sudt_id(fee_sudt_id.pack())
-            .build();
+    /// Set the set mapping args‘s fee.
+    fn set_fee(mut self, fee: u64) -> Self {
+        self.fee = fee;
         self
     }
     fn build(self) -> Vec<u8> {
         let mut output: Vec<u8> = vec![0u8; 4];
         output[0..4].copy_from_slice(&self.method.to_le_bytes()[..]);
         output.extend(self.gw_script_hash);
-        output.extend(self.fee_struct.as_slice());
+        output.extend(&self.fee.to_le_bytes()[..]);
         output
     }
 }
@@ -793,7 +791,7 @@ pub(crate) fn eth_address_regiser(
     let args = SetMappingArgsBuilder::default()
         .method(2u32)
         .gw_script_hash(gw_script_hash.into())
-        .fee_struct(CKB_SUDT_ACCOUNT_ID, 1000)
+        .set_fee(1000)
         .build();
     let raw_l2tx = RawL2Transaction::new_builder()
         .from_id(from_id.pack())
@@ -815,4 +813,7 @@ pub(crate) fn eth_address_regiser(
         .expect("execute the MSG_SET_MAPPING method of `ETH Address Registry` layer2 contract");
     state.apply_run_result(&run_result).expect("update state");
     assert_eq!(run_result.exit_code, 0);
+
+    // cycles(1176198)] < 1200k cycles
+    check_cycles("eth_address_regiser", run_result.used_cycles, 1_200_000);
 }

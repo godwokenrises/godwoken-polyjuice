@@ -78,14 +78,14 @@ fn test_update_eth_addr_reg_by_contract() {
         .mint_sudt(
             CKB_SUDT_ACCOUNT_ID,
             &eth_eoa_account_script_hash[..20],
-            200000,
+            1000,
         )
         .unwrap();
     assert_eq!(
         state
             .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &eth_eoa_account_script_hash[..20])
             .unwrap(),
-        200000u128
+        1000u128
     );
 
     // update_eth_address_registry by `ETH Address Registry` layer2 contract
