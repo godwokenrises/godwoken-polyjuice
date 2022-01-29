@@ -21,7 +21,7 @@
 #define MSG_QUERY_ETH_BY_GW 1
 #define MSG_SET_MAPPING     2
 
-int handle_fee(gw_context_t *ctx, mol_seg_t fee_seg) {
+int handle_fee(gw_context_t *ctx, uint64_t fee) {
   if (ctx == NULL) {
     return GW_FATAL_INVALID_CONTEXT;
   }
@@ -33,15 +33,11 @@ int handle_fee(gw_context_t *ctx, mol_seg_t fee_seg) {
   if (ret != 0) {
     return ret;
   }
-  uint64_t short_script_hash_len = DEFAULT_SHORT_SCRIPT_HASH_LEN;
-  /* sudt */
-  mol_seg_t sudt_id_seg = MolReader_Fee_get_sudt_id(&fee_seg);
-  uint32_t sudt_id = *(uint32_t *)sudt_id_seg.ptr;
-  /* amount */
-  mol_seg_t amount_seg = MolReader_Fee_get_amount(&fee_seg);
-  uint128_t amount = *(uint128_t *)amount_seg.ptr;
-  return sudt_pay_fee(ctx, sudt_id, short_script_hash_len,
-                      payer_account_script_hash, amount);
+
+  const uint32_t CKB_SUDT_ACCOUNT_ID = 1;
+  const uint64_t SHORT_SCRIPT_HASH_LEN = DEFAULT_SHORT_SCRIPT_HASH_LEN;
+  return sudt_pay_fee(ctx, CKB_SUDT_ACCOUNT_ID, SHORT_SCRIPT_HASH_LEN, 
+                      payer_account_script_hash, fee);
 }
 
 int main() {
@@ -100,7 +96,8 @@ int main() {
   else if (msg.item_id == MSG_SET_MAPPING) {
     /* charge fee */
     mol_seg_t fee_seg = MolReader_SetMapping_get_fee(&msg.seg);
-    ret = handle_fee(&ctx, fee_seg);
+    uint64_t fee = *(uint64_t *)fee_seg.ptr;
+    ret = handle_fee(&ctx, fee);
     if (ret != 0) {
       return ret;
     }

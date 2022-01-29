@@ -18,6 +18,6 @@ struct GwToEth {
 
 struct SetMapping {
     gw_script_hash: Byte32,
-    fee: Fee,
+    fee: Uint64, // tx fee in CKB shannon
 }
 // --- end of ETH Address Registry ---
