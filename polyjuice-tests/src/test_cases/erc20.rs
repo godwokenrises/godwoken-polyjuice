@@ -2,8 +2,8 @@
 //!   See ./evm-contracts/ERC20.bin
 
 use crate::helper::{
-    self, account_id_to_eth_address, build_eth_l2_script, deploy, new_account_script,
-    new_block_info, setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, L2TX_MAX_CYCLES,
+    self, deploy, eth_addr_to_ethabi_addr, new_block_info, new_contract_account_script, setup,
+    PolyjuiceArgsBuilder, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
@@ -15,37 +15,27 @@ const INIT_CODE: &str = include_str!("./evm-contracts/ERC20.bin");
 
 #[test]
 fn test_erc20() {
-    let (store, mut state, generator, creator_account_id) = setup();
-    let block_producer_script = build_eth_l2_script([0x99u8; 20]);
-    let block_producer_id = state
-        .create_account_from_script(block_producer_script)
-        .unwrap();
+    let (store, mut state, generator) = setup();
+    let block_producer_id = crate::helper::create_block_producer(&mut state);
 
-    let from_script1 = build_eth_l2_script([1u8; 20]);
-    let from_script_hash1 = from_script1.hash();
-    let from_short_address1 = &from_script_hash1[0..20];
-    let from_id1 = state.create_account_from_script(from_script1).unwrap();
+    let from_eth_address1 = [1u8; 20];
+    let (from_id1, _from_script_hash1) =
+        helper::create_eth_eoa_account(&mut state, &from_eth_address1, 2000000);
 
-    let from_script2 = build_eth_l2_script([2u8; 20]);
-    let from_id2 = state.create_account_from_script(from_script2).unwrap();
+    let from_eth_address2 = [2u8; 20];
+    let (_from_id2, _from_script_hash2) =
+        helper::create_eth_eoa_account(&mut state, &from_eth_address2, 0);
 
-    let from_script3 = build_eth_l2_script([3u8; 20]);
-    let from_script_hash3 = from_script3.hash();
-    let from_short_address3 = &from_script_hash3[0..20];
-    let from_id3 = state.create_account_from_script(from_script3).unwrap();
-    state
-        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_short_address1, 2000000)
-        .unwrap();
-    state
-        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_short_address3, 80000)
-        .unwrap();
+    let from_eth_address3 = [3u8; 20];
+    let (from_id3, _from_script_hash3) =
+        helper::create_eth_eoa_account(&mut state, &from_eth_address3, 80000);
 
     // Deploy ERC20
     let run_result = deploy(
         &generator,
         &store,
         &mut state,
-        creator_account_id,
+        CREATOR_ACCOUNT_ID,
         from_id1,
         INIT_CODE,
         122000,
@@ -56,31 +46,30 @@ fn test_erc20() {
     // [Deploy ERC20] used cycles: 1018075 < 1020K
     helper::check_cycles("Deploy ERC20", run_result.used_cycles, 1_020_000);
 
-    let contract_account_script =
-        new_account_script(&mut state, creator_account_id, from_id1, false);
-    let new_account_id = state
-        .get_account_id_by_script_hash(&contract_account_script.hash().into())
+    let erc20_contract_script =
+        new_contract_account_script(&state, from_id1, &from_eth_address1, false);
+    let erc20_contract_id = state
+        .get_account_id_by_script_hash(&erc20_contract_script.hash().into())
         .unwrap()
         .unwrap();
-    let is_ethabi = true;
-    let eoa1_hex = hex::encode(account_id_to_eth_address(&state, from_id1, is_ethabi));
-    let eoa2_hex = hex::encode(account_id_to_eth_address(&state, from_id2, is_ethabi));
-    let eoa3_hex = hex::encode(account_id_to_eth_address(&state, from_id3, is_ethabi));
-    for (idx, (from_id, args_str, return_data_str)) in [
-        // balanceOf(eoa1)
+    let eoa1_hex = hex::encode(eth_addr_to_ethabi_addr(&from_eth_address1));
+    let eoa2_hex = hex::encode(eth_addr_to_ethabi_addr(&from_eth_address2));
+    let eoa3_hex = hex::encode(eth_addr_to_ethabi_addr(&from_eth_address3));
+    for (idx, (operation, from_id, args_str, return_data_str)) in [
         (
+            "balanceOf(eoa1) 1",
             from_id1,
             format!("70a08231{}", eoa1_hex),
             "000000000000000000000000000000000000000204fce5e3e250261100000000",
         ),
-        // balanceOf(eoa2)
         (
+            "balanceOf(eoa2) 1",
             from_id1,
             format!("70a08231{}", eoa2_hex),
             "0000000000000000000000000000000000000000000000000000000000000000",
         ),
-        // transfer("eoa2", 0x22b)
         (
+            "transfer(eoa2, 0x22b)",
             from_id1,
             format!(
                 "a9059cbb{}000000000000000000000000000000000000000000000000000000000000022b",
@@ -88,14 +77,14 @@ fn test_erc20() {
             ),
             "",
         ),
-        // balanceOf(eoa2)
         (
+            "balanceOf(eoa2) 2",
             from_id1,
             format!("70a08231{}", eoa2_hex),
             "000000000000000000000000000000000000000000000000000000000000022b",
         ),
-        // transfer("eoa2", 0x219)
         (
+            "transfer(eoa2, 0x219)",
             from_id1,
             format!(
                 "a9059cbb{}0000000000000000000000000000000000000000000000000000000000000219",
@@ -103,26 +92,26 @@ fn test_erc20() {
             ),
             "",
         ),
-        // balanceOf(eoa2)
         (
+            "balanceOf(eoa2) 3",
             from_id1,
             format!("70a08231{}", eoa2_hex),
             "0000000000000000000000000000000000000000000000000000000000000444",
         ),
-        // burn(8908)
         (
+            "burn(8908)",
             from_id1,
             "42966c6800000000000000000000000000000000000000000000000000000000000022cc".to_string(),
             "0000000000000000000000000000000000000000000000000000000000000001",
         ),
-        // balanceOf(eoa1)
         (
+            "balanceOf(eoa1) 2",
             from_id1,
             format!("70a08231{}", eoa1_hex),
             "000000000000000000000000000000000000000204fce5e3e2502610ffffd8f0",
         ),
-        // approve(eoa3, 0x3e8)
         (
+            "approve(eoa3, 0x3e8)",
             from_id1,
             format!(
                 "095ea7b3{}00000000000000000000000000000000000000000000000000000000000003e8",
@@ -130,8 +119,8 @@ fn test_erc20() {
             ),
             "0000000000000000000000000000000000000000000000000000000000000001",
         ),
-        // transferFrom(eoa1, eoa2, 0x3e8)
         (
+            "transferFrom(eoa1, eoa2, 0x3e8)",
             from_id3,
             format!(
                 "23b872dd{}{}00000000000000000000000000000000000000000000000000000000000003e8",
@@ -155,7 +144,7 @@ fn test_erc20() {
             .build();
         let raw_tx = RawL2Transaction::new_builder()
             .from_id(from_id.pack())
-            .to_id(new_account_id.pack())
+            .to_id(erc20_contract_id.pack())
             .args(Bytes::from(args).pack())
             .build();
         let db = store.begin_transaction();
@@ -169,13 +158,15 @@ fn test_erc20() {
                 L2TX_MAX_CYCLES,
                 None,
             )
-            .expect("construct");
+            .expect(&operation);
         // [ERC20 contract method_x] used cycles: 942107 < 960K
         helper::check_cycles("ERC20 contract method_x", run_result.used_cycles, 960_000);
         state.apply_run_result(&run_result).expect("update state");
         assert_eq!(
             run_result.return_data,
-            hex::decode(return_data_str).unwrap()
+            hex::decode(return_data_str).unwrap(),
+            "return data of {}",
+            operation
         );
         // println!(
         //     "result {}",

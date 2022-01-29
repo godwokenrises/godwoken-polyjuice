@@ -2,9 +2,10 @@
 //!   See ./evm-contracts/ERC20.bin
 
 use crate::helper::{
-    account_id_to_eth_address, build_eth_l2_script, build_l2_sudt_script, deploy,
-    new_account_script, new_block_info, setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
-    FATAL_PRECOMPILED_CONTRACTS, L2TX_MAX_CYCLES,
+    self, build_eth_l2_script, build_l2_sudt_script, deploy, eth_addr_to_ethabi_addr,
+    new_block_info, new_contract_account_script, setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
+    CREATOR_ACCOUNT_ID, FATAL_PRECOMPILED_CONTRACTS, L2TX_MAX_CYCLES,
+    SUDT_ERC20_PROXY_USER_DEFINED_DECIMALS_CODE,
 };
 use gw_common::state::State;
 use gw_generator::{dummy_state::DummyState, error::TransactionError, traits::StateExt, Generator};
@@ -12,42 +13,30 @@ use gw_store::traits::chain_store::ChainStore;
 use gw_store::{chain_view::ChainView, Store};
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
 
-const SUDT_ERC20_PROXY_USER_DEFINED_DECIMALS_CODE: &str =
-    include_str!("../../../solidity/erc20/SudtERC20Proxy_UserDefinedDecimals.bin");
-
 fn test_sudt_erc20_proxy_inner(
     generator: &Generator,
     store: &Store,
     state: &mut DummyState,
-    creator_account_id: u32,
     new_sudt_id: u32,
-    block_producer_id: u32,
     decimals: Option<u8>,
 ) -> Result<(), TransactionError> {
     let decimals = decimals.unwrap_or(18);
-    let from_script1 = build_eth_l2_script([1u8; 20]);
-    let from_script_hash1 = from_script1.hash();
-    let from_short_address1 = &from_script_hash1[0..20];
-    let from_id1 = state.create_account_from_script(from_script1).unwrap();
+    let block_producer_id = crate::helper::create_block_producer(state);
 
-    let from_script2 = build_eth_l2_script([2u8; 20]);
-    let from_script_hash2 = from_script2.hash();
-    let from_short_address2 = &from_script_hash2[0..20];
-    let from_id2 = state.create_account_from_script(from_script2).unwrap();
+    let from_eth_address1 = [1u8; 20];
+    let (from_id1, from_script_hash1) =
+        helper::create_eth_eoa_account(state, &from_eth_address1, 2000000);
+    let from_short_script_hash1 = &from_script_hash1[0..20];
 
-    let from_script3 = build_eth_l2_script([3u8; 20]);
-    let from_script_hash3 = from_script3.hash();
-    let from_short_address3 = &from_script_hash3[0..20];
-    let from_id3 = state.create_account_from_script(from_script3).unwrap();
-    state
-        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_short_address1, 2000000)
-        .unwrap();
-    state
-        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_short_address2, 2000000)
-        .unwrap();
-    state
-        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_short_address3, 2000000)
-        .unwrap();
+    let from_eth_address2 = [2u8; 20];
+    let (_from_id2, from_script_hash2) =
+        helper::create_eth_eoa_account(state, &from_eth_address2, 2000000);
+    let from_short_script_hash2 = &from_script_hash2[0..20];
+
+    let from_eth_address3 = [3u8; 20];
+    let (from_id3, from_script_hash3) =
+        helper::create_eth_eoa_account(state, &from_eth_address3, 2000000);
+    let from_short_script_hash3 = &from_script_hash3[0..20];
 
     // Deploy SudtERC20Proxy_UserDefinedDecimals
     // encodeDeploy(["erc20_decimals", "DEC", BigNumber.from(9876543210), 1, 8])
@@ -58,7 +47,7 @@ fn test_sudt_erc20_proxy_inner(
         generator,
         store,
         state,
-        creator_account_id,
+        CREATOR_ACCOUNT_ID,
         from_id1,
         init_code.as_str(),
         122000,
@@ -72,42 +61,39 @@ fn test_sudt_erc20_proxy_inner(
     }
     println!();
 
-    let contract_account_script = new_account_script(state, creator_account_id, from_id1, false);
+    let contract_account_script =
+        new_contract_account_script(&state, from_id1, &from_eth_address1, false);
     let script_hash = contract_account_script.hash().into();
     let new_account_id = state
         .get_account_id_by_script_hash(&script_hash)
         .unwrap()
         .unwrap();
-    let is_ethabi = true;
-    let eoa1_hex = hex::encode(account_id_to_eth_address(state, from_id1, is_ethabi));
-    let eoa2_hex = hex::encode(account_id_to_eth_address(state, from_id2, is_ethabi));
-    let eoa3_hex = hex::encode(account_id_to_eth_address(state, from_id3, is_ethabi));
-    println!("eoa1_hex: {}", eoa1_hex);
-    println!("eoa2_hex: {}", eoa2_hex);
-    println!("eoa3_hex: {}", eoa3_hex);
+    let eoa1_hex = hex::encode(eth_addr_to_ethabi_addr(&from_eth_address1));
+    let eoa2_hex = hex::encode(eth_addr_to_ethabi_addr(&from_eth_address2));
+    let eoa3_hex = hex::encode(eth_addr_to_ethabi_addr(&from_eth_address3));
     state
         .mint_sudt(
             new_sudt_id,
-            from_short_address1,
+            from_short_script_hash1,
             160000000000000000000000000000u128,
         )
         .unwrap();
 
     assert_eq!(
         state
-            .get_sudt_balance(new_sudt_id, from_short_address1)
+            .get_sudt_balance(new_sudt_id, from_short_script_hash1)
             .unwrap(),
         160000000000000000000000000000u128
     );
     assert_eq!(
         state
-            .get_sudt_balance(new_sudt_id, from_short_address2)
+            .get_sudt_balance(new_sudt_id, from_short_script_hash2)
             .unwrap(),
         0
     );
     assert_eq!(
         state
-            .get_sudt_balance(new_sudt_id, from_short_address3)
+            .get_sudt_balance(new_sudt_id, from_short_script_hash3)
             .unwrap(),
         0
     );
@@ -368,54 +354,31 @@ fn test_sudt_erc20_proxy_inner(
 
 #[test]
 fn test_sudt_erc20_proxy_user_defined_decimals() {
-    let (store, mut state, generator, creator_account_id) = setup();
-    let block_producer_script = build_eth_l2_script([0x99u8; 20]);
-    let block_producer_id = state
-        .create_account_from_script(block_producer_script)
-        .unwrap();
+    let (store, mut state, generator) = setup();
+
     let new_sudt_script = build_l2_sudt_script([0xffu8; 32]);
     let new_sudt_id = state.create_account_from_script(new_sudt_script).unwrap();
 
     assert_eq!(CKB_SUDT_ACCOUNT_ID, 1);
 
     assert_eq!(
-        test_sudt_erc20_proxy_inner(
-            &generator,
-            &store,
-            &mut state,
-            creator_account_id,
-            new_sudt_id,
-            block_producer_id,
-            Some(8)
-        ),
+        test_sudt_erc20_proxy_inner(&generator, &store, &mut state, new_sudt_id, Some(8)),
         Ok(())
     );
 }
 
 #[test]
 fn test_error_sudt_id_sudt_erc20_proxy() {
-    let (store, mut state, generator, creator_account_id) = setup();
-    let block_producer_script = build_eth_l2_script([0x99u8; 20]);
-    let block_producer_id = state
-        .create_account_from_script(block_producer_script)
-        .unwrap();
+    let (store, mut state, generator) = setup();
 
-    let error_new_sudt_script = build_eth_l2_script([0xffu8; 20]);
+    let error_new_sudt_script = build_eth_l2_script(&[0xffu8; 20]);
     let error_new_sudt_id = state
         .create_account_from_script(error_new_sudt_script)
         .unwrap();
 
     assert_eq!(CKB_SUDT_ACCOUNT_ID, 1);
     assert_eq!(
-        test_sudt_erc20_proxy_inner(
-            &generator,
-            &store,
-            &mut state,
-            creator_account_id,
-            error_new_sudt_id,
-            block_producer_id,
-            None
-        ),
+        test_sudt_erc20_proxy_inner(&generator, &store, &mut state, error_new_sudt_id, None),
         Err(TransactionError::InvalidExitCode(
             FATAL_PRECOMPILED_CONTRACTS
         ))

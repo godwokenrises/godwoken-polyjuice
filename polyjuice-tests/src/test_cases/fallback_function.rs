@@ -2,8 +2,8 @@
 //!   See ./evm-contracts/FallbackFunction.sol
 
 use crate::helper::{
-    self, build_eth_l2_script, new_account_script, new_block_info, setup, simple_storage_get,
-    PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, L2TX_MAX_CYCLES,
+    self, build_eth_l2_script, new_block_info, new_contract_account_script, setup,
+    simple_storage_get, PolyjuiceArgsBuilder, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
@@ -15,19 +15,15 @@ const INIT_CODE: &str = include_str!("./evm-contracts/FallbackFunction.bin");
 
 #[test]
 fn test_fallback_function() {
-    let (store, mut state, generator, creator_account_id) = setup();
-    let block_producer_script = build_eth_l2_script([0x99u8; 20]);
+    let (store, mut state, generator) = setup();
+    let block_producer_script = build_eth_l2_script(&[0x99u8; 20]);
     let _block_producer_id = state
         .create_account_from_script(block_producer_script)
         .unwrap();
 
-    let from_script = build_eth_l2_script([1u8; 20]);
-    let from_script_hash = from_script.hash();
-    let from_short_address = &from_script_hash[0..20];
-    let from_id = state.create_account_from_script(from_script).unwrap();
-    state
-        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_short_address, 200000)
-        .unwrap();
+    let from_eth_address = [1u8; 20];
+    let (from_id, _from_script_hash) =
+        crate::helper::create_eth_eoa_account(&mut state, &from_eth_address, 200000);
 
     {
         // Deploy FallbackFunction Contract
@@ -42,7 +38,7 @@ fn test_fallback_function() {
             .build();
         let raw_tx = RawL2Transaction::new_builder()
             .from_id(from_id.pack())
-            .to_id(creator_account_id.pack())
+            .to_id(CREATOR_ACCOUNT_ID.pack())
             .args(Bytes::from(args).pack())
             .build();
         let db = store.begin_transaction();
@@ -63,7 +59,7 @@ fn test_fallback_function() {
     }
 
     let contract_account_script =
-        new_account_script(&mut state, creator_account_id, from_id, false);
+        new_contract_account_script(&mut state, from_id, &from_eth_address, false);
     let new_account_id = state
         .get_account_id_by_script_hash(&contract_account_script.hash().into())
         .unwrap()

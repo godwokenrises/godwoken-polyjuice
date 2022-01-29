@@ -874,7 +874,10 @@ int bn256_pairing_istanbul(gw_context_t* ctx,
   return ERROR_BN256_PAIRING;
 }
 
-
+/**
+ * @brief Match Precompiled Contracts
+ * @see  - https://www.evm.codes/precompiled
+ */
 bool match_precompiled_address(const evmc_address* destination,
                                precompiled_contract_gas_fn* contract_gas,
                                precompiled_contract_fn* contract) {
@@ -934,8 +937,8 @@ bool match_precompiled_address(const evmc_address* destination,
     *contract = recover_account;
     break;
   case 0xf3:
-    *contract_gas = eth_to_godwoken_addr_gas;
-    *contract = eth_to_godwoken_addr;
+    *contract_gas = eth_addr_to_gw_short_script_hash_gas;
+    *contract = eth_addr_to_gw_short_script_hash;
     break;
   case 0xf4:
     *contract_gas = total_supply_of_any_sudt_gas;

@@ -14,13 +14,6 @@ Note in Ethereum, one can also send some ETH to a smart contract for certain beh
 
 Polyjuice only provides [contract accounts](https://ethereum.org/en/glossary/#contract-account). Godwoken's user accounts are leveraged to act as [EoAs](https://ethereum.org/en/glossary/#eoa).
 
-### Different Address Type
-
-* All eth_address(EoA/contract) format are `short_godwoken_account_script_hash`, which is the 20 bytes prefix of Godwoken account script hash
-* Creating a contract account returns `short_godwoken_account_script_hash`
-
-When you pass some [address-type](https://docs.soliditylang.org/en/v0.8.9/types.html#address) parameters to call smart-contract, the `address` converting must be done first, vice versa for the return `address` value. [Polyjuice-Provider](https://github.com/nervosnetwork/polyjuice-provider) has been designed to handle these conversion tasks. It converts `address` type converting according to your contract's ABI.
-
 ## Transaction Structure
 
 A Polyjuice transaction is essentially just a Godwoken transaction.

@@ -58,7 +58,7 @@ void test(const char *sender_hex, uint32_t nonce, const char *expected_rlp, cons
 }
 
 int main() {
-#ifndef NO_DEBUG_LOG
+#ifdef CKB_C_STDLIB_PRINTF
   // init buffer for debug_print
   char buffer[DEBUG_BUFFER_SIZE];
   g_debug_buffer = buffer;

@@ -12,15 +12,6 @@
 #include <evmc/evmc.hpp>
 #include <evmone/evmone.h>
 
-#ifdef NO_DEBUG_LOG
-int printf(const char *format, ...) { return 0; }
-#else
-int printf(const char *format, ...) {
-  ckb_debug(format);
-  return 0;
-}
-#endif
-
 /* https://stackoverflow.com/a/1545079 */
 #pragma push_macro("errno")
 #undef errno
@@ -30,7 +21,6 @@ int printf(const char *format, ...) {
 #include "common.h"
 
 #include "sudt_utils.h"
-#include "polyjuice_globals.h"
 #include "polyjuice_errors.h"
 #include "polyjuice_utils.h"
 
@@ -155,9 +145,13 @@ int parse_args(struct evmc_message* msg, uint128_t* gas_price,
   size_t offset = 0;
   uint8_t* args = tx_ctx->args;
 
-  /* args[0..8] magic header + call kind */
-  static const uint8_t polyjuice_args_header[7] = {0xff, 0xff, 0xff, 'P', 'O', 'L', 'Y'};
-  if (memcmp(polyjuice_args_header, args, 7) != 0) {
+  /**
+   * args[0..8] magic header + call kind
+   * Only access native eth_address after Polyjuice v1.0.0
+   */
+  static const uint8_t eth_polyjuice_args_header[7]
+    = {0xff, 0xff, 0xff, 'P', 'O', 'L', 'Y'};
+  if (memcmp(eth_polyjuice_args_header, args, 7) != 0) {
     debug_print_data("invalid polyjuice args header", args, 7);
     return -1;
   }
@@ -205,16 +199,23 @@ int parse_args(struct evmc_message* msg, uint128_t* gas_price,
   /* args[52..52+input_size] */
   uint8_t* input_data = args + offset;
 
-  int ret;
+  /* Fill msg.sender */
   evmc_address sender{0};
   uint8_t from_script_hash[32] = {0};
-  ret = ctx->sys_get_script_hash_by_account_id(ctx, tx_ctx->from_id, from_script_hash);
+  int ret = ctx->sys_get_script_hash_by_account_id(ctx, tx_ctx->from_id,
+                                                   from_script_hash);
   if (ret != 0) {
     debug_print_int("get from script hash failed", tx_ctx->from_id);
     return ret;
   }
-  memcpy(sender.bytes, from_script_hash, 20);
-  memcpy(g_tx_origin.bytes, sender.bytes, 20);
+  // msg.sender should always be an EOA
+  ret = load_eth_address_by_script_hash(ctx, from_script_hash, sender.bytes);
+  if (ret != 0) {
+    debug_print_int("load eth_address by script hash failed", tx_ctx->from_id);
+    return ret;
+  }
+
+  memcpy(g_tx_origin.bytes, sender.bytes, ETH_ADDRESS_LEN);
 
   msg->kind = kind;
   msg->flags = 0;
@@ -256,7 +257,7 @@ int load_account_code(gw_context_t* gw_ctx, uint32_t account_id,
   mol_seg_t hash_type_seg = MolReader_Script_get_hash_type(&script_seg);
   mol_seg_t args_seg = MolReader_Script_get_args(&script_seg);
   mol_seg_t raw_args_seg = MolReader_Bytes_raw_bytes(&args_seg);
-  if (raw_args_seg.size != CONTRACT_ACCOUNT_SCRIPT_ARGS_SIZE) {
+  if (raw_args_seg.size != CONTRACT_ACCOUNT_SCRIPT_ARGS_LEN) {
     debug_print_int("[load_account_code] invalid account script", account_id);
     debug_print_int("[load_account_code] raw_args_seg.size", raw_args_seg.size);
     // This is an EoA or other kind of account
@@ -328,6 +329,7 @@ struct evmc_tx_context get_tx_context(struct evmc_host_context* context) {
     debug_print_int("get script hash by block producer id failed", context->gw_ctx->block_info.block_producer_id);
     context->error_code = ret;
   }
+  // FIXME: fix the address of coinbase (block producer)
   memcpy(ctx.block_coinbase.bytes, coinbase_script_hash, 20);
   ctx.block_number = context->gw_ctx->block_info.number;
   /*
@@ -357,10 +359,12 @@ bool account_exists(struct evmc_host_context* context,
   debug_print_data("BEGIN account_exists", address->bytes, 20);
   uint8_t script_hash[32] = {0};
   bool exists = true;
-  int ret = context->gw_ctx->sys_get_script_hash_by_prefix(context->gw_ctx, (uint8_t *)address->bytes, 20, script_hash);
+  int ret = load_script_hash_by_eth_address(context->gw_ctx, address->bytes,
+                                            script_hash);
   if (ret != 0) {
     exists = false;
-    return ret;
+    debug_print_int("[account_exists] load_script_hash_by_eth_address failed",
+                    ret);
   }
   debug_print_int("END account_exists", (int)exists);
   return exists;
@@ -371,7 +375,8 @@ evmc_bytes32 get_storage(struct evmc_host_context* context,
   ckb_debug("BEGIN get_storage");
   evmc_bytes32 value{0};
   int ret = context->gw_ctx->sys_load(context->gw_ctx, context->to_id,
-                                      key->bytes, GW_KEY_BYTES, (uint8_t*)value.bytes);
+                                      key->bytes, GW_KEY_BYTES,
+                                      (uint8_t *)value.bytes);
   if (ret != 0) {
     debug_print_int("get_storage, sys_load failed", ret);
     if (is_fatal_error(ret)) {
@@ -405,9 +410,9 @@ enum evmc_storage_status set_storage(struct evmc_host_context* context,
 size_t get_code_size(struct evmc_host_context* context,
                      const evmc_address* address) {
   ckb_debug("BEGIN get_code_size");
-  int ret;
   uint32_t account_id = 0;
-  ret = address_to_account_id(context->gw_ctx, address->bytes, &account_id);
+  int ret = load_account_id_by_eth_address(context->gw_ctx,
+                                           address->bytes, &account_id);
   if (ret != 0) {
     ckb_debug("get contract account id failed");
     return 0;
@@ -428,9 +433,9 @@ evmc_bytes32 get_code_hash(struct evmc_host_context* context,
                            const evmc_address* address) {
   ckb_debug("BEGIN get_code_hash");
   evmc_bytes32 hash{0};
-  int ret;
   uint32_t account_id = 0;
-  ret = address_to_account_id(context->gw_ctx, address->bytes, &account_id);
+  int ret = load_account_id_by_eth_address(context->gw_ctx,
+                                           address->bytes, &account_id);
   if (ret != 0) {
     ckb_debug("get contract account id failed");
     context->error_code = ret;
@@ -457,9 +462,9 @@ evmc_bytes32 get_code_hash(struct evmc_host_context* context,
 size_t copy_code(struct evmc_host_context* context, const evmc_address* address,
                  size_t code_offset, uint8_t* buffer_data, size_t buffer_size) {
   ckb_debug("BEGIN copy_code");
-  int ret;
   uint32_t account_id = 0;
-  ret = address_to_account_id(context->gw_ctx, address->bytes, &account_id);
+  int ret = load_account_id_by_eth_address(context->gw_ctx,
+                                           address->bytes, &account_id);
   if (ret != 0) {
     ckb_debug("get contract account id failed");
     context->error_code = ret;
@@ -481,43 +486,78 @@ size_t copy_code(struct evmc_host_context* context, const evmc_address* address,
 evmc_uint256be get_balance(struct evmc_host_context* context,
                            const evmc_address* address) {
   ckb_debug("BEGIN get_balance");
-  int ret;
   evmc_uint256be balance{};
+
+  uint8_t script_hash[32] = {0};
+
+  int ret = load_script_hash_by_eth_address(context->gw_ctx, address->bytes,
+                                            script_hash);
+  if (ret != 0) {
+    debug_print_int("[get_balance] load_script_hash_by_eth_address failed",
+                    ret);
+    context->error_code = FATAL_POLYJUICE;
+    return balance;
+  }
+
   uint128_t value_u128 = 0;
-  ret = sudt_get_balance(context->gw_ctx, g_sudt_id, POLYJUICE_SHORT_ADDR_LEN, address->bytes, &value_u128);
-  /* g_sudt_id account must exists */
+  ret = sudt_get_balance(context->gw_ctx,
+                         g_sudt_id, /* g_sudt_id account must exists */
+                         DEFAULT_SHORT_SCRIPT_HASH_LEN,
+                         script_hash, &value_u128);
   if (ret != 0) {
     ckb_debug("sudt_get_balance failed");
     context->error_code = FATAL_POLYJUICE;
     return balance;
   }
+
   uint8_t* value_ptr = (uint8_t*)(&value_u128);
   for (int i = 0; i < 16; i++) {
     balance.bytes[31 - i] = *(value_ptr + i);
   }
-  ckb_debug("END get_balance");
   debug_print_data("address", address->bytes, 20);
   debug_print_int("balance", value_u128);
+  ckb_debug("END get_balance");
   return balance;
 }
 
 void selfdestruct(struct evmc_host_context* context,
                   const evmc_address* address,
                   const evmc_address* beneficiary) {
-  int ret;
+  uint8_t from_script_hash[32] = {0};
+  int ret = load_script_hash_by_eth_address(context->gw_ctx, address->bytes,
+                                            from_script_hash);
+  if (ret != 0) {
+    debug_print_int("[selfdestruct] load_script_hash_by_eth_address failed",
+                    ret);
+    context->error_code = ret;
+    return;
+  }
   uint128_t balance;
-  ret = sudt_get_balance(context->gw_ctx, g_sudt_id, POLYJUICE_SHORT_ADDR_LEN, context->destination.bytes, &balance);
-  /* g_sudt_id account must exists */
+  ret = sudt_get_balance(context->gw_ctx,
+                         g_sudt_id,  /* g_sudt_id account must exists */
+                         DEFAULT_SHORT_SCRIPT_HASH_LEN,
+                         from_script_hash, &balance);
   if (ret != 0) {
     ckb_debug("get balance failed");
     context->error_code = ret;
     return;
   }
+
   if (balance > 0) {
+    uint8_t to_script_hash[32] = {0};
+    ret = load_script_hash_by_eth_address(context->gw_ctx, beneficiary->bytes,
+                                          to_script_hash);
+    if (ret != 0) {
+      debug_print_int("[selfdestruct] load_script_hash_by_eth_address failed",
+                      ret);
+      context->error_code = ret;
+      return;
+    }
+
     ret = sudt_transfer(context->gw_ctx, g_sudt_id,
-                        POLYJUICE_SHORT_ADDR_LEN,
-                        context->destination.bytes,
-                        beneficiary->bytes,
+                        DEFAULT_SHORT_SCRIPT_HASH_LEN,
+                        from_script_hash,
+                        to_script_hash,
                         balance);
     if (ret != 0) {
       ckb_debug("transfer beneficiary failed");
@@ -668,6 +708,9 @@ void emit_log(struct evmc_host_context* context, const evmc_address* address,
   return;
 }
 
+/**
+ * @return 0 if the `to_id` account is not destructed
+ */
 int check_destructed(gw_context_t* ctx, uint32_t to_id) {
   int ret;
   uint8_t destructed_raw_key[GW_KEY_BYTES];
@@ -692,6 +735,13 @@ int check_destructed(gw_context_t* ctx, uint32_t to_id) {
   return 0;
 }
 
+/**
+ * load the following global values:
+ * - g_creator_account_id
+ * - g_script_hash_type
+ * - g_rollup_script_hash
+ * - g_sudt_id
+ */
 int load_globals(gw_context_t* ctx, uint32_t to_id, evmc_call_kind call_kind) {
   uint8_t buffer[GW_MAX_SCRIPT_SIZE];
   mol_seg_t script_seg;
@@ -714,8 +764,8 @@ int load_globals(gw_context_t* ctx, uint32_t to_id, evmc_call_kind call_kind) {
     /* polyjuice creator account */
     g_creator_account_id = to_id;
     creator_raw_args_seg = raw_args_seg;
-  } else if (raw_args_seg.size == CONTRACT_ACCOUNT_SCRIPT_ARGS_SIZE) {
-    /* read creator account and then read sudt id from it */
+  } else if (raw_args_seg.size == CONTRACT_ACCOUNT_SCRIPT_ARGS_LEN) {
+    /* read creator account id and do some checking */
     memcpy(&g_creator_account_id, raw_args_seg.ptr + 32, sizeof(uint32_t));
     int ret = load_account_script(ctx,
                                   g_creator_account_id,
@@ -741,11 +791,11 @@ int load_globals(gw_context_t* ctx, uint32_t to_id, evmc_call_kind call_kind) {
     debug_print_data("invalid to account script args", raw_args_seg.ptr, raw_args_seg.size);
     return FATAL_POLYJUICE;
   }
-
+  /** read rollup_script_hash and g_sudt_id from creator account */
   memcpy(g_rollup_script_hash, creator_raw_args_seg.ptr, 32);
   memcpy(&g_sudt_id, creator_raw_args_seg.ptr + 32, sizeof(uint32_t));
-  debug_print_data("rollup_script_hash", g_rollup_script_hash, 32);
-  debug_print_int("sudt id", g_sudt_id);
+  debug_print_data("g_rollup_script_hash", g_rollup_script_hash, 32);
+  debug_print_int("g_sudt_id", g_sudt_id);
   return 0;
 }
 
@@ -756,12 +806,12 @@ int create_new_account(gw_context_t* ctx,
                        uint8_t* code_data,
                        size_t code_size) {
   if (code_size == 0) {
-    ckb_debug("can't create new account by empty code data");
+    ckb_debug("[create_new_account] can't create new account by empty code data");
     return FATAL_POLYJUICE;
   }
 
   int ret = 0;
-  uint8_t script_args[SCRIPT_ARGS_LEN];
+  uint8_t script_args[CONTRACT_ACCOUNT_SCRIPT_ARGS_LEN];
   uint8_t data[128] = {0};
   uint32_t data_len = 0;
   if (msg->kind == EVMC_CREATE) {
@@ -772,6 +822,7 @@ int create_new_account(gw_context_t* ctx,
 
        Above data will be RLP encoded.
     */
+    ckb_debug("[create_new_account] msg->kind == EVMC_CREATE");
     uint32_t nonce;
     /* from_id must already exists */
     ret = ctx->sys_get_account_nonce(ctx, from_id, &nonce);
@@ -790,6 +841,7 @@ int create_new_account(gw_context_t* ctx,
        - [32 bytes] create2_salt
        - [32 bytes] keccak256(init_code)
     */
+    ckb_debug("[create_new_account] msg->kind == EVMC_CREATE2");
     union ethash_hash256 hash_result = ethash::keccak256(code_data, code_size);
     data[0] = 0xff;
     memcpy(data + 1, msg->sender.bytes, 20);
@@ -797,7 +849,7 @@ int create_new_account(gw_context_t* ctx,
     memcpy(data + 1 + 20 + 32, hash_result.bytes, 32);
     data_len = 1 + 20 + 32 + 32;
   } else {
-    ckb_debug("unreachable");
+    ckb_debug("[create_new_account] unreachable");
     return FATAL_POLYJUICE;
   }
 
@@ -810,12 +862,13 @@ int create_new_account(gw_context_t* ctx,
   memcpy(script_args, g_rollup_script_hash, 32);
   memcpy(script_args + 32, (uint8_t*)(&g_creator_account_id), 4);
   union ethash_hash256 data_hash_result = ethash::keccak256(data, data_len);
-  memcpy(script_args + 32 + 4, data_hash_result.bytes + 12, 20);
+  uint8_t *eth_addr = data_hash_result.bytes + 12;
+  memcpy(script_args + 32 + 4, eth_addr, ETH_ADDRESS_LEN);
 
   mol_seg_t new_script_seg;
   uint32_t new_account_id;
   ret = build_script(g_script_code_hash, g_script_hash_type, script_args,
-                     SCRIPT_ARGS_LEN, &new_script_seg);
+                     CONTRACT_ACCOUNT_SCRIPT_ARGS_LEN, &new_script_seg);
   if (ret != 0) {
     return ret;
   }
@@ -824,7 +877,8 @@ int create_new_account(gw_context_t* ctx,
   ret = ctx->sys_create(ctx, new_script_seg.ptr, new_script_seg.size, &new_account_id);
   if (ret != 0) {
     debug_print_int("sys_create error", ret);
-    ckb_debug("create account failed assume account already created by meta_contract");
+
+    // create account failed assume account already created by meta_contract
     ret = ctx->sys_get_account_id_by_script_hash(ctx, script_hash, &new_account_id);
     if (ret != 0) {
       return ret;
@@ -832,41 +886,69 @@ int create_new_account(gw_context_t* ctx,
   }
   free(new_script_seg.ptr);
   *to_id = new_account_id;
-  memcpy((uint8_t *)msg->destination.bytes, script_hash, 20);
+  memcpy((uint8_t *)msg->destination.bytes, eth_addr, 20);
   debug_print_int(">> new to id", *to_id);
+
+  // register a created contract account into `ETH Address Registry`
+  ret = update_eth_address_register(ctx, eth_addr, script_hash);
+  if (ret != 0) {
+    ckb_debug("[create_new_account] failed to register a contract account");
+    return ret;
+  }
+
   return 0;
 }
 
 int handle_transfer(gw_context_t* ctx,
                     const evmc_message* msg,
-                    uint8_t tx_origin_addr[20],
                     bool to_address_is_eoa) {
-  int ret;
   uint8_t value_u128_bytes[16];
   for (int i = 0; i < 16; i++) {
     if (msg->value.bytes[i] != 0) {
-      ckb_debug("transfer value can not larger than u128::max()");
+      ckb_debug("[handle_transfer] transfer value can not larger than u128::max()");
       return FATAL_POLYJUICE;
     }
     value_u128_bytes[i] = msg->value.bytes[31 - i];
   }
   uint128_t value_u128 = *(uint128_t*)value_u128_bytes;
-  debug_print_data("sender", msg->sender.bytes, 20);
-  debug_print_data("destination", msg->destination.bytes, 20);
-  debug_print_int("transfer value", value_u128);
-  ret = sudt_transfer(ctx, g_sudt_id,
-                      POLYJUICE_SHORT_ADDR_LEN,
-                      msg->sender.bytes,
-                      msg->destination.bytes,
-                      value_u128);
+  debug_print_data("[handle_transfer] sender", msg->sender.bytes, 20);
+  debug_print_data("[handle_transfer] destination", msg->destination.bytes, 20);
+  debug_print_int("[handle_transfer] msg->value", value_u128);
+
+  if (msg->kind == EVMC_CALL
+   && memcmp(msg->sender.bytes, g_tx_origin.bytes, 20) == 0
+   && to_address_is_eoa) {
+    ckb_debug("warning: transfer value from eoa to eoa");
+    return FATAL_POLYJUICE;
+  }
+
+  uint8_t from_script_hash[32] = {0};
+  int ret = load_script_hash_by_eth_address(ctx, msg->sender.bytes,
+                                            from_script_hash);
   if (ret != 0) {
-    ckb_debug("sudt_transfer failed");
+    debug_print_int("[handle_transfer] load from_script_hash failed", ret);
     return ret;
   }
 
-  if (msg->kind == EVMC_CALL && memcmp(msg->sender.bytes, tx_origin_addr, 20) == 0 && to_address_is_eoa) {
-    ckb_debug("transfer value from eoa to eoa");
-    return FATAL_POLYJUICE;
+  uint8_t to_script_hash[32] = {0};
+  ret = load_script_hash_by_eth_address(ctx, msg->destination.bytes,
+                                        to_script_hash);
+  if (ret != 0) {
+    debug_print_int("[handle_transfer] load to_script_hash failed", ret);
+    return ret;
+  }
+
+  if (value_u128 == 0) {
+    return 0;
+  }
+  ret = sudt_transfer(ctx, g_sudt_id,
+                      DEFAULT_SHORT_SCRIPT_HASH_LEN,
+                      from_script_hash,
+                      to_script_hash,
+                      value_u128);
+  if (ret != 0) {
+    ckb_debug("[handle_transfer] sudt_transfer failed");
+    return ret;
   }
 
   return 0;
@@ -921,7 +1003,7 @@ int store_contract_code(gw_context_t* ctx,
   blake2b_hash(data_hash, (uint8_t*)res->output_data, res->output_size);
   polyjuice_build_contract_code_key(to_id, key);
   ckb_debug("BEGIN store data key");
-  debug_print_data("data_hash", data_hash, 32);
+  debug_print_data("code_data_hash", data_hash, 32);
   /* to_id must exists here */
   ret = ctx->sys_store(ctx, to_id, key, GW_KEY_BYTES, data_hash);
   if (ret != 0) {
@@ -949,25 +1031,20 @@ int handle_message(gw_context_t* ctx,
                    const evmc_message* msg_origin, struct evmc_result* res) {
   static const evmc_address zero_address{0};
 
-  ckb_debug("[handle_message] BEGIN handle_message");
   evmc_message msg = *msg_origin;
   int ret;
 
   bool to_address_exists = false;
   uint32_t to_id = 0;
   uint32_t from_id;
-  // TODO: passing this value from function argument
-  uint8_t from_script_hash[32] = {0};
-  uint8_t to_script_hash[32] = {0};
+
   if (memcmp(zero_address.bytes, msg.destination.bytes, 20) != 0) {
-    ret = ctx->sys_get_script_hash_by_prefix(ctx, msg.destination.bytes, 20, to_script_hash);
-    if (ret == 0) {
+    ret = load_account_id_by_eth_address(ctx, msg.destination.bytes, &to_id);
+    if (ret != 0) {
+      debug_print_int(
+        "[handle_message] load_account_id_by_eth_address failed", ret);
+    } else {
       to_address_exists = true;
-      ret = ctx->sys_get_account_id_by_script_hash(ctx, to_script_hash, &to_id);
-      if (ret != 0) {
-        debug_print_data("[handle_message] get to account id by script hash failed", to_script_hash, 32);
-        return ret;
-      }
     }
   } else {
     /* When msg.destination is zero
@@ -976,15 +1053,11 @@ int handle_message(gw_context_t* ctx,
     */
   }
 
-  ret = ctx->sys_get_script_hash_by_prefix(ctx, msg.sender.bytes, 20, from_script_hash);
-  if (ret == 0) {
-    ret = ctx->sys_get_account_id_by_script_hash(ctx, from_script_hash, &from_id);
-    if (ret != 0) {
-      debug_print_data("[handle_message] get from account id by script hash failed", from_script_hash, 32);
-      return ret;
-    }
-  } else {
-    debug_print_data("[handle_message] get sender script hash failed", msg.sender.bytes, 20);
+  /** get from_id */
+  ret = load_account_id_by_eth_address(ctx, msg.sender.bytes, &from_id);
+  if (ret != 0) {
+    debug_print_int(
+      "[handle_message] load_account_id_by_eth_address failed", ret);
     return ret;
   }
 
@@ -1029,7 +1102,8 @@ int handle_message(gw_context_t* ctx,
     }
     code_size = (size_t)code_size_u32;
   } else {
-    // Call non-exists address
+    /** Call non-exists address */
+    ckb_debug("[handle_message] Warn: Call non-exists address");
   }
 
   /* Handle special call: CALLCODE/DELEGATECALL */
@@ -1064,7 +1138,7 @@ int handle_message(gw_context_t* ctx,
      */
     ret = gw_increase_nonce(ctx, from_id, NULL);
     if (ret != 0) {
-      debug_print_int("increase nonce failed", ret);
+      debug_print_int("[handle_message] increase nonce failed", ret);
       return ret;
     }
   }
@@ -1072,7 +1146,7 @@ int handle_message(gw_context_t* ctx,
   /* Handle transfer logic.
      NOTE: MUST do this before vm.execute and after to_id finalized */
   bool to_address_is_eoa = !to_address_exists || (to_address_exists && code_size == 0);
-  ret = handle_transfer(ctx, &msg, (uint8_t *)g_tx_origin.bytes, to_address_is_eoa);
+  ret = handle_transfer(ctx, &msg, to_address_is_eoa);
   if (ret != 0) {
     return ret;
   }
@@ -1092,31 +1166,31 @@ int handle_message(gw_context_t* ctx,
     res->status_code = EVMC_SUCCESS;
   }
 
-  /* Store contract code though syscall */
   if (is_create(msg.kind)) {
-    // TODO: check code length < MAX_DATA_SIZE
+    /** Store contract code though syscall */
     ret = store_contract_code(ctx, to_id, res);
     if (ret != 0) {
       return ret;
     }
-  }
 
-  /* Rewrite create_address when call kind is CREATE/CREATE2 */
-  if (is_create(msg.kind)) {
+    /**
+     * When call kind is CREATE/CREATE2, update create_address of the new
+     * contract
+     */
     memcpy(res->create_address.bytes, msg.destination.bytes, 20);
   }
 
-  debug_print_int("[handle_message] output size", res->output_size);
-  debug_print_int("[handle_message] gas left", res->gas_left);
   uint32_t used_memory;
   memcpy(&used_memory, res->padding, sizeof(uint32_t));
   debug_print_int("[handle_message] used_memory(Bytes)", used_memory);
+  debug_print_int("[handle_message] gas left", res->gas_left);
   debug_print_int("[handle_message] status_code", res->status_code);
-  ckb_debug("[handle_message] END handle_message");
+
   return (int)res->status_code;
 }
 
-int emit_evm_result_log(gw_context_t* ctx, const uint64_t gas_used, const int status_code) {
+int emit_evm_result_log(gw_context_t* ctx,
+                        const uint64_t gas_used, const int status_code) {
   /*
     data = { gasUsed: u64, cumulativeGasUsed: u64, contractAddress: [u8;20], status_code: u32 }
 
@@ -1157,7 +1231,7 @@ int clean_evmc_result_and_return(evmc_result *res, int code) {
 }
 
 int run_polyjuice() {
-#ifndef NO_DEBUG_LOG
+#ifdef POLYJUICE_DEBUG_LOG
   // init buffer for debug_print
   char buffer[DEBUG_BUFFER_SIZE];
   g_debug_buffer = buffer;
@@ -1184,7 +1258,7 @@ int run_polyjuice() {
     return ret;
   }
 
-  /* Load: validator_code_hash, hash_type, sudt_id */
+  /* Load: validator_code_hash, hash_type, g_sudt_id */
   ret = load_globals(&context, context.transaction_context.to_id, msg.kind);
   if (ret != 0) {
     return ret;
@@ -1193,11 +1267,21 @@ int run_polyjuice() {
   /* Fill msg.destination after load globals */
   if (msg.kind != EVMC_CREATE) {
     uint8_t script_hash[32] = {0};
-    ret = context.sys_get_script_hash_by_account_id(&context,context.transaction_context.to_id, script_hash);
+    ret = context.sys_get_script_hash_by_account_id(
+        &context,
+        context.transaction_context.to_id,
+        script_hash);
     if (ret != 0) {
       return ret;
     }
-    memcpy(msg.destination.bytes, script_hash, 20);
+    // msg.destination should always be a contract account
+    ret = load_eth_address_by_script_hash(&context,
+                                          script_hash, msg.destination.bytes);
+    if (ret != 0) {
+      debug_print_int("load msg.destination failed, to_id",
+                      context.transaction_context.to_id);
+      return ret;
+    }
   }
 
   uint8_t evm_memory[MAX_EVM_MEMORY_SIZE];
@@ -1214,7 +1298,8 @@ int run_polyjuice() {
   if (res.status_code != 0) {
     debug_print_int("evmc_result.output_size", res.output_size);
     // The output contains data coming from REVERT opcode
-    debug_print_data("evmc_result.output_data:", res.output_data, res.output_size);
+    debug_print_data("evmc_result.output_data:", res.output_data,
+                     res.output_size > 64 ? 64 : res.output_size);
   }
   
   ret = emit_evm_result_log(&context, gas_used, res.status_code);
@@ -1256,19 +1341,34 @@ int run_polyjuice() {
   memcpy(&used_memory, res.padding, sizeof(uint32_t));
   debug_print_int("[run_polyjuice] used_memory(Bytes)", used_memory);
 
-  /* g_sudt_id must already exists */
-  ret = sudt_pay_fee(&context, g_sudt_id, POLYJUICE_SHORT_ADDR_LEN, msg.sender.bytes, fee);
+
+  uint8_t sender_script_hash[32] = {0};
+  ret = load_script_hash_by_eth_address(&context, msg.sender.bytes,
+                                        sender_script_hash);
   if (ret != 0) {
-    debug_print_int("pay fee to block_producer failed", ret);
-    return clean_evmc_result_and_return(&res, ret);
-  }
-  ret = sys_pay_fee(&context, msg.sender.bytes, POLYJUICE_SHORT_ADDR_LEN, g_sudt_id, fee);
-  if (ret != 0) {
-    debug_print_int("Record fee payment failed", ret);
+    debug_print_int("[run_polyjuice] load_script_hash failed", ret);
     return clean_evmc_result_and_return(&res, ret);
   }
 
-  ckb_debug("finalize");
+  ret = sudt_pay_fee(&context,
+                     g_sudt_id, /* g_sudt_id must already exists */
+                     DEFAULT_SHORT_SCRIPT_HASH_LEN,
+                     sender_script_hash, fee);
+  if (ret != 0) {
+    debug_print_int("[run_polyjuice] pay fee to block_producer failed", ret);
+    return clean_evmc_result_and_return(&res, ret);
+  }
+
+  // call the SYS_PAY_FEE syscall to record the fee
+  // NOTICE: this function do not actually execute the transfer of assets
+  ret = sys_pay_fee(&context, sender_script_hash, DEFAULT_SHORT_SCRIPT_HASH_LEN,
+                    g_sudt_id, fee);
+  if (ret != 0) {
+    debug_print_int("[run_polyjuice] Record fee payment failed", ret);
+    return clean_evmc_result_and_return(&res, ret);
+  }
+
+  ckb_debug("[run_polyjuice] finalize");
   ret = gw_finalize(&context);
   if (ret != 0) {
     return clean_evmc_result_and_return(&res, ret);

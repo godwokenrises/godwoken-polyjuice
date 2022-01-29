@@ -2,8 +2,8 @@
 //!   See ./evm-contracts/RecursionContract.sol
 
 use crate::helper::{
-    build_eth_l2_script, deploy, new_account_script, new_block_info, setup, PolyjuiceArgsBuilder,
-    CKB_SUDT_ACCOUNT_ID, L2TX_MAX_CYCLES,
+    self, deploy, new_block_info, new_contract_account_script, setup, PolyjuiceArgsBuilder,
+    CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
 use gw_generator::{error::TransactionError, traits::StateExt};
@@ -15,19 +15,12 @@ const RECURSION_INIT_CODE: &str = include_str!("./evm-contracts/RecursionContrac
 
 #[test]
 fn test_recursion_contract_call() {
-    let (store, mut state, generator, creator_account_id) = setup();
-    let block_producer_script = build_eth_l2_script([0x99u8; 20]);
-    let block_producer_id = state
-        .create_account_from_script(block_producer_script)
-        .unwrap();
+    let (store, mut state, generator) = setup();
+    let block_producer_id = helper::create_block_producer(&mut state);
 
-    let from_script = build_eth_l2_script([1u8; 20]);
-    let from_script_hash = from_script.hash();
-    let from_short_address = &from_script_hash[0..20];
-    let from_id = state.create_account_from_script(from_script).unwrap();
-    state
-        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_short_address, 200000)
-        .unwrap();
+    let from_eth_address = [1u8; 20];
+    let (from_id, _from_script_hash) =
+        helper::create_eth_eoa_account(&mut state, &from_eth_address, 200000);
     let mut block_number = 1;
 
     // Deploy RecursionContract
@@ -35,7 +28,7 @@ fn test_recursion_contract_call() {
         &generator,
         &store,
         &mut state,
-        creator_account_id,
+        CREATOR_ACCOUNT_ID,
         from_id,
         RECURSION_INIT_CODE,
         122000,
@@ -44,7 +37,8 @@ fn test_recursion_contract_call() {
         block_number,
     );
     block_number += 1;
-    let recur_account_script = new_account_script(&mut state, creator_account_id, from_id, false);
+    let recur_account_script =
+        new_contract_account_script(&mut state, from_id, &from_eth_address, false);
     let recur_account_id = state
         .get_account_id_by_script_hash(&recur_account_script.hash().into())
         .unwrap()
