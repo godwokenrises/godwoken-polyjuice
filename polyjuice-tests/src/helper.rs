@@ -801,12 +801,8 @@ pub(crate) fn eth_address_regiser(
             .build()
             .pack(),
         SetMappingArgs::Batch(gw_script_hashes) => {
-            let fee = gw_types::packed::Fee::new_builder()
-                .amount(1000.pack())
-                .sudt_id(CKB_SUDT_ACCOUNT_ID.pack())
-                .build();
             let batch_set_mapping = BatchSetMapping::new_builder()
-                .fee(fee)
+                .fee(1000u64.pack())
                 .gw_script_hashes(gw_script_hashes.pack())
                 .build();
             let args = ETHAddrRegArgs::new_builder()
