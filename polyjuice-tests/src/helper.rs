@@ -18,13 +18,16 @@ use gw_store::traits::chain_store::ChainStore;
 use gw_store::traits::kv_store::KVStoreWrite;
 pub use gw_store::{chain_view::ChainView, Store};
 use gw_traits::CodeStore;
-use gw_types::offchain::RollupContext;
 use gw_types::{
     bytes::Bytes,
     core::ScriptHashType,
     offchain::RunResult,
-    packed::{BlockInfo, LogItem, RawL2Transaction, RollupConfig, Script, Uint64},
+    packed::{BatchSetMapping, BlockInfo, LogItem, RawL2Transaction, RollupConfig, Script, Uint64},
     prelude::*,
+};
+use gw_types::{
+    offchain::RollupContext,
+    packed::{ETHAddrRegArgs, ETHAddrRegArgsUnion},
 };
 use rlp::RlpStream;
 use std::{fs, io::Read, path::PathBuf};
@@ -775,6 +778,11 @@ impl SetMappingArgsBuilder {
     }
 }
 
+pub enum SetMappingArgs {
+    One(H256),
+    Batch(Vec<H256>),
+}
+
 /// Set two-ways mappings between `eth_address` and `gw_script_hash`
 /// by `ETH Address Registry` layer2 contract
 pub(crate) fn eth_address_regiser(
@@ -782,18 +790,32 @@ pub(crate) fn eth_address_regiser(
     state: &mut DummyState,
     generator: &Generator,
     from_id: u32,
-    gw_script_hash: H256,
     block_info: BlockInfo,
+    set_mapping_args: SetMappingArgs,
 ) -> Result<RunResult, TransactionError> {
-    let args = SetMappingArgsBuilder::default()
-        .method(2u32)
-        .gw_script_hash(gw_script_hash.into())
-        .set_fee(1000)
-        .build();
+    let args = match set_mapping_args {
+        SetMappingArgs::One(gw_script_hash) => SetMappingArgsBuilder::default()
+            .method(2u32)
+            .gw_script_hash(gw_script_hash.into())
+            .set_fee(1000)
+            .build()
+            .pack(),
+        SetMappingArgs::Batch(gw_script_hashes) => {
+            let batch_set_mapping = BatchSetMapping::new_builder()
+                .fee(1000u64.pack())
+                .gw_script_hashes(gw_script_hashes.pack())
+                .build();
+            let args = ETHAddrRegArgs::new_builder()
+                .set(ETHAddrRegArgsUnion::BatchSetMapping(batch_set_mapping))
+                .build();
+            args.as_bytes().pack()
+        }
+    };
+
     let raw_l2tx = RawL2Transaction::new_builder()
         .from_id(from_id.pack())
         .to_id(ETH_ADDRESS_REGISTRY_ACCOUNT_ID.pack())
-        .args(args.pack())
+        .args(args)
         .build();
     let db = store.begin_transaction();
     let tip_block_hash = store.get_tip_block_hash().unwrap();
