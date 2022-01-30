@@ -215,7 +215,7 @@ fn test_batch_set_mapping_by_contract() {
     }
 
     // update_eth_address_registry by `ETH Address Registry` layer2 contract
-    crate::helper::eth_address_regiser(
+    let run_result = crate::helper::eth_address_regiser(
         &store,
         &mut state,
         &generator,
@@ -224,8 +224,9 @@ fn test_batch_set_mapping_by_contract() {
         crate::helper::SetMappingArgs::Batch(eth_eoa_script_hashes.clone()),
     )
     .expect("eth address registered");
+    assert_eq!(run_result.exit_code, 0);
+    state.apply_run_result(&run_result).expect("update state");
 
-    let mut block_number = 2;
     for (eth_eoa_address, eth_eoa_account_script_hash) in
         eth_eoa_addresses.into_iter().zip(eth_eoa_script_hashes)
     {
@@ -241,15 +242,13 @@ fn test_batch_set_mapping_by_contract() {
             .to_id(ETH_ADDRESS_REGISTRY_ACCOUNT_ID.pack())
             .args(args.pack())
             .build();
-        let block_info = new_block_info(block_producer_id, block_number, 0);
-        block_number += 1;
         let tip_block_hash = store.get_tip_block_hash().unwrap();
         let db = store.begin_transaction();
         let run_result = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
                 &state,
-                &block_info,
+                &new_block_info(block_producer_id, 3, 3),
                 &raw_l2tx,
                 L2TX_MAX_CYCLES,
                 None,
@@ -269,13 +268,11 @@ fn test_batch_set_mapping_by_contract() {
             .build();
         let db = store.begin_transaction();
         let tip_block_hash = db.get_tip_block_hash().unwrap();
-        let block_info = new_block_info(block_producer_id, block_number, 0);
-        block_number += 1;
         let run_result = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
                 &state,
-                &block_info,
+                &new_block_info(block_producer_id, 3, 3),
                 &raw_l2tx,
                 L2TX_MAX_CYCLES,
                 None,
