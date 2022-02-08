@@ -35,7 +35,6 @@ int handle_fee(gw_context_t *ctx, uint64_t fee) {
     return ret;
   }
 
-  const uint32_t CKB_SUDT_ACCOUNT_ID = 1;
   const uint64_t SHORT_SCRIPT_HASH_LEN = DEFAULT_SHORT_SCRIPT_HASH_LEN;
   return sudt_pay_fee(ctx, CKB_SUDT_ACCOUNT_ID, SHORT_SCRIPT_HASH_LEN,
                       payer_account_script_hash, fee);
