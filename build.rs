@@ -15,19 +15,19 @@ const CKB_HASH_PERSONALIZATION: &[u8] = b"ckb-default-hash";
 const BINARIES: &[(&str, &str)] = &[
     (
         "generator",
-        "bdeb615b9fb35b562c99ecf33ca16067db5f9d18565fc7e1886c10dbd38d0671",
+        "260736cca15f42ec5316b3e162b8876e6c4408d2bf2d932ddd6edf510ccb1688",
     ),
     (
         "validator",
-        "4a9b7884057399e611caf163ec62a07f6d5419d30926938cf7ae9fb5006ef4c8",
+        "53062d7fd82f6bf1ac8671fcc585510800c66a98499a2c3458a44edfe5330a16",
     ),
     (
         "generator_log",
-        "51a00a5cc8c039c387789ff98e6fe207b25c0ca444a377929302d44bd56ebc02",
+        "941b06beefeb6f6721da4085cbf03044ff9aa06b37006646ba191e846849c0a0",
     ),
     (
         "validator_log",
-        "f9fc83481fc18f0f7586cea0769ce59816ca2534d75535229d9febd5bc88cd16",
+        "6cb7351c0acb7f423a61ed044e7f96ab430c5832edc89a83bbf6bcde289febcb",
     ),
 ];
 

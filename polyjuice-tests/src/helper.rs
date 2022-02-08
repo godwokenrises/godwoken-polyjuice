@@ -20,9 +20,12 @@ pub use gw_store::{chain_view::ChainView, Store};
 use gw_traits::CodeStore;
 use gw_types::{
     bytes::Bytes,
-    core::ScriptHashType,
+    core::{AllowedContractType, AllowedEoaType, ScriptHashType},
     offchain::RunResult,
-    packed::{BatchSetMapping, BlockInfo, LogItem, RawL2Transaction, RollupConfig, Script, Uint64},
+    packed::{
+        AllowedTypeHash, BatchSetMapping, BlockInfo, LogItem, RawL2Transaction, RollupConfig,
+        Script, Uint64,
+    },
     prelude::*,
 };
 use gw_types::{
@@ -293,7 +296,7 @@ pub fn eth_address_to_account_id(state: &DummyState, data: &[u8]) -> Result<u32,
         return Ok(0);
     }
     let account_script_hash = state
-        .get_script_hash_by_short_address(data)
+        .get_script_hash_by_short_script_hash(data)
         .ok_or_else(|| format!("can not get script hash by short address: {:?}", data))?;
     state
         .get_account_id_by_script_hash(&account_script_hash)
@@ -482,14 +485,20 @@ pub fn setup() -> (Store, DummyState, Generator) {
         .l2_sudt_validator_script_type_hash(SUDT_VALIDATOR_SCRIPT_TYPE_HASH.pack())
         .allowed_contract_type_hashes(
             vec![
-                META_VALIDATOR_SCRIPT_TYPE_HASH.clone().pack(),
-                SUDT_VALIDATOR_SCRIPT_TYPE_HASH.clone().pack(),
-                POLYJUICE_PROGRAM_CODE_HASH.clone().pack(),
+                AllowedTypeHash::new(AllowedContractType::Meta, META_VALIDATOR_SCRIPT_TYPE_HASH),
+                AllowedTypeHash::new(AllowedContractType::Sudt, SUDT_VALIDATOR_SCRIPT_TYPE_HASH),
+                AllowedTypeHash::new(AllowedContractType::Polyjuice, *POLYJUICE_PROGRAM_CODE_HASH),
                 // ETH_ADDRESS_REGISTRY_PROGRAM_CODE_HASH.clone().pack(),
             ]
             .pack(),
         )
-        .allowed_eoa_type_hashes(vec![ETH_ACCOUNT_LOCK_CODE_HASH.clone().pack()].pack())
+        .allowed_eoa_type_hashes(
+            vec![AllowedTypeHash::new(
+                AllowedEoaType::Eth,
+                ETH_ACCOUNT_LOCK_CODE_HASH,
+            )]
+            .pack(),
+        )
         .build();
     let rollup_context = RollupContext {
         rollup_script_hash: ROLLUP_SCRIPT_HASH.clone().into(),
