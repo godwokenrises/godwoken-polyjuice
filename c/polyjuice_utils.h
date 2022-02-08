@@ -305,22 +305,34 @@ int eth_address_register(gw_context_t *ctx,
    */
   mol_seg_t allowed_eoa_list_seg =
       MolReader_RollupConfig_get_allowed_eoa_type_hashes(&rollup_config_seg);
-  const uint32_t eth_eoa_idx = 0;
-  mol_seg_res_t eth_lock_code_hash_res =
-      MolReader_Byte32Vec_get(&allowed_eoa_list_seg, eth_eoa_idx);
-  if (!is_errno_ok(&eth_lock_code_hash_res)) {
-    ckb_debug("[eth_address_register] failed to get eth_lock EOA code_hash");
-    return GW_FATAL_INVALID_DATA;
-  }
-  if (memcmp(script_code_hash_seg.ptr, eth_lock_code_hash_res.seg.ptr,
-             script_code_hash_seg.size) == 0) {
-    ckb_debug("[eth_address_register] This is an ETH externally owned account");
-    if (raw_bytes_seg.size != 52) {
-      ckb_debug("[eth_address_register] not eth_account_lock");
-      return GW_FATAL_UNKNOWN_ARGS;
+  uint32_t len = MolReader_AllowedTypeHashVec_length(&allowed_eoa_list_seg);
+  for (uint32_t i = 0; i < len; i++) {
+    mol_seg_res_t allowed_type_hash_res =
+        MolReader_AllowedTypeHashVec_get(&allowed_eoa_list_seg, i);
+
+    if (!is_errno_ok(&allowed_type_hash_res)) {
+      ckb_debug("[eth_address_register] failed to get eth_lock EOA code_hash");
+      return GW_FATAL_INVALID_DATA;
     }
-    _gw_fast_memcpy(eth_address, raw_bytes_seg.ptr + 32, ETH_ADDRESS_LEN);
-    return update_eth_address_register(ctx, eth_address, script_hash);
+
+    mol_seg_t type_seg =
+        MolReader_AllowedTypeHash_get_type_(&allowed_type_hash_res.seg);
+    if (*(uint8_t *)type_seg.ptr == GW_ALLOWED_EOA_ETH) {
+      mol_seg_t eth_lock_code_hash_seg =
+          MolReader_AllowedTypeHash_get_hash(&allowed_type_hash_res.seg);
+
+      if (memcmp(script_code_hash_seg.ptr, eth_lock_code_hash_seg.ptr,
+                 script_code_hash_seg.size) == 0) {
+        ckb_debug(
+            "[eth_address_register] This is an ETH externally owned account");
+        if (raw_bytes_seg.size != 52) {
+          ckb_debug("[eth_address_register] not eth_account_lock");
+          return GW_FATAL_UNKNOWN_ARGS;
+        }
+        _gw_fast_memcpy(eth_address, raw_bytes_seg.ptr + 32, ETH_ADDRESS_LEN);
+        return update_eth_address_register(ctx, eth_address, script_hash);
+      }
+    }
   }
 
   /**
@@ -345,22 +357,35 @@ int eth_address_register(gw_context_t *ctx,
   mol_seg_t allowed_contract_list_seg =
       MolReader_RollupConfig_get_allowed_contract_type_hashes(
           &rollup_config_seg);
-  const uint32_t polyjuice_idx = 2;
-  mol_seg_res_t polyjuice_code_hash_res =
-      MolReader_Byte32Vec_get(&allowed_contract_list_seg, polyjuice_idx);
-  if (!is_errno_ok(&polyjuice_code_hash_res)) {
-    ckb_debug("[eth_address_register] failed to get Polyjuice code_hash");
-    return GW_FATAL_INVALID_DATA;
-  }
-  if (memcmp(script_code_hash_seg.ptr, polyjuice_code_hash_res.seg.ptr,
-             script_code_hash_seg.size) == 0) {
-    ckb_debug("[eth_address_register] This is a Polyjuice contract account");
-    if (raw_bytes_seg.size != CONTRACT_ACCOUNT_SCRIPT_ARGS_LEN) {
-      ckb_debug("[eth_address_register] not Polyjuice contract script_args");
-      return GW_FATAL_UNKNOWN_ARGS;
+  len = MolReader_AllowedTypeHashVec_length(&allowed_contract_list_seg);
+  for (uint32_t i = 0; i < len; i++) {
+    mol_seg_res_t allowed_type_hash_res =
+        MolReader_AllowedTypeHashVec_get(&allowed_eoa_list_seg, i);
+
+    if (!is_errno_ok(&allowed_type_hash_res)) {
+      ckb_debug("[eth_address_register] failed to get Polyjuice code_hash");
+      return GW_FATAL_INVALID_DATA;
     }
-    _gw_fast_memcpy(eth_address, raw_bytes_seg.ptr + 36, ETH_ADDRESS_LEN);
-    return update_eth_address_register(ctx, eth_address, script_hash);
+
+    mol_seg_t type_seg =
+        MolReader_AllowedTypeHash_get_type_(&allowed_type_hash_res.seg);
+    if (*(uint8_t *)type_seg.ptr == GW_ALLOWED_CONTRACT_POLYJUICE) {
+      mol_seg_t polyjuice_code_hash_seg =
+          MolReader_AllowedTypeHash_get_hash(&allowed_type_hash_res.seg);
+
+      if (memcmp(script_code_hash_seg.ptr, polyjuice_code_hash_seg.ptr,
+                 script_code_hash_seg.size) == 0) {
+        ckb_debug(
+            "[eth_address_register] This is a Polyjuice contract account");
+        if (raw_bytes_seg.size != CONTRACT_ACCOUNT_SCRIPT_ARGS_LEN) {
+          ckb_debug(
+              "[eth_address_register] not Polyjuice contract script_args");
+          return GW_FATAL_UNKNOWN_ARGS;
+        }
+        _gw_fast_memcpy(eth_address, raw_bytes_seg.ptr + 36, ETH_ADDRESS_LEN);
+        return update_eth_address_register(ctx, eth_address, script_hash);
+      }
+    }
   }
 
   return GW_ERROR_UNKNOWN_SCRIPT_CODE_HASH;
