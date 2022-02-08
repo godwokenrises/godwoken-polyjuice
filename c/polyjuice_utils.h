@@ -1,13 +1,13 @@
 #ifndef POLYJUICE_UTILS_H
 #define POLYJUICE_UTILS_H
 
+#include <evmc/evmc.h>
 #include <stddef.h>
 #include <stdint.h>
 
-#include <evmc/evmc.h>
 #include "ckb_syscalls.h"
-#include "polyjuice_globals.h"
 #include "polyjuice_errors.h"
+#include "polyjuice_globals.h"
 
 #ifdef POLYJUICE_DEBUG_LOG
 /* 64 KB */
@@ -15,7 +15,7 @@
 static char *g_debug_buffer;
 void debug_print_data(const char *prefix, const uint8_t *data,
                       uint32_t data_len) {
-  if (data_len > (DEBUG_BUFFER_SIZE - 1024) / 2 - 1) { // leave 1KB to prefix
+  if (data_len > (DEBUG_BUFFER_SIZE - 1024) / 2 - 1) {  // leave 1KB to prefix
     ckb_debug("warning: length of data is too large");
     return;
   }
@@ -32,7 +32,7 @@ void debug_print_data(const char *prefix, const uint8_t *data,
   g_debug_buffer[offset] = '\0';
   ckb_debug(g_debug_buffer);
 }
-void debug_print_int(const char* prefix, int64_t ret) {
+void debug_print_int(const char *prefix, int64_t ret) {
   sprintf(g_debug_buffer, "%s => %ld", prefix, ret);
   ckb_debug(g_debug_buffer);
 }
@@ -40,10 +40,18 @@ void debug_print_int(const char* prefix, int64_t ret) {
 int printf(const char *format, ...) { return 0; }
 #else
 #undef ckb_debug
-#define ckb_debug(s) do {} while (0)
-#define debug_print(s) do {} while (0)
-#define debug_print_int(prefix, value) do {} while (0)
-#define debug_print_data(prefix, data, data_len) do {} while (0)
+#define ckb_debug(s) \
+  do {               \
+  } while (0)
+#define debug_print(s) \
+  do {                 \
+  } while (0)
+#define debug_print_int(prefix, value) \
+  do {                                 \
+  } while (0)
+#define debug_print_data(prefix, data, data_len) \
+  do {                                           \
+  } while (0)
 int printf(const char *format, ...) { return 0; }
 #endif /* POLYJUICE_DEBUG_LOG */
 
@@ -58,16 +66,16 @@ bool is_errno_ok(mol_seg_res_t *script_res) {
 #pragma pop_macro("errno")
 
 int build_script(const uint8_t code_hash[32], const uint8_t hash_type,
-                 const uint8_t* args, const uint32_t args_len,
-                 mol_seg_t* script_seg) {
+                 const uint8_t *args, const uint32_t args_len,
+                 mol_seg_t *script_seg) {
   /* 1. Build Script by receipt.return_data */
   mol_seg_t args_seg;
   args_seg.size = 4 + args_len;
-  args_seg.ptr = (uint8_t*)malloc(args_seg.size);
+  args_seg.ptr = (uint8_t *)malloc(args_seg.size);
   if (args_seg.ptr == NULL) {
     return FATAL_POLYJUICE;
   }
-  memcpy(args_seg.ptr, (uint8_t*)(&args_len), 4);
+  memcpy(args_seg.ptr, (uint8_t *)(&args_len), 4);
   memcpy(args_seg.ptr + 4, args, args_len);
   debug_print_int("script.hash_type", hash_type);
 
@@ -121,12 +129,12 @@ void gw_build_eth_addr_to_script_hash_key(
 
 /**
  * @param script_hash should have been initialed as zero_hash = {0}
- * 
+ *
  * TODO: shall we cache the mapping data in Polyjuice memory?
  */
 int load_script_hash_by_eth_address(gw_context_t *ctx,
                                     const uint8_t eth_address[ETH_ADDRESS_LEN],
-                                    uint8_t script_hash[GW_VALUE_BYTES]) {                                    
+                                    uint8_t script_hash[GW_VALUE_BYTES]) {
   if (ctx == NULL) {
     return GW_FATAL_INVALID_CONTEXT;
   }
@@ -137,7 +145,7 @@ int load_script_hash_by_eth_address(gw_context_t *ctx,
   if (ret != 0) {
     return ret;
   }
-  if (_is_zero_hash(script_hash)) { 
+  if (_is_zero_hash(script_hash)) {
     return GW_ERROR_NOT_FOUND;
   }
   ckb_debug("load_script_hash_by_eth_address success");
@@ -154,7 +162,7 @@ int load_eth_address_by_script_hash(gw_context_t *ctx,
   uint8_t raw_key[GW_KEY_BYTES] = {0};
   gw_build_script_hash_to_eth_address_key(script_hash, raw_key);
 
-  /** 
+  /**
    * ethabi address format
    *  e.g. web3.eth.abi.decodeParameter('address',
    *         '0000000000000000000000001829d79cce6aa43d13e67216b355e81a7fffb220')
@@ -174,7 +182,7 @@ int load_eth_address_by_script_hash(gw_context_t *ctx,
 
 /**
  * @brief register a created account into `ETH Address Registry`
- * 
+ *
  * @param ctx gw_context
  * @param eth_address there are two ETH account types:
  * 1. Externally-owned – controlled by anyone with the private keys
@@ -184,15 +192,15 @@ int load_eth_address_by_script_hash(gw_context_t *ctx,
  */
 int update_eth_address_register(gw_context_t *ctx,
                                 const uint8_t eth_address[ETH_ADDRESS_LEN],
-                                const uint8_t script_hash[GW_VALUE_BYTES]) {  
+                                const uint8_t script_hash[GW_VALUE_BYTES]) {
   if (ctx == NULL) {
     return GW_FATAL_INVALID_CONTEXT;
   }
 
-  debug_print_data("[eth_address_registry] Add ETH Address",
-        eth_address, ETH_ADDRESS_LEN);
+  debug_print_data("[eth_address_registry] Add ETH Address", eth_address,
+                   ETH_ADDRESS_LEN);
   debug_print_data("[eth_address_registry] Add godwoken_account_script_hash",
-                     script_hash, GW_VALUE_BYTES);
+                   script_hash, GW_VALUE_BYTES);
 
   int ret;
   uint8_t raw_key[GW_KEY_BYTES] = {0};
@@ -212,7 +220,7 @@ int update_eth_address_register(gw_context_t *ctx,
 
   // gw_script_hash -> eth_address
   gw_build_script_hash_to_eth_address_key(script_hash, raw_key);
-  /** 
+  /**
    * ethabi address format
    *  e.g. web3.eth.abi.decodeParameter('address',
    *         '0000000000000000000000001829d79cce6aa43d13e67216b355e81a7fffb220')
@@ -230,21 +238,21 @@ int update_eth_address_register(gw_context_t *ctx,
 
 /**
  * @brief register an account into `ETH Address Registry` by its script_hash
- * 
+ *
  * Option 1: ETH EOA (externally owned account)
  * Option 2: Polyjuice Contract Account
- * 
+ *
  * @param ctx gw_context
  * @param script_hash this account should be created on Godwoken
  * @return int: 0 means success
- * 
+ *
  * NOTICE: We should avoid address conflict between EOA and contract.
- * 
- * Ethereum addresses are currently only 160 bits long. This means it is 
+ *
+ * Ethereum addresses are currently only 160 bits long. This means it is
  * possible to create a collision between a contract account and an Externally
- * Owned Account (EOA) using an estimated 2**80 computing operations, which is 
+ * Owned Account (EOA) using an estimated 2**80 computing operations, which is
  * feasible now given a large budget (ca. 10 billion USD).
- * 
+ *
  * See https://eips.ethereum.org/EIPS/eip-3607
  */
 int eth_address_register(gw_context_t *ctx,
@@ -304,7 +312,7 @@ int eth_address_register(gw_context_t *ctx,
     ckb_debug("[eth_address_register] failed to get eth_lock EOA code_hash");
     return GW_FATAL_INVALID_DATA;
   }
-  if (memcmp(script_code_hash_seg.ptr, eth_lock_code_hash_res.seg.ptr, 
+  if (memcmp(script_code_hash_seg.ptr, eth_lock_code_hash_res.seg.ptr,
              script_code_hash_seg.size) == 0) {
     ckb_debug("[eth_address_register] This is an ETH externally owned account");
     if (raw_bytes_seg.size != 52) {
@@ -314,28 +322,29 @@ int eth_address_register(gw_context_t *ctx,
     _gw_fast_memcpy(eth_address, raw_bytes_seg.ptr + 32, ETH_ADDRESS_LEN);
     return update_eth_address_register(ctx, eth_address, script_hash);
   }
-   
+
   /**
    * Option 2: Polyjuice Contract Account
-   * 
+   *
    * There are 2 major ways in which a Polyjuice smart contract can be deployed:
-   * 
+   *
    * 1. CREATE Flow:
-   *   The address of an normal contract is deterministically computed from 
-   * the address of its creator (sender) and how many transactions the creator 
-   * has sent (nonce). The sender and nonce are RLP encoded and then hashed with 
+   *   The address of an normal contract is deterministically computed from
+   * the address of its creator (sender) and how many transactions the creator
+   * has sent (nonce). The sender and nonce are RLP encoded and then hashed with
    * Keccak-256.
    *   `eth_address = hash(sender, nonce)`
-   * 
+   *
    * 2. CREATE2 Flow (EIP-1014):
-   *   This is a way to say: “I'll deploy this contract at this address in the 
+   *   This is a way to say: “I'll deploy this contract at this address in the
    * future."
    *   `eth_address = hash(0xFF, sender, salt, bytecode)`
-   * 
+   *
    * See {create_new_account} in polyjuice.h
    */
   mol_seg_t allowed_contract_list_seg =
-      MolReader_RollupConfig_get_allowed_contract_type_hashes(&rollup_config_seg);
+      MolReader_RollupConfig_get_allowed_contract_type_hashes(
+          &rollup_config_seg);
   const uint32_t polyjuice_idx = 2;
   mol_seg_res_t polyjuice_code_hash_res =
       MolReader_Byte32Vec_get(&allowed_contract_list_seg, polyjuice_idx);
@@ -346,7 +355,7 @@ int eth_address_register(gw_context_t *ctx,
   if (memcmp(script_code_hash_seg.ptr, polyjuice_code_hash_res.seg.ptr,
              script_code_hash_seg.size) == 0) {
     ckb_debug("[eth_address_register] This is a Polyjuice contract account");
-    if (raw_bytes_seg.size != CONTRACT_ACCOUNT_SCRIPT_ARGS_LEN ) {
+    if (raw_bytes_seg.size != CONTRACT_ACCOUNT_SCRIPT_ARGS_LEN) {
       ckb_debug("[eth_address_register] not Polyjuice contract script_args");
       return GW_FATAL_UNKNOWN_ARGS;
     }
@@ -358,15 +367,15 @@ int eth_address_register(gw_context_t *ctx,
 }
 
 /**
- * @brief 
+ * @brief
  * TODO: test this function
- * @param ctx 
- * @param address 
- * @param account_id 
- * @return int 
+ * @param ctx
+ * @param address
+ * @param account_id
+ * @return int
  */
-int load_account_id_by_eth_address(
-    gw_context_t *ctx, const uint8_t address[20], uint32_t *account_id) {
+int load_account_id_by_eth_address(gw_context_t *ctx, const uint8_t address[20],
+                                   uint32_t *account_id) {
   if (ctx == NULL) {
     return GW_FATAL_INVALID_CONTEXT;
   }
@@ -411,7 +420,8 @@ void rlp_encode_sender_and_nonce(const evmc_address *sender, uint32_t nonce,
     /* nonce header */
     data[2 + 20] = nonce_bytes_len + RLP_ITEM_OFFSET;
     /* nonce content */
-    memcpy(data + 2 + 20 + 1, nonce_be + (4 - nonce_bytes_len), nonce_bytes_len);
+    memcpy(data + 2 + 20 + 1, nonce_be + (4 - nonce_bytes_len),
+           nonce_bytes_len);
     *data_len = 2 + 20 + 1 + nonce_bytes_len;
   }
   /* list header */
@@ -419,7 +429,8 @@ void rlp_encode_sender_and_nonce(const evmc_address *sender, uint32_t nonce,
 }
 
 /* Parse uint32_t/uint128_t from big endian byte32 data */
-int parse_integer(const uint8_t data_be[32], uint8_t *value, size_t value_size) {
+int parse_integer(const uint8_t data_be[32], uint8_t *value,
+                  size_t value_size) {
   if (value_size > 32) {
     return -1;
   }
@@ -469,7 +480,8 @@ void put_u128(uint128_t value, uint8_t *output) {
  *   - polyjuice_globals.h   FATAL_PRECOMPILED_CONTRACTS -51
  */
 bool is_fatal_error(int error_code) {
-  return (error_code >= 50 && error_code < 80) || (error_code > -80 && error_code <= -50);
+  return (error_code >= 50 && error_code < 80) ||
+         (error_code > -80 && error_code <= -50);
 }
 
 /* See evmc.h evmc_status_code */
@@ -477,4 +489,4 @@ bool is_evmc_error(int error_code) {
   return error_code >= 1 && error_code <= 16;
 }
 
-#endif // POLYJUICE_UTILS_H
+#endif  // POLYJUICE_UTILS_H
