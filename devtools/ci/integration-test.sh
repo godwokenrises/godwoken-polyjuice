@@ -15,7 +15,7 @@ else
     git clone -b compatibility-breaking-changes https://github.com/nervosnetwork/godwoken.git $GODWOKEN_DIR
 fi
 cd $GODWOKEN_DIR
-git checkout 8da36de46fd703419869f013c41f4755add0a982 # https://github.com/nervosnetwork/godwoken/commits/8da36de
+git checkout 5ab0b782f0eb2d835705bf52475eeb874b203ed0 # https://github.com/nervosnetwork/godwoken/commits/5ab0b78
 git submodule update --init --recursive --depth=1
 
 cd $PROJECT_ROOT
