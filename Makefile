@@ -59,7 +59,7 @@ all: build/blockchain.h build/godwoken.h \
   build/generator_log build/validator_log \
   build/eth_addr_reg_generator build/eth_addr_reg_validator
 
-all-via-docker: generate-protocol
+all-via-docker: generate-protocol fetch-gw-scripts
 	mkdir -p build
 	docker run --rm -v `pwd`:/code -w /code ${BUILDER_DOCKER} make
 	make patch-generator && make patch-generator_log
@@ -251,7 +251,6 @@ contract/sudt-erc20-proxy:
 
 fetch-gw-scripts:
 	mkdir -p build
-	docker pull ghcr.io/flouse/godwoken-prebuilds:v1.0.x-aot-202202080748
 	docker run --rm -v `pwd`/build:/build-dir \
 		ghcr.io/flouse/godwoken-prebuilds:v1.0.x-aot-202202080748 \
 		cp -r /scripts/godwoken-scripts /build-dir \
