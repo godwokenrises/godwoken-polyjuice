@@ -293,7 +293,7 @@ pub fn eth_address_to_account_id(state: &DummyState, data: &[u8]) -> Result<u32,
         return Ok(0);
     }
     let account_script_hash = state
-        .get_script_hash_by_short_address(data)
+        .get_script_hash_by_short_script_hash(data)
         .ok_or_else(|| format!("can not get script hash by short address: {:?}", data))?;
     state
         .get_account_id_by_script_hash(&account_script_hash)
