@@ -251,9 +251,9 @@ contract/sudt-erc20-proxy:
 
 fetch-gw-scripts:
 	mkdir -p build
-	docker pull nervos/godwoken-prebuilds:latest
+	docker pull ghcr.io/flouse/godwoken-prebuilds:v1.0.x-aot-202202080748
 	docker run --rm -v `pwd`/build:/build-dir \
-		nervos/godwoken-prebuilds:latest \
+		ghcr.io/flouse/godwoken-prebuilds:v1.0.x-aot-202202080748 \
 		cp -r /scripts/godwoken-scripts /build-dir \
 		&& echo "Copy godwoken-scripts"
 
