@@ -100,29 +100,34 @@ int build_script(const uint8_t code_hash[32], const uint8_t hash_type,
   return 0;
 }
 
+/**
+ * @brief Generate a SMT key
+ * @param script_hash 
+ * @param raw_key = blake2b(g_eth_addr_reg_id | type | script_hash)
+ */
 void gw_build_script_hash_to_eth_address_key(
     const uint8_t script_hash[GW_KEY_BYTES], uint8_t raw_key[GW_KEY_BYTES]) {
   blake2b_state blake2b_ctx;
   blake2b_init(&blake2b_ctx, GW_KEY_BYTES);
-  uint32_t placeholder = 0;
-  blake2b_update(&blake2b_ctx, (uint8_t *)&placeholder, sizeof(uint32_t));
+  blake2b_update(&blake2b_ctx, (uint8_t *)&g_eth_addr_reg_id, sizeof(uint32_t));
   uint8_t type = GW_ACCOUNT_SCRIPT_HASH_TO_ETH_ADDR;
   blake2b_update(&blake2b_ctx, (uint8_t *)&type, 1);
   blake2b_update(&blake2b_ctx, script_hash, GW_KEY_BYTES);
   blake2b_final(&blake2b_ctx, raw_key, GW_KEY_BYTES);
 }
 
+/**
+ * @brief Generate a SMT key
+ * @param eth_address 
+ * @param raw_key = blake2b(g_eth_addr_reg_id | type | eth_address)
+ */
 void gw_build_eth_addr_to_script_hash_key(
     const uint8_t eth_address[ETH_ADDRESS_LEN], uint8_t raw_key[GW_KEY_BYTES]) {
   blake2b_state blake2b_ctx;
   blake2b_init(&blake2b_ctx, GW_KEY_BYTES);
-  /* placeholder: 0 */
-  uint32_t placeholder = 0;
-  blake2b_update(&blake2b_ctx, (uint8_t *)&placeholder, sizeof(uint32_t));
-  /* type */
+  blake2b_update(&blake2b_ctx, (uint8_t *)&g_eth_addr_reg_id, sizeof(uint32_t));
   uint8_t type = ETH_ADDR_TO_GW_ACCOUNT_SCRIPT_HASH;
   blake2b_update(&blake2b_ctx, (uint8_t *)&type, 1);
-  /* eth_address */
   blake2b_update(&blake2b_ctx, eth_address, ETH_ADDRESS_LEN);
   blake2b_final(&blake2b_ctx, raw_key, GW_KEY_BYTES);
 }

@@ -36,8 +36,8 @@ use rlp::RlpStream;
 use std::{fs, io::Read, path::PathBuf};
 
 pub use gw_common::builtins::{CKB_SUDT_ACCOUNT_ID, RESERVED_ACCOUNT_ID};
-pub const CREATOR_ACCOUNT_ID: u32 = 2;
-pub const ETH_ADDRESS_REGISTRY_ACCOUNT_ID: u32 = 3;
+pub const ETH_ADDRESS_REGISTRY_ACCOUNT_ID: u32 = 2;
+pub const CREATOR_ACCOUNT_ID: u32 = 3;
 
 pub const L2TX_MAX_CYCLES: u64 = 7000_0000;
 
@@ -421,19 +421,6 @@ pub fn setup() -> (Store, DummyState, Generator) {
         "ckb simple UDT account id"
     );
 
-    let mut args = [0u8; 36];
-    args[0..32].copy_from_slice(&ROLLUP_SCRIPT_HASH);
-    args[32..36].copy_from_slice(&ckb_sudt_id.to_le_bytes()[..]);
-    let creator_script = Script::new_builder()
-        .code_hash(POLYJUICE_PROGRAM_CODE_HASH.pack())
-        .hash_type(ScriptHashType::Type.into())
-        .args(args.to_vec().pack())
-        .build();
-    let creator_account_id = state
-        .create_account_from_script(creator_script)
-        .expect("create creator_account");
-    assert_eq!(creator_account_id, CREATOR_ACCOUNT_ID);
-
     // create `ETH Address Registry` layer2 contract account
     let eth_addr_reg_script = Script::new_builder()
         .code_hash(ETH_ADDRESS_REGISTRY_PROGRAM_CODE_HASH.pack())
@@ -443,6 +430,20 @@ pub fn setup() -> (Store, DummyState, Generator) {
         .create_account_from_script(eth_addr_reg_script)
         .expect("create `ETH Address Registry` layer2 contract");
     assert_eq!(eth_addr_reg_account_id, ETH_ADDRESS_REGISTRY_ACCOUNT_ID);
+
+    let mut args = [0u8; 40];
+    args[0..32].copy_from_slice(&ROLLUP_SCRIPT_HASH);
+    args[32..36].copy_from_slice(&ckb_sudt_id.to_le_bytes()[..]);
+    args[36..40].copy_from_slice(&eth_addr_reg_account_id.to_le_bytes()[..]);
+    let creator_script = Script::new_builder()
+        .code_hash(POLYJUICE_PROGRAM_CODE_HASH.pack())
+        .hash_type(ScriptHashType::Type.into())
+        .args(args.to_vec().pack())
+        .build();
+    let creator_account_id = state
+        .create_account_from_script(creator_script)
+        .expect("create creator_account");
+    assert_eq!(creator_account_id, CREATOR_ACCOUNT_ID);
 
     state.insert_data(*SECP_DATA_HASH, Bytes::from(SECP_DATA));
     state
@@ -473,7 +474,7 @@ pub fn setup() -> (Store, DummyState, Generator) {
         validator_script_type_hash: POLYJUICE_PROGRAM_CODE_HASH.clone().into(),
     });
     backend_manage.register_backend(Backend {
-        backend_type: BackendType::Unknown,
+        backend_type: BackendType::EthAddrReg,
         validator: ETH_ADDRESS_REGISTRY_VALIDATOR_PROGRAM.clone(),
         generator: ETH_ADDRESS_REGISTRY_GENERATOR_PROGRAM.clone(),
         validator_script_type_hash: ETH_ADDRESS_REGISTRY_PROGRAM_CODE_HASH.clone().into(),
@@ -488,7 +489,10 @@ pub fn setup() -> (Store, DummyState, Generator) {
                 AllowedTypeHash::new(AllowedContractType::Meta, META_VALIDATOR_SCRIPT_TYPE_HASH),
                 AllowedTypeHash::new(AllowedContractType::Sudt, SUDT_VALIDATOR_SCRIPT_TYPE_HASH),
                 AllowedTypeHash::new(AllowedContractType::Polyjuice, *POLYJUICE_PROGRAM_CODE_HASH),
-                // ETH_ADDRESS_REGISTRY_PROGRAM_CODE_HASH.clone().pack(),
+                AllowedTypeHash::new(
+                    AllowedContractType::EthAddrReg,
+                    *ETH_ADDRESS_REGISTRY_PROGRAM_CODE_HASH,
+                ),
             ]
             .pack(),
         )
@@ -716,7 +720,7 @@ pub(crate) fn check_cycles(l2_tx_label: &str, used_cycles: u64, warning_cycles: 
 fn build_eth_address_to_script_hash_key(eth_address: &[u8; 20]) -> H256 {
     let mut key: [u8; 32] = H256::zero().into();
     let mut hasher = new_blake2b();
-    hasher.update(&gw_common::state::GW_NON_ACCOUNT_PLACEHOLDER);
+    hasher.update(&ETH_ADDRESS_REGISTRY_ACCOUNT_ID.to_le_bytes());
     hasher.update(&[ETH_ADDR_TO_GW_ACCOUNT_SCRIPT_HASH]);
     hasher.update(eth_address);
     hasher.finalize(&mut key);
@@ -726,7 +730,7 @@ fn build_eth_address_to_script_hash_key(eth_address: &[u8; 20]) -> H256 {
 fn build_script_hash_to_eth_address_key(script_hash: &[u8; 32]) -> H256 {
     let mut key: [u8; 32] = H256::zero().into();
     let mut hasher = new_blake2b();
-    hasher.update(&gw_common::state::GW_NON_ACCOUNT_PLACEHOLDER);
+    hasher.update(&ETH_ADDRESS_REGISTRY_ACCOUNT_ID.to_le_bytes());
     hasher.update(&[GW_ACCOUNT_SCRIPT_HASH_TO_ETH_ADDR]);
     hasher.update(script_hash);
     hasher.finalize(&mut key);
