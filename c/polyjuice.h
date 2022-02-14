@@ -199,24 +199,6 @@ int parse_args(struct evmc_message* msg, uint128_t* gas_price,
   /* args[52..52+input_size] */
   uint8_t* input_data = args + offset;
 
-  /* Fill msg.sender */
-  evmc_address sender{0};
-  uint8_t from_script_hash[32] = {0};
-  int ret = ctx->sys_get_script_hash_by_account_id(ctx, tx_ctx->from_id,
-                                                   from_script_hash);
-  if (ret != 0) {
-    debug_print_int("get from script hash failed", tx_ctx->from_id);
-    return ret;
-  }
-  // msg.sender should always be an EOA
-  ret = load_eth_address_by_script_hash(ctx, from_script_hash, sender.bytes);
-  if (ret != 0) {
-    debug_print_int("load eth_address by script hash failed", tx_ctx->from_id);
-    return ret;
-  }
-
-  memcpy(g_tx_origin.bytes, sender.bytes, ETH_ADDRESS_LEN);
-
   msg->kind = kind;
   msg->flags = 0;
   msg->depth = 0;
@@ -224,7 +206,7 @@ int parse_args(struct evmc_message* msg, uint128_t* gas_price,
   msg->input_data = input_data;
   msg->input_size = input_size;
   msg->gas = gas_limit;
-  msg->sender = sender;
+  msg->sender = evmc_address{0};
   msg->destination = evmc_address{0};
   msg->create2_salt = evmc_bytes32{};
   return 0;
@@ -741,8 +723,9 @@ int check_destructed(gw_context_t* ctx, uint32_t to_id) {
  * - g_script_hash_type
  * - g_rollup_script_hash
  * - g_sudt_id
+ * - g_eth_addr_reg_id
  */
-int load_globals(gw_context_t* ctx, uint32_t to_id, evmc_call_kind call_kind) {
+int load_globals(gw_context_t* ctx, uint32_t to_id) {
   uint8_t buffer[GW_MAX_SCRIPT_SIZE];
   mol_seg_t script_seg;
   int ret = load_account_script(ctx, to_id, buffer, GW_MAX_SCRIPT_SIZE, &script_seg);
@@ -760,7 +743,7 @@ int load_globals(gw_context_t* ctx, uint32_t to_id, evmc_call_kind call_kind) {
   uint8_t creator_script_buffer[GW_MAX_SCRIPT_SIZE];
   mol_seg_t creator_script_seg;
   mol_seg_t creator_raw_args_seg;
-  if (raw_args_seg.size == 36) {
+  if (raw_args_seg.size == CREATOR_SCRIPT_ARGS_LEN) {
     /* polyjuice creator account */
     g_creator_account_id = to_id;
     creator_raw_args_seg = raw_args_seg;
@@ -783,8 +766,9 @@ int load_globals(gw_context_t* ctx, uint32_t to_id, evmc_call_kind call_kind) {
         || *creator_hash_type_seg.ptr != *hash_type_seg.ptr
         /* compare rollup_script_hash */
         || memcmp(creator_raw_args_seg.ptr, raw_args_seg.ptr, 32) != 0
-        || creator_raw_args_seg.size != 36) {
-      debug_print_int("invalid creator account id in normal contract account script args", g_creator_account_id);
+        || creator_raw_args_seg.size != CREATOR_SCRIPT_ARGS_LEN) {
+      debug_print_int("invalid creator account id in normal contract account script args",
+                      g_creator_account_id);
       return FATAL_POLYJUICE;
     }
   } else {
@@ -796,6 +780,10 @@ int load_globals(gw_context_t* ctx, uint32_t to_id, evmc_call_kind call_kind) {
   memcpy(&g_sudt_id, creator_raw_args_seg.ptr + 32, sizeof(uint32_t));
   debug_print_data("g_rollup_script_hash", g_rollup_script_hash, 32);
   debug_print_int("g_sudt_id", g_sudt_id);
+  /** read g_eth_addr_reg_id from creator_script_args[36..40] */
+  memcpy(&g_eth_addr_reg_id, creator_raw_args_seg.ptr + 36, sizeof(uint32_t));
+  debug_print_int("g_eth_addr_reg_id", g_eth_addr_reg_id);
+
   return 0;
 }
 
@@ -1230,6 +1218,52 @@ int clean_evmc_result_and_return(evmc_result *res, int code) {
   return code;
 }
 
+/**
+ * @brief Fill the sender and destination of msg after globals loaded
+ */
+int fill_msg_sender_and_dest(gw_context_t* ctx, struct evmc_message* msg) {
+  gw_transaction_context_t *tx_ctx = &ctx->transaction_context;
+
+  /* Fill msg.sender afert load globals */
+  uint8_t from_script_hash[GW_KEY_BYTES] = {0};
+  int ret = ctx->sys_get_script_hash_by_account_id(ctx, tx_ctx->from_id,
+                                                   from_script_hash);
+  if (ret != 0) {
+    debug_print_int("get from script hash failed, from_id", tx_ctx->from_id);
+    return ret;
+  }
+  // msg.sender should always be an EOA
+  ret = load_eth_address_by_script_hash(ctx, from_script_hash,
+                                        msg->sender.bytes);
+  if (ret != 0) {
+    debug_print_int("load msg->sender failed, from_id", tx_ctx->from_id);
+    return ret;
+  }
+  memcpy(g_tx_origin.bytes, msg->sender.bytes, ETH_ADDRESS_LEN);
+
+  /* Fill msg.destination after load globals */
+  if (msg->kind != EVMC_CREATE) {
+    uint8_t to_script_hash[GW_KEY_BYTES] = {0};
+    ret = ctx->sys_get_script_hash_by_account_id(
+        ctx,
+        tx_ctx->to_id,
+        to_script_hash);
+    if (ret != 0) {
+      return ret;
+    }
+    // msg.destination should always be a contract account
+    ret = load_eth_address_by_script_hash(ctx, to_script_hash,
+                                          msg->destination.bytes);
+    if (ret != 0) {
+      debug_print_int("load msg.destination failed, to_id",
+                      tx_ctx->to_id);
+      return ret;
+    }
+  }
+
+  return 0;
+}
+
 int run_polyjuice() {
 #ifdef POLYJUICE_DEBUG_LOG
   // init buffer for debug_print
@@ -1259,29 +1293,15 @@ int run_polyjuice() {
   }
 
   /* Load: validator_code_hash, hash_type, g_sudt_id */
-  ret = load_globals(&context, context.transaction_context.to_id, msg.kind);
+  ret = load_globals(&context, context.transaction_context.to_id);
   if (ret != 0) {
     return ret;
   }
 
-  /* Fill msg.destination after load globals */
-  if (msg.kind != EVMC_CREATE) {
-    uint8_t script_hash[32] = {0};
-    ret = context.sys_get_script_hash_by_account_id(
-        &context,
-        context.transaction_context.to_id,
-        script_hash);
-    if (ret != 0) {
-      return ret;
-    }
-    // msg.destination should always be a contract account
-    ret = load_eth_address_by_script_hash(&context,
-                                          script_hash, msg.destination.bytes);
-    if (ret != 0) {
-      debug_print_int("load msg.destination failed, to_id",
-                      context.transaction_context.to_id);
-      return ret;
-    }
+  ret = fill_msg_sender_and_dest(&context, &msg);
+  if (ret !=0 ) {
+    ckb_debug("failed to fill_msg_sender_and_dest");
+    return ret;
   }
 
   uint8_t evm_memory[MAX_EVM_MEMORY_SIZE];
