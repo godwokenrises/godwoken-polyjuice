@@ -2,7 +2,7 @@
 
 [![FuzzTest](https://github.com/Flouse/godwoken-polyjuice/actions/workflows/fuzz.yml/badge.svg?branch=fuzz-v2)](https://github.com/Flouse/godwoken-polyjuice/actions/workflows/fuzz.yml)
 
-These three file were created to simulate `gw_syscalls`:
+These two file were created to simulate `gw_syscalls`:
 - polyjuice-tests/fuzz/ckb_syscalls.h
 - polyjuice-tests/fuzz/mock_godwoken.hpp
 
@@ -37,6 +37,15 @@ make build/test_contracts
 make build/test_rlp
 ./build/test_rlp
 ```
+
+## How to debug Polyjuice generator on x86?
+1. Compile Polyjuice generator on x86
+    ```bash
+    cd fuzz
+    make build/polyjuice_generator_fuzzer
+    ```
+2. Construct `pre_defined_test_case` in [polyjuice_generator_fuzzer.cc](./polyjuice_generator_fuzzer.cc)
+3. Run `build/polyjuice_generator_fuzzer_log` with GDB debugger, see: [launch.json](../../.vscode/launch.json) 
 
 ## Coverage Report[WIP]
 TBD
