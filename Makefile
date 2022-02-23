@@ -54,17 +54,17 @@ all: build/test_contracts build/test_rlp build/generator build/validator build/g
 
 all-via-docker: generate-protocol
 	mkdir -p build
-	docker run --rm -v `pwd`:/code ${BUILDER_DOCKER} bash -c "cd /code && make"
-	make patch-generator
+	docker run --rm -v `pwd`:/code -w /code ${BUILDER_DOCKER} make
+	make patch-generator && make patch-generator_log
 log-version-via-docker: generate-protocol
 	mkdir -p build
-	docker run --rm -v `pwd`:/code ${BUILDER_DOCKER} bash -c "cd /code && make build/generator_log && make build/validator_log"
+	docker run --rm -v `pwd`:/code -w /code ${BUILDER_DOCKER} bash -c "make build/generator_log && make build/validator_log"
 
 clean-via-docker:
 	mkdir -p build
-	docker run --rm -v `pwd`:/code ${BUILDER_DOCKER} bash -c "cd /code && make clean"
+	docker run --rm -v `pwd`:/code -w /code ${BUILDER_DOCKER} make clean
 
-dist: clean-via-docker all-via-docker patch-generator patch-generator_log
+dist: clean-via-docker all-via-docker
 
 CKB_BIN_PATCHER := deps/ckb-binary-patcher/target/release/ckb-binary-patcher
 build/ckb-binary-patcher:
@@ -80,10 +80,12 @@ build/ckb-binary-patcher:
 		cargo build --release)
 patch-generator: build/ckb-binary-patcher
 	${CKB_BIN_PATCHER} --remove-a -i build/generator -o build/generator.aot
-	cp build/generator build/generator.asm
+	mv build/generator build/generator.asm
+	cp build/generator.aot build/generator
 patch-generator_log: build/ckb-binary-patcher
 	${CKB_BIN_PATCHER} --remove-a -i build/generator_log -o build/generator_log.aot
-	cp build/generator_log build/generator_log.asm
+	mv build/generator_log build/generator_log.asm
+	cp build/generator_log.aot build/generator_log
 # patch-validator: build/ckb-binary-patcher
 # 	${CKB_BIN_PATCHER} --remove-a -i build/validator -o build/validator.aot
 # patch-validator_log: build/ckb-binary-patcher
