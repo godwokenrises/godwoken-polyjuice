@@ -425,6 +425,7 @@ pub fn setup() -> (Store, DummyState, Generator) {
     let eth_addr_reg_script = Script::new_builder()
         .code_hash(ETH_ADDRESS_REGISTRY_PROGRAM_CODE_HASH.pack())
         .hash_type(ScriptHashType::Type.into())
+        .args(ROLLUP_SCRIPT_HASH.to_vec().pack())
         .build();
     let eth_addr_reg_account_id = state
         .create_account_from_script(eth_addr_reg_script)
