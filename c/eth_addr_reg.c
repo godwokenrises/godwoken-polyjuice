@@ -41,7 +41,7 @@ int handle_fee(gw_context_t *ctx, uint64_t fee) {
 }
 
 int main() {
-#ifdef CKB_C_STDLIB_PRINTF
+#ifdef POLYJUICE_DEBUG_LOG
   // init buffer for debug_print
   char buffer[DEBUG_BUFFER_SIZE];
   g_debug_buffer = buffer;
@@ -54,6 +54,9 @@ int main() {
   if (ret != 0) {
     return ret;
   };
+
+  /* g_eth_addr_reg_id is used in the mapping key constructions */
+  g_eth_addr_reg_id = ctx.transaction_context.to_id;
 
   /* verify and parse args */
   mol_seg_t args_seg;

@@ -623,7 +623,7 @@ int init_mock_state() {
 #endif
 
 int main() {
-#ifdef CKB_C_STDLIB_PRINTF
+#ifdef POLYJUICE_DEBUG_LOG
   // init buffer for debug_print
   char buffer[DEBUG_BUFFER_SIZE];
   g_debug_buffer = buffer;

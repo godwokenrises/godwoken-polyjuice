@@ -66,7 +66,7 @@ all: generate-protocol build/polyjuice_generator_fuzzer
 build/polyjuice_generator_fuzzer: generate-protocol $(GENERATOR_DEPS)
 	$(CXX) $(CFLAGS) $(LDFLAGS) $(SANITIZER_FLAGS) $(LIMIT_ERROR) -fsanitize=fuzzer -Ibuild -o $@ polyjuice_generator_fuzzer.cc $(ALL_OBJS)
 build/polyjuice_generator_fuzzer_log: generate-protocol $(GENERATOR_DEPS)
-	$(CXX) $(CFLAGS) $(LDFLAGS) $(SANITIZER_FLAGS) $(LIMIT_ERROR) -fsanitize=fuzzer -Ibuild -o $@ polyjuice_generator_fuzzer.cc $(ALL_OBJS) -DCKB_C_STDLIB_PRINTF
+	$(CXX) $(CFLAGS) $(LDFLAGS) $(SANITIZER_FLAGS) $(LIMIT_ERROR) -fsanitize=fuzzer -Ibuild -o $@ polyjuice_generator_fuzzer.cc $(ALL_OBJS) -DPOLYJUICE_DEBUG_LOG
 
 ###
 # TODO:
@@ -98,7 +98,7 @@ build/generator: ../../c/generator.c $(GENERATOR_DEPS)
 	cd $(SECP_DIR) && (git apply -R workaround-fix-g++-linking.patch || true) && cd - # revert patch
 build/generator_log: ../../c/generator.c $(GENERATOR_DEPS)
 	cd $(SECP_DIR) && (git apply workaround-fix-g++-linking.patch || true) && cd - # apply patch
-	$(CXX) $(CFLAGS) $(LDFLAGS) $(SANITIZER_FLAGS) -Ibuild -o $@ ../../c/generator.c $(ALL_OBJS) -DCKB_C_STDLIB_PRINTF
+	$(CXX) $(CFLAGS) $(LDFLAGS) $(SANITIZER_FLAGS) -Ibuild -o $@ ../../c/generator.c $(ALL_OBJS) -DPOLYJUICE_DEBUG_LOG
 	$(OBJCOPY) --only-keep-debug $@ $@.debug
 	$(OBJCOPY) --strip-debug --strip-all $@
 	cd $(SECP_DIR) && (git apply -R workaround-fix-g++-linking.patch || true) && cd - # revert patch
@@ -110,7 +110,7 @@ build/validator: ../../c/validator.c $(VALIDATOR_DEPS)
 	cd $(SECP_DIR) && (git apply -R workaround-fix-g++-linking.patch || true) && cd - # revert patch
 build/validator_log: ../../c/validator.c $(VALIDATOR_DEPS)
 	cd $(SECP_DIR) && (git apply workaround-fix-g++-linking.patch || true) && cd - # apply patch
-	$(CXX) $(SANITIZER_FLAGS) $(CFLAGS) $(LDFLAGS) -Ibuild -o $@ ../../c/validator.c $(ALL_OBJS) -DCKB_C_STDLIB_PRINTF
+	$(CXX) $(SANITIZER_FLAGS) $(CFLAGS) $(LDFLAGS) -Ibuild -o $@ ../../c/validator.c $(ALL_OBJS) -DPOLYJUICE_DEBUG_LOG
 	$(OBJCOPY) --only-keep-debug $@ $@.debug
 	$(OBJCOPY) --strip-debug --strip-all $@
 	cd $(SECP_DIR) && (git apply -R workaround-fix-g++-linking.patch || true) && cd - # revert patch

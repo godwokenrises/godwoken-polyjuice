@@ -7,6 +7,8 @@ use gw_generator::{error::TransactionError, traits::StateExt};
 use gw_store::{chain_view::ChainView, traits::chain_store::ChainStore};
 use gw_types::{packed::RawL2Transaction, prelude::*};
 
+const SS_INIT_CODE: &str = include_str!("./evm-contracts/SimpleStorage.bin");
+
 #[derive(Debug, Default)]
 pub struct EthToGwArgsBuilder {
     pub(crate) method: u32,
@@ -78,14 +80,14 @@ fn test_update_eth_addr_reg_by_contract() {
         .mint_sudt(
             CKB_SUDT_ACCOUNT_ID,
             &eth_eoa_account_script_hash[..20],
-            2000,
+            52000,
         )
         .unwrap();
     assert_eq!(
         state
             .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &eth_eoa_account_script_hash[..20])
             .unwrap(),
-        2000u128
+        52000u128
     );
 
     // update_eth_address_registry by `ETH Address Registry` layer2 contract
@@ -107,7 +109,7 @@ fn test_update_eth_addr_reg_by_contract() {
         state
             .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &eth_eoa_account_script_hash[..20])
             .unwrap(),
-        1000u128
+        51000u128
     );
 
     // try to register the same account again
@@ -176,6 +178,20 @@ fn test_update_eth_addr_reg_by_contract() {
     assert_eq!(run_result.return_data, eth_eoa_address);
 
     // New Polyjuice conatract account will be registered in `create_new_account` of polyjuice.h
+
+    // Deploy SimpleStorage using the eth_eoa_acount as from_id
+    let _run_result = helper::deploy(
+        &generator,
+        &store,
+        &mut state,
+        helper::CREATOR_ACCOUNT_ID,
+        eth_eoa_account_id,
+        SS_INIT_CODE,
+        50000,
+        0,
+        block_producer_id,
+        4,
+    );
 }
 
 #[test]

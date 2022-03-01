@@ -49,7 +49,7 @@ extern "C" int ckb_debug(const char* str) {
   return 0;
 }
 
-#ifndef CKB_C_STDLIB_PRINTF
+#ifndef POLYJUICE_DEBUG_LOG
 #undef ckb_debug
 #define ckb_debug(s) do {} while (0)
 #endif
