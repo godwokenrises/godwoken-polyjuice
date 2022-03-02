@@ -71,7 +71,7 @@ all-via-docker-in-debug-mode: generate-protocol
 	docker run --rm -v `pwd`:/code -w /code ${BUILDER_DOCKER} make all-in-debug-mode
 # Be aware that a given prerequisite will only be built once per invocation of make, at most.
 all-in-debug-mode: LDFLAGS := -g # only use -O0 to decrease compile time while coding and debugging (O0 compile time: 1m58s)
-all-in-debug-mode: CFLAGS += -DCKB_C_STDLIB_PRINTF
+all-in-debug-mode: CFLAGS += -DPOLYJUICE_DEBUG_LOG
 all-in-debug-mode: all
 
 clean-via-docker:
