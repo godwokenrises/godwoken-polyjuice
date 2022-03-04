@@ -213,7 +213,7 @@ int update_eth_address_register(gw_context_t *ctx,
   // check if the account has been registered
   ret = load_script_hash_by_eth_address(ctx, eth_address, raw_key);
   if (ret == 0) {
-    return ERROR_ETH_ADDRESS_REGISTRY_DUPLICATE;
+    return 0;
   }
 
   // eth_address -> gw_script_hash
