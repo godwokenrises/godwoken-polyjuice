@@ -1,7 +1,7 @@
 #ifndef POLYJUICE_GLOBALS_H
 #define POLYJUICE_GLOBALS_H
 
-#define POLYJUICE_VERSION "v1.0.0-alpha"
+#define POLYJUICE_VERSION "v1.0.0-beta"
 
 #define DEFAULT_SHORT_SCRIPT_HASH_LEN 20
 #define ETH_ADDRESS_LEN 20
@@ -24,6 +24,10 @@ static uint32_t g_sudt_id = UINT32_MAX;
 static uint8_t g_created_address[20] = {0};
 static uint32_t g_created_id = UINT32_MAX;
 
+/**
+ * @brief compatible_chain_id in Godwoken RollupConfig
+ */
+static uint32_t g_compatible_chain_id = UINT32_MAX;
 /**
  * creator_account, known as root account
  * @see https://github.com/nervosnetwork/godwoken/blob/5735d8f/docs/life_of_a_polyjuice_transaction.md#root-account--deployment

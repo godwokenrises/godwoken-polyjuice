@@ -3,7 +3,7 @@
 
 use crate::helper::{
     build_eth_l2_script, new_block_info, new_contract_account_script, setup, PolyjuiceArgsBuilder,
-    CKB_SUDT_ACCOUNT_ID, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
+    CKB_SUDT_ACCOUNT_ID, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES, COMPATIBLE_CHAIN_ID,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
@@ -75,7 +75,6 @@ fn test_get_chain_id() {
         .unwrap();
     println!("balance of {} = {}", from_id, from_balance2);
 
-    let chain_id: u32 = CREATOR_ACCOUNT_ID;
     {
         // call GetChainId.get()
         let block_info = new_block_info(0, 3, 0);
@@ -104,9 +103,11 @@ fn test_get_chain_id() {
             )
             .expect("construct");
         state.apply_run_result(&run_result).expect("update state");
-        let mut expected_return_data = vec![0u8; 32];
-        expected_return_data[28..32].copy_from_slice(&chain_id.to_be_bytes()[..]);
-        assert_eq!(run_result.return_data, expected_return_data);
-        // println!("result {:?}", run_result);
+
+        /* chain_id = compatible_chain_id(u32) | creator_account_id(u32) */
+        let mut expected_chain_id = vec![0u8; 32];
+        expected_chain_id[28..32].copy_from_slice(&CREATOR_ACCOUNT_ID.to_be_bytes()[..]);
+        expected_chain_id[24..28].copy_from_slice(&COMPATIBLE_CHAIN_ID.to_be_bytes()[..]);
+        assert_eq!(run_result.return_data, expected_chain_id);
     }
 }

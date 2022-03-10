@@ -25,14 +25,15 @@ When you send an ethereum transaction, the transaction is converted to Godwoken 
 | EVM Opcode | Solidity Usage | Behavior in Polyjuice | Behavior in EVM |
 | - | - | - | - |
 | COINBASE | `block.coinbase` | address of the block_producer | address of the current block's miner |
-| CHAINID | `chain_id()` | creator_account_id | Istanbul hardfork, EIP-1344: current network's chain id |
 | GASLIMIT | `block.gaslimit` | 12,500,000 | current block's gas limit |
 | DIFFICULTY | `block.difficulty` | 2,500,000,000,000,000 | current block's difficulty |
 
 ## Others
 
 * transaction context
-  * chain_id is [creator_account_id](https://github.com/nervosnetwork/godwoken/blob/5735d8f/docs/life_of_a_polyjuice_transaction.md#root-account--deployment)
+  * `chain_id` consists up of two parts: [**compatible_chain_id(u32) | [creator_account_id]()(u32)**]
+    - `compatible_chain_id` is defined in Godwoken [RollupConfig](https://github.com/nervosnetwork/godwoken/blob/acc6614/crates/types/schemas/godwoken.mol#L64).
+    - `creator_account` is known as [the root account of Polyjuice](https://github.com/nervosnetwork/godwoken/blob/5735d8f/docs/life_of_a_polyjuice_transaction.md#root-account--deployment).
   * block gas limit is `12500000`, and is not block level limit, every transaction can reach the limit
   * block difficulty is always `2500000000000000`
 * The `transfer value` can not exceed uint128:MAX
