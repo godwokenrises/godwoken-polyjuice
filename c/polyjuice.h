@@ -327,12 +327,19 @@ struct evmc_tx_context get_tx_context(struct evmc_host_context* context) {
       0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00,
       0x00, 0x00, 0x00, 0x08, 0xe1, 0xbc, 0x9b, 0xf0, 0x40, 0x00,
   };
-  /* chain_id = creator_account_id */
+
+  /* chain_id = compatible_chain_id(u32) | creator_account_id(u32) */
+  uint8_t *compatible_chain_id_ptr = (uint8_t *)(&g_compatible_chain_id);
+  ctx.chain_id.bytes[27] = compatible_chain_id_ptr[0];
+  ctx.chain_id.bytes[26] = compatible_chain_id_ptr[1];
+  ctx.chain_id.bytes[25] = compatible_chain_id_ptr[2];
+  ctx.chain_id.bytes[24] = compatible_chain_id_ptr[3];
   uint8_t *creator_account_id_ptr = (uint8_t *)(&g_creator_account_id);
   ctx.chain_id.bytes[31] = creator_account_id_ptr[0];
   ctx.chain_id.bytes[30] = creator_account_id_ptr[1];
   ctx.chain_id.bytes[29] = creator_account_id_ptr[2];
   ctx.chain_id.bytes[28] = creator_account_id_ptr[3];
+
   return ctx;
 }
 
@@ -719,6 +726,7 @@ int check_destructed(gw_context_t* ctx, uint32_t to_id) {
 
 /**
  * load the following global values:
+ * - g_compatible_chain_id
  * - g_creator_account_id
  * - g_script_hash_type
  * - g_rollup_script_hash
@@ -775,6 +783,15 @@ int load_globals(gw_context_t* ctx, uint32_t to_id) {
     debug_print_data("invalid to account script args", raw_args_seg.ptr, raw_args_seg.size);
     return FATAL_POLYJUICE;
   }
+  /** read g_compatible_chain_id from Godwoken RollupConfig */
+  mol_seg_t rollup_config_seg;
+  rollup_config_seg.ptr = ctx->rollup_config;
+  rollup_config_seg.size = ctx->rollup_config_size;
+  mol_seg_t id_u32_seg = MolReader_RollupConfig_get_compatible_chain_id(&rollup_config_seg);
+  memcpy(&g_compatible_chain_id, id_u32_seg.ptr, id_u32_seg.size);
+  debug_print_int("compatible_chain_id", g_compatible_chain_id);
+  debug_print_int("creator_account_id", g_creator_account_id);
+
   /** read rollup_script_hash and g_sudt_id from creator account */
   memcpy(g_rollup_script_hash, creator_raw_args_seg.ptr, 32);
   memcpy(&g_sudt_id, creator_raw_args_seg.ptr + 32, sizeof(uint32_t));
