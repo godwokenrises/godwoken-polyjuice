@@ -43,7 +43,7 @@ When you send an Ethereum transaction, the transaction is converted to Godwoken 
   * block difficulty is always `2500000000000000`
 
 * Value (pETH) transfer from EOA to EOA directly is not supported.
-  > Workaround: Since pETH (CKB) is a layer2 sUDT, it could be transfered through the [sUDT_ERC20_Proxy](https://github.com/nervosnetwork/godwoken-polyjuice/blob/3f1ad5b/solidity/erc20/README.md) contract's `transfer function`.
+  > Workaround: pETH (CKB) is represented as an ERC 20 token on layer2, it could be transfer through the [sUDT_ERC20_Proxy](https://github.com/nervosnetwork/godwoken-polyjuice/blob/3f1ad5b/solidity/erc20/README.md) contract's `transfer function`.
 * The `transfer value` can not exceed uint128:MAX
 
 * Pre-compiled contract
