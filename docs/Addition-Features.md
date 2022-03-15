@@ -73,7 +73,7 @@ See: [Example](../solidity/erc20/SudtERC20Proxy_UserDefinedDecimals.sol)
    input[12..32] => ETH address
 
  output:
-   output[12..32] => godwoken short address
+   output[12..32] => short_gw_script_hash
 ```
 
 See: [Example](../polyjuice-tests/src/test_cases/evm-contracts/EthToGodwokenAddr.sol)
