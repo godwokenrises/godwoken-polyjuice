@@ -3,7 +3,7 @@
 
 use crate::helper::{
     build_eth_l2_script, new_block_info, new_contract_account_script, setup, PolyjuiceArgsBuilder,
-    CKB_SUDT_ACCOUNT_ID, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES, COMPATIBLE_CHAIN_ID,
+    CKB_SUDT_ACCOUNT_ID, COMPATIBLE_CHAIN_ID, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
@@ -33,7 +33,7 @@ fn test_get_chain_id() {
     println!("balance of {} = {}", from_id, from_balance1);
     {
         // Deploy GetChainId contract
-        let block_info = new_block_info(0, 1, 0);
+        let block_info = new_block_info(from_id, 1, 0);
         let input = hex::decode(INIT_CODE).unwrap();
         let args = PolyjuiceArgsBuilder::default()
             .do_create(true)
@@ -77,7 +77,7 @@ fn test_get_chain_id() {
 
     {
         // call GetChainId.get()
-        let block_info = new_block_info(0, 3, 0);
+        let block_info = new_block_info(from_id, 3, 0);
         let input = hex::decode("6d4ce63c").unwrap();
         let args = PolyjuiceArgsBuilder::default()
             .gas_limit(21000)
