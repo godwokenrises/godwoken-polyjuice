@@ -300,19 +300,31 @@ int load_account_code(gw_context_t* gw_ctx, uint32_t account_id,
 ////////////////////////////////////////////////////////////////////////////
 struct evmc_tx_context get_tx_context(struct evmc_host_context* context) {
   struct evmc_tx_context ctx{0};
+  memcpy(ctx.tx_origin.bytes, g_tx_origin.bytes, 20);
+
   /* gas price = 1 */
   ctx.tx_gas_price.bytes[31] = 0x01;
-  memcpy(ctx.tx_origin.bytes, g_tx_origin.bytes, 20);
+
   uint8_t coinbase_script_hash[32] = {0};
-  int ret = context->gw_ctx->sys_get_script_hash_by_account_id(context->gw_ctx,
-                                                               context->gw_ctx->block_info.block_producer_id,
-                                                               coinbase_script_hash);
+  int ret = context->gw_ctx->sys_get_script_hash_by_account_id(
+    context->gw_ctx,
+    context->gw_ctx->block_info.block_producer_id,
+    coinbase_script_hash
+  );
   if (ret != 0) {
-    debug_print_int("get script hash by block producer id failed", context->gw_ctx->block_info.block_producer_id);
+    debug_print_int("failed to get block_producer script_hash",
+                    context->gw_ctx->block_info.block_producer_id);
     context->error_code = ret;
   }
-  // FIXME: fix the address of coinbase (block producer)
-  memcpy(ctx.block_coinbase.bytes, coinbase_script_hash, 20);
+  ret = load_eth_address_by_script_hash(context->gw_ctx,
+                                        coinbase_script_hash,
+                                        ctx.block_coinbase.bytes);
+  if (ret != 0) {
+    debug_print_int("load block_coinbase address failed, id",
+                    context->gw_ctx->block_info.block_producer_id);
+    context->error_code = ret;
+  }
+
   ctx.block_number = context->gw_ctx->block_info.number;
   /*
     block_timestamp      => second
