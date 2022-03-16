@@ -40,13 +40,13 @@ fn test_get_block_info() {
     let (from_id, _from_script_hash) =
         crate::helper::create_eth_eoa_account(&mut state, &from_eth_address, 400000);
 
-    let aggregator_eth_addr = [2u8; 20];
-    let (aggregator_id, aggregator_script_hash) =
+    let aggregator_eth_addr: [u8; 20] = hex::decode("a1ad227Ad369f593B5f3d0Cc934A681a50811CB2")
+        .unwrap()
+        .try_into()
+        .unwrap();
+    let (aggregator_id, _aggregator_script_hash) =
         crate::helper::create_eth_eoa_account(&mut state, &aggregator_eth_addr, 0);
-    // FIXME(Godwoken): coinbase_hex => eth_addr_to_ethabi_addr(&aggregator_eth_addr)
-    let coinbase_hex = hex::encode(eth_addr_to_ethabi_addr(
-        &aggregator_script_hash[..20].try_into().unwrap(),
-    ));
+    let coinbase_hex = hex::encode(eth_addr_to_ethabi_addr(&aggregator_eth_addr));
     println!("coinbase_hex: {}", coinbase_hex);
 
     // Deploy BlockInfo
@@ -118,7 +118,7 @@ fn test_get_block_info() {
             "188ec356",
             "000000000000000000000000000000000000000000000000000000000000ff33",
         ),
-        // FIXME(Godwoken): coinbase_hex => eth_addr_to_ethabi_addr(&aggregator_eth_addr)
+        // coinbase_hex => eth_addr_to_ethabi_addr(&aggregator_eth_addr)
         ("getCoinbase()", "d1a82a9d", coinbase_hex.as_str()),
     ]
     .iter()
