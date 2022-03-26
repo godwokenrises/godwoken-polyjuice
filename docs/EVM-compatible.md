@@ -19,6 +19,12 @@ Note in Ethereum, one can also send some ETH to a smart contract for certain beh
 
 Polyjuice only provides [contract accounts](https://ethereum.org/en/glossary/#contract-account). Godwoken's user accounts are leveraged to act as [EOAs](https://ethereum.org/en/glossary/#eoa).
 
+## All Tokens Are ERC20 Tokens
+
+Ethereum differs in the processing of ERC20 tokens, and native ETH tokens. This is also the reason why wETH is invented. Godwoken conceals this difference:
+
+Whether you use a native CKB or any sUDT token type, they will all be represented in Godwoken as a layer2 sUDT type. Polyjuice starts from this layer2 sUDT [contract](https://github.com/nervosnetwork/godwoken-polyjuice/blob/b9c3ad4/solidity/erc20/SudtERC20Proxy_UserDefinedDecimals.sol) and ensures that all the tokens on Godwoken are in compliance with the ERC20 standard, no matter if they are backed by a native CKB or a sUDT. This means you don't need to distinguish between native token and ERC20 tokens. All you have to deal with is the same ERC20 interface for all different tokens.
+
 ## Transaction Structure
 
 A Polyjuice transaction is essentially just a Godwoken transaction.
