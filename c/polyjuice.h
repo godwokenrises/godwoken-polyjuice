@@ -924,8 +924,7 @@ int load_globals(gw_context_t *ctx, uint32_t to_id)
   memcpy(&g_sudt_id, creator_raw_args_seg.ptr + 32, sizeof(uint32_t));
   debug_print_data("g_rollup_script_hash", g_rollup_script_hash, 32);
   debug_print_int("g_sudt_id", g_sudt_id);
-  /** read g_eth_addr_reg_id from creator_script_args[36..40] */
-  memcpy(&g_eth_addr_reg_id, creator_raw_args_seg.ptr + 36, sizeof(uint32_t));
+  g_eth_addr_reg_id = GW_DEFAULT_ETH_REGISTRY_ACCOUNT_ID;
   debug_print_int("g_eth_addr_reg_id", g_eth_addr_reg_id);
 
   return 0;
