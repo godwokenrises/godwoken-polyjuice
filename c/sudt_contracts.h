@@ -20,7 +20,7 @@ int balance_of_any_sudt_gas(const uint8_t* input_src, const size_t input_size,
    input:
    ======
      input[ 0..32] => sudt_id (big endian)
-     input[32..64] => address (short_address)
+     input[32..64] => address (eth_address)
 
    output:
    =======
@@ -157,8 +157,8 @@ int transfer_to_any_sudt_gas(const uint8_t* input_src, const size_t input_size,
    input:
    ======
      input[ 0..32 ] => sudt_id (big endian)
-     input[32..64 ] => from_addr (short address)
-     input[64..96 ] => to_addr (short address)
+     input[32..64 ] => from_addr (eth address)
+     input[64..96 ] => to_addr (eth address)
      input[96..128] => amount (big endian)
 
    output: []
@@ -223,6 +223,8 @@ int transfer_to_any_sudt(gw_context_t* ctx, const uint8_t* code_data,
   to_addr.reg_id = GW_DEFAULT_ETH_REGISTRY_ACCOUNT_ID;
   memcpy(to_addr.addr, to_address.bytes, ETH_ADDRESS_LEN);
   to_addr.addr_len = ETH_ADDRESS_LEN;
+
+  ret = sudt_transfer(ctx, sudt_id, from_addr, to_addr, amount);
 
   if (ret != 0) {
     debug_print_int("[transfer_to_any_sudt] transfer failed", ret);
