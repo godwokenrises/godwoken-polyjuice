@@ -26,17 +26,17 @@ fn test_sudt_erc20_proxy_inner(
     let block_producer_id = crate::helper::create_block_producer(state);
 
     let from_eth_address1 = [1u8; 20];
-    let (from_id1, from_script_hash1) =
+    let (from_id1, _from_script_hash1) =
         helper::create_eth_eoa_account(state, &from_eth_address1, 2000000);
     let from_reg_addr1 = RegistryAddress::new(ETH_REGISTRY_ACCOUNT_ID, from_eth_address1.to_vec());
 
     let from_eth_address2 = [2u8; 20];
-    let (_from_id2, from_script_hash2) =
+    let (_from_id2, _from_script_hash2) =
         helper::create_eth_eoa_account(state, &from_eth_address2, 2000000);
     let from_reg_addr2 = RegistryAddress::new(ETH_REGISTRY_ACCOUNT_ID, from_eth_address2.to_vec());
 
     let from_eth_address3 = [3u8; 20];
-    let (from_id3, from_script_hash3) =
+    let (from_id3, _from_script_hash3) =
         helper::create_eth_eoa_account(state, &from_eth_address3, 2000000);
     let from_reg_addr3 = RegistryAddress::new(ETH_REGISTRY_ACCOUNT_ID, from_eth_address3.to_vec());
 
@@ -64,7 +64,7 @@ fn test_sudt_erc20_proxy_inner(
     println!();
 
     let contract_account_script =
-        new_contract_account_script(&state, from_id1, &from_eth_address1, false);
+        new_contract_account_script(state, from_id1, &from_eth_address1, false);
     let script_hash = contract_account_script.hash().into();
     let new_account_id = state
         .get_account_id_by_script_hash(&script_hash)

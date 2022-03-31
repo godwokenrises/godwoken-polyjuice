@@ -2,9 +2,9 @@
 //!   See ./evm-contracts/CallContract.sol
 
 use crate::helper::{
-    self, compute_create2_script, contract_script_to_eth_addr, deploy, new_block_info,
-    new_contract_account_script, setup, simple_storage_get, Account, MockContractInfo,
-    PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
+    self, compute_create2_script, contract_script_to_eth_addr, deploy, new_block_info, setup,
+    simple_storage_get, MockContractInfo, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
+    CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::{builtins::ETH_REGISTRY_ACCOUNT_ID, state::State};
 use gw_generator::traits::StateExt;
@@ -35,7 +35,7 @@ fn test_create2() {
         CREATE2_IMPL_CODE,
         122000,
         0,
-        block_producer_id,
+        block_producer_id.clone(),
         block_number,
     );
     // [Deploy Create2Impl] used cycles: 819215 < 820K
@@ -45,7 +45,6 @@ fn test_create2() {
     //     serde_json::to_string_pretty(&RunResult::from(run_result)).unwrap()
     // );
     let create2_contract = MockContractInfo::create(&from_eth_address, 0);
-    create2_contract.mapping_registry_address_to_script_hash(&mut state);
     let create2_contract_addr = create2_contract.eth_addr;
     let create2_contract_script_hash = create2_contract.script_hash;
     let create2_contract_id = state
@@ -69,8 +68,7 @@ fn test_create2() {
     // Create2Impl.deploy(uint256 value, bytes32 salt, bytes memory code)
     let run_result = {
         block_number += 1;
-        let (_, block_producer) = Account::build_script(0);
-        let block_info = new_block_info(block_producer, block_number, block_number);
+        let block_info = new_block_info(block_producer_id, block_number, block_number);
         // uint256 value: 0x000000000000000000000000000000000000000000000000000000000000009a
         let input_value = format!(
             "00000000000000000000000000000000000000000000000000000000000000{:2x}",

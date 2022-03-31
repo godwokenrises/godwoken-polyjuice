@@ -3,7 +3,7 @@
 
 use crate::helper::{
     self, deploy, eth_addr_to_ethabi_addr, new_block_info, new_contract_account_script, setup,
-    simple_storage_get, Account, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, CREATOR_ACCOUNT_ID,
+    simple_storage_get, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, CREATOR_ACCOUNT_ID,
     L2TX_MAX_CYCLES,
 };
 use gw_common::{
@@ -25,16 +25,17 @@ fn test_simple_transfer() {
 
     let mint_balance: u128 = 400000;
     let from_eth_address = [1u8; 20];
-    let (from_id, from_script_hash) =
+    let (from_id, _from_script_hash) =
         helper::create_eth_eoa_account(&mut state, &from_eth_address, mint_balance);
+    let from_addr = RegistryAddress::new(ETH_REGISTRY_ACCOUNT_ID, from_eth_address.to_vec());
 
     let target_eth_addr = [2u8; 20];
-    let (target_id, target_script_hash) =
+    let (target_id, _target_script_hash) =
         helper::create_eth_eoa_account(&mut state, &target_eth_addr, 0);
     let target_reg_addr = RegistryAddress::new(ETH_REGISTRY_ACCOUNT_ID, target_eth_addr.to_vec());
 
     let from_balance = state
-        .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &target_reg_addr)
+        .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &from_addr)
         .unwrap();
     assert_eq!(from_balance, mint_balance);
     let target_balance = state
@@ -61,8 +62,7 @@ fn test_simple_transfer() {
     //     "result {}",
     //     serde_json::to_string_pretty(&RunResult::from(run_result)).unwrap()
     // );
-    let ss_account_script =
-        new_contract_account_script(&mut state, from_id, &from_eth_address, false);
+    let ss_account_script = new_contract_account_script(&state, from_id, &from_eth_address, false);
     let ss_script_hash = ss_account_script.hash();
     let simple_storage_contract_addr: [u8; 20] = ss_account_script.args().raw_data().as_ref()
         [36..56]
@@ -109,10 +109,10 @@ fn test_simple_transfer() {
         block_number,
     );
     // [Deploy SimpleTransfer] used cycles: 491894 -> 500005 < 501K
-    helper::check_cycles("Deploy SimpleTransfer", run_result.used_cycles, 501_000);
+    helper::check_cycles("Deploy SimpleTransfer", run_result.used_cycles, 610_000);
 
     let st_contract_account_script =
-        new_contract_account_script(&mut state, from_id, &from_eth_address, false);
+        new_contract_account_script(&state, from_id, &from_eth_address, false);
     let st_contract_script_hash = st_contract_account_script.hash();
     let st_contract_reg_addr = state
         .get_registry_address_by_script_hash(
@@ -142,7 +142,7 @@ fn test_simple_transfer() {
         let old_balance = state
             .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &st_contract_reg_addr)
             .unwrap();
-        let block_info = new_block_info(block_producer_id, block_number, block_number);
+        let block_info = new_block_info(block_producer_id.clone(), block_number, block_number);
         let input = hex::decode(format!(
             "a03fa7e3{}",
             hex::encode(eth_addr_to_ethabi_addr(&target_eth_addr)),
@@ -172,7 +172,7 @@ fn test_simple_transfer() {
             )
             .expect("construct");
         // [SimpleTransfer to EoA] used cycles: 725217 < 736K
-        helper::check_cycles("SimpleTransfer to EoA", run_result.used_cycles, 736_000);
+        helper::check_cycles("SimpleTransfer to EoA", run_result.used_cycles, 905_000);
         state.apply_run_result(&run_result).expect("update state");
 
         let new_balance = state
@@ -244,8 +244,7 @@ fn test_simple_transfer() {
         let old_balance = state
             .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &st_contract_reg_addr)
             .unwrap();
-        let (_, block_producer) = Account::build_script(0);
-        let block_info = new_block_info(block_producer, block_number, block_number);
+        let block_info = new_block_info(block_producer_id.clone(), block_number, block_number);
 
         let input = hex::decode(format!(
             "f10c7360{}",
@@ -279,7 +278,7 @@ fn test_simple_transfer() {
         helper::check_cycles(
             "SimpleTransfer.transferToSimpleStorage1()",
             run_result.used_cycles,
-            1_210_000,
+            1_460_000,
         );
         state.apply_run_result(&run_result).expect("update state");
 
@@ -311,8 +310,7 @@ fn test_simple_transfer() {
         let old_balance = state
             .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &st_contract_reg_addr)
             .unwrap();
-        let (_, block_producer) = Account::build_script(0);
-        let block_info = new_block_info(block_producer, block_number, block_number);
+        let block_info = new_block_info(block_producer_id, block_number, block_number);
         let input = hex::decode(format!(
             "2a5eb963{}",
             hex::encode(eth_addr_to_ethabi_addr(&simple_storage_contract_addr)),

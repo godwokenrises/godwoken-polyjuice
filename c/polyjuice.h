@@ -1039,19 +1039,6 @@ int create_new_account(gw_context_t *ctx,
     ckb_debug("[create_new_account] failed to register a contract account");
     return ret;
   }
-  uint8_t sh[32] = {1};
-  ckb_debug("###################################################");
-  ret = load_script_hash_by_eth_address(ctx, eth_addr, sh);
-  debug_print_int("ret", ret);
-  debug_print_data("eth_addr", eth_addr, 20);
-  debug_print_data("sh", sh, 32);
-  uint8_t ea[20] = {1};
-  ret = load_eth_address_by_script_hash(ctx, script_hash, ea);
-  debug_print_int("ret", ret);
-  debug_print_data("ea", ea, 20);
-  debug_print_data("script_hash", script_hash, 32);
-  ckb_debug("###################################################");
-
   return 0;
 }
 

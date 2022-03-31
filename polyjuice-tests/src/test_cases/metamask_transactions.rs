@@ -70,7 +70,7 @@ fn test_transfer_by_metamask() {
         block_number,
     );
     let ckb_proxy_contract_script = 
-    new_contract_account_script(&state, from_id, &[0x99u8; 20])
+    // new_contract_account_script(&state, from_id, &[0x99u8; 20])
     
     _deprecated_new_contract_account_script(
         &state,

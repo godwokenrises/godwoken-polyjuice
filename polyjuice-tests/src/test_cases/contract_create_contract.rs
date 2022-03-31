@@ -2,7 +2,7 @@
 //!   See ./evm-contracts/CreateContract.sol
 
 use crate::helper::{
-    self, deploy, new_block_info, new_contract_account_script, setup, Account, MockContractInfo,
+    self, deploy, new_block_info, new_contract_account_script, setup, MockContractInfo,
     PolyjuiceArgsBuilder, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
@@ -35,12 +35,12 @@ fn test_contract_create_contract() {
         INIT_CODE,
         122000,
         0,
-        block_producer_id,
+        block_producer_id.clone(),
         1,
     );
     state.apply_run_result(&run_result).expect("update state");
     // [Deploy CreateContract] used cycles: 2109521 < 2120K
-    helper::check_cycles("Deploy CreateContract", run_result.used_cycles, 2_120_000);
+    helper::check_cycles("Deploy CreateContract", run_result.used_cycles, 2_820_000);
     // println!(
     //     "result {}",
     //     serde_json::to_string_pretty(&RunResult::from(run_result)).unwrap()
@@ -69,7 +69,6 @@ fn test_contract_create_contract() {
 
     // mom_contract create SimpleStorage contract
     let ss_contract = MockContractInfo::create(&mom_contract_address, 0);
-    ss_contract.mapping_registry_address_to_script_hash(&mut state);
     let ss_contract_script_hash = ss_contract.script_hash;
     let ss_account_id = state
         .get_account_id_by_script_hash(&ss_contract_script_hash)
@@ -79,8 +78,7 @@ fn test_contract_create_contract() {
 
     {
         // SimpleStorage.get();
-        let (_, block_producer) = Account::build_script(0);
-        let block_info = new_block_info(block_producer, 2, 0);
+        let block_info = new_block_info(block_producer_id, 2, 0);
         let input = hex::decode("6d4ce63c").unwrap();
         let args = PolyjuiceArgsBuilder::default()
             .gas_limit(21000)
