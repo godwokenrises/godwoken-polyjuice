@@ -2,8 +2,8 @@
 //!   See ./evm-contracts/HeadTail.sol
 
 use crate::helper::{
-    self, deploy, new_block_info, new_contract_account_script, setup, Account, MockContractInfo,
-    PolyjuiceArgsBuilder, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
+    self, deploy, new_block_info, setup, MockContractInfo, PolyjuiceArgsBuilder,
+    CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
@@ -32,7 +32,7 @@ fn test_ecrecover() {
         INIT_CODE,
         122000,
         0,
-        block_producer_id,
+        block_producer_id.clone(),
         1,
     );
     // [Deploy HeadTail Contract] used cycles: 1645593 < 1650K
@@ -47,7 +47,6 @@ fn test_ecrecover() {
     // );
 
     let contract_account = MockContractInfo::create(&from_eth_address, 0);
-    contract_account.mapping_registry_address_to_script_hash(&mut state);
     let contract_account_script_hash = contract_account.script_hash;
     let new_account_id = state
         .get_account_id_by_script_hash(&contract_account_script_hash)
@@ -56,8 +55,7 @@ fn test_ecrecover() {
 
     {
         // verify|recover(bytes32 hash, bytes memory signature)
-        let (_, block_producer) = Account::build_script(0);
-        let block_info = new_block_info(block_producer, 2, 0);
+        let block_info = new_block_info(block_producer_id, 2, 0);
         let hash = "8ab0890f028c9502cc20d441b4c4bb116f48ea632f522ac84e965d1dadf918e1";
         let signed_hash = "aaa99f644a5c4447314c5b7fcfac80deb186218aca1edaa63711aa75eb36585b47743901ce20f32768c7108bf85457ee0f16020f9bebc2bf456d6094c1c923c11c";
         let input = hex::decode(format!(

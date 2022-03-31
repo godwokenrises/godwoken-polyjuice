@@ -2,8 +2,8 @@
 //!   See ./evm-contracts/CallContract.sol
 
 use crate::helper::{
-    self, contract_script_to_eth_addr, deploy, new_block_info, new_contract_account_script,
-    new_contract_account_script_with_nonce, setup, simple_storage_get, Account, MockContractInfo,
+    self, contract_script_to_eth_addr, deploy, new_block_info,
+    new_contract_account_script_with_nonce, setup, simple_storage_get, MockContractInfo,
     PolyjuiceArgsBuilder, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
@@ -55,7 +55,7 @@ fn test_delegatecall() {
         INIT_CODE,
         122000,
         0,
-        block_producer_id,
+        block_producer_id.clone(),
         block_number,
     );
     // [Deploy DelegateCall] used cycles: 753698 < 760K
@@ -64,8 +64,7 @@ fn test_delegatecall() {
     //     "result {}",
     //     serde_json::to_string_pretty(&RunResult::from(run_result)).unwrap()
     // );
-    let delegate_contract = MockContractInfo::create(&from_eth_address, 0);
-    delegate_contract.mapping_registry_address_to_script_hash(&mut state);
+    let delegate_contract = MockContractInfo::create(&from_eth_address, 1);
     let delegate_contract_script_hash = delegate_contract.script_hash;
     let delegate_contract_id = state
         .get_account_id_by_script_hash(&delegate_contract_script_hash)
@@ -102,8 +101,7 @@ fn test_delegatecall() {
     .iter()
     {
         block_number += 1;
-        let (_, block_producer) = Account::build_script(0);
-        let block_info = new_block_info(block_producer, block_number, block_number);
+        let block_info = new_block_info(block_producer_id.clone(), block_number, block_number);
         let input = hex::decode(format!(
             "{}{}{}",
             fn_sighash,
@@ -135,7 +133,7 @@ fn test_delegatecall() {
             )
             .expect("construct");
         // [DelegateCall] used cycles: 1457344 < 1460K
-        helper::check_cycles("DelegateCall", run_result.used_cycles, 1_460_000);
+        helper::check_cycles("DelegateCall", run_result.used_cycles, 1_700_000);
         state.apply_run_result(&run_result).expect("update state");
         // println!(
         //     "result {}",

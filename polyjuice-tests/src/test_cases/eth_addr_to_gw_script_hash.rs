@@ -1,9 +1,8 @@
 //! See ./evm-contracts/EthToGodwokenAddr.sol
 
 use crate::helper::{
-    self, deploy, new_block_info, new_contract_account_script, setup, Account, MockContractInfo,
-    PolyjuiceArgsBuilder, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES, POLYJUICE_PROGRAM_CODE_HASH,
-    ROLLUP_SCRIPT_HASH,
+    self, deploy, new_block_info, setup, MockContractInfo, PolyjuiceArgsBuilder,
+    CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES, POLYJUICE_PROGRAM_CODE_HASH, ROLLUP_SCRIPT_HASH,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
@@ -36,7 +35,7 @@ fn test_eth_addr_to_gw_script_hash() {
         INIT_CODE,
         122000,
         0,
-        block_producer_id,
+        block_producer_id.clone(),
         0,
     );
     // [Deploy EthToGodwokenAddr Contract] used cycles: 593775 < 600K
@@ -47,7 +46,6 @@ fn test_eth_addr_to_gw_script_hash() {
     );
 
     let contract_account = MockContractInfo::create(&from_eth_address, 0);
-    contract_account.mapping_registry_address_to_script_hash(&mut state);
     let contract_id = state
         .get_account_id_by_script_hash(&contract_account.script_hash)
         .unwrap()
@@ -55,8 +53,7 @@ fn test_eth_addr_to_gw_script_hash() {
 
     {
         // EthToGodwokenAddr.convert(addr);
-        let (_, block_producer) = Account::build_script(0);
-        let block_info = new_block_info(block_producer, 2, 0);
+        let block_info = new_block_info(block_producer_id, 2, 0);
         let hex_eth_address = "fffffffffffffff333333333333fffffffffffff";
         let input = hex::decode(format!(
             "def2489b000000000000000000000000{}",

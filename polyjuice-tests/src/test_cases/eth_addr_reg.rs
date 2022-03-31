@@ -69,20 +69,14 @@ fn test_update_eth_addr_reg_by_contract() {
     let eth_eoa_address = [0xeeu8; 20];
     let eth_eoa_account_script = build_eth_l2_script(&eth_eoa_address);
     let eth_eoa_account_script_hash = eth_eoa_account_script.hash();
-    let reg_addr = RegistryAddress::new(ETH_REGISTRY_ACCOUNT_ID, eth_eoa_address.to_vec());
-    state
-        .mapping_registry_address_to_script_hash(reg_addr, eth_eoa_account_script_hash.into())
-        .expect("map reg addr to script hash");
-    let address = state
-        .get_registry_address_by_script_hash(
-            ETH_ADDRESS_REGISTRY_ACCOUNT_ID,
-            &eth_eoa_account_script_hash.into(),
-        )
-        .unwrap()
-        .unwrap();
+    // let reg_addr = RegistryAddress::new(ETH_REGISTRY_ACCOUNT_ID, eth_eoa_address.to_vec());
+    // state
+    // // .mapping_registry_address_to_script_hash(reg_addr, eth_eoa_account_script_hash.into())
+    // .expect("map reg addr to script hash");
     let eth_eoa_account_id = state
         .create_account_from_script(eth_eoa_account_script)
         .unwrap();
+    let address = RegistryAddress::new(ETH_REGISTRY_ACCOUNT_ID, eth_eoa_address.to_vec());
     assert_eq!(
         state
             .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &address)
@@ -133,8 +127,8 @@ fn test_update_eth_addr_reg_by_contract() {
     .expect_err("try to register the same account again");
     assert_eq!(
         run_err,
-        TransactionError::InvalidExitCode(-92),
-        "ERROR_ETH_ADDRESS_REGISTRY_DUPLICATE"
+        TransactionError::InvalidExitCode(101),
+        "GW_REGISTRY_ERROR_DUPLICATE_MAPPING"
     );
 
     // check result: eth_address -> gw_script_hash
@@ -220,15 +214,9 @@ fn test_batch_set_mapping_by_contract() {
     for address in eth_eoa_addresses.iter() {
         let account_script = build_eth_l2_script(address);
         let account_script_hash = account_script.hash();
-        let address = state
-            .get_registry_address_by_script_hash(
-                ETH_ADDRESS_REGISTRY_ACCOUNT_ID,
-                &account_script_hash.into(),
-            )
-            .unwrap()
-            .unwrap();
         eth_eoa_script_hashes.push(account_script_hash.into());
         state.create_account_from_script(account_script).unwrap();
+        let address = RegistryAddress::new(ETH_REGISTRY_ACCOUNT_ID, address.to_vec());
 
         assert_eq!(
             state
@@ -253,14 +241,14 @@ fn test_batch_set_mapping_by_contract() {
         &mut state,
         &generator,
         from_id,
-        new_block_info(_block_producer_id.clone(), 1, 1),
+        new_block_info(_block_producer_id, 1, 1),
         crate::helper::SetMappingArgs::Batch(eth_eoa_script_hashes.clone()),
     )
     .expect("eth address registered");
     assert_eq!(run_result.exit_code, 0);
     state.apply_run_result(&run_result).expect("update state");
 
-    let _block_producer_id = block_producer_id.clone();
+    let _block_producer_id = block_producer_id;
     for (eth_eoa_address, eth_eoa_account_script_hash) in
         eth_eoa_addresses.into_iter().zip(eth_eoa_script_hashes)
     {

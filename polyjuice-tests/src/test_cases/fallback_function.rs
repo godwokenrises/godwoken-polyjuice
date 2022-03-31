@@ -2,9 +2,8 @@
 //!   See ./evm-contracts/FallbackFunction.sol
 
 use crate::helper::{
-    self, build_eth_l2_script, new_block_info, new_contract_account_script, setup,
-    simple_storage_get, Account, MockContractInfo, PolyjuiceArgsBuilder, CREATOR_ACCOUNT_ID,
-    L2TX_MAX_CYCLES,
+    self, create_block_producer, new_block_info, setup, simple_storage_get, MockContractInfo,
+    PolyjuiceArgsBuilder, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
@@ -17,10 +16,7 @@ const INIT_CODE: &str = include_str!("./evm-contracts/FallbackFunction.bin");
 #[test]
 fn test_fallback_function() {
     let (store, mut state, generator) = setup();
-    let block_producer_script = build_eth_l2_script(&[0x99u8; 20]);
-    let _block_producer_id = state
-        .create_account_from_script(block_producer_script)
-        .unwrap();
+    let block_producer = create_block_producer(&mut state);
 
     let from_eth_address = [1u8; 20];
     let (from_id, _from_script_hash) =
@@ -28,8 +24,7 @@ fn test_fallback_function() {
 
     {
         // Deploy FallbackFunction Contract
-        let (_, block_producer) = Account::build_script(0);
-        let block_info = new_block_info(block_producer, 1, 0);
+        let block_info = new_block_info(block_producer.clone(), 1, 0);
         let input = hex::decode(INIT_CODE).unwrap();
         let args = PolyjuiceArgsBuilder::default()
             .do_create(true)
@@ -61,7 +56,6 @@ fn test_fallback_function() {
     }
 
     let contract_account = MockContractInfo::create(&from_eth_address, 0);
-    contract_account.mapping_registry_address_to_script_hash(&mut state);
     let new_account_id = state
         .get_account_id_by_script_hash(&contract_account.script_hash)
         .unwrap()
@@ -74,7 +68,6 @@ fn test_fallback_function() {
 
     {
         // Call fallback()
-        let (_, block_producer) = Account::build_script(0);
         let block_info = new_block_info(block_producer, 2, 0);
         let input = hex::decode("3333").unwrap();
         let args = PolyjuiceArgsBuilder::default()

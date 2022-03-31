@@ -2,9 +2,8 @@
 //!   See ./evm-contracts/SimpleStorage.sol
 
 use crate::helper::{
-    build_eth_l2_script, new_block_info, new_contract_account_script, setup, Account,
-    MockContractInfo, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, COMPATIBLE_CHAIN_ID,
-    CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
+    new_block_info, setup, MockContractInfo, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
+    COMPATIBLE_CHAIN_ID, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::{builtins::ETH_REGISTRY_ACCOUNT_ID, state::State};
 use gw_generator::traits::StateExt;
@@ -17,10 +16,7 @@ const INIT_CODE: &str = include_str!("./evm-contracts/GetChainId.bin");
 #[test]
 fn test_get_chain_id() {
     let (store, mut state, generator) = setup();
-    let block_producer_script = build_eth_l2_script(&[0x99u8; 20]);
-    let _block_producer_id = state
-        .create_account_from_script(block_producer_script)
-        .unwrap();
+    let block_producer = crate::helper::create_block_producer(&mut state);
 
     let from_eth_address = [1u8; 20];
     let (from_id, from_script_hash) =
@@ -36,8 +32,7 @@ fn test_get_chain_id() {
     println!("balance of {} = {}", from_id, from_balance1);
     {
         // Deploy GetChainId contract
-        let (_, block_producer) = Account::build_script(0);
-        let block_info = new_block_info(block_producer, 1, 0);
+        let block_info = new_block_info(block_producer.clone(), 1, 0);
         let input = hex::decode(INIT_CODE).unwrap();
         let args = PolyjuiceArgsBuilder::default()
             .do_create(true)
@@ -69,7 +64,6 @@ fn test_get_chain_id() {
     }
 
     let contract_account = MockContractInfo::create(&from_eth_address, 0);
-    contract_account.mapping_registry_address_to_script_hash(&mut state);
     let new_account_id = state
         .get_account_id_by_script_hash(&contract_account.script_hash)
         .unwrap()
@@ -81,10 +75,6 @@ fn test_get_chain_id() {
 
     {
         // call GetChainId.get()
-        let (script, block_producer) = Account::build_script(0);
-        state
-            .mapping_registry_address_to_script_hash(block_producer.clone(), script.hash().into())
-            .expect("map reg addr to script hash");
         let block_info = new_block_info(block_producer, 3, 0);
         let input = hex::decode("6d4ce63c").unwrap();
         let args = PolyjuiceArgsBuilder::default()

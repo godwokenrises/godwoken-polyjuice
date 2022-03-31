@@ -2,7 +2,7 @@
 //!   See ./evm-contracts/SelfDestruct.sol
 
 use crate::helper::{
-    self, deploy, eth_addr_to_ethabi_addr, new_block_info, setup, Account, MockContractInfo,
+    self, deploy, eth_addr_to_ethabi_addr, new_block_info, setup, MockContractInfo,
     PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::{
@@ -57,10 +57,9 @@ fn test_selfdestruct() {
         block_number,
     );
     // 571282 < 580K
-    helper::check_cycles("deploy SelfDestruct", run_result.used_cycles, 790_000);
+    helper::check_cycles("deploy SelfDestruct", run_result.used_cycles, 900_000);
 
     let mock_contract_info = MockContractInfo::create(&from_eth_address, 0);
-    mock_contract_info.mapping_registry_address_to_script_hash(&mut state);
     let sd_script_hash = mock_contract_info.script_hash;
     let sd_address = mock_contract_info.reg_addr;
     let sd_ethabi_addr = mock_contract_info.eth_abi_addr;
@@ -92,14 +91,13 @@ fn test_selfdestruct() {
         CALL_SD_INIT_CODE,
         122000,
         0,
-        block_producer_id,
+        block_producer_id.clone(),
         block_number,
     );
     // [deploy CallSelfDestruct] used cycles: 551984 < 560K
-    helper::check_cycles("deploy CallSelfDestruct", run_result.used_cycles, 710_000);
+    helper::check_cycles("deploy CallSelfDestruct", run_result.used_cycles, 830_000);
 
     let ssd_account = MockContractInfo::create(&from_eth_address, 1);
-    ssd_account.mapping_registry_address_to_script_hash(&mut state);
     let ssd_account_script_hash = ssd_account.script_hash;
     let csd_account_id = state
         .get_account_id_by_script_hash(&ssd_account_script_hash)
@@ -113,8 +111,7 @@ fn test_selfdestruct() {
     {
         // call CallSelfDestruct.proxyDone(sd_account_id)
         block_number += 1;
-        let (_, block_producer) = Account::build_script(0);
-        let block_info = new_block_info(block_producer, block_number, block_number);
+        let block_info = new_block_info(block_producer_id.clone(), block_number, block_number);
         let input = hex::decode(format!("9a33d968{}", hex::encode(&sd_ethabi_addr))).unwrap();
         let args = PolyjuiceArgsBuilder::default()
             .gas_limit(100000)
@@ -168,8 +165,7 @@ fn test_selfdestruct() {
 
     {
         // call SelfDestruct.done() which was already destructed
-        let (_, block_producer) = Account::build_script(0);
-        let block_info = new_block_info(block_producer, block_number, block_number);
+        let block_info = new_block_info(block_producer_id.clone(), block_number, block_number);
         let input = hex::decode("ae8421e1").unwrap();
         let args = PolyjuiceArgsBuilder::default()
             .gas_limit(31000)
@@ -199,8 +195,7 @@ fn test_selfdestruct() {
     {
         // call CallSelfDestruct.proxyDone(sd_account_id)
         // target contract of the proxy was already destructed
-        let (_, block_producer) = Account::build_script(0);
-        let block_info = new_block_info(block_producer, block_number, block_number);
+        let block_info = new_block_info(block_producer_id, block_number, block_number);
         let input = hex::decode(format!("9a33d968{}", hex::encode(&sd_ethabi_addr))).unwrap();
         let args = PolyjuiceArgsBuilder::default()
             .gas_limit(31000)
