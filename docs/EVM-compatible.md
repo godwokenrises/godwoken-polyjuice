@@ -39,8 +39,11 @@ When you send an Ethereum transaction, the transaction is converted to Godwoken 
   * `chain_id` consists up of two parts: [**compatible_chain_id(u32) | [creator_account_id]()(u32)**]
     - `compatible_chain_id` is defined in Godwoken [RollupConfig](https://github.com/nervosnetwork/godwoken/blob/acc6614/crates/types/schemas/godwoken.mol#L64).
     - `creator_account` is known as [the root account of Polyjuice](https://github.com/nervosnetwork/godwoken/blob/5735d8f/docs/life_of_a_polyjuice_transaction.md#root-account--deployment).
-  * block gas limit is `12500000`, and is not block level limit, every transaction can reach the limit
-  * block difficulty is always `2500000000000000`
+  * the block difficulty is always `2500000000000000`
+  * the gas limit for each block is 12500000; it is not a transaction-level limit. Any transaction can reach the gas limit
+  * the size limit for contract's return data is [`25600B`](https://github.com/nervosnetwork/godwoken-scripts/blob/31293d1/c/gw_def.h#L21-L22)
+  * the size limit for contract's storage is [`25600B`](https://github.com/nervosnetwork/godwoken-scripts/blob/31293d1/c/gw_def.h#L21-L22)
+
 
 * Value (pETH) transfer from EOA to EOA directly is not supported.
   > Workaround: pETH (CKB) is represented as an ERC 20 token on layer2, it could be transfer through the [sUDT_ERC20_Proxy](https://github.com/nervosnetwork/godwoken-polyjuice/blob/3f1ad5b/solidity/erc20/README.md) contract's `transfer function`.
