@@ -84,7 +84,7 @@ fn load_program(program_name: &str) -> Bytes {
     let mut buf = Vec::new();
     let mut path = PathBuf::new();
     path.push(program_name);
-    let mut f = fs::File::open(&path).expect(&format!("load program {}", program_name));
+    let mut f = fs::File::open(&path).unwrap_or_else(|_| panic!("load program {}", program_name));
     f.read_to_end(&mut buf).expect("read program");
     Bytes::from(buf.to_vec())
 }
@@ -93,15 +93,15 @@ lazy_static::lazy_static! {
     pub static ref SECP_DATA_HASH: H256 = {
         let mut buf = [0u8; 32];
         let mut hasher = new_blake2b();
-        hasher.update(&SECP_DATA);
+        hasher.update(SECP_DATA);
         hasher.finalize(&mut buf);
         buf.into()
     };
 
     pub static ref POLYJUICE_GENERATOR_PROGRAM: Bytes
-        = load_program(&POLYJUICE_GENERATOR_NAME);
+        = load_program(POLYJUICE_GENERATOR_NAME);
     pub static ref POLYJUICE_VALIDATOR_PROGRAM: Bytes
-        = load_program(&POLYJUICE_VALIDATOR_NAME);
+        = load_program(POLYJUICE_VALIDATOR_NAME);
     pub static ref POLYJUICE_PROGRAM_CODE_HASH: [u8; 32] = {
         let mut buf = [0u8; 32];
         let mut hasher = new_blake2b();
@@ -111,9 +111,9 @@ lazy_static::lazy_static! {
     };
 
     pub static ref ETH_ADDRESS_REGISTRY_GENERATOR_PROGRAM: Bytes
-        = load_program(&ETH_ADDRESS_REGISTRY_GENERATOR_NAME);
+        = load_program(ETH_ADDRESS_REGISTRY_GENERATOR_NAME);
     pub static ref ETH_ADDRESS_REGISTRY_VALIDATOR_PROGRAM: Bytes
-        = load_program(&ETH_ADDRESS_REGISTRY_VALIDATOR_NAME);
+        = load_program(ETH_ADDRESS_REGISTRY_VALIDATOR_NAME);
     pub static ref ETH_ADDRESS_REGISTRY_PROGRAM_CODE_HASH: [u8; 32] = {
         let mut buf = [0u8; 32];
         let mut hasher = new_blake2b();
@@ -127,14 +127,14 @@ lazy_static::lazy_static! {
 pub enum Log {
     SudtTransfer {
         sudt_id: u32,
-        from_addr: [u8; 20],
-        to_addr: [u8; 20],
+        from_addr: RegistryAddress,
+        to_addr: RegistryAddress,
         amount: u128,
     },
     SudtPayFee {
         sudt_id: u32,
-        from_addr: [u8; 20],
-        block_producer_addr: [u8; 20],
+        from_addr: RegistryAddress,
+        block_producer_addr: RegistryAddress,
         amount: u128,
     },
     PolyjuiceSystem {
@@ -150,15 +150,12 @@ pub enum Log {
     },
 }
 
-fn parse_sudt_log_data(data: &[u8]) -> ([u8; 20], [u8; 20], u128) {
-    assert_eq!(data[0], 20);
-    let mut from_addr = [0u8; 20];
-    from_addr.copy_from_slice(&data[1..21]);
-    let mut to_addr = [0u8; 20];
-    to_addr.copy_from_slice(&data[21..41]);
+fn parse_sudt_log_data(data: &[u8]) -> (RegistryAddress, RegistryAddress, u128) {
+    let from_addr = RegistryAddress::from_slice(&data[0..28]).expect("parse from_addr");
+    let to_addr = RegistryAddress::from_slice(&data[28..56]).expect("parse to_addr");
 
     let mut u128_bytes = [0u8; 16];
-    u128_bytes.copy_from_slice(&data[41..41 + 16]);
+    u128_bytes.copy_from_slice(&data[56..56 + 16]);
     let amount = u128::from_le_bytes(u128_bytes);
     (from_addr, to_addr, amount)
 }
@@ -170,7 +167,7 @@ pub fn parse_log(item: &LogItem) -> Log {
     match service_flag {
         GW_LOG_SUDT_TRANSFER => {
             let sudt_id: u32 = item.account_id().unpack();
-            if data.len() != (1 + 20 + 20 + 16) {
+            if data.len() != (28 + 28 + 16) {
                 panic!("Invalid data length: {}", data.len());
             }
             let (from_addr, to_addr, amount) = parse_sudt_log_data(data);
@@ -183,7 +180,7 @@ pub fn parse_log(item: &LogItem) -> Log {
         }
         GW_LOG_SUDT_PAY_FEE => {
             let sudt_id: u32 = item.account_id().unpack();
-            if data.len() != (1 + 20 + 20 + 16) {
+            if data.len() != (28 + 28 + 16) {
                 panic!("Invalid data length: {}", data.len());
             }
             let (from_addr, block_producer_addr, amount) = parse_sudt_log_data(data);
@@ -451,13 +448,13 @@ pub fn setup() -> (Store, DummyState, Generator) {
         backend_type: BackendType::Polyjuice,
         validator: POLYJUICE_VALIDATOR_PROGRAM.clone(),
         generator: POLYJUICE_GENERATOR_PROGRAM.clone(),
-        validator_script_type_hash: POLYJUICE_PROGRAM_CODE_HASH.clone().into(),
+        validator_script_type_hash: (*POLYJUICE_PROGRAM_CODE_HASH).into(),
     });
     backend_manage.register_backend(Backend {
         backend_type: BackendType::EthAddrReg,
         validator: ETH_ADDRESS_REGISTRY_VALIDATOR_PROGRAM.clone(),
         generator: ETH_ADDRESS_REGISTRY_GENERATOR_PROGRAM.clone(),
-        validator_script_type_hash: ETH_ADDRESS_REGISTRY_PROGRAM_CODE_HASH.clone().into(),
+        validator_script_type_hash: (*ETH_ADDRESS_REGISTRY_PROGRAM_CODE_HASH).into(),
     });
     let mut account_lock_manage = AccountLockManage::default();
     account_lock_manage
@@ -486,7 +483,7 @@ pub fn setup() -> (Store, DummyState, Generator) {
         )
         .build();
     let rollup_context = RollupContext {
-        rollup_script_hash: ROLLUP_SCRIPT_HASH.clone().into(),
+        rollup_script_hash: ROLLUP_SCRIPT_HASH.into(),
         rollup_config,
     };
     let generator = Generator::new(backend_manage, account_lock_manage, rollup_context);
@@ -589,27 +586,6 @@ pub fn compute_create2_script(
         .build()
 }
 
-pub struct Account {
-    id: u32,
-}
-
-impl Account {
-    pub fn build_script(n: u32) -> (Script, RegistryAddress) {
-        let mut addr = [0u8; 20];
-        addr[..4].copy_from_slice(&n.to_le_bytes());
-        let mut args = vec![42u8; 32];
-        args.extend(&addr);
-        let code_hash = [3u8; 32];
-        let script = Script::new_builder()
-            .code_hash(code_hash.pack())
-            .hash_type(ScriptHashType::Type.into())
-            .args(args.pack())
-            .build();
-        let addr = RegistryAddress::new(ETH_REGISTRY_ACCOUNT_ID, addr.to_vec());
-        (script, addr)
-    }
-}
-
 #[derive(Debug, Clone)]
 pub struct MockContractInfo {
     pub eth_addr: Vec<u8>,
@@ -631,12 +607,6 @@ impl MockContractInfo {
             reg_addr,
         }
     }
-
-    pub fn mapping_registry_address_to_script_hash(&self, state: &mut DummyState) {
-        state
-            .mapping_registry_address_to_script_hash(self.reg_addr.clone(), self.script_hash)
-            .expect("map reg addr to script hash");
-    }
 }
 
 pub fn simple_storage_get(
@@ -647,7 +617,8 @@ pub fn simple_storage_get(
     from_id: u32,
     ss_account_id: u32,
 ) -> RunResult {
-    let (_, addr) = Account::build_script(0);
+    let eth_addr = [0x99u8; 20];
+    let addr = RegistryAddress::new(ETH_REGISTRY_ACCOUNT_ID, eth_addr.to_vec());
     let block_info = new_block_info(addr, block_number, block_number);
     let input = hex::decode("6d4ce63c").unwrap();
     let args = PolyjuiceArgsBuilder::default()
@@ -674,7 +645,7 @@ pub fn simple_storage_get(
         )
         .expect("execute_transaction");
     // 491894, 571661 -> 586360 < 587K
-    check_cycles("simple_storage_get", run_result.used_cycles, 637_000);
+    check_cycles("simple_storage_get", run_result.used_cycles, 700_000);
     run_result
 }
 
@@ -703,7 +674,7 @@ pub fn build_eth_l2_script(args: &[u8; 20]) -> Script {
 pub(crate) fn create_block_producer(state: &mut DummyState) -> RegistryAddress {
     let block_producer_script = build_eth_l2_script(&[0x99u8; 20]);
     let block_producer_script_hash = block_producer_script.hash();
-    let block_producer_id = state
+    let _block_producer_id = state
         .create_account_from_script(block_producer_script)
         .expect("create_block_producer");
     let eth_addr = [0x99u8; 20];
@@ -745,7 +716,8 @@ pub(crate) fn check_cycles(l2_tx_label: &str, used_cycles: u64, warning_cycles: 
     println!("[check_cycles] used_cycles: {}", used_cycles);
     assert!(
         used_cycles < warning_cycles,
-        "[Warning: {} used too many cycles({})]",
+        "[Warning(cycles: {}): {} used too many cycles({})]",
+        warning_cycles,
         l2_tx_label,
         used_cycles
     );
@@ -824,6 +796,7 @@ impl SetMappingArgsBuilder {
         let mut output: Vec<u8> = vec![0u8; 4];
         output[0..4].copy_from_slice(&self.method.to_le_bytes()[..]);
         output.extend(self.gw_script_hash);
+        output.extend(ETH_REGISTRY_ACCOUNT_ID.to_le_bytes());
         output.extend(&self.fee.to_le_bytes()[..]);
         output
     }
