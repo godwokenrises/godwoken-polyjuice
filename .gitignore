@@ -57,3 +57,5 @@ integration-test/
 /.vscode/settings.json
 /.vscode/*.log
 .vscode/c_cpp_properties.json
+
+polyjuice-tests/.vscode/
