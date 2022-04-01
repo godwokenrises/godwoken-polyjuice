@@ -4,10 +4,12 @@
 use std::convert::TryInto;
 
 use crate::helper::{
-    eth_addr_to_ethabi_addr, new_block_info, new_contract_account_script, setup,
-    PolyjuiceArgsBuilder, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
+    build_eth_l2_script, eth_addr_to_ethabi_addr, new_block_info, new_contract_account_script,
+    register_eoa_account, setup, PolyjuiceArgsBuilder, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
-use gw_common::{builtins::ETH_REGISTRY_ACCOUNT_ID, state::State};
+use gw_common::{
+    builtins::ETH_REGISTRY_ACCOUNT_ID, registry_address::RegistryAddress, state::State,
+};
 use gw_db::schema::COLUMN_INDEX;
 use gw_generator::traits::StateExt;
 use gw_store::chain_view::ChainView;
@@ -24,7 +26,19 @@ const INIT_CODE: &str = include_str!("./evm-contracts/BlockInfo.bin");
 #[test]
 fn test_get_block_info() {
     let (store, mut state, generator) = setup();
-
+    let block_producer_script = build_eth_l2_script(&[0x99u8; 20]);
+    let block_producer_script_hash = block_producer_script.hash();
+    let _block_producer_id = state
+        .create_account_from_script(block_producer_script)
+        .expect("create_block_producer");
+    // mock eth addr of coinbase in contract
+    let eth_addr = hex::decode("a1ad227Ad369f593B5f3d0Cc934A681a50811CB2").unwrap();
+    register_eoa_account(
+        &mut state,
+        &eth_addr.clone().try_into().unwrap(),
+        &block_producer_script_hash,
+    );
+    let block_producer = RegistryAddress::new(ETH_REGISTRY_ACCOUNT_ID, eth_addr);
     {
         let genesis_number: Uint64 = 0.pack();
         // See: BlockInfo.sol
@@ -40,27 +54,16 @@ fn test_get_block_info() {
     let (from_id, _from_script_hash) =
         crate::helper::create_eth_eoa_account(&mut state, &from_eth_address, 400000);
 
-    let aggregator_eth_addr = [2u8; 20];
-    let (_aggregator_id, aggregator_script_hash) =
-        crate::helper::create_eth_eoa_account(&mut state, &aggregator_eth_addr, 0);
-
-    let aggregator_account = state
-        .get_registry_address_by_script_hash(
-            ETH_REGISTRY_ACCOUNT_ID,
-            &aggregator_script_hash.into(),
-        )
-        .unwrap()
-        .unwrap();
     // FIXME(Godwoken): coinbase_hex => eth_addr_to_ethabi_addr(&aggregator_eth_addr)
     let coinbase_hex = hex::encode(eth_addr_to_ethabi_addr(
-        &aggregator_script_hash.as_slice()[..20].try_into().unwrap(),
+        &block_producer.address.clone().try_into().unwrap(),
     ));
     println!("coinbase_hex: {}", coinbase_hex);
 
     // Deploy BlockInfo
     let mut block_number = 0x05;
     let timestamp: u64 = 0xff33 * 1000;
-    let block_info = new_block_info(aggregator_account.clone(), block_number, timestamp);
+    let block_info = new_block_info(block_producer.clone(), block_number, timestamp);
     let input = hex::decode(INIT_CODE).unwrap();
     let args = PolyjuiceArgsBuilder::default()
         .do_create(true)
@@ -131,8 +134,7 @@ fn test_get_block_info() {
     ]
     .iter()
     {
-        let block_info =
-            new_block_info(aggregator_account.clone(), block_number + 1, timestamp + 1);
+        let block_info = new_block_info(block_producer.clone(), block_number + 1, timestamp + 1);
         let input = hex::decode(fn_sighash).unwrap();
         let args = PolyjuiceArgsBuilder::default()
             .gas_limit(21000)
