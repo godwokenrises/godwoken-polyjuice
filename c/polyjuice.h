@@ -347,8 +347,8 @@ struct evmc_tx_context get_tx_context(struct evmc_host_context* context) {
                                         coinbase_script_hash,
                                         ctx.block_coinbase.bytes);
   if (ret != 0) {
-    debug_print_int("load block_coinbase address failed, id",
-                    context->gw_ctx->block_info.block_producer_id);
+    debug_print_data("load block_coinbase address failed, id",
+                    context->gw_ctx->block_info.block_producer.addr, 32);
     context->error_code = ret;
   }
 
