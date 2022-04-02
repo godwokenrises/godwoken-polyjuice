@@ -12,10 +12,12 @@ if [ -d "$GODWOKEN_DIR" ]
 then
     echo "godwoken project already exists"
 else
-    git clone -b compatibility-breaking-changes https://github.com/nervosnetwork/godwoken.git $GODWOKEN_DIR
+    git clone --depth=1 https://github.com/nervosnetwork/godwoken.git $GODWOKEN_DIR
 fi
 cd $GODWOKEN_DIR
-git checkout 5ab0b782f0eb2d835705bf52475eeb874b203ed0 # https://github.com/nervosnetwork/godwoken/commits/5ab0b78
+# https://github.com/nervosnetwork/godwoken/commits/c9d4da
+git fetch origin c9d4daa3902b5f98d59c56343f94caee540ef3fa
+git checkout FETCH_HEAD
 git submodule update --init --recursive --depth=1
 
 cd $PROJECT_ROOT
