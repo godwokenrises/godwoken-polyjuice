@@ -299,7 +299,6 @@ int load_account_code(gw_context_t* gw_ctx, uint32_t account_id,
     return 0;
   }
 
-  uint64_t old_code_size = *code_size;
   debug_print_int("[load_account_code] code_size before loading", *code_size);
   ret = gw_ctx->sys_load_data(gw_ctx, data_hash, code_size, offset, code);
   debug_print_int("[load_account_code] code_size after loading", *code_size);
@@ -307,11 +306,7 @@ int load_account_code(gw_context_t* gw_ctx, uint32_t account_id,
     ckb_debug("[load_account_code] sys_load_data failed");
     return ret;
   }
-  if (*code_size > old_code_size) {
-    debug_print_int("[load_account_code] code can't be larger than buffer size",
-                    old_code_size);
-    return -1;
-  }
+
   return 0;
 }
 
