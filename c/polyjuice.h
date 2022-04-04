@@ -289,6 +289,11 @@ int load_account_code(gw_context_t* gw_ctx, uint32_t account_id,
     ckb_debug("[load_account_code] sys_load_data failed");
     return ret;
   }
+  if (*code_size > MAX_DATA_SIZE) {
+    debug_print_int("[load_account_code] code_size can't be larger than",
+                    MAX_DATA_SIZE);
+    return GW_FATAL_BUFFER_OVERFLOW;
+  }
 
   return 0;
 }
@@ -416,14 +421,16 @@ size_t get_code_size(struct evmc_host_context* context,
     ckb_debug("get contract account id failed");
     return 0;
   }
+
   uint8_t code[MAX_DATA_SIZE];
   uint64_t code_size = MAX_DATA_SIZE;
   ret = load_account_code(context->gw_ctx, account_id, &code_size, 0, code);
   if (ret != 0) {
-    ckb_debug("load_account_code failed");
+    debug_print_int("[get_code_size] load_account_code failed", ret);
     context->error_code = ret;
     return 0;
   }
+
   ckb_debug("END get_code_size");
   return code_size;
 }
@@ -445,7 +452,7 @@ evmc_bytes32 get_code_hash(struct evmc_host_context* context,
   uint64_t code_size = MAX_DATA_SIZE;
   ret = load_account_code(context->gw_ctx, account_id, &code_size, 0, code);
   if (ret != 0) {
-    ckb_debug("load_account_code failed");
+    debug_print_int("[get_code_hash] load_account_code failed", ret);
     context->error_code = ret;
     return hash;
   }
@@ -489,15 +496,15 @@ size_t copy_code(struct evmc_host_context* context, const evmc_address* address,
     return 0;
   }
 
-  // why (uint32_t)buffer_size ?
-  uint64_t code_size = (uint32_t)buffer_size;
+  uint64_t code_size = buffer_size;
   ret = load_account_code(context->gw_ctx, account_id, &code_size,
-                          (uint32_t)code_offset, buffer_data);
+                          code_offset, buffer_data);
   if (ret != 0) {
-    ckb_debug("load account code failed");
+    debug_print_int("[copy_code] load_account_code failed", ret);
     context->error_code = ret;
     return 0;
   }
+
   ckb_debug("END copy_code");
   return code_size >= buffer_size ? buffer_size : code_size;
 }
@@ -1116,7 +1123,6 @@ int handle_message(gw_context_t* ctx,
   uint8_t* code_data = NULL;
   size_t code_size = 0;
   uint8_t code_data_buffer[MAX_DATA_SIZE];
-  uint64_t code_size_u32 = MAX_DATA_SIZE;
   if (is_create(msg.kind)) {
     /* use input as code */
     code_data = (uint8_t*)msg.input_data;
@@ -1124,18 +1130,21 @@ int handle_message(gw_context_t* ctx,
     msg.input_data = NULL;
     msg.input_size = 0;
   } else if (to_address_exists) {
+    uint64_t code_size_tmp = MAX_DATA_SIZE;
     /* call kind: CALL/CALLCODE/DELEGATECALL */
-    ret = load_account_code(ctx, to_id, &code_size_u32, 0, code_data_buffer);
+    ret = load_account_code(ctx, to_id, &code_size_tmp, 0, code_data_buffer);
     if (ret != 0) {
+      debug_print_int("[handle_message] load_account_code failed", ret);
       return ret;
     }
-    if (code_size_u32 == 0) {
-      debug_print_int("[handle_message] empty contract code for account (EoA account)", to_id);
+    if (code_size_tmp == 0) {
+      debug_print_int("[handle_message] account with empty code (EoA account)",
+                      to_id);
       code_data = NULL;
     } else {
       code_data = code_data_buffer;
     }
-    code_size = (size_t)code_size_u32;
+    code_size = (size_t)code_size_tmp;
   } else {
     /** Call non-exists address */
     ckb_debug("[handle_message] Warn: Call non-exists address");
