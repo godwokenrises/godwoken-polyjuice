@@ -259,7 +259,7 @@ int load_account_code(gw_context_t* gw_ctx, uint32_t account_id,
     return 0;
   }
 
-  debug_print_int("[load_account_code] account_id:", account_id);
+  debug_print_int("[load_account_code] account_id", account_id);
   uint8_t key[32];
   uint8_t data_hash[32];
   polyjuice_build_contract_code_key(account_id, key);
@@ -283,21 +283,24 @@ int load_account_code(gw_context_t* gw_ctx, uint32_t account_id,
   }
 
   uint64_t old_code_size = *code_size;
+  debug_print_int("[load_account_code] code_size before loading", *code_size);
   ret = gw_ctx->sys_load_data(gw_ctx, data_hash, code_size, offset, code);
+  debug_print_int("[load_account_code] code_size after loading", *code_size);
   if (ret != 0) {
     ckb_debug("[load_account_code] sys_load_data failed");
     return ret;
   }
   if (*code_size > old_code_size) {
-    debug_print_int("[load_account_code] code can't be larger than", MAX_DATA_SIZE);
+    debug_print_int("[load_account_code] code can't be larger than buffer size",
+                    old_code_size);
     return -1;
   }
   return 0;
 }
 
-////////////////////////////////////////////////////////////////////////////
-//// Callbacks
-////////////////////////////////////////////////////////////////////////////
+////////////////////////////////////////////////////////////////////////////////
+//// Callbacks - EVMC Host Interfaces
+////////////////////////////////////////////////////////////////////////////////
 struct evmc_tx_context get_tx_context(struct evmc_host_context* context) {
   struct evmc_tx_context ctx{0};
   memcpy(ctx.tx_origin.bytes, g_tx_origin.bytes, 20);
@@ -460,9 +463,28 @@ evmc_bytes32 get_code_hash(struct evmc_host_context* context,
   return hash;
 }
 
+/**
+ * @brief Copy code callback function.
+ *
+ * This callback function is used by an EVM to request a copy of the code of the
+ * given account to the memory buffer provided by the EVM. The Client MUST copy
+ * the requested code, starting with the given offset, to the provided memory
+ * buffer up to the size of the buffer or the size of the code, whichever is
+ * smaller.
+ *
+ * @param context The pointer to the Host execution context.
+ * @param address The address of the account.
+ * @param code_offset The offset of the code to copy.
+ * @param buffer_data The pointer to the memory buffer allocated by the EVM to
+ *                    store a copy of the requested code.
+ * @param buffer_size The size of the memory buffer.
+ * @return size_t The number of bytes copied to the buffer by the Client.
+ */
 size_t copy_code(struct evmc_host_context* context, const evmc_address* address,
                  size_t code_offset, uint8_t* buffer_data, size_t buffer_size) {
   ckb_debug("BEGIN copy_code");
+  debug_print_int("[copy_code] code_offset", code_offset);
+  debug_print_int("[copy_code] buffer_size", buffer_size);
   uint32_t account_id = 0;
   int ret = load_account_id_by_eth_address(context->gw_ctx,
                                            address->bytes, &account_id);
@@ -472,6 +494,7 @@ size_t copy_code(struct evmc_host_context* context, const evmc_address* address,
     return 0;
   }
 
+  // why (uint32_t)buffer_size ?
   uint64_t code_size = (uint32_t)buffer_size;
   ret = load_account_code(context->gw_ctx, account_id, &code_size,
                           (uint32_t)code_offset, buffer_data);
@@ -481,7 +504,7 @@ size_t copy_code(struct evmc_host_context* context, const evmc_address* address,
     return 0;
   }
   ckb_debug("END copy_code");
-  return 0;
+  return code_size >= buffer_size ? buffer_size : code_size;
 }
 
 evmc_uint256be get_balance(struct evmc_host_context* context,
@@ -1357,7 +1380,8 @@ int run_polyjuice() {
     return clean_evmc_result_and_return(&res, ret);
   }
 
-  ret = context.sys_set_program_return_data(&context, (uint8_t *)res.output_data,
+  ret = context.sys_set_program_return_data(&context,
+                                            (uint8_t *)res.output_data,
                                             res.output_size);
   if (ret != 0) {
     ckb_debug("set return data failed");
