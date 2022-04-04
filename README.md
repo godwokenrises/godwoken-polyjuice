@@ -50,7 +50,7 @@ args:
     eth_addr_reg_id  : u32          (little endian, the ETH_Address_Registry Contract id)
 ```
 
-Polyjuice creator account is a Godwoken account for creating Polyjuice contract account. This account can only be created by [meta contract][meta-contract], and the account id is used as the chain id in Polyjuice. The `sudt_id` field in script args is the sUDT token current Polyjuice instance bind to as [`pETH`](https://github.com/nervosnetwork/godwoken/blob/develop/docs/life_of_a_polyjuice_transaction.md#pCKB). The `eth_addr_reg_id` field in script args is the id of `ETH Address Registry` layer2 contract which provides two-ways mappings between `eth_address` and `gw_script_hash`.
+Polyjuice creator account is a Godwoken account for creating Polyjuice contract account. This account can only be created by [meta contract][meta-contract], and the account id is used as the chain id in Polyjuice. The `sudt_id` field in script args is the sUDT token current Polyjuice instance bind to as [`pCKB`](https://github.com/nervosnetwork/godwoken/blob/develop/docs/life_of_a_polyjuice_transaction.md#pCKB). The `eth_addr_reg_id` field in script args is the id of `ETH Address Registry` layer2 contract which provides two-ways mappings between `eth_address` and `gw_script_hash`.
 
 ### Contract account script
 

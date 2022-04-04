@@ -104,7 +104,7 @@ fn test_transfer_by_metamask() {
     // ```
     //
     // if tx.data is null && to_address is EoA or notExistEoA,
-    // then handle it as a simple pETH transfer, using ERC20_Proxy(sUDT_ID = 1)
+    // then handle it as a simple pCKB transfer, using ERC20_Proxy(sUDT_ID = 1)
     //
     // The RawL2Transaction from Web3 RPC to Godwoken RPC:
     // {
