@@ -56,8 +56,7 @@ BUILDER_DOCKER := nervos/ckb-riscv-gnu-toolchain@sha256:7b168b4b109a0f741078a71b
 all: build/blockchain.h build/godwoken.h \
   build/test_contracts build/test_rlp build/test_ripemd160 \
   build/generator build/validator \
-  build/generator_log build/validator_log \
-  build/eth_addr_reg_generator build/eth_addr_reg_validator
+  build/generator_log build/validator_log
 
 all-via-docker: generate-protocol fetch-gw-scripts
 	mkdir -p build
@@ -136,16 +135,6 @@ build/validator_log: c/validator.c $(VALIDATOR_DEPS)
 	$(OBJCOPY) --only-keep-debug $@ $@.debug
 	$(OBJCOPY) --strip-debug --strip-all $@
 	cd $(SECP_DIR) && (git apply -R workaround-fix-g++-linking.patch || true) && cd - # revert patch
-
-build/eth_addr_reg_generator: c/eth_addr_reg.c
-	$(CC) $(CFLAGS) $(GENERATOR_FLAGS) $(LDFLAGS) -Ibuild -o $@ $<
-	$(OBJCOPY) --only-keep-debug $@ $@.debug
-	$(OBJCOPY) --strip-debug --strip-all $@
-
-build/eth_addr_reg_validator: c/eth_addr_reg.c
-	$(CC) $(CFLAGS) $(VALIDATOR_FLAGS) $(LDFLAGS) -Ibuild -o $@ $<
-	$(OBJCOPY) --only-keep-debug $@ $@.debug
-	$(OBJCOPY) --strip-debug --strip-all $@
 
 build/test_contracts: c/tests/test_contracts.c $(VALIDATOR_DEPS)
 	cd $(SECP_DIR) && (git apply workaround-fix-g++-linking.patch || true) && cd - # apply patch
