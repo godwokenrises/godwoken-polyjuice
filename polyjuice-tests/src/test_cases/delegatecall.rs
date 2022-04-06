@@ -3,8 +3,8 @@
 
 use crate::helper::{
     self, contract_script_to_eth_addr, deploy, new_block_info, new_contract_account_script,
-    new_contract_account_script_with_nonce, setup, simple_storage_get, PolyjuiceArgsBuilder,
-    CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
+    new_contract_account_script_with_nonce, setup, simple_storage_get, Account, MockContractInfo,
+    PolyjuiceArgsBuilder, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
@@ -35,7 +35,7 @@ fn test_delegatecall() {
         SS_INIT_CODE,
         122000,
         0,
-        block_producer_id,
+        block_producer_id.clone(),
         block_number,
     );
     let ss_account_script = new_contract_account_script_with_nonce(&from_eth_address, 0);
@@ -59,15 +59,16 @@ fn test_delegatecall() {
         block_number,
     );
     // [Deploy DelegateCall] used cycles: 753698 < 760K
-    helper::check_cycles("Deploy DelegateCall", run_result.used_cycles, 760_000);
+    helper::check_cycles("Deploy DelegateCall", run_result.used_cycles, 1_100_000);
     // println!(
     //     "result {}",
     //     serde_json::to_string_pretty(&RunResult::from(run_result)).unwrap()
     // );
-    let delegate_contract_script =
-        new_contract_account_script(&mut state, from_id, &from_eth_address, false);
+    let delegate_contract = MockContractInfo::create(&from_eth_address, 0);
+    delegate_contract.mapping_registry_address_to_script_hash(&mut state);
+    let delegate_contract_script_hash = delegate_contract.script_hash;
     let delegate_contract_id = state
-        .get_account_id_by_script_hash(&delegate_contract_script.hash().into())
+        .get_account_id_by_script_hash(&delegate_contract_script_hash)
         .unwrap()
         .unwrap();
 
@@ -101,7 +102,8 @@ fn test_delegatecall() {
     .iter()
     {
         block_number += 1;
-        let block_info = new_block_info(0, block_number, block_number);
+        let (_, block_producer) = Account::build_script(0);
+        let block_info = new_block_info(block_producer, block_number, block_number);
         let input = hex::decode(format!(
             "{}{}{}",
             fn_sighash,

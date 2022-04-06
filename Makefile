@@ -241,7 +241,7 @@ contract/sudt-erc20-proxy:
 fetch-gw-scripts:
 	mkdir -p build
 	docker run --rm -v `pwd`/build:/build-dir \
-		ghcr.io/flouse/godwoken-prebuilds:v1.0.x-aot-202202080748 \
+	  	ghcr.io/jjyr/godwoken-prebuilds:refactor-registry-address-202203150449 \
 		cp -r /scripts/godwoken-scripts /build-dir \
 		&& echo "Copy godwoken-scripts"
 

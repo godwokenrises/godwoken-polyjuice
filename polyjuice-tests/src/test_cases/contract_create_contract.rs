@@ -2,9 +2,8 @@
 //!   See ./evm-contracts/CreateContract.sol
 
 use crate::helper::{
-    self, deploy, new_block_info, new_contract_account_script,
-    new_contract_account_script_with_nonce, setup, PolyjuiceArgsBuilder, CREATOR_ACCOUNT_ID,
-    L2TX_MAX_CYCLES,
+    self, deploy, new_block_info, new_contract_account_script, setup, Account, MockContractInfo,
+    PolyjuiceArgsBuilder, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
@@ -22,6 +21,9 @@ fn test_contract_create_contract() {
     let from_eth_address = [1u8; 20];
     let (from_id, _from_script_hash) =
         helper::create_eth_eoa_account(&mut state, &from_eth_address, 200000);
+    // let account_sub = MockContractInfo::create(&from_eth_address, 0);
+    // dbg!(hex::encode(&account_sub.eth_addr));
+    // account_sub.mapping_registry_address_to_script_hash(&mut state);
 
     // Deploy CreateContract
     let run_result = deploy(
@@ -38,7 +40,7 @@ fn test_contract_create_contract() {
     );
     state.apply_run_result(&run_result).expect("update state");
     // [Deploy CreateContract] used cycles: 2109521 < 2120K
-    helper::check_cycles("Deploy CreateContract", run_result.used_cycles, 2120_000);
+    helper::check_cycles("Deploy CreateContract", run_result.used_cycles, 2_120_000);
     // println!(
     //     "result {}",
     //     serde_json::to_string_pretty(&RunResult::from(run_result)).unwrap()
@@ -66,17 +68,19 @@ fn test_contract_create_contract() {
     );
 
     // mom_contract create SimpleStorage contract
-    let ss_contract_script = new_contract_account_script_with_nonce(&mom_contract_address, 0);
-    let ss_contract_script_hash = ss_contract_script.hash();
+    let ss_contract = MockContractInfo::create(&mom_contract_address, 0);
+    ss_contract.mapping_registry_address_to_script_hash(&mut state);
+    let ss_contract_script_hash = ss_contract.script_hash;
     let ss_account_id = state
-        .get_account_id_by_script_hash(&ss_contract_script_hash.into())
+        .get_account_id_by_script_hash(&ss_contract_script_hash)
         .unwrap()
         .unwrap(); // ss_account_id = 7
     assert_eq!(ss_account_id, 7);
 
     {
         // SimpleStorage.get();
-        let block_info = new_block_info(0, 2, 0);
+        let (_, block_producer) = Account::build_script(0);
+        let block_info = new_block_info(block_producer, 2, 0);
         let input = hex::decode("6d4ce63c").unwrap();
         let args = PolyjuiceArgsBuilder::default()
             .gas_limit(21000)

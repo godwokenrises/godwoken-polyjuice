@@ -3,15 +3,16 @@
 
 use crate::helper::{
     build_eth_l2_script, contract_script_to_eth_addr, deploy, eth_addr_to_ethabi_addr,
-    new_block_info, new_contract_account_script, parse_log, register_eoa_account, setup, Log,
-    PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
+    new_block_info, new_contract_account_script, parse_log, register_eoa_account, setup, Account,
+    Log, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
-use gw_common::state::State;
+use gw_common::{
+    builtins::ETH_REGISTRY_ACCOUNT_ID, registry_address::RegistryAddress, state::State,
+};
 use gw_generator::traits::StateExt;
 use gw_store::chain_view::ChainView;
 use gw_store::traits::chain_store::ChainStore;
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
-use std::convert::TryInto;
 
 const INIT_CODE: &str = include_str!("./evm-contracts/LogEvents.bin");
 
@@ -23,15 +24,26 @@ fn test_parse_log_event() {
     let block_producer_id = state
         .create_account_from_script(block_producer_script)
         .expect("create_block_producer");
-    register_eoa_account(&mut state, &[0x99u8; 20], &block_producer_script_hash);
+    let block_producer = Account::build_script(block_producer_id);
+    let block_producer_eth_addr = [0x99u8; 20];
+    register_eoa_account(
+        &mut state,
+        &block_producer_eth_addr,
+        &block_producer_script_hash,
+    );
+    let block_producer_reg_addr =
+        RegistryAddress::new(ETH_REGISTRY_ACCOUNT_ID, block_producer_eth_addr.to_vec());
 
-    let from_eth_address = [1u8; 20];
+    let from_eth_addr = [1u8; 20];
     let (from_id, from_script_hash) =
-        crate::helper::create_eth_eoa_account(&mut state, &from_eth_address, 200000);
-    let from_short_script_hash: &[u8; 20] = &from_script_hash[..20].try_into().unwrap();
+        crate::helper::create_eth_eoa_account(&mut state, &from_eth_addr, 200000);
+    let address = state
+        .get_registry_address_by_script_hash(ETH_REGISTRY_ACCOUNT_ID, &from_script_hash.into())
+        .unwrap()
+        .unwrap();
 
     let from_balance1 = state
-        .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, from_short_script_hash)
+        .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &address)
         .unwrap();
     assert_eq!(from_balance1, 200000);
 
@@ -46,11 +58,10 @@ fn test_parse_log_event() {
         INIT_CODE,
         50000,
         deploy_value,
-        block_producer_id,
+        block_producer_reg_addr,
         block_number,
     );
-    let contract_script =
-        new_contract_account_script(&mut state, from_id, &from_eth_address, false);
+    let contract_script = new_contract_account_script(&mut state, from_id, &from_eth_addr, false);
     let contract_addr = contract_script_to_eth_addr(&contract_script, false);
     let contract_script_hash = contract_script.hash();
     let contract_short_script_hash = &contract_script_hash[0..20];
@@ -74,8 +85,8 @@ fn test_parse_log_event() {
             ..
         } = log
         {
-            assert_eq!(&the_from_addr, from_short_script_hash);
-            assert_eq!(the_to_addr, contract_short_script_hash);
+            assert_eq!(&the_from_addr, &from_eth_addr);
+            assert_eq!(&the_to_addr, &contract_addr[..]);
             assert_eq!(amount, deploy_value);
         } else {
             panic!("unexpected polyjuice log");
@@ -99,7 +110,7 @@ fn test_parse_log_event() {
             assert_eq!(data[63], 1); // true
             assert_eq!(
                 topics[1].as_slice(),
-                eth_addr_to_ethabi_addr(&from_eth_address)
+                eth_addr_to_ethabi_addr(&from_eth_addr)
             );
         } else {
             panic!("unexpected polyjuice log");
@@ -140,7 +151,7 @@ fn test_parse_log_event() {
             ..
         } = log
         {
-            assert_eq!(&the_from_addr, from_short_script_hash);
+            assert_eq!(&the_from_addr, &from_eth_addr);
             // The block producer id is `0`
             assert_eq!(the_to_addr, block_producer_script_hash[..20]);
             assert_eq!(amount, 1814);
@@ -152,7 +163,8 @@ fn test_parse_log_event() {
     block_number += 1;
     {
         // LogEvents.log();
-        let block_info = new_block_info(0, block_number, block_number);
+        let (_, block_producer) = Account::build_script(0);
+        let block_info = new_block_info(block_producer, block_number, block_number);
         let input = hex::decode("51973ec9").unwrap();
         let call_value = 0xac;
         let args = PolyjuiceArgsBuilder::default()
@@ -198,7 +210,7 @@ fn test_parse_log_event() {
                 assert_eq!(data[63], 0); // false
                 assert_eq!(
                     topics[1].as_slice(),
-                    eth_addr_to_ethabi_addr(&from_eth_address)
+                    eth_addr_to_ethabi_addr(&from_eth_addr)
                 );
             } else {
                 panic!("unexpected polyjuice log");

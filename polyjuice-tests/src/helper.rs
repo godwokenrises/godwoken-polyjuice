@@ -4,6 +4,7 @@ pub use gw_common::{
     state::{build_data_hash_key, State},
     CKB_SUDT_SCRIPT_ARGS, H256,
 };
+use gw_common::{builtins::ETH_REGISTRY_ACCOUNT_ID, registry_address::RegistryAddress};
 use gw_config::{BackendConfig, BackendType};
 use gw_db::schema::{COLUMN_INDEX, COLUMN_META, META_TIP_BLOCK_HASH_KEY};
 use gw_generator::error::TransactionError;
@@ -23,7 +24,7 @@ use gw_types::{
     core::{AllowedContractType, AllowedEoaType, ScriptHashType},
     offchain::RunResult,
     packed::{
-        AllowedTypeHash, BatchSetMapping, BlockInfo, LogItem, RawL2Transaction, RollupConfig,
+        AllowedTypeHash, BatchSetMapping, BlockInfo, Fee, LogItem, RawL2Transaction, RollupConfig,
         Script, Uint64,
     },
     prelude::*,
@@ -52,13 +53,14 @@ pub const SUDT_GENERATOR_PATH: &str = "../build/godwoken-scripts/sudt-generator"
 pub const SUDT_VALIDATOR_SCRIPT_TYPE_HASH: [u8; 32] = [0xa2u8; 32];
 pub const SECP_DATA: &[u8] = include_bytes!("../../build/secp256k1_data");
 
-pub const BIN_DIR: &str = "../build";
 // polyjuice
-pub const POLYJUICE_GENERATOR_NAME: &str = "generator_log.aot";
-pub const POLYJUICE_VALIDATOR_NAME: &str = "validator";
+pub const POLYJUICE_GENERATOR_NAME: &str = "../build/generator_log.aot";
+pub const POLYJUICE_VALIDATOR_NAME: &str = "../build/validator";
 // ETH Address Registry
-pub const ETH_ADDRESS_REGISTRY_GENERATOR_NAME: &str = "eth_addr_reg_generator";
-pub const ETH_ADDRESS_REGISTRY_VALIDATOR_NAME: &str = "eth_addr_reg_validator";
+pub const ETH_ADDRESS_REGISTRY_GENERATOR_NAME: &str =
+    "../build/godwoken-scripts/eth-addr-reg-generator";
+pub const ETH_ADDRESS_REGISTRY_VALIDATOR_NAME: &str =
+    "../build/godwoken-scripts/eth-addr-reg-validator";
 // Key type for ETH Address Registry
 const GW_ACCOUNT_SCRIPT_HASH_TO_ETH_ADDR: u8 = 200;
 const ETH_ADDR_TO_GW_ACCOUNT_SCRIPT_HASH: u8 = 201;
@@ -81,7 +83,6 @@ pub(crate) const SUDT_ERC20_PROXY_USER_DEFINED_DECIMALS_CODE: &str =
 fn load_program(program_name: &str) -> Bytes {
     let mut buf = Vec::new();
     let mut path = PathBuf::new();
-    path.push(&BIN_DIR);
     path.push(program_name);
     let mut f = fs::File::open(&path).expect(&format!("load program {}", program_name));
     f.read_to_end(&mut buf).expect("read program");
@@ -261,9 +262,9 @@ pub fn parse_log(item: &LogItem) -> Log {
     }
 }
 
-pub fn new_block_info(block_producer_id: u32, number: u64, timestamp: u64) -> BlockInfo {
+pub fn new_block_info(block_producer: RegistryAddress, number: u64, timestamp: u64) -> BlockInfo {
     BlockInfo::new_builder()
-        .block_producer_id(block_producer_id.pack())
+        .block_producer(Bytes::from(block_producer.to_bytes()).pack())
         .number(number.pack())
         .timestamp(timestamp.pack())
         .build()
@@ -285,29 +286,6 @@ pub(crate) fn eth_addr_to_ethabi_addr(eth_addr: &[u8; 20]) -> [u8; 32] {
     let mut ethabi_addr = [0; 32];
     ethabi_addr[12..32].copy_from_slice(eth_addr);
     ethabi_addr
-}
-
-#[allow(dead_code)]
-pub fn eth_address_to_account_id(state: &DummyState, data: &[u8]) -> Result<u32, String> {
-    if data.len() != 20 {
-        return Err(format!("Invalid eth address length: {}", data.len()));
-    }
-    if data == &[0u8; 20][..] {
-        // Zero address is special case
-        return Ok(0);
-    }
-    let account_script_hash = state
-        .get_script_hash_by_short_script_hash(data)
-        .ok_or_else(|| format!("can not get script hash by short address: {:?}", data))?;
-    state
-        .get_account_id_by_script_hash(&account_script_hash)
-        .map_err(|err| err.to_string())?
-        .ok_or_else(|| {
-            format!(
-                "can not get account id by script hash: {:?}",
-                account_script_hash
-            )
-        })
 }
 
 pub fn new_contract_account_script_with_nonce(from_addr: &[u8; 20], from_nonce: u32) -> Script {
@@ -544,10 +522,10 @@ pub fn deploy(
     init_code: &str,
     gas_limit: u64,
     value: u128,
-    block_producer_id: u32,
+    block_producer: RegistryAddress,
     block_number: u64,
 ) -> RunResult {
-    let block_info = new_block_info(block_producer_id, block_number, block_number);
+    let block_info = new_block_info(block_producer, block_number, block_number);
     let input = hex::decode(init_code).unwrap();
     let args = PolyjuiceArgsBuilder::default()
         .do_create(true)
@@ -611,6 +589,56 @@ pub fn compute_create2_script(
         .build()
 }
 
+pub struct Account {
+    id: u32,
+}
+
+impl Account {
+    pub fn build_script(n: u32) -> (Script, RegistryAddress) {
+        let mut addr = [0u8; 20];
+        addr[..4].copy_from_slice(&n.to_le_bytes());
+        let mut args = vec![42u8; 32];
+        args.extend(&addr);
+        let code_hash = [3u8; 32];
+        let script = Script::new_builder()
+            .code_hash(code_hash.pack())
+            .hash_type(ScriptHashType::Type.into())
+            .args(args.pack())
+            .build();
+        let addr = RegistryAddress::new(ETH_REGISTRY_ACCOUNT_ID, addr.to_vec());
+        (script, addr)
+    }
+}
+
+#[derive(Debug, Clone)]
+pub struct MockContractInfo {
+    pub eth_addr: Vec<u8>,
+    pub eth_abi_addr: Vec<u8>,
+    pub script_hash: H256,
+    pub reg_addr: RegistryAddress,
+}
+
+impl MockContractInfo {
+    pub fn create(eth_addr: &[u8; 20], nonce: u32) -> Self {
+        let contract_script = new_contract_account_script_with_nonce(eth_addr, nonce);
+        let contract_eth_addr = contract_script_to_eth_addr(&contract_script, false);
+        let contract_eth_abi_addr = contract_script_to_eth_addr(&contract_script, true);
+        let reg_addr = RegistryAddress::new(ETH_REGISTRY_ACCOUNT_ID, contract_eth_addr.clone());
+        Self {
+            eth_addr: contract_eth_addr,
+            eth_abi_addr: contract_eth_abi_addr,
+            script_hash: contract_script.hash().into(),
+            reg_addr,
+        }
+    }
+
+    pub fn mapping_registry_address_to_script_hash(&self, state: &mut DummyState) {
+        state
+            .mapping_registry_address_to_script_hash(self.reg_addr.clone(), self.script_hash)
+            .expect("map reg addr to script hash");
+    }
+}
+
 pub fn simple_storage_get(
     store: &Store,
     state: &DummyState,
@@ -619,7 +647,8 @@ pub fn simple_storage_get(
     from_id: u32,
     ss_account_id: u32,
 ) -> RunResult {
-    let block_info = new_block_info(0, block_number, block_number);
+    let (_, addr) = Account::build_script(0);
+    let block_info = new_block_info(addr, block_number, block_number);
     let input = hex::decode("6d4ce63c").unwrap();
     let args = PolyjuiceArgsBuilder::default()
         .gas_limit(21000)
@@ -645,7 +674,7 @@ pub fn simple_storage_get(
         )
         .expect("execute_transaction");
     // 491894, 571661 -> 586360 < 587K
-    check_cycles("simple_storage_get", run_result.used_cycles, 587_000);
+    check_cycles("simple_storage_get", run_result.used_cycles, 637_000);
     run_result
 }
 
@@ -671,14 +700,15 @@ pub fn build_eth_l2_script(args: &[u8; 20]) -> Script {
         .build()
 }
 
-pub(crate) fn create_block_producer(state: &mut DummyState) -> u32 {
+pub(crate) fn create_block_producer(state: &mut DummyState) -> RegistryAddress {
     let block_producer_script = build_eth_l2_script(&[0x99u8; 20]);
     let block_producer_script_hash = block_producer_script.hash();
     let block_producer_id = state
         .create_account_from_script(block_producer_script)
         .expect("create_block_producer");
-    register_eoa_account(state, &[0x99u8; 20], &block_producer_script_hash);
-    block_producer_id
+    let eth_addr = [0x99u8; 20];
+    register_eoa_account(state, &eth_addr, &block_producer_script_hash);
+    RegistryAddress::new(ETH_REGISTRY_ACCOUNT_ID, eth_addr.to_vec())
 }
 
 pub(crate) fn create_eth_eoa_account(
@@ -686,12 +716,13 @@ pub(crate) fn create_eth_eoa_account(
     eth_address: &[u8; 20],
     mint_ckb: u128,
 ) -> (u32, [u8; 32]) {
-    let script = build_eth_l2_script(&eth_address);
+    let script = build_eth_l2_script(eth_address);
     let script_hash = script.hash();
     let account_id = state.create_account_from_script(script).unwrap();
-    register_eoa_account(state, &eth_address, &script_hash);
+    register_eoa_account(state, eth_address, &script_hash);
+    let address = RegistryAddress::new(ETH_REGISTRY_ACCOUNT_ID, eth_address.to_vec());
     state
-        .mint_sudt(CKB_SUDT_ACCOUNT_ID, &script_hash[0..20], mint_ckb)
+        .mint_sudt(CKB_SUDT_ACCOUNT_ID, &address, mint_ckb)
         .unwrap();
     (account_id, script_hash)
 }
@@ -749,7 +780,7 @@ pub(crate) fn register_eoa_account(
     state
         .update_raw(
             build_eth_address_to_script_hash_key(eth_address),
-            script_hash.clone().into(),
+            (*script_hash).into(),
         )
         .expect("add GW_ETH_ADDRESS_TO_SCRIPT_HASH mapping into state");
 
@@ -761,6 +792,10 @@ pub(crate) fn register_eoa_account(
             eth_address_abi_format.into(),
         )
         .expect("add GW_ACCOUNT_SCRIPT_HASH_TO_ETH_ADDR mapping into state");
+    let address = RegistryAddress::new(ETH_REGISTRY_ACCOUNT_ID, eth_address.to_vec());
+    state
+        .mapping_registry_address_to_script_hash(address, (*script_hash).into())
+        .expect("map reg addr to script hash");
 }
 
 #[derive(Default)]
@@ -817,8 +852,12 @@ pub(crate) fn eth_address_regiser(
             .build()
             .pack(),
         SetMappingArgs::Batch(gw_script_hashes) => {
+            let fee = Fee::new_builder()
+                .registry_id(ETH_REGISTRY_ACCOUNT_ID.pack())
+                .amount(1000u64.pack())
+                .build();
             let batch_set_mapping = BatchSetMapping::new_builder()
-                .fee(1000u64.pack())
+                .fee(fee)
                 .gw_script_hashes(gw_script_hashes.pack())
                 .build();
             let args = ETHAddrRegArgs::new_builder()

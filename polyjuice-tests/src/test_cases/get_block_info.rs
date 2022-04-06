@@ -4,8 +4,8 @@
 use std::convert::TryInto;
 
 use crate::helper::{
-    eth_addr_to_ethabi_addr, new_block_info, new_contract_account_script, setup,
-    PolyjuiceArgsBuilder, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
+    self, eth_addr_to_ethabi_addr, new_block_info, new_contract_account_script, setup, Account,
+    MockContractInfo, PolyjuiceArgsBuilder, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
 use gw_db::schema::COLUMN_INDEX;
@@ -46,13 +46,26 @@ fn test_get_block_info() {
         .unwrap();
     let (aggregator_id, _aggregator_script_hash) =
         crate::helper::create_eth_eoa_account(&mut state, &aggregator_eth_addr, 0);
-    let coinbase_hex = hex::encode(eth_addr_to_ethabi_addr(&aggregator_eth_addr));
+    let (script, aggregator_account) = Account::build_script(aggregator_id);
+    state
+        .mapping_registry_address_to_script_hash(aggregator_account.clone(), script.hash().into())
+        .expect("map reg addr to script hash");
+    // FIXME(Godwoken): coinbase_hex => eth_addr_to_ethabi_addr(&aggregator_eth_addr)
+    let coinbase_hex = hex::encode(eth_addr_to_ethabi_addr(
+        &aggregator_script_hash[..20].try_into().unwrap(),
+    ));
     println!("coinbase_hex: {}", coinbase_hex);
+    let contract_account = MockContractInfo::create(&from_eth_address, 0);
+    contract_account.mapping_registry_address_to_script_hash(&mut state);
+    let contract_account_id = state
+        .get_account_id_by_script_hash(&contract_account.script_hash)
+        .unwrap()
+        .unwrap();
 
     // Deploy BlockInfo
     let mut block_number = 0x05;
     let timestamp: u64 = 0xff33 * 1000;
-    let block_info = new_block_info(aggregator_id, block_number, timestamp);
+    let block_info = new_block_info(aggregator_account.clone(), block_number, timestamp);
     let input = hex::decode(INIT_CODE).unwrap();
     let args = PolyjuiceArgsBuilder::default()
         .do_create(true)
@@ -63,7 +76,7 @@ fn test_get_block_info() {
         .build();
     let raw_tx = RawL2Transaction::new_builder()
         .from_id(from_id.pack())
-        .to_id(CREATOR_ACCOUNT_ID.pack())
+        .to_id(contract_account_id.pack())
         .args(Bytes::from(args).pack())
         .build();
     let db = store.begin_transaction();
@@ -123,7 +136,8 @@ fn test_get_block_info() {
     ]
     .iter()
     {
-        let block_info = new_block_info(aggregator_id, block_number + 1, timestamp + 1);
+        let block_info =
+            new_block_info(aggregator_account.clone(), block_number + 1, timestamp + 1);
         let input = hex::decode(fn_sighash).unwrap();
         let args = PolyjuiceArgsBuilder::default()
             .gas_limit(21000)

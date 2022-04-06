@@ -2,7 +2,7 @@
 //!   See ./evm-contracts/RecoverAccount.sol
 
 use crate::helper::{
-    self, deploy, new_block_info, new_contract_account_script, setup, simple_storage_get,
+    self, deploy, new_block_info, new_contract_account_script, setup, simple_storage_get, Account,
     PolyjuiceArgsBuilder, CREATOR_ACCOUNT_ID, FATAL_PRECOMPILED_CONTRACTS, L2TX_MAX_CYCLES,
     ROLLUP_SCRIPT_HASH, SECP_LOCK_CODE_HASH,
 };
@@ -64,7 +64,8 @@ fn test_recover_account() {
     let signature_hex = "28aa0c394487edf2211f445c47fb5f4fb5e3023920f62124d309f5bdf70d95045a934f278cec717300a5417313d1cdc390e761e37c0964b940c0a6f07b7361ed01";
     {
         // RecoverAccount.recover(message, signature, code_hash);
-        let block_info = new_block_info(0, 2, 0);
+        let (_, block_producer) = Account::build_script(0);
+        let block_info = new_block_info(block_producer, 2, 0);
         let input = hex::decode(format!(
             "7d7b0255{}0000000000000000000000000000000000000000000000000000000000000060{}0000000000000000000000000000000000000000000000000000000000000041{}00000000000000000000000000000000000000000000000000000000000000",
             message_hex,
@@ -119,7 +120,8 @@ fn test_recover_account() {
     let signature_hex = "22222222222222222222222222225f4fb5e3023920f62124d309f5bdf70d95045a934f278cec717300a5417313d1cdc390e761e37c0964b940c0a6f07b7361ed01";
     {
         // RecoverAccount.recover(message, signature, code_hash);
-        let block_info = new_block_info(0, 2, 0);
+        let (_, block_producer) = Account::build_script(0);
+        let block_info = new_block_info(block_producer, 2, 0);
         let input = hex::decode(format!(
             "7d7b0255{}0000000000000000000000000000000000000000000000000000000000000060{}0000000000000000000000000000000000000000000000000000000000000041{}00000000000000000000000000000000000000000000000000000000000000",
             message_hex,
@@ -159,7 +161,8 @@ fn test_recover_account() {
     let signature_hex = "28aa0c394487edf2211f445c47fb5f4fb5e3023920f62124d309f5bdf70d95045a934f278cec717300a5417313d1cdc390e761e37c0964b940c0a6f07b7361ed01";
     {
         // RecoverAccount.recover(message, signature, code_hash);
-        let block_info = new_block_info(0, 2, 0);
+        let (_, block_producer) = Account::build_script(0);
+        let block_info = new_block_info(block_producer, 2, 0);
         let input = hex::decode(format!(
             "7d7b0255{}0000000000000000000000000000000000000000000000000000000000000060{}0000000000000000000000000000000000000000000000000000000000000041{}00000000000000000000000000000000000000000000000000000000000000",
             message_hex,

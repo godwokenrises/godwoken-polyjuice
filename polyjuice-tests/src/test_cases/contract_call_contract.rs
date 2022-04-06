@@ -3,8 +3,8 @@
 
 use crate::helper::{
     self, contract_script_to_eth_addr, create_eth_eoa_account, deploy, eth_addr_to_ethabi_addr,
-    new_block_info, new_contract_account_script, setup, simple_storage_get, PolyjuiceArgsBuilder,
-    CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
+    new_block_info, new_contract_account_script, setup, simple_storage_get, Account,
+    MockContractInfo, PolyjuiceArgsBuilder, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
 use gw_generator::{error::TransactionError, traits::StateExt};
@@ -36,23 +36,22 @@ fn test_contract_call_contract() {
         SS_INIT_CODE,
         122000,
         0,
-        block_producer_id,
+        block_producer_id.clone(),
         block_number,
     );
-    let ss_account_script =
-        new_contract_account_script(&mut state, from_id, &from_eth_address, false);
+
+    let ss_account = MockContractInfo::create(&from_eth_address, 0);
+    ss_account.mapping_registry_address_to_script_hash(&mut state);
+    let ss_eth_abi_addr = ss_account.eth_abi_addr;
+    let ss_script_hash = ss_account.script_hash;
     let ss_account_id = state
-        .get_account_id_by_script_hash(&ss_account_script.hash().into())
+        .get_account_id_by_script_hash(&ss_script_hash)
         .unwrap()
         .unwrap();
 
     // Deploy CallContract
     block_number += 1;
-    let input = format!(
-        "{}{}",
-        INIT_CODE,
-        hex::encode(contract_script_to_eth_addr(&ss_account_script, true)),
-    );
+    let input = format!("{}{}", INIT_CODE, hex::encode(&ss_eth_abi_addr),);
     let run_result = deploy(
         &generator,
         &store,
@@ -70,11 +69,9 @@ fn test_contract_call_contract() {
     //     serde_json::to_string_pretty(&RunResult::from(run_result)).unwrap()
     // );
     // [Deploy CreateContract] used cycles: 600288 < 610K
-    helper::check_cycles("Deploy CreateContract", run_result.used_cycles, 610_000);
-    let cc_contract_script =
-        new_contract_account_script(&mut state, from_id, &from_eth_address, false);
+    helper::check_cycles("Deploy CreateContract", run_result.used_cycles, 760_000);
     let cc_contract_id = state
-        .get_account_id_by_script_hash(&cc_contract_script.hash().into())
+        .get_account_id_by_script_hash(&ss_script_hash)
         .unwrap()
         .unwrap();
 
@@ -95,7 +92,8 @@ fn test_contract_call_contract() {
     {
         // CallContract.proxySet(222) => SimpleStorage.set(x+3)
         block_number += 1;
-        let block_info = new_block_info(0, block_number, block_number);
+        let (_, block_producer) = Account::build_script(0);
+        let block_info = new_block_info(block_producer, block_number, block_number);
         let input =
             hex::decode("28cc7b2500000000000000000000000000000000000000000000000000000000000000de")
                 .unwrap(); // 0xde = 222
@@ -172,19 +170,21 @@ fn test_contract_call_non_exists_contract() {
     helper::check_cycles(
         "Deploy CallNonExistsContract",
         run_result.used_cycles,
-        670_000,
+        820_000,
     );
 
-    let contract_account_script =
-        new_contract_account_script(&mut state, from_id, &from_eth_address, false);
+    let non_existing_account_address = [0xff; 20];
+    let contract = MockContractInfo::create(&from_eth_address, 0);
+    // contract.mapping_registry_address_to_script_hash(&mut state);
+    let contract_script_hash = contract.script_hash;
     let contract_account_id = state
-        .get_account_id_by_script_hash(&contract_account_script.hash().into())
+        .get_account_id_by_script_hash(&contract_script_hash)
         .unwrap()
         .unwrap();
-    let block_info = new_block_info(0, block_number, block_number);
+    let (_, block_producer) = Account::build_script(0);
+    let block_info = new_block_info(block_producer, block_number, block_number);
     {
         // Call CallNonExistsContract.rawCall(address addr)
-        let _non_existing_account_address = [0xff; 20];
         /* abi.encodeWithSignature("rawCall") => 56c94e70
         ethabi_addr: 000000000000000000000000ffffffffffffffffffffffffffffffffffffffff" */
         let input =
@@ -214,10 +214,11 @@ fn test_contract_call_non_exists_contract() {
                 None,
             )
             .expect_err("non_existing_account_address => load to_script_hash failed");
-        assert_eq!(err, TransactionError::InvalidExitCode(2));
+        assert_eq!(err, TransactionError::InvalidExitCode(83));
     }
     {
         // Call CallNonExistsContract.rawCall(address eoa_addr)
+        contract.mapping_registry_address_to_script_hash(&mut state);
         let eoa_addr = [2u8; 20];
         let (_, _script_hash) = create_eth_eoa_account(&mut state, &eoa_addr, 0);
         let eoa_ethabi_addr = eth_addr_to_ethabi_addr(&eoa_addr);
@@ -263,7 +264,7 @@ fn test_contract_call_non_exists_contract() {
         helper::check_cycles(
             "CallNonExistsContract.rawCall(address eoa_addr)",
             run_result.used_cycles,
-            870_000,
+            1_100_000,
         );
     }
 }

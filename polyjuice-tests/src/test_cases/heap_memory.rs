@@ -2,8 +2,8 @@
 //!   See ./evm-contracts/Memory.sol
 
 use crate::helper::{
-    self, deploy, new_block_info, new_contract_account_script, setup, PolyjuiceArgsBuilder,
-    CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
+    self, deploy, new_block_info, new_contract_account_script, setup, Account,
+    PolyjuiceArgsBuilder, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 
 use gw_common::state::State;
@@ -48,7 +48,8 @@ fn test_heap_momory() {
         let call_code = format!("4e688844{:064x}", 1024 * 15); // < 16 * 32 = 512
         println!("{}", call_code);
         block_number += 1;
-        let block_info = new_block_info(0, block_number, block_number);
+        let (_, block_producer) = Account::build_script(0);
+        let block_info = new_block_info(block_producer, block_number, block_number);
         let input = hex::decode(call_code).unwrap();
         let args = PolyjuiceArgsBuilder::default()
             .gas_limit(20000000)
@@ -87,7 +88,8 @@ fn test_heap_momory() {
         let call_code = format!("4e688844{:064x}", 1024 * 16 + 1);
         println!("{}", call_code);
         block_number += 1;
-        let block_info = new_block_info(0, block_number, block_number);
+        let (_, block_producer) = Account::build_script(0);
+        let block_info = new_block_info(block_producer, block_number, block_number);
         let input = hex::decode(call_code).unwrap();
         let args = PolyjuiceArgsBuilder::default()
             .gas_limit(20000000)
