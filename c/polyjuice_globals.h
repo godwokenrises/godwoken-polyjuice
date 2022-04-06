@@ -24,9 +24,9 @@ static uint8_t g_created_address[20] = {0};
 static uint32_t g_created_id = UINT32_MAX;
 
 /**
- * @brief compatible_chain_id in Godwoken RollupConfig
+ * @brief chain_id in Godwoken RollupConfig
  */
-static uint32_t g_compatible_chain_id = UINT32_MAX;
+static uint64_t g_chain_id = UINT64_MAX;
 /**
  * creator_account, known as root account
  * @see https://github.com/nervosnetwork/godwoken/blob/develop/docs/life_of_a_polyjuice_transaction.md#root-account--deployment

@@ -2,8 +2,8 @@
 //!   See ./evm-contracts/SimpleStorage.sol
 
 use crate::helper::{
-    new_block_info, setup, MockContractInfo, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
-    COMPATIBLE_CHAIN_ID, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
+    new_block_info, setup, MockContractInfo, PolyjuiceArgsBuilder, CHAIN_ID, CKB_SUDT_ACCOUNT_ID,
+    CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::{builtins::ETH_REGISTRY_ACCOUNT_ID, state::State};
 use gw_generator::traits::StateExt;
@@ -104,8 +104,7 @@ fn test_get_chain_id() {
 
         /* chain_id = compatible_chain_id(u32) | creator_account_id(u32) */
         let mut expected_chain_id = vec![0u8; 32];
-        expected_chain_id[28..32].copy_from_slice(&CREATOR_ACCOUNT_ID.to_be_bytes()[..]);
-        expected_chain_id[24..28].copy_from_slice(&COMPATIBLE_CHAIN_ID.to_be_bytes()[..]);
+        expected_chain_id[24..32].copy_from_slice(&CHAIN_ID.to_be_bytes()[..]);
         assert_eq!(run_result.return_data, expected_chain_id);
     }
 }

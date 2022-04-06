@@ -39,7 +39,7 @@ use std::{fs, io::Read, path::PathBuf};
 pub use gw_common::builtins::{CKB_SUDT_ACCOUNT_ID, RESERVED_ACCOUNT_ID};
 pub const ETH_ADDRESS_REGISTRY_ACCOUNT_ID: u32 = 2;
 pub const CREATOR_ACCOUNT_ID: u32 = 3;
-pub const COMPATIBLE_CHAIN_ID: u32 = 202203;
+pub const CHAIN_ID: u64 = 202203;
 
 pub const L2TX_MAX_CYCLES: u64 = 7000_0000;
 
@@ -460,7 +460,7 @@ pub fn setup() -> (Store, DummyState, Generator) {
     account_lock_manage
         .register_lock_algorithm(SECP_LOCK_CODE_HASH.into(), Box::new(Secp256k1::default()));
     let rollup_config = RollupConfig::new_builder()
-        .compatible_chain_id(COMPATIBLE_CHAIN_ID.pack())
+        .chain_id(CHAIN_ID.pack())
         .l2_sudt_validator_script_type_hash(SUDT_VALIDATOR_SCRIPT_TYPE_HASH.pack())
         .allowed_contract_type_hashes(
             vec![
