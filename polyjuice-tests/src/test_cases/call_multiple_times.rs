@@ -2,9 +2,8 @@
 //!   See ./evm-contracts/CallContract.sol
 
 use crate::helper::{
-    contract_script_to_eth_addr, create_eth_eoa_account, deploy, new_block_info,
-    new_contract_account_script, new_contract_account_script_with_nonce, setup, simple_storage_get,
-    PolyjuiceArgsBuilder, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
+    create_eth_eoa_account, deploy, new_block_info, setup, simple_storage_get, Account,
+    MockContractInfo, PolyjuiceArgsBuilder, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
@@ -35,29 +34,34 @@ fn test_call_multiple_times() {
             SS_INIT_CODE,
             122000,
             0,
-            block_producer_id,
+            block_producer_id.clone(),
             block_number,
         );
         state.apply_run_result(&_run_result).expect("update state");
         block_number += 1;
     }
 
-    let ss1_account_script = new_contract_account_script_with_nonce(&from_eth_address, 0);
-    let ss1_contract_ethabi_addr = contract_script_to_eth_addr(&ss1_account_script, true);
+    let ss1_contract = MockContractInfo::create(&from_eth_address, 0);
+    ss1_contract.mapping_registry_address_to_script_hash(&mut state);
+    let ss1_contract_eth_abi_addr = ss1_contract.eth_abi_addr;
+    let ss1_contract_script_hash = ss1_contract.script_hash;
+
     let ss1_account_id = state
-        .get_account_id_by_script_hash(&ss1_account_script.hash().into())
+        .get_account_id_by_script_hash(&ss1_contract_script_hash)
         .unwrap()
         .unwrap();
+    let ss2_contract = MockContractInfo::create(&from_eth_address, 1);
+    ss2_contract.mapping_registry_address_to_script_hash(&mut state);
+    let ss2_contract_eth_abi_addr = ss2_contract.eth_abi_addr;
+    let ss2_contract_script_hash = ss2_contract.script_hash;
 
-    let ss2_account_script = new_contract_account_script_with_nonce(&from_eth_address, 1);
-    let ss2_contract_ethabi_addr = contract_script_to_eth_addr(&ss2_account_script, true);
     let ss2_account_id = state
-        .get_account_id_by_script_hash(&ss2_account_script.hash().into())
+        .get_account_id_by_script_hash(&ss2_contract_script_hash)
         .unwrap()
         .unwrap();
 
     // Deploy CallMultipleTimes - constructor(address)
-    let input = format!("{}{}", INIT_CODE, hex::encode(ss1_contract_ethabi_addr));
+    let input = format!("{}{}", INIT_CODE, hex::encode(ss1_contract_eth_abi_addr));
     let _run_result = deploy(
         &generator,
         &store,
@@ -76,10 +80,11 @@ fn test_call_multiple_times() {
     //     "result {}",
     //     serde_json::to_string_pretty(&RunResult::from(run_result)).unwrap()
     // );
-    let cm_contract_account_script =
-        new_contract_account_script(&mut state, from_id, &from_eth_address, false);
+    let cm_contract = MockContractInfo::create(&from_eth_address, 2);
+    cm_contract.mapping_registry_address_to_script_hash(&mut state);
+
     let cm_contract_id = state
-        .get_account_id_by_script_hash(&cm_contract_account_script.hash().into())
+        .get_account_id_by_script_hash(&cm_contract.script_hash)
         .unwrap()
         .unwrap();
 
@@ -114,11 +119,13 @@ fn test_call_multiple_times() {
     assert_eq!(state.get_nonce(cm_contract_id).unwrap(), 0);
 
     {
+        let (_, block_producer) = Account::build_script(0);
         // CallMultipleTimes.proxySet(20);
-        let block_info = new_block_info(0, block_number, block_number);
+        let block_info = new_block_info(block_producer, block_number, block_number);
+        // let ss2_contract_ethabi_addr = contract_script_to_eth_addr(&ss2_account_script, true);
         let input = hex::decode(format!(
             "bca0b9c2{}{}",
-            hex::encode(&ss2_contract_ethabi_addr),
+            hex::encode(&ss2_contract_eth_abi_addr),
             "0000000000000000000000000000000000000000000000000000000000000014",
         ))
         .unwrap();

@@ -3,10 +3,10 @@
 
 use crate::helper::{
     self, compute_create2_script, contract_script_to_eth_addr, deploy, new_block_info,
-    new_contract_account_script, setup, simple_storage_get, PolyjuiceArgsBuilder,
-    CKB_SUDT_ACCOUNT_ID, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
+    new_contract_account_script, setup, simple_storage_get, Account, MockContractInfo,
+    PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
-use gw_common::state::State;
+use gw_common::{builtins::ETH_REGISTRY_ACCOUNT_ID, state::State};
 use gw_generator::traits::StateExt;
 use gw_store::chain_view::ChainView;
 use gw_store::traits::chain_store::ChainStore;
@@ -39,22 +39,26 @@ fn test_create2() {
         block_number,
     );
     // [Deploy Create2Impl] used cycles: 819215 < 820K
-    helper::check_cycles("Deploy Create2Impl", run_result.used_cycles, 820_000);
+    helper::check_cycles("Deploy Create2Impl", run_result.used_cycles, 1_200_000);
     // println!(
     //     "result {}",
     //     serde_json::to_string_pretty(&RunResult::from(run_result)).unwrap()
     // );
-    let create2_contract_script =
-        new_contract_account_script(&state, from_id, &from_eth_address, false);
-    let create2_contract_addr = contract_script_to_eth_addr(&create2_contract_script, false);
-    let create2_contract_script_hash = create2_contract_script.hash();
+    let create2_contract = MockContractInfo::create(&from_eth_address, 0);
+    create2_contract.mapping_registry_address_to_script_hash(&mut state);
+    let create2_contract_addr = create2_contract.eth_addr;
+    let create2_contract_script_hash = create2_contract.script_hash;
     let create2_contract_id = state
-        .get_account_id_by_script_hash(&create2_contract_script_hash.into())
+        .get_account_id_by_script_hash(&create2_contract_script_hash)
         .unwrap()
         .unwrap();
     println!("create2_contract account id = {}", create2_contract_id);
+    let address = state
+        .get_registry_address_by_script_hash(ETH_REGISTRY_ACCOUNT_ID, &create2_contract_script_hash)
+        .unwrap()
+        .unwrap();
     let create2_contract_balance = state
-        .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &create2_contract_script_hash[0..20])
+        .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &address)
         .unwrap();
     assert_eq!(create2_contract_balance, 0);
 
@@ -65,7 +69,8 @@ fn test_create2() {
     // Create2Impl.deploy(uint256 value, bytes32 salt, bytes memory code)
     let run_result = {
         block_number += 1;
-        let block_info = new_block_info(0, block_number, block_number);
+        let (_, block_producer) = Account::build_script(0);
+        let block_info = new_block_info(block_producer, block_number, block_number);
         // uint256 value: 0x000000000000000000000000000000000000000000000000000000000000009a
         let input_value = format!(
             "00000000000000000000000000000000000000000000000000000000000000{:2x}",
@@ -97,7 +102,7 @@ fn test_create2() {
             )
             .expect("Create2Impl.deploy(uint256 value, bytes32 salt, bytes memory code)");
         // [Create2Impl.deploy(...)] used cycles: 1197555 < 1230K
-        helper::check_cycles("Create2Impl.deploy(...)", run_result.used_cycles, 1230_000);
+        helper::check_cycles("Create2Impl.deploy(...)", run_result.used_cycles, 1_750_000);
         state.apply_run_result(&run_result).expect("update state");
         run_result
     };
@@ -109,7 +114,6 @@ fn test_create2() {
     );
     let create2_script_hash = create2_script.hash();
     let create2_ethabi_addr = contract_script_to_eth_addr(&create2_script, true);
-    let create2_short_script_hash = &create2_script_hash[0..20];
     println!(
         "create2_address: 0x{}",
         hex::encode(&run_result.return_data)
@@ -119,8 +123,12 @@ fn test_create2() {
         .get_account_id_by_script_hash(&create2_script_hash.into())
         .unwrap()
         .unwrap();
+    let address = state
+        .get_registry_address_by_script_hash(ETH_REGISTRY_ACCOUNT_ID, &create2_script_hash.into())
+        .unwrap()
+        .unwrap();
     let create2_account_balance = state
-        .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, create2_short_script_hash)
+        .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &address)
         .unwrap();
     assert_eq!(create2_account_balance, input_value_u128);
 

@@ -7,6 +7,8 @@ use crate::helper::{
     CREATOR_ACCOUNT_ID, FATAL_PRECOMPILED_CONTRACTS, L2TX_MAX_CYCLES,
     SUDT_ERC20_PROXY_USER_DEFINED_DECIMALS_CODE,
 };
+use gw_common::builtins::ETH_REGISTRY_ACCOUNT_ID;
+use gw_common::registry_address::RegistryAddress;
 use gw_common::state::State;
 use gw_generator::{dummy_state::DummyState, error::TransactionError, traits::StateExt, Generator};
 use gw_store::traits::chain_store::ChainStore;
@@ -26,17 +28,17 @@ fn test_sudt_erc20_proxy_inner(
     let from_eth_address1 = [1u8; 20];
     let (from_id1, from_script_hash1) =
         helper::create_eth_eoa_account(state, &from_eth_address1, 2000000);
-    let from_short_script_hash1 = &from_script_hash1[0..20];
+    let from_reg_addr1 = RegistryAddress::new(ETH_REGISTRY_ACCOUNT_ID, from_eth_address1.to_vec());
 
     let from_eth_address2 = [2u8; 20];
     let (_from_id2, from_script_hash2) =
         helper::create_eth_eoa_account(state, &from_eth_address2, 2000000);
-    let from_short_script_hash2 = &from_script_hash2[0..20];
+    let from_reg_addr2 = RegistryAddress::new(ETH_REGISTRY_ACCOUNT_ID, from_eth_address2.to_vec());
 
     let from_eth_address3 = [3u8; 20];
     let (from_id3, from_script_hash3) =
         helper::create_eth_eoa_account(state, &from_eth_address3, 2000000);
-    let from_short_script_hash3 = &from_script_hash3[0..20];
+    let from_reg_addr3 = RegistryAddress::new(ETH_REGISTRY_ACCOUNT_ID, from_eth_address3.to_vec());
 
     // Deploy SudtERC20Proxy_UserDefinedDecimals
     // encodeDeploy(["erc20_decimals", "DEC", BigNumber.from(9876543210), 1, 8])
@@ -52,7 +54,7 @@ fn test_sudt_erc20_proxy_inner(
         init_code.as_str(),
         122000,
         0,
-        block_producer_id,
+        block_producer_id.clone(),
         1,
     );
     print!("SudtERC20Proxy_UserDefinedDecimals.ContractCode.hex: 0x");
@@ -74,26 +76,26 @@ fn test_sudt_erc20_proxy_inner(
     state
         .mint_sudt(
             new_sudt_id,
-            from_short_script_hash1,
+            &from_reg_addr1,
             160000000000000000000000000000u128,
         )
         .unwrap();
 
     assert_eq!(
         state
-            .get_sudt_balance(new_sudt_id, from_short_script_hash1)
+            .get_sudt_balance(new_sudt_id, &from_reg_addr1)
             .unwrap(),
         160000000000000000000000000000u128
     );
     assert_eq!(
         state
-            .get_sudt_balance(new_sudt_id, from_short_script_hash2)
+            .get_sudt_balance(new_sudt_id, &from_reg_addr2)
             .unwrap(),
         0
     );
     assert_eq!(
         state
-            .get_sudt_balance(new_sudt_id, from_short_script_hash3)
+            .get_sudt_balance(new_sudt_id, &from_reg_addr3)
             .unwrap(),
         0
     );
@@ -237,7 +239,7 @@ fn test_sudt_erc20_proxy_inner(
     .enumerate()
     {
         let block_number = 2 + idx as u64;
-        let block_info = new_block_info(block_producer_id, block_number, block_number);
+        let block_info = new_block_info(block_producer_id.clone(), block_number, block_number);
         println!(">> [input]: {}", args_str);
         let input = hex::decode(args_str).unwrap();
         let args = PolyjuiceArgsBuilder::default()
@@ -283,7 +285,7 @@ fn test_sudt_erc20_proxy_inner(
             eoa2_hex
         );
         let block_number = 80;
-        let block_info = new_block_info(block_producer_id, block_number, block_number);
+        let block_info = new_block_info(block_producer_id.clone(), block_number, block_number);
         println!(">> [input]: {}", args_str);
         let input = hex::decode(args_str).unwrap();
         let args = PolyjuiceArgsBuilder::default()

@@ -2,7 +2,9 @@ use crate::helper::{
     self, build_eth_l2_script, new_block_info, setup, CKB_SUDT_ACCOUNT_ID,
     ETH_ADDRESS_REGISTRY_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
-use gw_common::state::State;
+use gw_common::{
+    builtins::ETH_REGISTRY_ACCOUNT_ID, registry_address::RegistryAddress, state::State,
+};
 use gw_generator::{error::TransactionError, traits::StateExt};
 use gw_store::{chain_view::ChainView, traits::chain_store::ChainStore};
 use gw_types::{packed::RawL2Transaction, prelude::*};
@@ -67,25 +69,32 @@ fn test_update_eth_addr_reg_by_contract() {
     let eth_eoa_address = [0xeeu8; 20];
     let eth_eoa_account_script = build_eth_l2_script(&eth_eoa_address);
     let eth_eoa_account_script_hash = eth_eoa_account_script.hash();
+    let reg_addr = RegistryAddress::new(ETH_REGISTRY_ACCOUNT_ID, eth_eoa_address.to_vec());
+    state
+        .mapping_registry_address_to_script_hash(reg_addr, eth_eoa_account_script_hash.into())
+        .expect("map reg addr to script hash");
+    let address = state
+        .get_registry_address_by_script_hash(
+            ETH_ADDRESS_REGISTRY_ACCOUNT_ID,
+            &eth_eoa_account_script_hash.into(),
+        )
+        .unwrap()
+        .unwrap();
     let eth_eoa_account_id = state
         .create_account_from_script(eth_eoa_account_script)
         .unwrap();
     assert_eq!(
         state
-            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &eth_eoa_account_script_hash[..20])
+            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &address)
             .unwrap(),
         0u128
     );
     state /* mint CKB to pay fee */
-        .mint_sudt(
-            CKB_SUDT_ACCOUNT_ID,
-            &eth_eoa_account_script_hash[..20],
-            52000,
-        )
+        .mint_sudt(CKB_SUDT_ACCOUNT_ID, &address, 52000)
         .unwrap();
     assert_eq!(
         state
-            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &eth_eoa_account_script_hash[..20])
+            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &address)
             .unwrap(),
         52000u128
     );
@@ -96,7 +105,7 @@ fn test_update_eth_addr_reg_by_contract() {
         &mut state,
         &generator,
         eth_eoa_account_id,
-        new_block_info(block_producer_id, 1, 1),
+        new_block_info(block_producer_id.clone(), 1, 1),
         crate::helper::SetMappingArgs::One(eth_eoa_account_script_hash.into()),
     )
     .expect("execute the MSG_SET_MAPPING method of `ETH Address Registry` layer2 contract");
@@ -107,7 +116,7 @@ fn test_update_eth_addr_reg_by_contract() {
     assert_eq!(
         // make sure the fee was paid
         state
-            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &eth_eoa_account_script_hash[..20])
+            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &address)
             .unwrap(),
         51000u128
     );
@@ -118,7 +127,7 @@ fn test_update_eth_addr_reg_by_contract() {
         &mut state,
         &generator,
         eth_eoa_account_id,
-        new_block_info(block_producer_id, 2, 2),
+        new_block_info(block_producer_id.clone(), 2, 2),
         crate::helper::SetMappingArgs::One(eth_eoa_account_script_hash.into()),
     )
     .expect_err("try to register the same account again");
@@ -144,7 +153,7 @@ fn test_update_eth_addr_reg_by_contract() {
         .execute_transaction(
             &ChainView::new(&db, tip_block_hash),
             &state,
-            &new_block_info(block_producer_id, 3, 3),
+            &new_block_info(block_producer_id.clone(), 3, 3),
             &raw_l2tx,
             L2TX_MAX_CYCLES,
             None,
@@ -164,7 +173,7 @@ fn test_update_eth_addr_reg_by_contract() {
         .build();
     let db = store.begin_transaction();
     let tip_block_hash = db.get_tip_block_hash().unwrap();
-    let block_info = new_block_info(block_producer_id, 3, 0);
+    let block_info = new_block_info(block_producer_id.clone(), 3, 0);
     let run_result = generator
         .execute_transaction(
             &ChainView::new(&db, tip_block_hash),
@@ -207,24 +216,32 @@ fn test_batch_set_mapping_by_contract() {
     // create new EOAs which is not registered
     let eth_eoa_addresses = vec![[0xeeu8; 20], [0xefu8; 20]];
     let mut eth_eoa_script_hashes = vec![];
+    let _block_producer_id = block_producer_id.clone();
     for address in eth_eoa_addresses.iter() {
         let account_script = build_eth_l2_script(address);
         let account_script_hash = account_script.hash();
+        let address = state
+            .get_registry_address_by_script_hash(
+                ETH_ADDRESS_REGISTRY_ACCOUNT_ID,
+                &account_script_hash.into(),
+            )
+            .unwrap()
+            .unwrap();
         eth_eoa_script_hashes.push(account_script_hash.into());
         state.create_account_from_script(account_script).unwrap();
 
         assert_eq!(
             state
-                .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &account_script_hash[..20])
+                .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &address)
                 .unwrap(),
             0u128
         );
         state /* mint CKB to pay fee */
-            .mint_sudt(CKB_SUDT_ACCOUNT_ID, &account_script_hash[..20], 200000)
+            .mint_sudt(CKB_SUDT_ACCOUNT_ID, &address, 200000)
             .unwrap();
         assert_eq!(
             state
-                .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &account_script_hash[..20])
+                .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &address)
                 .unwrap(),
             200000u128
         );
@@ -236,13 +253,14 @@ fn test_batch_set_mapping_by_contract() {
         &mut state,
         &generator,
         from_id,
-        new_block_info(block_producer_id, 1, 1),
+        new_block_info(_block_producer_id.clone(), 1, 1),
         crate::helper::SetMappingArgs::Batch(eth_eoa_script_hashes.clone()),
     )
     .expect("eth address registered");
     assert_eq!(run_result.exit_code, 0);
     state.apply_run_result(&run_result).expect("update state");
 
+    let _block_producer_id = block_producer_id.clone();
     for (eth_eoa_address, eth_eoa_account_script_hash) in
         eth_eoa_addresses.into_iter().zip(eth_eoa_script_hashes)
     {
@@ -264,7 +282,7 @@ fn test_batch_set_mapping_by_contract() {
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
                 &state,
-                &new_block_info(block_producer_id, 3, 3),
+                &new_block_info(_block_producer_id.clone(), 3, 3),
                 &raw_l2tx,
                 L2TX_MAX_CYCLES,
                 None,
@@ -288,7 +306,7 @@ fn test_batch_set_mapping_by_contract() {
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
                 &state,
-                &new_block_info(block_producer_id, 3, 3),
+                &new_block_info(_block_producer_id.clone(), 3, 3),
                 &raw_l2tx,
                 L2TX_MAX_CYCLES,
                 None,

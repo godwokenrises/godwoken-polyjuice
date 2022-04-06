@@ -3,9 +3,10 @@
 
 use crate::helper::{
     self, build_l2_sudt_script, deploy, eth_addr_to_ethabi_addr, new_block_info,
-    new_contract_account_script, setup, PolyjuiceArgsBuilder, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
+    new_contract_account_script, setup, Account, PolyjuiceArgsBuilder, CREATOR_ACCOUNT_ID,
+    L2TX_MAX_CYCLES,
 };
-use gw_common::state::State;
+use gw_common::{builtins::ETH_REGISTRY_ACCOUNT_ID, state::State};
 use gw_generator::{error::TransactionError, traits::StateExt};
 use gw_store::chain_view::ChainView;
 use gw_store::traits::chain_store::ChainStore;
@@ -25,10 +26,18 @@ fn test_invalid_sudt_erc20_proxy() {
     let from_eth_address1 = [1u8; 20];
     let (from_id1, from_script_hash1) =
         helper::create_eth_eoa_account(&mut state, &from_eth_address1, 2000000);
+    let address1 = state
+        .get_registry_address_by_script_hash(ETH_REGISTRY_ACCOUNT_ID, &from_script_hash1.into())
+        .unwrap()
+        .unwrap();
 
     let from_eth_address2 = [2u8; 20];
     let (_from_id2, from_script_hash2) =
         helper::create_eth_eoa_account(&mut state, &from_eth_address2, 2000000);
+    let address2 = state
+        .get_registry_address_by_script_hash(ETH_REGISTRY_ACCOUNT_ID, &from_script_hash2.into())
+        .unwrap()
+        .unwrap();
 
     let from_eth_address3 = [3u8; 20];
     let (_from_id3, _from_script_hash3) =
@@ -69,31 +78,15 @@ fn test_invalid_sudt_erc20_proxy() {
     let eoa2_hex = hex::encode(eth_addr_to_ethabi_addr(&from_eth_address2));
 
     state
-        .mint_sudt(
-            new_sudt_id,
-            &from_script_hash1[0..20],
-            160000000000000000000000000000u128,
-        )
+        .mint_sudt(new_sudt_id, &address1, 160000000000000000000000000000u128)
         .unwrap();
 
     assert_eq!(
-        state
-            .get_sudt_balance(new_sudt_id, &from_script_hash1[0..20])
-            .unwrap(),
+        state.get_sudt_balance(new_sudt_id, &address1).unwrap(),
         160000000000000000000000000000u128
     );
-    assert_eq!(
-        state
-            .get_sudt_balance(new_sudt_id, &from_script_hash2[0..20])
-            .unwrap(),
-        0
-    );
-    assert_eq!(
-        state
-            .get_sudt_balance(new_sudt_id, &from_script_hash2[0..20])
-            .unwrap(),
-        0
-    );
+    assert_eq!(state.get_sudt_balance(new_sudt_id, &address2).unwrap(), 0);
+    assert_eq!(state.get_sudt_balance(new_sudt_id, &address2).unwrap(), 0);
     for (_idx, (from_id, args_str, success, return_data_str)) in [
         // balanceOf(eoa1)
         (
@@ -124,7 +117,8 @@ fn test_invalid_sudt_erc20_proxy() {
     .enumerate()
     {
         block_number += 1;
-        let block_info = new_block_info(0, block_number, block_number);
+        let (_, block_producer) = Account::build_script(0);
+        let block_info = new_block_info(block_producer, block_number, block_number);
         println!(">> [input]: {}", args_str);
         let input = hex::decode(args_str).unwrap();
         let args = PolyjuiceArgsBuilder::default()

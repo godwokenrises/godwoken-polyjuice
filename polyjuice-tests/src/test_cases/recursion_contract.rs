@@ -2,8 +2,8 @@
 //!   See ./evm-contracts/RecursionContract.sol
 
 use crate::helper::{
-    self, deploy, new_block_info, new_contract_account_script, setup, PolyjuiceArgsBuilder,
-    CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
+    self, deploy, new_block_info, new_contract_account_script, setup, Account,
+    PolyjuiceArgsBuilder, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
 use gw_generator::{error::TransactionError, traits::StateExt};
@@ -46,7 +46,8 @@ fn test_recursion_contract_call() {
 
     {
         // Call Sum(31), 31 < max_depth=32
-        let block_info = new_block_info(0, block_number, block_number);
+        let (_, block_producer) = Account::build_script(0);
+        let block_info = new_block_info(block_producer, block_number, block_number);
         let input =
             hex::decode("188b85b4000000000000000000000000000000000000000000000000000000000000001f")
                 .unwrap();
@@ -116,7 +117,8 @@ fn test_recursion_contract_call() {
     {
         // Case: out of gas and revert
         block_number += 1;
-        let block_info = new_block_info(0, block_number, block_number);
+        let (_, block_producer) = Account::build_script(0);
+        let block_info = new_block_info(block_producer, block_number, block_number);
         let input =
             hex::decode("188b85b40000000000000000000000000000000000000000000000000000000000000020")
                 .unwrap();
@@ -149,7 +151,8 @@ fn test_recursion_contract_call() {
     {
         // Case: out of gas and no revert
         block_number += 1;
-        let block_info = new_block_info(0, block_number, block_number);
+        let (_, block_producer) = Account::build_script(0);
+        let block_info = new_block_info(block_producer, block_number, block_number);
         let input =
             hex::decode("188b85b40000000000000000000000000000000000000000000000000000000000000020")
                 .unwrap();

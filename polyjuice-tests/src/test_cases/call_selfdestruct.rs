@@ -1,14 +1,13 @@
 //! Test call selfdestruct from a contract account
 //!   See ./evm-contracts/SelfDestruct.sol
 
-use std::convert::TryInto;
-
 use crate::helper::{
-    self, contract_script_to_eth_addr, deploy, eth_addr_to_ethabi_addr, new_block_info,
-    new_contract_account_script_with_nonce, setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
-    CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
+    self, deploy, eth_addr_to_ethabi_addr, new_block_info, setup, Account, MockContractInfo,
+    PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
-use gw_common::state::State;
+use gw_common::{
+    builtins::ETH_REGISTRY_ACCOUNT_ID, registry_address::RegistryAddress, state::State,
+};
 use gw_generator::traits::StateExt;
 use gw_store::chain_view::ChainView;
 use gw_store::traits::chain_store::ChainStore;
@@ -27,11 +26,12 @@ fn test_selfdestruct() {
 
     let beneficiary_eth_addr = [2u8; 20];
     let beneficiary_ethabi_addr = eth_addr_to_ethabi_addr(&beneficiary_eth_addr);
-    let (_beneficiary_id, beneficiary_script_hash) =
-        helper::create_eth_eoa_account(&mut state, &beneficiary_eth_addr, 0);
+    let (_beneficiary_id, _) = helper::create_eth_eoa_account(&mut state, &beneficiary_eth_addr, 0);
+    let beneficiary_address =
+        RegistryAddress::new(ETH_REGISTRY_ACCOUNT_ID, beneficiary_eth_addr.to_vec());
     assert_eq!(
         state
-            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &beneficiary_script_hash[..20])
+            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &beneficiary_address)
             .unwrap(),
         0
     );
@@ -53,29 +53,30 @@ fn test_selfdestruct() {
         input.as_str(),
         122000,
         200,
-        block_producer_id,
+        block_producer_id.clone(),
         block_number,
     );
     // 571282 < 580K
-    helper::check_cycles("deploy SelfDestruct", run_result.used_cycles, 580_000);
+    helper::check_cycles("deploy SelfDestruct", run_result.used_cycles, 790_000);
 
-    let sd_account_script = new_contract_account_script_with_nonce(&from_eth_address, 0);
-    let sd_script_hash = sd_account_script.hash();
-    let sd_short_script_hash: &[u8; 20] = &sd_script_hash[0..20].try_into().unwrap();
-    let sd_ethabi_addr = contract_script_to_eth_addr(&sd_account_script, true);
+    let mock_contract_info = MockContractInfo::create(&from_eth_address, 0);
+    mock_contract_info.mapping_registry_address_to_script_hash(&mut state);
+    let sd_script_hash = mock_contract_info.script_hash;
+    let sd_address = mock_contract_info.reg_addr;
+    let sd_ethabi_addr = mock_contract_info.eth_abi_addr;
     let sd_account_id = state
-        .get_account_id_by_script_hash(&sd_account_script.hash().into())
+        .get_account_id_by_script_hash(&sd_script_hash)
         .unwrap()
         .unwrap();
     assert_eq!(
         state
-            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, sd_short_script_hash)
+            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &sd_address)
             .unwrap(),
         200
     );
     assert_eq!(
         state
-            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &beneficiary_script_hash[..20])
+            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &beneficiary_address)
             .unwrap(),
         0
     );
@@ -95,11 +96,13 @@ fn test_selfdestruct() {
         block_number,
     );
     // [deploy CallSelfDestruct] used cycles: 551984 < 560K
-    helper::check_cycles("deploy CallSelfDestruct", run_result.used_cycles, 560_000);
+    helper::check_cycles("deploy CallSelfDestruct", run_result.used_cycles, 710_000);
 
-    let csd_account_script = new_contract_account_script_with_nonce(&from_eth_address, 1);
+    let ssd_account = MockContractInfo::create(&from_eth_address, 1);
+    ssd_account.mapping_registry_address_to_script_hash(&mut state);
+    let ssd_account_script_hash = ssd_account.script_hash;
     let csd_account_id = state
-        .get_account_id_by_script_hash(&csd_account_script.hash().into())
+        .get_account_id_by_script_hash(&ssd_account_script_hash)
         .unwrap()
         .unwrap();
 
@@ -110,7 +113,8 @@ fn test_selfdestruct() {
     {
         // call CallSelfDestruct.proxyDone(sd_account_id)
         block_number += 1;
-        let block_info = new_block_info(0, block_number, block_number);
+        let (_, block_producer) = Account::build_script(0);
+        let block_info = new_block_info(block_producer, block_number, block_number);
         let input = hex::decode(format!("9a33d968{}", hex::encode(&sd_ethabi_addr))).unwrap();
         let args = PolyjuiceArgsBuilder::default()
             .gas_limit(100000)
@@ -140,7 +144,7 @@ fn test_selfdestruct() {
         helper::check_cycles(
             "CallSelfDestruct.proxyDone(sd_account_id)",
             run_result.used_cycles,
-            1100_000,
+            1_300_000,
         );
     }
 
@@ -149,13 +153,13 @@ fn test_selfdestruct() {
     assert_eq!(state.get_nonce(csd_account_id).unwrap(), 0);
     assert_eq!(
         state
-            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, sd_short_script_hash)
+            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &sd_address)
             .unwrap(),
         0
     );
     assert_eq!(
         state
-            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &beneficiary_script_hash[..20])
+            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &beneficiary_address)
             .unwrap(),
         200
     );
@@ -164,7 +168,8 @@ fn test_selfdestruct() {
 
     {
         // call SelfDestruct.done() which was already destructed
-        let block_info = new_block_info(0, block_number, block_number);
+        let (_, block_producer) = Account::build_script(0);
+        let block_info = new_block_info(block_producer, block_number, block_number);
         let input = hex::decode("ae8421e1").unwrap();
         let args = PolyjuiceArgsBuilder::default()
             .gas_limit(31000)
@@ -194,7 +199,8 @@ fn test_selfdestruct() {
     {
         // call CallSelfDestruct.proxyDone(sd_account_id)
         // target contract of the proxy was already destructed
-        let block_info = new_block_info(0, block_number, block_number);
+        let (_, block_producer) = Account::build_script(0);
+        let block_info = new_block_info(block_producer, block_number, block_number);
         let input = hex::decode(format!("9a33d968{}", hex::encode(&sd_ethabi_addr))).unwrap();
         let args = PolyjuiceArgsBuilder::default()
             .gas_limit(31000)

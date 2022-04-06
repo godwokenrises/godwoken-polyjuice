@@ -10,13 +10,13 @@
 #define ETH_ADDR_TO_GW_ACCOUNT_SCRIPT_HASH 201
 
 /** Polyjuice contract account (normal/create2) script args size */
-#define CONTRACT_ACCOUNT_SCRIPT_ARGS_LEN 56       /* 32 + 4 + 20 */
-#define CREATOR_SCRIPT_ARGS_LEN          40       /* 32 + 4 + 4  */
+#define CONTRACT_ACCOUNT_SCRIPT_ARGS_LEN 56 /* 32 + 4 + 20 */
+#define CREATOR_SCRIPT_ARGS_LEN 40			/* 32 + 4 + 4  */
 
 static uint8_t g_rollup_script_hash[32] = {0};
 static uint32_t g_sudt_id = UINT32_MAX;
 
-/** 
+/**
  * Receipt.contractAddress is the created contract,
  * if the transaction was a contract creation, otherwise null
  */
