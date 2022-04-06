@@ -3,7 +3,6 @@
 
 #define POLYJUICE_VERSION "v1.1.1"
 
-#define DEFAULT_SHORT_SCRIPT_HASH_LEN 20
 #define ETH_ADDRESS_LEN 20
 
 /* Key type for ETH Address Registry */

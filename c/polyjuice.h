@@ -6,6 +6,7 @@
 
 #include "ckb_syscalls.h"
 #include "godwoken.h"
+#include "gw_eth_addr_reg.h"
 
 #include <ethash/keccak.hpp>
 #include <evmc/evmc.h>
@@ -309,14 +310,11 @@ struct evmc_tx_context get_tx_context(struct evmc_host_context* context) {
   ctx.tx_gas_price.bytes[31] = 0x01;
 
   uint8_t coinbase_script_hash[32] = {0};
-  int ret = context->gw_ctx->sys_get_script_hash_by_account_id(
-    context->gw_ctx,
-    context->gw_ctx->block_info.block_producer_id,
-    coinbase_script_hash
-  );
+  int ret = context->gw_ctx->sys_get_script_hash_by_registry_address(context->gw_ctx,
+                                                               &context->gw_ctx->block_info.block_producer,
+                                                               coinbase_script_hash);
   if (ret != 0) {
-    debug_print_int("failed to get block_producer script_hash",
-                    context->gw_ctx->block_info.block_producer_id);
+    ckb_debug("get script hash by block producer failed");
     context->error_code = ret;
   }
   ret = load_eth_address_by_script_hash(context->gw_ctx,
@@ -514,22 +512,15 @@ evmc_uint256be get_balance(struct evmc_host_context* context,
   ckb_debug("BEGIN get_balance");
   evmc_uint256be balance{};
 
-  uint8_t script_hash[32] = {0};
-
-  int ret = load_script_hash_by_eth_address(context->gw_ctx, address->bytes,
-                                            script_hash);
-  if (ret != 0) {
-    debug_print_int("[get_balance] load_script_hash_by_eth_address failed",
-                    ret);
-    context->error_code = FATAL_POLYJUICE;
-    return balance;
-  }
+  gw_reg_addr_t addr = {0};
+  addr.reg_id = GW_DEFAULT_ETH_REGISTRY_ACCOUNT_ID;
+  memcpy(addr.addr, address->bytes, ETH_ADDRESS_LEN);
+  addr.addr_len = ETH_ADDRESS_LEN;
 
   uint128_t value_u128 = 0;
-  ret = sudt_get_balance(context->gw_ctx,
+  int ret = sudt_get_balance(context->gw_ctx,
                          g_sudt_id, /* g_sudt_id account must exists */
-                         DEFAULT_SHORT_SCRIPT_HASH_LEN,
-                         script_hash, &value_u128);
+                         addr, &value_u128);
   if (ret != 0) {
     ckb_debug("sudt_get_balance failed");
     context->error_code = FATAL_POLYJUICE;
@@ -549,20 +540,15 @@ evmc_uint256be get_balance(struct evmc_host_context* context,
 void selfdestruct(struct evmc_host_context* context,
                   const evmc_address* address,
                   const evmc_address* beneficiary) {
-  uint8_t from_script_hash[32] = {0};
-  int ret = load_script_hash_by_eth_address(context->gw_ctx, address->bytes,
-                                            from_script_hash);
-  if (ret != 0) {
-    debug_print_int("[selfdestruct] load_script_hash_by_eth_address failed",
-                    ret);
-    context->error_code = ret;
-    return;
-  }
+  gw_reg_addr_t from_addr = {0};
+  from_addr.reg_id = GW_DEFAULT_ETH_REGISTRY_ACCOUNT_ID;
+  memcpy(from_addr.addr, address->bytes, ETH_ADDRESS_LEN);
+  from_addr.addr_len = ETH_ADDRESS_LEN;
+
   uint128_t balance;
-  ret = sudt_get_balance(context->gw_ctx,
+  int ret = sudt_get_balance(context->gw_ctx,
                          g_sudt_id,  /* g_sudt_id account must exists */
-                         DEFAULT_SHORT_SCRIPT_HASH_LEN,
-                         from_script_hash, &balance);
+                         from_addr, &balance);
   if (ret != 0) {
     ckb_debug("get balance failed");
     context->error_code = ret;
@@ -570,20 +556,14 @@ void selfdestruct(struct evmc_host_context* context,
   }
 
   if (balance > 0) {
-    uint8_t to_script_hash[32] = {0};
-    ret = load_script_hash_by_eth_address(context->gw_ctx, beneficiary->bytes,
-                                          to_script_hash);
-    if (ret != 0) {
-      debug_print_int("[selfdestruct] load_script_hash_by_eth_address failed",
-                      ret);
-      context->error_code = ret;
-      return;
-    }
+    gw_reg_addr_t to_addr = {0};
+    to_addr.reg_id = GW_DEFAULT_ETH_REGISTRY_ACCOUNT_ID;
+    memcpy(to_addr.addr, beneficiary->bytes, ETH_ADDRESS_LEN);
+    to_addr.addr_len = ETH_ADDRESS_LEN;
 
     ret = sudt_transfer(context->gw_ctx, g_sudt_id,
-                        DEFAULT_SHORT_SCRIPT_HASH_LEN,
-                        from_script_hash,
-                        to_script_hash,
+                        from_addr,
+                        to_addr,
                         balance);
     if (ret != 0) {
       ckb_debug("transfer beneficiary failed");
@@ -932,7 +912,7 @@ int create_new_account(gw_context_t* ctx,
   debug_print_int(">> new to id", *to_id);
 
   // register a created contract account into `ETH Address Registry`
-  ret = update_eth_address_register(ctx, eth_addr, script_hash);
+  ret = gw_update_eth_address_register(ctx, eth_addr, script_hash);
   if (ret != 0) {
     ckb_debug("[create_new_account] failed to register a contract account");
     return ret;
@@ -964,29 +944,22 @@ int handle_transfer(gw_context_t* ctx,
     return FATAL_POLYJUICE;
   }
 
-  uint8_t from_script_hash[32] = {0};
-  int ret = load_script_hash_by_eth_address(ctx, msg->sender.bytes,
-                                            from_script_hash);
-  if (ret != 0) {
-    debug_print_int("[handle_transfer] load from_script_hash failed", ret);
-    return ret;
-  }
+  gw_reg_addr_t from_addr = {0};
+  from_addr.reg_id = GW_DEFAULT_ETH_REGISTRY_ACCOUNT_ID;
+  memcpy(from_addr.addr, msg->sender.bytes, ETH_ADDRESS_LEN);
+  from_addr.addr_len = ETH_ADDRESS_LEN;
 
-  uint8_t to_script_hash[32] = {0};
-  ret = load_script_hash_by_eth_address(ctx, msg->destination.bytes,
-                                        to_script_hash);
-  if (ret != 0) {
-    debug_print_int("[handle_transfer] load to_script_hash failed", ret);
-    return ret;
-  }
+  gw_reg_addr_t to_addr = {0};
+  to_addr.reg_id = GW_DEFAULT_ETH_REGISTRY_ACCOUNT_ID;
+  memcpy(to_addr.addr, msg->destination.bytes, ETH_ADDRESS_LEN);
+  to_addr.addr_len = ETH_ADDRESS_LEN;
 
   if (value_u128 == 0) {
     return 0;
   }
-  ret = sudt_transfer(ctx, g_sudt_id,
-                      DEFAULT_SHORT_SCRIPT_HASH_LEN,
-                      from_script_hash,
-                      to_script_hash,
+  int ret = sudt_transfer(ctx, g_sudt_id,
+                      from_addr,
+                      to_addr,
                       value_u128);
   if (ret != 0) {
     ckb_debug("[handle_transfer] sudt_transfer failed");
@@ -1419,18 +1392,15 @@ int run_polyjuice() {
   debug_print_int("[run_polyjuice] used_memory(Bytes)", used_memory);
 
 
-  uint8_t sender_script_hash[32] = {0};
-  ret = load_script_hash_by_eth_address(&context, msg.sender.bytes,
-                                        sender_script_hash);
-  if (ret != 0) {
-    debug_print_int("[run_polyjuice] load_script_hash failed", ret);
-    return clean_evmc_result_and_return(&res, ret);
-  }
+  gw_reg_addr_t sender_addr = {0};
+  sender_addr.reg_id = GW_DEFAULT_ETH_REGISTRY_ACCOUNT_ID;
+  sender_addr.addr_len = ETH_ADDRESS_LEN;
+  memcpy(sender_addr.addr, msg.sender.bytes, ETH_ADDRESS_LEN);
+
 
   ret = sudt_pay_fee(&context,
                      g_sudt_id, /* g_sudt_id must already exists */
-                     DEFAULT_SHORT_SCRIPT_HASH_LEN,
-                     sender_script_hash, fee);
+                     sender_addr, fee);
   if (ret != 0) {
     debug_print_int("[run_polyjuice] pay fee to block_producer failed", ret);
     return clean_evmc_result_and_return(&res, ret);
@@ -1438,8 +1408,7 @@ int run_polyjuice() {
 
   // call the SYS_PAY_FEE syscall to record the fee
   // NOTICE: this function do not actually execute the transfer of assets
-  ret = sys_pay_fee(&context, sender_script_hash, DEFAULT_SHORT_SCRIPT_HASH_LEN,
-                    g_sudt_id, fee);
+  ret = sys_pay_fee(&context, sender_addr, g_sudt_id, fee);
   if (ret != 0) {
     debug_print_int("[run_polyjuice] Record fee payment failed", ret);
     return clean_evmc_result_and_return(&res, ret);
