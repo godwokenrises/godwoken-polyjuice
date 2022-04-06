@@ -25,7 +25,7 @@ make all-via-docker
 # fetch godwoken-scripts from godwoken-prebuilds image,
 # including meta-contract and sudt-contract
 GW_SCRIPTS_DIR=$PROJECT_ROOT/build
-prebuild_image=ghcr.io/magicalne/godwoken-prebuilds:refactor-registry-address-202203300911
+prebuild_image=ghcr.io/magicalne/godwoken-prebuilds:refactor-registry-address-202204060742
 docker pull $prebuild_image
 mkdir -p $GW_SCRIPTS_DIR && echo "Create dir"
 docker run --rm -v $GW_SCRIPTS_DIR:/build-dir \
