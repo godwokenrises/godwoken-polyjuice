@@ -210,7 +210,6 @@ fn test_batch_set_mapping_by_contract() {
     // create new EOAs which is not registered
     let eth_eoa_addresses = vec![[0xeeu8; 20], [0xefu8; 20]];
     let mut eth_eoa_script_hashes = vec![];
-    let _block_producer_id = block_producer_id.clone();
     for address in eth_eoa_addresses.iter() {
         let account_script = build_eth_l2_script(address);
         let account_script_hash = account_script.hash();
@@ -241,14 +240,13 @@ fn test_batch_set_mapping_by_contract() {
         &mut state,
         &generator,
         from_id,
-        new_block_info(_block_producer_id, 1, 1),
+        new_block_info(block_producer_id.clone(), 1, 1),
         crate::helper::SetMappingArgs::Batch(eth_eoa_script_hashes.clone()),
     )
     .expect("eth address registered");
     assert_eq!(run_result.exit_code, 0);
     state.apply_run_result(&run_result).expect("update state");
 
-    let _block_producer_id = block_producer_id;
     for (eth_eoa_address, eth_eoa_account_script_hash) in
         eth_eoa_addresses.into_iter().zip(eth_eoa_script_hashes)
     {
@@ -270,7 +268,7 @@ fn test_batch_set_mapping_by_contract() {
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
                 &state,
-                &new_block_info(_block_producer_id.clone(), 3, 3),
+                &new_block_info(block_producer_id.clone(), 3, 3),
                 &raw_l2tx,
                 L2TX_MAX_CYCLES,
                 None,
@@ -294,7 +292,7 @@ fn test_batch_set_mapping_by_contract() {
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
                 &state,
-                &new_block_info(_block_producer_id.clone(), 3, 3),
+                &new_block_info(block_producer_id.clone(), 3, 3),
                 &raw_l2tx,
                 L2TX_MAX_CYCLES,
                 None,
