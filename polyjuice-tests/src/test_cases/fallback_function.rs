@@ -94,7 +94,7 @@ fn test_fallback_function() {
             )
             .expect("construct");
         // [Call fallback()] used cycles: 514059 < 520K
-        helper::check_cycles("Call fallback()", run_result.used_cycles, 620_000);
+        helper::check_cycles("Call fallback()", run_result.used_cycles, 625_000);
         assert!(run_result.return_data.is_empty());
         state.apply_run_result(&run_result).expect("update state");
     }

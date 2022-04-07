@@ -87,7 +87,7 @@ fn test_eth_addr_to_gw_script_hash() {
         helper::check_cycles(
             "EthToGodwokenAddr.convert(addr)",
             run_result.used_cycles,
-            710_000,
+            712_000,
         );
         state.apply_run_result(&run_result).expect("update state");
 
