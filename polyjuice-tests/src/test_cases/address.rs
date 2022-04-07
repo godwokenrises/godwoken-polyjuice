@@ -1,8 +1,6 @@
-use crate::helper::{
-    self, deploy, new_block_info, new_contract_account_script, PolyjuiceArgsBuilder,
-    CREATOR_ACCOUNT_ID,
-};
+use crate::helper::{self, deploy, new_account_script, new_block_info, PolyjuiceArgsBuilder};
 use gw_common::state::State;
+use gw_generator::traits::StateExt;
 use gw_store::traits::chain_store::ChainStore;
 use gw_types::{
     packed::RawL2Transaction,
@@ -14,12 +12,20 @@ const CONTRACT_CODE: &str = include_str!("./evm-contracts/AddressType.bin");
 
 #[test]
 fn test_get_contract_code() {
-    let (store, mut state, generator) = helper::setup();
-    let block_producer_id = helper::create_block_producer(&mut state);
+    let (store, mut state, generator, _creator_account_id) = helper::setup();
+    let block_producer_script = helper::build_eth_l2_script([0x99u8; 20]);
+    let block_producer_id = state
+        .create_account_from_script(block_producer_script)
+        .unwrap();
 
     let from_eth_address = [1u8; 20];
-    let (from_id, _from_script_hash) =
-        helper::create_eth_eoa_account(&mut state, &from_eth_address, 400000);
+    let from_script = helper::build_eth_l2_script(from_eth_address.clone());
+    let from_script_hash = from_script.hash();
+    let from_short_script_hash = &from_script_hash[0..20];
+    let from_id = state.create_account_from_script(from_script).unwrap();
+    state
+        .mint_sudt(helper::CKB_SUDT_ACCOUNT_ID, from_short_script_hash, 400000)
+        .unwrap();
 
     // Deploy contract
     let mut block_number = 1;
@@ -27,7 +33,7 @@ fn test_get_contract_code() {
         &generator,
         &store,
         &mut state,
-        CREATOR_ACCOUNT_ID,
+        _creator_account_id,
         from_id,
         CONTRACT_CODE,
         122000,
@@ -35,12 +41,11 @@ fn test_get_contract_code() {
         block_producer_id,
         block_number,
     );
-    let contract_script = new_contract_account_script(&state, from_id, &from_eth_address, false);
+    let contract_script = new_account_script(&mut state, _creator_account_id, from_id, false);
     let contract_id = state
         .get_account_id_by_script_hash(&contract_script.hash().into())
         .unwrap()
         .expect("get contract account ID by account_script");
-    assert!(contract_id >= 6);
 
     // test createMemoryArray function
     block_number += 1;

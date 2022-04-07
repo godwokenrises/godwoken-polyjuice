@@ -125,6 +125,7 @@ fn test_contract_call_contract() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .expect("construct");
         state.apply_run_result(&run_result).expect("update state");
@@ -219,6 +220,7 @@ fn test_contract_call_non_exists_contract() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .expect("construct");
         // [CallNonExistsContract.rawCall(addr)] used cycles: 862060 < 870K

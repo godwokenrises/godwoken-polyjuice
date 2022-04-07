@@ -99,6 +99,7 @@ fn test_recover_account() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .expect("construct");
         // [RecoverAccount.recover(message, signature, code_hash)] used cycles: 648630 < 670K
@@ -153,6 +154,7 @@ fn test_recover_account() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .expect("construct");
         state.apply_run_result(&run_result).expect("update state");
@@ -192,6 +194,7 @@ fn test_recover_account() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .expect_err("construct");
         assert_eq!(

@@ -58,6 +58,7 @@ fn test_simple_storage() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .expect("construct");
         state.apply_run_result(&run_result).expect("update state");
@@ -110,6 +111,7 @@ fn test_simple_storage() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .expect("construct");
         state.apply_run_result(&run_result).expect("update state");
@@ -141,6 +143,7 @@ fn test_simple_storage() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .expect("construct");
         state.apply_run_result(&run_result).expect("update state");
