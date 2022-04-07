@@ -1,6 +1,5 @@
 use crate::helper::{
-    self, deploy, new_block_info, new_contract_account_script, PolyjuiceArgsBuilder,
-    CREATOR_ACCOUNT_ID,
+    self, deploy, new_block_info, MockContractInfo, PolyjuiceArgsBuilder, CREATOR_ACCOUNT_ID,
 };
 use gw_common::state::State;
 use gw_store::traits::chain_store::ChainStore;
@@ -32,19 +31,19 @@ fn test_get_contract_code() {
         CONTRACT_CODE,
         122000,
         0,
-        block_producer_id,
+        block_producer_id.clone(),
         block_number,
     );
-    let contract_script = new_contract_account_script(&state, from_id, &from_eth_address, false);
+    let contract = MockContractInfo::create(&from_eth_address, 0);
     let contract_id = state
-        .get_account_id_by_script_hash(&contract_script.hash().into())
+        .get_account_id_by_script_hash(&contract.script_hash)
         .unwrap()
         .expect("get contract account ID by account_script");
     assert!(contract_id >= 6);
 
     // test createMemoryArray function
     block_number += 1;
-    let block_info = new_block_info(block_producer_id, block_number, block_number);
+    let block_info = new_block_info(block_producer_id.clone(), block_number, block_number);
     let input = hex::decode("c59083f5").expect("createMemoryArray function");
     let args = PolyjuiceArgsBuilder::default()
         .gas_limit(10000)

@@ -121,7 +121,7 @@ fn test_contract_call_contract() {
             .expect("CallContract.proxySet");
         state.apply_run_result(&run_result).expect("update state");
         // [CallContract.proxySet(222)] used cycles: 961599 -> 980564 < 981K
-        helper::check_cycles("CallContract.proxySet()", run_result.used_cycles, 1_160_000);
+        helper::check_cycles("CallContract.proxySet()", run_result.used_cycles, 1_170_000);
     }
 
     let run_result = simple_storage_get(

@@ -133,7 +133,7 @@ fn test_delegatecall() {
             )
             .expect("construct");
         // [DelegateCall] used cycles: 1457344 < 1460K
-        helper::check_cycles("DelegateCall", run_result.used_cycles, 1_700_000);
+        helper::check_cycles("DelegateCall", run_result.used_cycles, 1_710_000);
         state.apply_run_result(&run_result).expect("update state");
         // println!(
         //     "result {}",
