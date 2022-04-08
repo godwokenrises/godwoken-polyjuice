@@ -130,6 +130,7 @@ fn test_delegatecall() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .expect("construct");
         // [DelegateCall] used cycles: 1457344 < 1460K

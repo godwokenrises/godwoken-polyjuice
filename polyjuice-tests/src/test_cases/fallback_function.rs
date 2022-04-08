@@ -54,6 +54,7 @@ fn test_fallback_function() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .expect("construct");
         // [Deploy FallbackFunction] used cycles: 587271 < 590K
@@ -97,6 +98,7 @@ fn test_fallback_function() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .expect("construct");
         // [Call fallback()] used cycles: 514059 < 520K

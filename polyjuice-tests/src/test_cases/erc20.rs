@@ -167,6 +167,7 @@ fn test_erc20() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .expect("construct");
         // [ERC20 contract method_x] used cycles: 942107 < 960K

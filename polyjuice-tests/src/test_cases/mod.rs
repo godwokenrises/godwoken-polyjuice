@@ -1,3 +1,4 @@
+pub(crate) mod address;
 pub(crate) mod call_multiple_times;
 pub(crate) mod call_selfdestruct;
 pub(crate) mod contract_call_contract;

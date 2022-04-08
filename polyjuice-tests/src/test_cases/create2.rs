@@ -99,6 +99,7 @@ fn test_create2() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .expect("construct");
         // [Create2Impl.deploy(...)] used cycles: 1197555 < 1230K
