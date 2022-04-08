@@ -30,7 +30,7 @@ static uint32_t g_created_id = UINT32_MAX;
 static uint32_t g_compatible_chain_id = UINT32_MAX;
 /**
  * creator_account, known as root account
- * @see https://github.com/nervosnetwork/godwoken/blob/5735d8f/docs/life_of_a_polyjuice_transaction.md#root-account--deployment
+ * @see https://github.com/nervosnetwork/godwoken/blob/develop/docs/life_of_a_polyjuice_transaction.md#root-account--deployment
  */
 static uint32_t g_creator_account_id = UINT32_MAX;
 /**
