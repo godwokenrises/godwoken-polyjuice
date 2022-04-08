@@ -1,8 +1,8 @@
 
 # Godwoken Polyjuice
-An Ethereum compatible backend for [Godwoken](https://github.com/nervosnetwork/godwoken) rollup framework. It includes [generator](./c/generator.c) and [validator](./c/validator.c) implementations.
+An Ethereum compatible backend for [Godwoken](https://github.com/nervosnetwork/godwoken) (a generic optimistic rollup framework). It includes [generator](./c/generator.c) and [validator](./c/validator.c) implementations.
 
-Polyjuice provides an [Ethereum](https://ethereum.org/en/) compatible layer on [Nervos CKB](https://github.com/nervosnetwork/ckb). It leverages account model as well as scalability provided by [Godwoken](https://github.com/nervosnetwork/godwoken/blob/9de340c/docs/life_of_a_godwoken_transaction.md), then integrates [evmone](https://github.com/ethereum/evmone) as an EVM engine for running Ethereum smart contracts.
+Polyjuice provides an [Ethereum](https://ethereum.org/en/) compatible layer on [Nervos CKB](https://github.com/nervosnetwork/ckb). It leverages account model as well as scalability provided by [Godwoken](https://github.com/nervosnetwork/godwoken/blob/v1.0.0-rc1/docs/life_of_a_godwoken_transaction.md), then integrates [evmone](https://github.com/ethereum/evmone) as an EVM engine for running Ethereum smart contracts.
 
 Polyjuice aims at 100% EVM compatibility as a goal, meaning we plan to support all smart contracts supported by the latest Ethereum hardfork version. See [EVM-compatible.md](docs/EVM-compatible.md) and [Addition-Features.md](docs/Addition-Features.md) for more details.
 
@@ -37,7 +37,7 @@ input_size : u32      (little endian)
 input_data : [u8; input_size]   (input data)
 ```
 
-Every Polyjuice argument fields must been serialized one by one and put into godwoken [`RawL2Transaction.args`][rawl2tx-args] for polyjuice to read. If the `input_data` have 56 bytes, then the serialized data size is `8 + 8 + 16 + 16 + 4 + 56 = 108` bytes.
+Every Polyjuice argument fields must been serialized one by one and put into Godwoken [`RawL2Transaction.args`][rawl2tx-args] for Polyjuice to read. If the `input_data` have 56 bytes, then the serialized data size is `8 + 8 + 16 + 16 + 4 + 56 = 108` bytes.
 
 
 ### Creator account script
@@ -50,7 +50,7 @@ args:
     eth_addr_reg_id  : u32          (little endian, the ETH_Address_Registry Contract id)
 ```
 
-Polyjuice creator account is a godwoken account for creating Polyjuice contract account. This account can only be created by [meta contract][meta-contract], and the account id is used as the chain id in Polyjuice. The `sudt_id` field in script args is the sUDT token current Polyjuice instance bind to as [`pETH`](https://github.com/nervosnetwork/godwoken/blob/master/docs/life_of_a_polyjuice_transaction.md#peth). The `eth_addr_reg_id` field in script args is the id of `ETH Address Registry` layer2 contract which provides two-ways mappings between `eth_address` and `gw_script_hash`.
+Polyjuice creator account is a Godwoken account for creating Polyjuice contract account. This account can only be created by [meta contract][meta-contract], and the account id is used as the chain id in Polyjuice. The `sudt_id` field in script args is the sUDT token current Polyjuice instance bind to as [`pCKB`](https://github.com/nervosnetwork/godwoken/blob/develop/docs/life_of_a_polyjuice_transaction.md#pCKB). The `eth_addr_reg_id` field in script args is the id of `ETH Address Registry` layer2 contract which provides two-ways mappings between `eth_address` and `gw_script_hash`.
 
 ### Contract account script
 
@@ -94,10 +94,10 @@ short_godwoken_account_script_hash = blake2b(script.as_slice())[0..20]
 
 
 [rawl2tx-args]: https://github.com/nervosnetwork/godwoken/blob/9a3d921/crates/types/schemas/godwoken.mol#L60
-[meta-contract]: https://github.com/nervosnetwork/godwoken-scripts/blob/028dbc4/c/contracts/meta_contract.c
+[meta-contract]: https://github.com/nervosnetwork/godwoken-scripts/blob/86b299f/c/contracts/meta_contract.c
 
 ## More docs
 * [EVM compatible](docs/EVM-compatible.md)
 * [Addition Features](docs/Addition-Features.md)
-* [Life of a Polyjuice Transaction](https://github.com/nervosnetwork/godwoken/blob/master/docs/life_of_a_polyjuice_transaction.md)
-* [Life of a Godwoken Transaction](https://github.com/nervosnetwork/godwoken/blob/master/docs/life_of_a_godwoken_transaction.md)
+* [Life of a Polyjuice Transaction](https://github.com/nervosnetwork/godwoken/blob/develop/docs/life_of_a_polyjuice_transaction.md)
+* [Life of a Godwoken Transaction](https://github.com/nervosnetwork/godwoken/blob/develop/docs/life_of_a_godwoken_transaction.md)
