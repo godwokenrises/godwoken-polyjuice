@@ -6,7 +6,6 @@
 
 /* Gas fee */
 #define RECOVER_ACCOUNT_GAS                    3600 /* more than ecrecover */
-#define ETH_ADDR_TO_GW_SCRIPT_HASH_GAS         300
 
 int recover_account_gas(const uint8_t* input_src,
                         const size_t input_size,
@@ -73,64 +72,6 @@ int recover_account(gw_context_t* ctx,
   }
   *output_size = 32;
   blake2b_hash(*output, script, script_len);
-  return 0;
-}
-
-int eth_addr_to_gw_script_hash_gas(const uint8_t* input_src,
-                                         const size_t input_size,
-                                         uint64_t* gas) {
-  *gas = ETH_ADDR_TO_GW_SCRIPT_HASH_GAS;
-  return 0;
-}
-
-/* Calculate Godwoken short script hash of a contract account by it's corresponding ETH address
-
- input:
- ======
-   input[12..32] => ETH address
-
- output:
-   output[12..32] => gw_script_hash, a.k.a. godwoken short address
- */
-int eth_addr_to_gw_script_hash(gw_context_t* ctx,
-                         const uint8_t* code_data,
-                         const size_t code_size,
-                         bool is_static_call,
-                         const uint8_t* input_src,
-                         const size_t input_size,
-                         uint8_t** output, size_t* output_size) {
-  if (input_size < 32) {
-    debug_print_int("input size too small", input_size);
-    return ERROR_ETH_ADDR_TO_GW_SCRIPT_HASH;
-  }
-  for (int i = 0; i < 12; i++) {
-    if (input_src[i] != 0) {
-      ckb_debug("invalid ETH address");
-      return ERROR_ETH_ADDR_TO_GW_SCRIPT_HASH;
-    }
-  }
-  int ret;
-  uint8_t script_args[CONTRACT_ACCOUNT_SCRIPT_ARGS_LEN];
-  memcpy(script_args, g_rollup_script_hash, 32);
-  memcpy(script_args + 32, (uint8_t*)(&g_creator_account_id), 4);
-  memcpy(script_args + 32 + 4, input_src + 12, 20);
-  mol_seg_t new_script_seg;
-  ret = build_script(g_script_code_hash, g_script_hash_type, script_args,
-                     CONTRACT_ACCOUNT_SCRIPT_ARGS_LEN, &new_script_seg);
-  if (ret != 0) {
-    return ret;
-  }
-  uint8_t script_hash[32];
-  blake2b_hash(script_hash, new_script_seg.ptr, new_script_seg.size);
-  free(new_script_seg.ptr);
-
-  *output = (uint8_t *)malloc(32);
-  if (*output == NULL) {
-    ckb_debug("malloc failed");
-    return FATAL_PRECOMPILED_CONTRACTS;
-  }
-  *output_size = 32;
-  memcpy(*output, script_hash, 32);
   return 0;
 }
 
