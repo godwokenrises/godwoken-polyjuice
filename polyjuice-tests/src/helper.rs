@@ -696,7 +696,7 @@ pub(crate) fn create_eth_eoa_account(
 }
 
 pub(crate) fn check_cycles(l2_tx_label: &str, used_cycles: u64, warning_cycles: u64) {
-    if POLYJUICE_GENERATOR_NAME == "generator_log.aot" {
+    if POLYJUICE_GENERATOR_NAME.contains("_log") {
         return; // disable cycles check
     }
 
