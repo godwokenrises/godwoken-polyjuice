@@ -20,7 +20,6 @@ pub(crate) mod simple_wallet;
 pub(crate) mod account_already_exists;
 
 pub(crate) mod ecrecover;
-pub(crate) mod eth_addr_to_gw_script_hash;
 pub(crate) mod pre_compiled_contracts;
 pub(crate) mod recover_account;
 pub(crate) mod rlp;

@@ -936,10 +936,11 @@ bool match_precompiled_address(const evmc_address* destination,
     *contract_gas = recover_account_gas;
     *contract = recover_account;
     break;
-  case 0xf3:
-    *contract_gas = eth_addr_to_gw_script_hash_gas;
-    *contract = eth_addr_to_gw_script_hash;
-    break;
+  // Use gw_get_script_hash_by_registry_address RPC instead of this precompiled contract
+  // Deprecated case 0xf3:
+  //   *contract_gas = eth_addr_to_gw_script_hash_gas;
+  //   *contract = eth_addr_to_gw_script_hash;
+  //   break;
   case 0xf4:
     *contract_gas = total_supply_of_any_sudt_gas;
     *contract = total_supply_of_any_sudt;
