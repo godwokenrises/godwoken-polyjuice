@@ -102,7 +102,7 @@ fn test_get_chain_id() {
             .expect("construct");
         state.apply_run_result(&run_result).expect("update state");
 
-        /* chain_id = compatible_chain_id(u32) | creator_account_id(u32) */
+        /* chain_id = GodwokenRollupConfig#chain_id(u64) */
         let mut expected_chain_id = vec![0u8; 32];
         expected_chain_id[24..32].copy_from_slice(&CHAIN_ID.to_be_bytes()[..]);
         assert_eq!(run_result.return_data, expected_chain_id);
