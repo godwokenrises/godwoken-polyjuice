@@ -61,9 +61,6 @@ pub const ETH_ADDRESS_REGISTRY_GENERATOR_NAME: &str =
     "../build/godwoken-scripts/eth-addr-reg-generator";
 pub const ETH_ADDRESS_REGISTRY_VALIDATOR_NAME: &str =
     "../build/godwoken-scripts/eth-addr-reg-validator";
-// Key type for ETH Address Registry
-const GW_ACCOUNT_SCRIPT_HASH_TO_ETH_ADDR: u8 = 200;
-const ETH_ADDR_TO_GW_ACCOUNT_SCRIPT_HASH: u8 = 201;
 
 pub const ROLLUP_SCRIPT_HASH: [u8; 32] = [0xa9u8; 32];
 pub const ETH_ACCOUNT_LOCK_CODE_HASH: [u8; 32] = [0xaau8; 32];
@@ -699,7 +696,7 @@ pub(crate) fn create_eth_eoa_account(
 }
 
 pub(crate) fn check_cycles(l2_tx_label: &str, used_cycles: u64, warning_cycles: u64) {
-    if POLYJUICE_GENERATOR_NAME == "generator_log.aot" {
+    if POLYJUICE_GENERATOR_NAME.contains("_log") {
         return; // disable cycles check
     }
 
@@ -723,47 +720,12 @@ pub(crate) fn check_cycles(l2_tx_label: &str, used_cycles: u64, warning_cycles: 
     );
 }
 
-fn build_eth_address_to_script_hash_key(eth_address: &[u8; 20]) -> H256 {
-    let mut key: [u8; 32] = H256::zero().into();
-    let mut hasher = new_blake2b();
-    hasher.update(&ETH_ADDRESS_REGISTRY_ACCOUNT_ID.to_le_bytes());
-    hasher.update(&[ETH_ADDR_TO_GW_ACCOUNT_SCRIPT_HASH]);
-    hasher.update(eth_address);
-    hasher.finalize(&mut key);
-    key.into()
-}
-
-fn build_script_hash_to_eth_address_key(script_hash: &[u8; 32]) -> H256 {
-    let mut key: [u8; 32] = H256::zero().into();
-    let mut hasher = new_blake2b();
-    hasher.update(&ETH_ADDRESS_REGISTRY_ACCOUNT_ID.to_le_bytes());
-    hasher.update(&[GW_ACCOUNT_SCRIPT_HASH_TO_ETH_ADDR]);
-    hasher.update(script_hash);
-    hasher.finalize(&mut key);
-    key.into()
-}
-
 /// update eth_address_registry by state.update_raw(...)
 pub(crate) fn register_eoa_account(
     state: &mut DummyState,
     eth_address: &[u8; 20],
     script_hash: &[u8; 32],
 ) {
-    state
-        .update_raw(
-            build_eth_address_to_script_hash_key(eth_address),
-            (*script_hash).into(),
-        )
-        .expect("add GW_ETH_ADDRESS_TO_SCRIPT_HASH mapping into state");
-
-    let mut eth_address_abi_format = [0u8; 32];
-    eth_address_abi_format[12..].copy_from_slice(eth_address);
-    state
-        .update_raw(
-            build_script_hash_to_eth_address_key(script_hash),
-            eth_address_abi_format.into(),
-        )
-        .expect("add GW_ACCOUNT_SCRIPT_HASH_TO_ETH_ADDR mapping into state");
     let address = RegistryAddress::new(ETH_REGISTRY_ACCOUNT_ID, eth_address.to_vec());
     state
         .mapping_registry_address_to_script_hash(address, (*script_hash).into())
