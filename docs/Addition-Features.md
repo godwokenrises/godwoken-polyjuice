@@ -4,7 +4,6 @@
   - Add `recover_account` to recover any supported signature
   - Add `balance_of_any_sudt` to query the balance of any sudt_id account
   - Add `transfer_to_any_sudt` to transfer value by sudt_id (Must collaborate with SudtERC20Proxy_UserDefinedDecimals.sol contract)
-  - Add `eth_addr_to_gw_script_hash` to convert ETH address to Godwoken script hash of the corresponding account
 
 ### `recover_account` Spec
 
@@ -34,7 +33,7 @@ See: [Example](../polyjuice-tests/src/test_cases/evm-contracts/RecoverAccount.so
    input:
    ======
      input[ 0..32] => sudt_id (big endian)
-     input[32..64] => address (eth_address)
+     input[32+12..64] => address (eth_address)
 
    output:
    =======
@@ -54,26 +53,11 @@ See: [Example](../solidity/erc20/SudtERC20Proxy_UserDefinedDecimals.sol)
    input:
    ======
      input[ 0..32 ] => sudt_id (big endian)
-     input[32..64 ] => from_addr (eth address)
-     input[64..96 ] => to_addr (eth address)
+     input[32+12..64 ] => from_addr (eth address)
+     input[64+12..96 ] => to_addr (eth address)
      input[96..128] => amount (big endian)
 
    output: []
 ```
 
 See: [Example](../solidity/erc20/SudtERC20Proxy_UserDefinedDecimals.sol)
-
-### `eth_addr_to_gw_script_hash` Spec
-
-```
- Calculate Godwoken script hash of a contract account by it's corresponding ETH address
-
- input:
- ======
-   input[12..32] => ETH address
-
- output:
-   output[0..32] => godwoken script hash address
-```
-
-See: [Example](../polyjuice-tests/src/test_cases/evm-contracts/EthToGodwokenAddr.sol)

@@ -19,7 +19,7 @@ const CALL_NON_EXISTS_INIT_CODE: &str = include_str!("./evm-contracts/CallNonExi
 #[test]
 fn test_contract_call_contract() {
     let (store, mut state, generator) = setup();
-    let block_producer_id = helper::create_block_producer(&mut state);
+    let block_producer = helper::create_block_producer(&mut state);
 
     let from_eth_address = [1u8; 20];
     let (from_id, _from_script_hash) =
@@ -36,7 +36,7 @@ fn test_contract_call_contract() {
         SS_INIT_CODE,
         122000,
         0,
-        block_producer_id.clone(),
+        block_producer.clone(),
         block_number,
     );
 
@@ -60,7 +60,7 @@ fn test_contract_call_contract() {
         input.as_str(),
         122000,
         0,
-        block_producer_id.clone(),
+        block_producer.clone(),
         block_number,
     );
     // println!(
@@ -92,7 +92,7 @@ fn test_contract_call_contract() {
     {
         // CallContract.proxySet(222) => SimpleStorage.set(x+3)
         block_number += 1;
-        let block_info = new_block_info(block_producer_id, block_number, block_number);
+        let block_info = new_block_info(block_producer, block_number, block_number);
         let input =
             hex::decode("28cc7b2500000000000000000000000000000000000000000000000000000000000000de")
                 .unwrap(); // 0xde = 222

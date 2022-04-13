@@ -498,10 +498,7 @@ evmc_uint256be get_balance(struct evmc_host_context* context,
   ckb_debug("BEGIN get_balance");
   evmc_uint256be balance{};
 
-  gw_reg_addr_t addr = {0};
-  addr.reg_id = GW_DEFAULT_ETH_REGISTRY_ACCOUNT_ID;
-  memcpy(addr.addr, address->bytes, ETH_ADDRESS_LEN);
-  addr.addr_len = ETH_ADDRESS_LEN;
+  gw_reg_addr_t addr = init_reg_addr(address->bytes);
 
   uint128_t value_u128 = 0;
   int ret = sudt_get_balance(context->gw_ctx,
@@ -734,7 +731,6 @@ int check_destructed(gw_context_t* ctx, uint32_t to_id) {
  * - g_script_hash_type
  * - g_rollup_script_hash
  * - g_sudt_id
- * - g_eth_addr_reg_id
  */
 int load_globals(gw_context_t* ctx, uint32_t to_id) {
   uint8_t buffer[GW_MAX_SCRIPT_SIZE];
@@ -793,6 +789,7 @@ int load_globals(gw_context_t* ctx, uint32_t to_id) {
   mol_seg_t id_u64_seg = MolReader_RollupConfig_get_chain_id(&rollup_config_seg);
   memcpy(&g_chain_id, id_u64_seg.ptr, id_u64_seg.size);
   debug_print_int("chain_id", g_chain_id);
+  
   debug_print_int("creator_account_id", g_creator_account_id);
 
   /** read rollup_script_hash and g_sudt_id from creator account */
@@ -800,8 +797,6 @@ int load_globals(gw_context_t* ctx, uint32_t to_id) {
   memcpy(&g_sudt_id, creator_raw_args_seg.ptr + 32, sizeof(uint32_t));
   debug_print_data("g_rollup_script_hash", g_rollup_script_hash, 32);
   debug_print_int("g_sudt_id", g_sudt_id);
-  g_eth_addr_reg_id = GW_DEFAULT_ETH_REGISTRY_ACCOUNT_ID;
-  debug_print_int("g_eth_addr_reg_id", g_eth_addr_reg_id);
 
   return 0;
 }

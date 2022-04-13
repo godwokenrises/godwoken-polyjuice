@@ -65,6 +65,14 @@ bool is_errno_ok(mol_seg_res_t *script_res) {
 }
 #pragma pop_macro("errno")
 
+gw_reg_addr_t init_reg_addr(const uint8_t eth_addr[ETH_ADDRESS_LEN]) {
+  gw_reg_addr_t addr = {0};
+  addr.reg_id = GW_DEFAULT_ETH_REGISTRY_ACCOUNT_ID;
+  addr.addr_len = ETH_ADDRESS_LEN;
+  memcpy(addr.addr, eth_addr, ETH_ADDRESS_LEN);
+  return addr;
+}
+
 int build_script(const uint8_t code_hash[32], const uint8_t hash_type,
                  const uint8_t *args, const uint32_t args_len,
                  mol_seg_t *script_seg) {
@@ -113,11 +121,7 @@ int load_script_hash_by_eth_address(gw_context_t *ctx,
     return GW_FATAL_INVALID_CONTEXT;
   }
 
-  /* build addr */
-  gw_reg_addr_t addr = {0};
-  memcpy(addr.addr, eth_address, ETH_ADDRESS_LEN);
-  addr.addr_len = ETH_ADDRESS_LEN;
-  addr.reg_id = g_eth_addr_reg_id;
+  gw_reg_addr_t addr = init_reg_addr(eth_address);
 
   int ret = ctx->sys_get_script_hash_by_registry_address(ctx, &addr, script_hash);
   if (ret != 0) {
@@ -138,9 +142,9 @@ int load_eth_address_by_script_hash(gw_context_t *ctx,
   }
 
   /* build addr */
-  gw_reg_addr_t addr = {0};
+  gw_reg_addr_t addr = init_reg_addr(eth_address);
 
-  int ret = ctx->sys_get_registry_address_by_script_hash(ctx, script_hash, g_eth_addr_reg_id, &addr);
+  int ret = ctx->sys_get_registry_address_by_script_hash(ctx, script_hash, GW_DEFAULT_ETH_REGISTRY_ACCOUNT_ID, &addr);
   if (ret != 0) {
     return ret;
   }
