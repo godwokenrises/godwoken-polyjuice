@@ -209,7 +209,7 @@ fn test_contract_call_non_exists_contract() {
                 L2TX_MAX_CYCLES,
                 None,
             )
-            .expect("non_existing_account_address => load to_script_hash failed");
+            .expect("non_existing_account_address => success with '0x' return_data");
         assert_eq!(
             run_result.return_data,
             vec![
@@ -218,7 +218,6 @@ fn test_contract_call_non_exists_contract() {
                 0, 0, 0, 0, 0, 0, 0, 0, 0
             ]
         );
-        // assert_eq!(err, TransactionError::InvalidExitCode(83));
     }
     {
         // Call CallNonExistsContract.rawCall(address eoa_addr)
