@@ -32,11 +32,6 @@ static uint64_t g_chain_id = UINT64_MAX;
  * @see https://github.com/nervosnetwork/godwoken/blob/develop/docs/life_of_a_polyjuice_transaction.md#root-account--deployment
  */
 static uint32_t g_creator_account_id = UINT32_MAX;
-/**
- * ETH_Address_Registry Contract Account
- * @see c/eth_addr_reg.c
- */
-static uint32_t g_eth_addr_reg_id = UINT32_MAX;
 
 static evmc_address g_tx_origin = {0};
 
