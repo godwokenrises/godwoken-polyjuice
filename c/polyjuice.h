@@ -309,22 +309,10 @@ struct evmc_tx_context get_tx_context(struct evmc_host_context* context) {
   /* gas price = 1 */
   ctx.tx_gas_price.bytes[31] = 0x01;
 
-  uint8_t coinbase_script_hash[32] = {0};
-  int ret = context->gw_ctx->sys_get_script_hash_by_registry_address(context->gw_ctx,
-                                                                     &context->gw_ctx->block_info.block_producer,
-                                                                     coinbase_script_hash);
-  if (ret != 0) {
-    ckb_debug("get script hash by block producer failed");
-    context->error_code = ret;
-  }
-  ret = load_eth_address_by_script_hash(context->gw_ctx,
-                                        coinbase_script_hash,
-                                        ctx.block_coinbase.bytes);
-  if (ret != 0) {
-    debug_print_data("load block_coinbase address failed, id",
-                    context->gw_ctx->block_info.block_producer.addr, 32);
-    context->error_code = ret;
-  }
+  gw_reg_addr_t *block_producer = &context->gw_ctx->block_info.block_producer;
+  debug_print_data("load block_coinbase address:",
+                   block_producer->addr, ETH_ADDRESS_LEN);
+  memcpy(ctx.block_coinbase.bytes, block_producer->addr, ETH_ADDRESS_LEN);
 
   ctx.block_number = context->gw_ctx->block_info.number;
   /*
