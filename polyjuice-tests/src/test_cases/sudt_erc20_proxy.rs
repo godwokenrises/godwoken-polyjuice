@@ -234,6 +234,48 @@ fn test_sudt_erc20_proxy_inner(
             "18160ddd".to_string(),
             &total_supply,
         ),
+        // transfer 0 to an eth_address without Godwoken account
+        (
+            "transfer(0xffffffffffffffffffffffffffffffffffffffff, 0x0)",
+            from_id1,
+            "a9059cbb000000000000000000000000ffffffffffffffffffffffffffffffffffffffff0000000000000000000000000000000000000000000000000000000000000000".to_string(),
+            "0000000000000000000000000000000000000000000000000000000000000001",
+        ),
+        // balanceOf(eoa1)
+        (
+            "balanceOf(eoa1)",
+            from_id1,
+            format!("70a08231{}", eoa1_hex),
+            "000000000000000000000000000000000000000204fce5e3e2502610fffff7d4",
+        ),
+        // balanceOf(0xffffffffffffffffffffffffffffffffffffffff)
+        (
+            "balanceOf(0xffffffffffffffffffffffffffffffffffffffff)",
+            from_id1,
+            "70a08231000000000000000000000000ffffffffffffffffffffffffffffffffffffffff".to_string(),
+            "0000000000000000000000000000000000000000000000000000000000000000",
+        ),
+        // transfer 0xd4 to an eth_address without Godwoken account
+        (
+            "transfer(0xffffffffffffffffffffffffffffffffffffffff, 0xd4)",
+            from_id1,
+            "a9059cbb000000000000000000000000ffffffffffffffffffffffffffffffffffffffff00000000000000000000000000000000000000000000000000000000000000d4".to_string(),
+            "0000000000000000000000000000000000000000000000000000000000000001",
+        ),
+        // balanceOf(eoa1)
+        (
+            "balanceOf(eoa1)",
+            from_id1,
+            format!("70a08231{}", eoa1_hex),
+            "000000000000000000000000000000000000000204fce5e3e2502610fffff700",
+        ),
+        // balanceOf(0xffffffffffffffffffffffffffffffffffffffff)
+        (
+            "balanceOf(0xffffffffffffffffffffffffffffffffffffffff)",
+            from_id1,
+            "70a08231000000000000000000000000ffffffffffffffffffffffffffffffffffffffff".to_string(),
+            "00000000000000000000000000000000000000000000000000000000000000d4",
+        ),
     ]
     .iter()
     .enumerate()
@@ -362,7 +404,6 @@ fn test_sudt_erc20_proxy_user_defined_decimals() {
     let new_sudt_id = state.create_account_from_script(new_sudt_script).unwrap();
 
     assert_eq!(CKB_SUDT_ACCOUNT_ID, 1);
-
     assert_eq!(
         test_sudt_erc20_proxy_inner(&generator, &store, &mut state, new_sudt_id, Some(8)),
         Ok(())
