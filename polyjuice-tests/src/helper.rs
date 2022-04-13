@@ -34,7 +34,7 @@ use gw_types::{
     packed::{ETHAddrRegArgs, ETHAddrRegArgsUnion},
 };
 use rlp::RlpStream;
-use std::{fs, io::Read, path::PathBuf};
+use std::{convert::TryInto, fs, io::Read, path::PathBuf};
 
 pub use gw_common::builtins::{CKB_SUDT_ACCOUNT_ID, RESERVED_ACCOUNT_ID};
 pub const ETH_ADDRESS_REGISTRY_ACCOUNT_ID: u32 = 2;
@@ -669,14 +669,18 @@ pub fn build_eth_l2_script(args: &[u8; 20]) -> Script {
 }
 
 pub(crate) fn create_block_producer(state: &mut DummyState) -> RegistryAddress {
-    let block_producer_script = build_eth_l2_script(&[0x99u8; 20]);
+    // This eth_address is hardcoded in src/test_cases/evm-contracts/BlockInfo.sol
+    let eth_address: [u8; 20] = hex::decode("a1ad227Ad369f593B5f3d0Cc934A681a50811CB2")
+        .expect("decode hex eth_address")
+        .try_into()
+        .unwrap();
+    let block_producer_script = build_eth_l2_script(&eth_address);
     let block_producer_script_hash = block_producer_script.hash();
     let _block_producer_id = state
         .create_account_from_script(block_producer_script)
         .expect("create_block_producer");
-    let eth_addr = [0x99u8; 20];
-    register_eoa_account(state, &eth_addr, &block_producer_script_hash);
-    RegistryAddress::new(ETH_REGISTRY_ACCOUNT_ID, eth_addr.to_vec())
+    register_eoa_account(state, &eth_address, &block_producer_script_hash);
+    RegistryAddress::new(ETH_REGISTRY_ACCOUNT_ID, eth_address.to_vec())
 }
 
 pub(crate) fn create_eth_eoa_account(
