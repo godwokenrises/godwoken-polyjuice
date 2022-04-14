@@ -42,9 +42,7 @@ When you send an Ethereum transaction, the transaction is converted to Godwoken 
 ## Others
 
 * Transaction context
-  * `chain_id` consists up of two parts: [**compatible_chain_id(u32) | [creator_account_id]()(u32)**]
-    - `compatible_chain_id` is defined in Godwoken [RollupConfig](https://github.com/nervosnetwork/godwoken/blob/v1.0.0-rc1/crates/types/schemas/godwoken.mol#L64).
-    - `creator_account` is known as [the root account of Polyjuice](https://github.com/nervosnetwork/godwoken/blob/v1.0.0-rc1/docs/life_of_a_polyjuice_transaction.md#root-account--deployment).
+  * `chain_id` is defined in Godwoken [RollupConfig#chain_id](https://github.com/nervosnetwork/godwoken/blob/a099f2010b212355f5504a8d464b6b70d29640a5/crates/types/schemas/godwoken.mol#L64).
   * the block difficulty is always `2500000000000000`
   * the gas limit for each block is 12500000; it is not a transaction-level limit. Any transaction can reach the gas limit
   * the size limit for contract's return data is [`25600B`](https://github.com/nervosnetwork/godwoken-scripts/blob/31293d1/c/gw_def.h#L21-L22)

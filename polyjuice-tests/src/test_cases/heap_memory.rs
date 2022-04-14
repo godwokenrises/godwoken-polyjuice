@@ -34,10 +34,10 @@ fn test_heap_momory() {
         MEMORY_INIT_CODE,
         122000,
         0,
-        block_producer_id,
+        block_producer_id.clone(),
         block_number,
     );
-    let account_script = new_contract_account_script(&mut state, from_id, &from_eth_address, false);
+    let account_script = new_contract_account_script(&state, from_id, &from_eth_address, false);
     let contract_account_id = state
         .get_account_id_by_script_hash(&account_script.hash().into())
         .unwrap()
@@ -48,7 +48,7 @@ fn test_heap_momory() {
         let call_code = format!("4e688844{:064x}", 1024 * 15); // < 16 * 32 = 512
         println!("{}", call_code);
         block_number += 1;
-        let block_info = new_block_info(0, block_number, block_number);
+        let block_info = new_block_info(block_producer_id.clone(), block_number, block_number);
         let input = hex::decode(call_code).unwrap();
         let args = PolyjuiceArgsBuilder::default()
             .gas_limit(20000000)
@@ -74,7 +74,7 @@ fn test_heap_momory() {
             )
             .expect("success to malloc memory");
         // [newMemory less than 512K] used cycles: 752,115 -> 883611 (increase 17.48%) < 890K
-        helper::check_cycles("new Memory", run_result.used_cycles, 890_000);
+        helper::check_cycles("new Memory", run_result.used_cycles, 997_000);
         println!(
             "\t new byte(about {}K) => call result {:?}",
             16 * 32,
@@ -87,7 +87,7 @@ fn test_heap_momory() {
         let call_code = format!("4e688844{:064x}", 1024 * 16 + 1);
         println!("{}", call_code);
         block_number += 1;
-        let block_info = new_block_info(0, block_number, block_number);
+        let block_info = new_block_info(block_producer_id, block_number, block_number);
         let input = hex::decode(call_code).unwrap();
         let args = PolyjuiceArgsBuilder::default()
             .gas_limit(20000000)

@@ -54,7 +54,7 @@ impl<Mac: SupportMachine> Syscalls<Mac> for L2Syscalls {
                 })?;
                 machine
                     .memory_mut()
-                    .store_bytes(value_addr, &value.as_slice())?;
+                    .store_bytes(value_addr, value.as_slice())?;
                 machine.set_register(A0, Mac::REG::from_u8(SUCCESS));
                 Ok(true)
             }
@@ -131,7 +131,7 @@ fn test_contracts() {
         SECP_DATA.len()
     );
     let mut data = HashMap::default();
-    data.insert(SECP_DATA_HASH.clone(), Bytes::from(SECP_DATA.to_vec()));
+    data.insert(*SECP_DATA_HASH, Bytes::from(SECP_DATA.to_vec()));
     let mut tree = HashMap::default();
     tree.insert(build_data_hash_key(SECP_DATA_HASH.as_slice()), H256::one());
 

@@ -2,7 +2,7 @@
 //!   See ./evm-contracts/HeadTail.sol
 
 use crate::helper::{
-    self, deploy, new_block_info, new_contract_account_script, setup, PolyjuiceArgsBuilder,
+    self, deploy, new_block_info, setup, MockContractInfo, PolyjuiceArgsBuilder,
     CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
@@ -32,30 +32,30 @@ fn test_ecrecover() {
         INIT_CODE,
         122000,
         0,
-        block_producer_id,
+        block_producer_id.clone(),
         1,
     );
     // [Deploy HeadTail Contract] used cycles: 1645593 < 1650K
     helper::check_cycles(
         "Deploy HeadTail Contract",
         run_result.used_cycles,
-        1_650_000,
+        2_000_000,
     );
     // println!(
     //     "result {}",
     //     serde_json::to_string_pretty(&RunResult::from(run_result)).unwrap()
     // );
 
-    let contract_account_script =
-        new_contract_account_script(&mut state, from_id, &from_eth_address, false);
+    let contract_account = MockContractInfo::create(&from_eth_address, 0);
+    let contract_account_script_hash = contract_account.script_hash;
     let new_account_id = state
-        .get_account_id_by_script_hash(&contract_account_script.hash().into())
+        .get_account_id_by_script_hash(&contract_account_script_hash)
         .unwrap()
         .unwrap();
 
     {
         // verify|recover(bytes32 hash, bytes memory signature)
-        let block_info = new_block_info(0, 2, 0);
+        let block_info = new_block_info(block_producer_id, 2, 0);
         let hash = "8ab0890f028c9502cc20d441b4c4bb116f48ea632f522ac84e965d1dadf918e1";
         let signed_hash = "aaa99f644a5c4447314c5b7fcfac80deb186218aca1edaa63711aa75eb36585b47743901ce20f32768c7108bf85457ee0f16020f9bebc2bf456d6094c1c923c11c";
         let input = hex::decode(format!(
@@ -87,7 +87,7 @@ fn test_ecrecover() {
             )
             .expect("construct");
         // [recover] used cycles: 2604412 < 2660K
-        helper::check_cycles("verify|recover", run_result.used_cycles, 2_660_000);
+        helper::check_cycles("verify|recover", run_result.used_cycles, 2_960_000);
         state.apply_run_result(&run_result).expect("update state");
         assert_eq!(
             run_result.return_data,

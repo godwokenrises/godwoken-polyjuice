@@ -25,9 +25,8 @@ fn test_recover_account() {
     let block_producer_id = crate::helper::create_block_producer(&mut state);
 
     let from_eth_address = [1u8; 20];
-    let (from_id, from_script_hash) =
+    let (from_id, _from_script_hash) =
         helper::create_eth_eoa_account(&mut state, &from_eth_address, 200000);
-    let _fromt_short_script_hash = &from_script_hash[0..20];
 
     // Deploy RecoverAccount Contract
     let run_result = deploy(
@@ -39,17 +38,17 @@ fn test_recover_account() {
         INIT_CODE,
         122000,
         0,
-        block_producer_id,
+        block_producer_id.clone(),
         0,
     );
     // Deploy RecoverAccount Contract used cycles = 690541 < 700K
     helper::check_cycles(
         "Deploy RecoverAccount Contract",
         run_result.used_cycles,
-        700_000,
+        970_000,
     );
     let contract_account_script =
-        new_contract_account_script(&mut state, from_id, &from_eth_address, false);
+        new_contract_account_script(&state, from_id, &from_eth_address, false);
     let new_account_id = state
         .get_account_id_by_script_hash(&contract_account_script.hash().into())
         .unwrap()
@@ -64,7 +63,7 @@ fn test_recover_account() {
     let signature_hex = "28aa0c394487edf2211f445c47fb5f4fb5e3023920f62124d309f5bdf70d95045a934f278cec717300a5417313d1cdc390e761e37c0964b940c0a6f07b7361ed01";
     {
         // RecoverAccount.recover(message, signature, code_hash);
-        let block_info = new_block_info(0, 2, 0);
+        let block_info = new_block_info(block_producer_id.clone(), 2, 0);
         let input = hex::decode(format!(
             "7d7b0255{}0000000000000000000000000000000000000000000000000000000000000060{}0000000000000000000000000000000000000000000000000000000000000041{}00000000000000000000000000000000000000000000000000000000000000",
             message_hex,
@@ -99,7 +98,7 @@ fn test_recover_account() {
         helper::check_cycles(
             "RecoverAccount.recover(message, signature, code_hash)",
             run_result.used_cycles,
-            670_000,
+            800_000,
         );
         state.apply_run_result(&run_result).expect("update state");
         let mut script_args = vec![0u8; 32 + 20];
@@ -119,7 +118,7 @@ fn test_recover_account() {
     let signature_hex = "22222222222222222222222222225f4fb5e3023920f62124d309f5bdf70d95045a934f278cec717300a5417313d1cdc390e761e37c0964b940c0a6f07b7361ed01";
     {
         // RecoverAccount.recover(message, signature, code_hash);
-        let block_info = new_block_info(0, 2, 0);
+        let block_info = new_block_info(block_producer_id.clone(), 2, 0);
         let input = hex::decode(format!(
             "7d7b0255{}0000000000000000000000000000000000000000000000000000000000000060{}0000000000000000000000000000000000000000000000000000000000000041{}00000000000000000000000000000000000000000000000000000000000000",
             message_hex,
@@ -159,7 +158,7 @@ fn test_recover_account() {
     let signature_hex = "28aa0c394487edf2211f445c47fb5f4fb5e3023920f62124d309f5bdf70d95045a934f278cec717300a5417313d1cdc390e761e37c0964b940c0a6f07b7361ed01";
     {
         // RecoverAccount.recover(message, signature, code_hash);
-        let block_info = new_block_info(0, 2, 0);
+        let block_info = new_block_info(block_producer_id, 2, 0);
         let input = hex::decode(format!(
             "7d7b0255{}0000000000000000000000000000000000000000000000000000000000000060{}0000000000000000000000000000000000000000000000000000000000000041{}00000000000000000000000000000000000000000000000000000000000000",
             message_hex,

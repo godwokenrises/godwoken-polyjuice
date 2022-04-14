@@ -2,7 +2,9 @@ use crate::helper::{
     self, build_eth_l2_script, new_block_info, setup, CKB_SUDT_ACCOUNT_ID,
     ETH_ADDRESS_REGISTRY_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
-use gw_common::state::State;
+use gw_common::{
+    builtins::ETH_REGISTRY_ACCOUNT_ID, registry_address::RegistryAddress, state::State,
+};
 use gw_generator::{error::TransactionError, traits::StateExt};
 use gw_store::{chain_view::ChainView, traits::chain_store::ChainStore};
 use gw_types::{packed::RawL2Transaction, prelude::*};
@@ -67,25 +69,26 @@ fn test_update_eth_addr_reg_by_contract() {
     let eth_eoa_address = [0xeeu8; 20];
     let eth_eoa_account_script = build_eth_l2_script(&eth_eoa_address);
     let eth_eoa_account_script_hash = eth_eoa_account_script.hash();
+    // let reg_addr = RegistryAddress::new(ETH_REGISTRY_ACCOUNT_ID, eth_eoa_address.to_vec());
+    // state
+    // // .mapping_registry_address_to_script_hash(reg_addr, eth_eoa_account_script_hash.into())
+    // .expect("map reg addr to script hash");
     let eth_eoa_account_id = state
         .create_account_from_script(eth_eoa_account_script)
         .unwrap();
+    let address = RegistryAddress::new(ETH_REGISTRY_ACCOUNT_ID, eth_eoa_address.to_vec());
     assert_eq!(
         state
-            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &eth_eoa_account_script_hash[..20])
+            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &address)
             .unwrap(),
         0u128
     );
     state /* mint CKB to pay fee */
-        .mint_sudt(
-            CKB_SUDT_ACCOUNT_ID,
-            &eth_eoa_account_script_hash[..20],
-            52000,
-        )
+        .mint_sudt(CKB_SUDT_ACCOUNT_ID, &address, 52000)
         .unwrap();
     assert_eq!(
         state
-            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &eth_eoa_account_script_hash[..20])
+            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &address)
             .unwrap(),
         52000u128
     );
@@ -96,7 +99,7 @@ fn test_update_eth_addr_reg_by_contract() {
         &mut state,
         &generator,
         eth_eoa_account_id,
-        new_block_info(block_producer_id, 1, 1),
+        new_block_info(block_producer_id.clone(), 1, 1),
         crate::helper::SetMappingArgs::One(eth_eoa_account_script_hash.into()),
     )
     .expect("execute the MSG_SET_MAPPING method of `ETH Address Registry` layer2 contract");
@@ -107,7 +110,7 @@ fn test_update_eth_addr_reg_by_contract() {
     assert_eq!(
         // make sure the fee was paid
         state
-            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &eth_eoa_account_script_hash[..20])
+            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &address)
             .unwrap(),
         51000u128
     );
@@ -118,14 +121,14 @@ fn test_update_eth_addr_reg_by_contract() {
         &mut state,
         &generator,
         eth_eoa_account_id,
-        new_block_info(block_producer_id, 2, 2),
+        new_block_info(block_producer_id.clone(), 2, 2),
         crate::helper::SetMappingArgs::One(eth_eoa_account_script_hash.into()),
     )
     .expect_err("try to register the same account again");
     assert_eq!(
         run_err,
-        TransactionError::InvalidExitCode(-92),
-        "ERROR_ETH_ADDRESS_REGISTRY_DUPLICATE"
+        TransactionError::InvalidExitCode(101),
+        "GW_REGISTRY_ERROR_DUPLICATE_MAPPING"
     );
 
     // check result: eth_address -> gw_script_hash
@@ -144,7 +147,7 @@ fn test_update_eth_addr_reg_by_contract() {
         .execute_transaction(
             &ChainView::new(&db, tip_block_hash),
             &state,
-            &new_block_info(block_producer_id, 3, 3),
+            &new_block_info(block_producer_id.clone(), 3, 3),
             &raw_l2tx,
             L2TX_MAX_CYCLES,
             None,
@@ -164,7 +167,7 @@ fn test_update_eth_addr_reg_by_contract() {
         .build();
     let db = store.begin_transaction();
     let tip_block_hash = db.get_tip_block_hash().unwrap();
-    let block_info = new_block_info(block_producer_id, 3, 0);
+    let block_info = new_block_info(block_producer_id.clone(), 3, 0);
     let run_result = generator
         .execute_transaction(
             &ChainView::new(&db, tip_block_hash),
@@ -212,19 +215,20 @@ fn test_batch_set_mapping_by_contract() {
         let account_script_hash = account_script.hash();
         eth_eoa_script_hashes.push(account_script_hash.into());
         state.create_account_from_script(account_script).unwrap();
+        let address = RegistryAddress::new(ETH_REGISTRY_ACCOUNT_ID, address.to_vec());
 
         assert_eq!(
             state
-                .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &account_script_hash[..20])
+                .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &address)
                 .unwrap(),
             0u128
         );
         state /* mint CKB to pay fee */
-            .mint_sudt(CKB_SUDT_ACCOUNT_ID, &account_script_hash[..20], 200000)
+            .mint_sudt(CKB_SUDT_ACCOUNT_ID, &address, 200000)
             .unwrap();
         assert_eq!(
             state
-                .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &account_script_hash[..20])
+                .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &address)
                 .unwrap(),
             200000u128
         );
@@ -236,7 +240,7 @@ fn test_batch_set_mapping_by_contract() {
         &mut state,
         &generator,
         from_id,
-        new_block_info(block_producer_id, 1, 1),
+        new_block_info(block_producer_id.clone(), 1, 1),
         crate::helper::SetMappingArgs::Batch(eth_eoa_script_hashes.clone()),
     )
     .expect("eth address registered");
@@ -264,7 +268,7 @@ fn test_batch_set_mapping_by_contract() {
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
                 &state,
-                &new_block_info(block_producer_id, 3, 3),
+                &new_block_info(block_producer_id.clone(), 3, 3),
                 &raw_l2tx,
                 L2TX_MAX_CYCLES,
                 None,
@@ -288,7 +292,7 @@ fn test_batch_set_mapping_by_contract() {
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
                 &state,
-                &new_block_info(block_producer_id, 3, 3),
+                &new_block_info(block_producer_id.clone(), 3, 3),
                 &raw_l2tx,
                 L2TX_MAX_CYCLES,
                 None,

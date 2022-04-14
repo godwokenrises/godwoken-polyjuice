@@ -2,7 +2,7 @@
 //!   See ./evm-contracts/ERC20.bin
 
 use crate::helper::{
-    self, deploy, eth_addr_to_ethabi_addr, new_block_info, new_contract_account_script, setup,
+    self, deploy, eth_addr_to_ethabi_addr, new_block_info, setup, MockContractInfo,
     PolyjuiceArgsBuilder, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
@@ -40,16 +40,15 @@ fn test_erc20() {
         INIT_CODE,
         122000,
         0,
-        block_producer_id,
+        block_producer_id.clone(),
         1,
     );
     // [Deploy ERC20] used cycles: 1018075 < 1020K
-    helper::check_cycles("Deploy ERC20", run_result.used_cycles, 1_020_000);
+    helper::check_cycles("Deploy ERC20", run_result.used_cycles, 1_400_000);
 
-    let erc20_contract_script =
-        new_contract_account_script(&state, from_id1, &from_eth_address1, false);
+    let erc20_contract = MockContractInfo::create(&from_eth_address1, 0);
     let erc20_contract_id = state
-        .get_account_id_by_script_hash(&erc20_contract_script.hash().into())
+        .get_account_id_by_script_hash(&erc20_contract.script_hash)
         .unwrap()
         .unwrap();
     let eoa1_hex = hex::encode(eth_addr_to_ethabi_addr(&from_eth_address1));
@@ -133,7 +132,7 @@ fn test_erc20() {
     .enumerate()
     {
         let block_number = 2 + idx as u64;
-        let block_info = new_block_info(0, block_number, block_number);
+        let block_info = new_block_info(block_producer_id.clone(), block_number, block_number);
         println!(">> [input]: {}", args_str);
         let input = hex::decode(args_str).unwrap();
         let args = PolyjuiceArgsBuilder::default()
@@ -158,9 +157,9 @@ fn test_erc20() {
                 L2TX_MAX_CYCLES,
                 None,
             )
-            .expect(&operation);
+            .expect(operation);
         // [ERC20 contract method_x] used cycles: 942107 < 960K
-        helper::check_cycles("ERC20 contract method_x", run_result.used_cycles, 960_000);
+        helper::check_cycles("ERC20 contract method_x", run_result.used_cycles, 1_400_000);
         state.apply_run_result(&run_result).expect("update state");
         assert_eq!(
             run_result.return_data,

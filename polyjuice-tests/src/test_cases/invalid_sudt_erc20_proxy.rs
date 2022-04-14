@@ -5,7 +5,7 @@ use crate::helper::{
     self, build_l2_sudt_script, deploy, eth_addr_to_ethabi_addr, new_block_info,
     new_contract_account_script, setup, PolyjuiceArgsBuilder, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
-use gw_common::state::State;
+use gw_common::{builtins::ETH_REGISTRY_ACCOUNT_ID, state::State};
 use gw_generator::{error::TransactionError, traits::StateExt};
 use gw_store::chain_view::ChainView;
 use gw_store::traits::chain_store::ChainStore;
@@ -25,10 +25,18 @@ fn test_invalid_sudt_erc20_proxy() {
     let from_eth_address1 = [1u8; 20];
     let (from_id1, from_script_hash1) =
         helper::create_eth_eoa_account(&mut state, &from_eth_address1, 2000000);
+    let address1 = state
+        .get_registry_address_by_script_hash(ETH_REGISTRY_ACCOUNT_ID, &from_script_hash1.into())
+        .unwrap()
+        .unwrap();
 
     let from_eth_address2 = [2u8; 20];
     let (_from_id2, from_script_hash2) =
         helper::create_eth_eoa_account(&mut state, &from_eth_address2, 2000000);
+    let address2 = state
+        .get_registry_address_by_script_hash(ETH_REGISTRY_ACCOUNT_ID, &from_script_hash2.into())
+        .unwrap()
+        .unwrap();
 
     let from_eth_address3 = [3u8; 20];
     let (_from_id3, _from_script_hash3) =
@@ -49,14 +57,14 @@ fn test_invalid_sudt_erc20_proxy() {
         init_code.as_str(),
         122000,
         0,
-        block_producer_id,
+        block_producer_id.clone(),
         block_number,
     );
     // [Deploy InvalidSudtERC20Proxy] used cycles: 1457382 < 1460K
     helper::check_cycles(
         "Deploy InvalidSudtERC20Proxy",
         run_result.used_cycles,
-        1_460_000,
+        1_760_000,
     );
     let contract_account_script =
         new_contract_account_script(&state, from_id1, &from_eth_address1, false);
@@ -69,31 +77,15 @@ fn test_invalid_sudt_erc20_proxy() {
     let eoa2_hex = hex::encode(eth_addr_to_ethabi_addr(&from_eth_address2));
 
     state
-        .mint_sudt(
-            new_sudt_id,
-            &from_script_hash1[0..20],
-            160000000000000000000000000000u128,
-        )
+        .mint_sudt(new_sudt_id, &address1, 160000000000000000000000000000u128)
         .unwrap();
 
     assert_eq!(
-        state
-            .get_sudt_balance(new_sudt_id, &from_script_hash1[0..20])
-            .unwrap(),
+        state.get_sudt_balance(new_sudt_id, &address1).unwrap(),
         160000000000000000000000000000u128
     );
-    assert_eq!(
-        state
-            .get_sudt_balance(new_sudt_id, &from_script_hash2[0..20])
-            .unwrap(),
-        0
-    );
-    assert_eq!(
-        state
-            .get_sudt_balance(new_sudt_id, &from_script_hash2[0..20])
-            .unwrap(),
-        0
-    );
+    assert_eq!(state.get_sudt_balance(new_sudt_id, &address2).unwrap(), 0);
+    assert_eq!(state.get_sudt_balance(new_sudt_id, &address2).unwrap(), 0);
     for (_idx, (from_id, args_str, success, return_data_str)) in [
         // balanceOf(eoa1)
         (
@@ -124,7 +116,7 @@ fn test_invalid_sudt_erc20_proxy() {
     .enumerate()
     {
         block_number += 1;
-        let block_info = new_block_info(0, block_number, block_number);
+        let block_info = new_block_info(block_producer_id.clone(), block_number, block_number);
         println!(">> [input]: {}", args_str);
         let input = hex::decode(args_str).unwrap();
         let args = PolyjuiceArgsBuilder::default()
@@ -155,7 +147,7 @@ fn test_invalid_sudt_erc20_proxy() {
             helper::check_cycles(
                 "ERC20.{balanceOf|transfer}",
                 run_result.used_cycles,
-                870_000,
+                1_011_000,
             );
             state.apply_run_result(&run_result).expect("update state");
             assert_eq!(

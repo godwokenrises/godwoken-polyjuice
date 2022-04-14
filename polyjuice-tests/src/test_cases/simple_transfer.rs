@@ -6,7 +6,9 @@ use crate::helper::{
     simple_storage_get, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, CREATOR_ACCOUNT_ID,
     L2TX_MAX_CYCLES,
 };
-use gw_common::state::State;
+use gw_common::{
+    builtins::ETH_REGISTRY_ACCOUNT_ID, registry_address::RegistryAddress, state::State,
+};
 use gw_generator::traits::StateExt;
 use gw_store::chain_view::ChainView;
 use gw_store::traits::chain_store::ChainStore;
@@ -23,23 +25,21 @@ fn test_simple_transfer() {
 
     let mint_balance: u128 = 400000;
     let from_eth_address = [1u8; 20];
-    let (from_id, from_script_hash) =
+    let (from_id, _from_script_hash) =
         helper::create_eth_eoa_account(&mut state, &from_eth_address, mint_balance);
+    let from_addr = RegistryAddress::new(ETH_REGISTRY_ACCOUNT_ID, from_eth_address.to_vec());
 
     let target_eth_addr = [2u8; 20];
-    let (target_id, target_script_hash) =
+    let (target_id, _target_script_hash) =
         helper::create_eth_eoa_account(&mut state, &target_eth_addr, 0);
-    let target_short_script_hash = &target_script_hash[0..20];
+    let target_reg_addr = RegistryAddress::new(ETH_REGISTRY_ACCOUNT_ID, target_eth_addr.to_vec());
 
     let from_balance = state
-        .get_sudt_balance(
-            CKB_SUDT_ACCOUNT_ID,
-            from_script_hash[..20].try_into().unwrap(),
-        )
+        .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &from_addr)
         .unwrap();
     assert_eq!(from_balance, mint_balance);
     let target_balance = state
-        .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, target_short_script_hash)
+        .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &target_reg_addr)
         .unwrap();
     assert_eq!(target_balance, 0);
 
@@ -54,7 +54,7 @@ fn test_simple_transfer() {
         SS_INIT_CODE,
         50000,
         0,
-        block_producer_id,
+        block_producer_id.clone(),
         block_number,
     );
     block_number += 1;
@@ -62,20 +62,22 @@ fn test_simple_transfer() {
     //     "result {}",
     //     serde_json::to_string_pretty(&RunResult::from(run_result)).unwrap()
     // );
-    let ss_account_script =
-        new_contract_account_script(&mut state, from_id, &from_eth_address, false);
+    let ss_account_script = new_contract_account_script(&state, from_id, &from_eth_address, false);
     let ss_script_hash = ss_account_script.hash();
     let simple_storage_contract_addr: [u8; 20] = ss_account_script.args().raw_data().as_ref()
         [36..56]
         .try_into()
         .unwrap();
-    let ss_short_address = &ss_script_hash[0..20];
+    let ss_reg_addr = state
+        .get_registry_address_by_script_hash(ETH_REGISTRY_ACCOUNT_ID, &ss_script_hash.into())
+        .unwrap()
+        .unwrap();
     let ss_account_id = state
         .get_account_id_by_script_hash(&ss_account_script.hash().into())
         .unwrap()
         .unwrap();
     let ss_balance = state
-        .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, ss_short_address)
+        .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &ss_reg_addr)
         .unwrap();
     assert_eq!(ss_balance, 0);
     let run_result = simple_storage_get(
@@ -103,22 +105,28 @@ fn test_simple_transfer() {
         INIT_CODE,
         50000,
         deploy_value,
-        block_producer_id,
+        block_producer_id.clone(),
         block_number,
     );
     // [Deploy SimpleTransfer] used cycles: 491894 -> 500005 < 501K
-    helper::check_cycles("Deploy SimpleTransfer", run_result.used_cycles, 501_000);
+    helper::check_cycles("Deploy SimpleTransfer", run_result.used_cycles, 612_000);
 
     let st_contract_account_script =
-        new_contract_account_script(&mut state, from_id, &from_eth_address, false);
+        new_contract_account_script(&state, from_id, &from_eth_address, false);
     let st_contract_script_hash = st_contract_account_script.hash();
-    let st_contract_short_script_hash = &st_contract_script_hash[0..20];
+    let st_contract_reg_addr = state
+        .get_registry_address_by_script_hash(
+            ETH_REGISTRY_ACCOUNT_ID,
+            &st_contract_script_hash.into(),
+        )
+        .unwrap()
+        .unwrap();
     let st_contract_id = state
         .get_account_id_by_script_hash(&st_contract_account_script.hash().into())
         .unwrap()
         .unwrap();
     let st_contract_balance = state
-        .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, st_contract_short_script_hash)
+        .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &st_contract_reg_addr)
         .unwrap();
     assert_eq!(st_contract_balance, deploy_value);
 
@@ -132,9 +140,9 @@ fn test_simple_transfer() {
         // SimpleTransfer.transferTo();
         block_number += 1;
         let old_balance = state
-            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, st_contract_short_script_hash)
+            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &st_contract_reg_addr)
             .unwrap();
-        let block_info = new_block_info(block_producer_id, block_number, block_number);
+        let block_info = new_block_info(block_producer_id.clone(), block_number, block_number);
         let input = hex::decode(format!(
             "a03fa7e3{}",
             hex::encode(eth_addr_to_ethabi_addr(&target_eth_addr)),
@@ -164,15 +172,15 @@ fn test_simple_transfer() {
             )
             .expect("construct");
         // [SimpleTransfer to EoA] used cycles: 725217 < 736K
-        helper::check_cycles("SimpleTransfer to EoA", run_result.used_cycles, 736_000);
+        helper::check_cycles("SimpleTransfer to EoA", run_result.used_cycles, 908_000);
         state.apply_run_result(&run_result).expect("update state");
 
         let new_balance = state
-            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, st_contract_short_script_hash)
+            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &st_contract_reg_addr)
             .unwrap();
         assert_eq!(new_balance, old_balance - 1);
         let target_balance = state
-            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, target_short_script_hash)
+            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &target_reg_addr)
             .unwrap();
         assert_eq!(target_balance, 1);
     }
@@ -234,9 +242,9 @@ fn test_simple_transfer() {
     {
         // SimpleTransfer.transferToSimpleStorage1();
         let old_balance = state
-            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, st_contract_short_script_hash)
+            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &st_contract_reg_addr)
             .unwrap();
-        let block_info = new_block_info(0, block_number, block_number);
+        let block_info = new_block_info(block_producer_id.clone(), block_number, block_number);
 
         let input = hex::decode(format!(
             "f10c7360{}",
@@ -270,16 +278,16 @@ fn test_simple_transfer() {
         helper::check_cycles(
             "SimpleTransfer.transferToSimpleStorage1()",
             run_result.used_cycles,
-            1_210_000,
+            1_480_000,
         );
         state.apply_run_result(&run_result).expect("update state");
 
         let new_balance = state
-            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, st_contract_short_script_hash)
+            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &st_contract_reg_addr)
             .unwrap();
         assert_eq!(new_balance, old_balance - 1);
         let ss_balance = state
-            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, ss_short_address)
+            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &ss_reg_addr)
             .unwrap();
         assert_eq!(ss_balance, 1);
         println!("================");
@@ -300,9 +308,9 @@ fn test_simple_transfer() {
     {
         // SimpleTransfer.transferToSimpleStorage2();
         let old_balance = state
-            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, st_contract_short_script_hash)
+            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &st_contract_reg_addr)
             .unwrap();
-        let block_info = new_block_info(0, block_number, block_number);
+        let block_info = new_block_info(block_producer_id, block_number, block_number);
         let input = hex::decode(format!(
             "2a5eb963{}",
             hex::encode(eth_addr_to_ethabi_addr(&simple_storage_contract_addr)),
@@ -334,11 +342,11 @@ fn test_simple_transfer() {
         state.apply_run_result(&run_result).expect("update state");
 
         let new_balance = state
-            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, st_contract_short_script_hash)
+            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &st_contract_reg_addr)
             .unwrap();
         assert_eq!(new_balance, old_balance - 1);
         let ss_balance = state
-            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, ss_short_address)
+            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &ss_reg_addr)
             .unwrap();
         assert_eq!(ss_balance, 2);
         let run_result = simple_storage_get(

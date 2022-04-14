@@ -33,12 +33,12 @@ fn test_recursion_contract_call() {
         RECURSION_INIT_CODE,
         122000,
         0,
-        block_producer_id,
+        block_producer_id.clone(),
         block_number,
     );
     block_number += 1;
     let recur_account_script =
-        new_contract_account_script(&mut state, from_id, &from_eth_address, false);
+        new_contract_account_script(&state, from_id, &from_eth_address, false);
     let recur_account_id = state
         .get_account_id_by_script_hash(&recur_account_script.hash().into())
         .unwrap()
@@ -46,7 +46,7 @@ fn test_recursion_contract_call() {
 
     {
         // Call Sum(31), 31 < max_depth=32
-        let block_info = new_block_info(0, block_number, block_number);
+        let block_info = new_block_info(block_producer_id.clone(), block_number, block_number);
         let input =
             hex::decode("188b85b4000000000000000000000000000000000000000000000000000000000000001f")
                 .unwrap();
@@ -116,7 +116,7 @@ fn test_recursion_contract_call() {
     {
         // Case: out of gas and revert
         block_number += 1;
-        let block_info = new_block_info(0, block_number, block_number);
+        let block_info = new_block_info(block_producer_id.clone(), block_number, block_number);
         let input =
             hex::decode("188b85b40000000000000000000000000000000000000000000000000000000000000020")
                 .unwrap();
@@ -149,7 +149,7 @@ fn test_recursion_contract_call() {
     {
         // Case: out of gas and no revert
         block_number += 1;
-        let block_info = new_block_info(0, block_number, block_number);
+        let block_info = new_block_info(block_producer_id, block_number, block_number);
         let input =
             hex::decode("188b85b40000000000000000000000000000000000000000000000000000000000000020")
                 .unwrap();

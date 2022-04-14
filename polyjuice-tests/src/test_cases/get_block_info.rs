@@ -24,7 +24,7 @@ const INIT_CODE: &str = include_str!("./evm-contracts/BlockInfo.bin");
 #[test]
 fn test_get_block_info() {
     let (store, mut state, generator) = setup();
-
+    let block_producer = crate::helper::create_block_producer(&mut state);
     {
         let genesis_number: Uint64 = 0.pack();
         // See: BlockInfo.sol
@@ -35,24 +35,19 @@ fn test_get_block_info() {
         tx.commit().unwrap();
         println!("block_hash(0): {:?}", tx.get_block_hash_by_number(0));
     }
+    let coinbase_hex = hex::encode(eth_addr_to_ethabi_addr(
+        &block_producer.address.clone().try_into().unwrap(),
+    ));
+    println!("coinbase_hex: 0x{}", coinbase_hex);
 
     let from_eth_address = [1u8; 20];
     let (from_id, _from_script_hash) =
         crate::helper::create_eth_eoa_account(&mut state, &from_eth_address, 400000);
 
-    let aggregator_eth_addr: [u8; 20] = hex::decode("a1ad227Ad369f593B5f3d0Cc934A681a50811CB2")
-        .unwrap()
-        .try_into()
-        .unwrap();
-    let (aggregator_id, _aggregator_script_hash) =
-        crate::helper::create_eth_eoa_account(&mut state, &aggregator_eth_addr, 0);
-    let coinbase_hex = hex::encode(eth_addr_to_ethabi_addr(&aggregator_eth_addr));
-    println!("coinbase_hex: {}", coinbase_hex);
-
     // Deploy BlockInfo
     let mut block_number = 0x05;
     let timestamp: u64 = 0xff33 * 1000;
-    let block_info = new_block_info(aggregator_id, block_number, timestamp);
+    let block_info = new_block_info(block_producer.clone(), block_number, timestamp);
     let input = hex::decode(INIT_CODE).unwrap();
     let args = PolyjuiceArgsBuilder::default()
         .do_create(true)
@@ -86,7 +81,7 @@ fn test_get_block_info() {
     // );
 
     let contract_account_script =
-        new_contract_account_script(&mut state, from_id, &from_eth_address, false);
+        new_contract_account_script(&state, from_id, &from_eth_address, false);
     let new_account_id = state
         .get_account_id_by_script_hash(&contract_account_script.hash().into())
         .unwrap()
@@ -123,7 +118,7 @@ fn test_get_block_info() {
     ]
     .iter()
     {
-        let block_info = new_block_info(aggregator_id, block_number + 1, timestamp + 1);
+        let block_info = new_block_info(block_producer.clone(), block_number + 1, timestamp + 1);
         let input = hex::decode(fn_sighash).unwrap();
         let args = PolyjuiceArgsBuilder::default()
             .gas_limit(21000)
@@ -147,7 +142,7 @@ fn test_get_block_info() {
                 L2TX_MAX_CYCLES,
                 None,
             )
-            .expect(&operation);
+            .expect(operation);
         assert_eq!(
             run_result.return_data,
             hex::decode(expected_return_data).unwrap(),
