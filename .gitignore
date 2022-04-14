@@ -54,7 +54,6 @@ build/
 target/
 integration-test/
 
-/.vscode/launch.json
 /.vscode/settings.json
 /.vscode/*.log
 .vscode/c_cpp_properties.json
