@@ -498,7 +498,7 @@ evmc_uint256be get_balance(struct evmc_host_context* context,
   ckb_debug("BEGIN get_balance");
   evmc_uint256be balance{};
 
-  gw_reg_addr_t addr = init_reg_addr(address->bytes);
+  gw_reg_addr_t addr = new_reg_addr(address->bytes);
 
   uint128_t value_u128 = 0;
   int ret = sudt_get_balance(context->gw_ctx,
@@ -523,10 +523,7 @@ evmc_uint256be get_balance(struct evmc_host_context* context,
 void selfdestruct(struct evmc_host_context* context,
                   const evmc_address* address,
                   const evmc_address* beneficiary) {
-  gw_reg_addr_t from_addr = {0};
-  from_addr.reg_id = GW_DEFAULT_ETH_REGISTRY_ACCOUNT_ID;
-  memcpy(from_addr.addr, address->bytes, ETH_ADDRESS_LEN);
-  from_addr.addr_len = ETH_ADDRESS_LEN;
+  gw_reg_addr_t from_addr = new_reg_addr(address->bytes);
 
   uint128_t balance;
   int ret = sudt_get_balance(context->gw_ctx,
@@ -539,10 +536,7 @@ void selfdestruct(struct evmc_host_context* context,
   }
 
   if (balance > 0) {
-    gw_reg_addr_t to_addr = {0};
-    to_addr.reg_id = GW_DEFAULT_ETH_REGISTRY_ACCOUNT_ID;
-    memcpy(to_addr.addr, beneficiary->bytes, ETH_ADDRESS_LEN);
-    to_addr.addr_len = ETH_ADDRESS_LEN;
+    gw_reg_addr_t to_addr = new_reg_addr(beneficiary->bytes);
 
     ret = sudt_transfer(context->gw_ctx, g_sudt_id,
                         from_addr,
@@ -924,15 +918,8 @@ int handle_transfer(gw_context_t* ctx,
     return FATAL_POLYJUICE;
   }
 
-  gw_reg_addr_t from_addr = {0};
-  from_addr.reg_id = GW_DEFAULT_ETH_REGISTRY_ACCOUNT_ID;
-  memcpy(from_addr.addr, msg->sender.bytes, ETH_ADDRESS_LEN);
-  from_addr.addr_len = ETH_ADDRESS_LEN;
-
-  gw_reg_addr_t to_addr = {0};
-  to_addr.reg_id = GW_DEFAULT_ETH_REGISTRY_ACCOUNT_ID;
-  memcpy(to_addr.addr, msg->destination.bytes, ETH_ADDRESS_LEN);
-  to_addr.addr_len = ETH_ADDRESS_LEN;
+  gw_reg_addr_t from_addr = new_reg_addr(msg->sender.bytes);
+  gw_reg_addr_t to_addr = new_reg_addr(msg->destination.bytes);
 
   if (value_u128 == 0) {
     return 0;
@@ -1371,10 +1358,7 @@ int run_polyjuice() {
   memcpy(&used_memory, res.padding, sizeof(uint32_t));
   debug_print_int("[run_polyjuice] used_memory(Bytes)", used_memory);
 
-  gw_reg_addr_t sender_addr = {0};
-  sender_addr.reg_id = GW_DEFAULT_ETH_REGISTRY_ACCOUNT_ID;
-  sender_addr.addr_len = ETH_ADDRESS_LEN;
-  memcpy(sender_addr.addr, msg.sender.bytes, ETH_ADDRESS_LEN);
+  gw_reg_addr_t sender_addr = new_reg_addr(msg.sender.bytes);
 
   ret = sudt_pay_fee(&context,
                      g_sudt_id, /* g_sudt_id must already exists */

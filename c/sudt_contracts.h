@@ -58,7 +58,7 @@ int balance_of_any_sudt(gw_context_t* ctx, const uint8_t* code_data,
   }
   evmc_address address = *((evmc_address*)(input_src + 32 + 12));
 
-  gw_reg_addr_t addr = init_reg_addr(address.bytes);
+  gw_reg_addr_t addr = new_reg_addr(address.bytes);
   
   uint128_t balance;
   ret = sudt_get_balance(ctx, sudt_id, addr, &balance);
@@ -208,18 +208,10 @@ int transfer_to_any_sudt(gw_context_t* ctx, const uint8_t* code_data,
     return ERROR_TRANSFER_TO_ANY_SUDT;
   }
 
-  gw_reg_addr_t from_addr = {0};
-  from_addr.reg_id = GW_DEFAULT_ETH_REGISTRY_ACCOUNT_ID;
-  memcpy(from_addr.addr, input_src + 32 + 12, ETH_ADDRESS_LEN);
-  from_addr.addr_len = ETH_ADDRESS_LEN;
-
-  gw_reg_addr_t to_addr = {0};
-  to_addr.reg_id = GW_DEFAULT_ETH_REGISTRY_ACCOUNT_ID;
-  memcpy(to_addr.addr, input_src + 64 + 12, ETH_ADDRESS_LEN);
-  to_addr.addr_len = ETH_ADDRESS_LEN;
+  gw_reg_addr_t from_addr = new_reg_addr(input_src + 32 + 12);
+  gw_reg_addr_t to_addr = new_reg_addr(input_src + 64 + 12);
 
   ret = sudt_transfer(ctx, sudt_id, from_addr, to_addr, amount);
-
   if (ret != 0) {
     debug_print_int("[transfer_to_any_sudt] transfer failed", ret);
     if (is_fatal_error(ret)) {
@@ -228,6 +220,7 @@ int transfer_to_any_sudt(gw_context_t* ctx, const uint8_t* code_data,
       return ERROR_TRANSFER_TO_ANY_SUDT;
     }
   }
+
   *output = NULL;
   *output_size = 0;
   return 0;
