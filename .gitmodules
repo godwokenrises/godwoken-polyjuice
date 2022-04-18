@@ -27,5 +27,4 @@
 	url = https://github.com/mohanson/bn128.git
 [submodule "deps/godwoken-scripts"]
 	path = deps/godwoken-scripts
-	url = https://github.com/jjyr/godwoken-scripts.git
-	branch = refactor-sudt-with-registry-adress
+	url = https://github.com/nervosnetwork/godwoken-scripts.git

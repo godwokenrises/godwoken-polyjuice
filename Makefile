@@ -238,10 +238,12 @@ contract/sudt-erc20-proxy:
 # then echo "ERC20BIN_SHASUM matches" ; \
 # else echo "ERC20BIN_SHASUM does not match" ; exit 1 ; fi
 
+# fetch godwoken-scripts from godwoken-prebuilds image,
+# including meta-contract and sudt-contract
 fetch-gw-scripts:
 	mkdir -p build
 	docker run --rm -v `pwd`/build:/build-dir \
-	   	ghcr.io/magicalne/godwoken-prebuilds:refactor-registry-address-202204060742 \
+	   	ghcr.io/nervosnetwork/godwoken-prebuilds:v1.1 \
 		cp -r /scripts/godwoken-scripts /build-dir \
 		&& echo "Copy godwoken-scripts"
 

@@ -12,28 +12,19 @@ if [ -d "$GODWOKEN_DIR" ]
 then
     echo "godwoken project already exists"
 else
-    git clone -b refactor-sudt-with-registry-address https://github.com/jjyr/godwoken.git $GODWOKEN_DIR
+    git clone --depth=1 https://github.com/nervosnetwork/godwoken.git $GODWOKEN_DIR
 fi
 cd $GODWOKEN_DIR
-# git checkout 5ab0b782f0eb2d835705bf52475eeb874b203ed0 # https://github.com/nervosnetwork/godwoken/commits/5ab0b78
+# checkout https://github.com/nervosnetwork/godwoken/commits/d4cc2a
+git fetch origin d4cc2a8d6b6b20577ea6e6df1496eba191df6dc6
+git checkout FETCH_HEAD 
 git submodule update --init --recursive --depth=1
 
 cd $PROJECT_ROOT
 git submodule update --init --recursive --depth=1
 make all-via-docker
 
-# fetch godwoken-scripts from godwoken-prebuilds image,
-# including meta-contract and sudt-contract
-GW_SCRIPTS_DIR=$PROJECT_ROOT/build
-prebuild_image=ghcr.io/magicalne/godwoken-prebuilds:refactor-registry-address-202204060742
-docker pull $prebuild_image
-mkdir -p $GW_SCRIPTS_DIR && echo "Create dir"
-docker run --rm -v $GW_SCRIPTS_DIR:/build-dir \
-  $prebuild_image \
-  cp -r /scripts/godwoken-scripts /build-dir \
-  && echo "Copy godwoken-scripts"
-
 cd $TESTS_DIR
 export RUST_BACKTRACE=full
 cargo test -- --nocapture
-# cargo bench | egrep -v debug
+# TODO: cargo bench | egrep -v debug
