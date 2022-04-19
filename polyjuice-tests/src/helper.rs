@@ -1,10 +1,11 @@
+use gw_common::registry_address::RegistryAddress;
 pub use gw_common::{
     blake2b::new_blake2b,
     h256_ext::H256Ext,
     state::{build_data_hash_key, State},
     CKB_SUDT_SCRIPT_ARGS, H256,
 };
-use gw_common::{builtins::ETH_REGISTRY_ACCOUNT_ID, registry_address::RegistryAddress};
+
 use gw_config::{BackendConfig, BackendType};
 use gw_db::schema::{COLUMN_INDEX, COLUMN_META, META_TIP_BLOCK_HASH_KEY};
 use gw_generator::error::TransactionError;
@@ -36,10 +37,9 @@ use gw_types::{
 use rlp::RlpStream;
 use std::{convert::TryInto, fs, io::Read, path::PathBuf};
 
-pub use gw_common::builtins::{CKB_SUDT_ACCOUNT_ID, RESERVED_ACCOUNT_ID};
-pub const ETH_ADDRESS_REGISTRY_ACCOUNT_ID: u32 = 2;
+pub use gw_common::builtins::{CKB_SUDT_ACCOUNT_ID, ETH_REGISTRY_ACCOUNT_ID, RESERVED_ACCOUNT_ID};
 pub const CREATOR_ACCOUNT_ID: u32 = 3;
-pub const CHAIN_ID: u64 = 202203;
+pub const CHAIN_ID: u64 = 202204;
 
 pub const L2TX_MAX_CYCLES: u64 = 7000_0000;
 
@@ -403,12 +403,11 @@ pub fn setup() -> (Store, DummyState, Generator) {
     let eth_addr_reg_account_id = state
         .create_account_from_script(eth_addr_reg_script)
         .expect("create `ETH Address Registry` layer2 contract");
-    assert_eq!(eth_addr_reg_account_id, ETH_ADDRESS_REGISTRY_ACCOUNT_ID);
+    assert_eq!(eth_addr_reg_account_id, ETH_REGISTRY_ACCOUNT_ID);
 
-    let mut args = [0u8; 40];
+    let mut args = [0u8; 36];
     args[0..32].copy_from_slice(&ROLLUP_SCRIPT_HASH);
     args[32..36].copy_from_slice(&ckb_sudt_id.to_le_bytes()[..]);
-    args[36..40].copy_from_slice(&eth_addr_reg_account_id.to_le_bytes()[..]);
     let creator_script = Script::new_builder()
         .code_hash(POLYJUICE_PROGRAM_CODE_HASH.pack())
         .hash_type(ScriptHashType::Type.into())
@@ -808,7 +807,7 @@ pub(crate) fn eth_address_regiser(
 
     let raw_l2tx = RawL2Transaction::new_builder()
         .from_id(from_id.pack())
-        .to_id(ETH_ADDRESS_REGISTRY_ACCOUNT_ID.pack())
+        .to_id(ETH_REGISTRY_ACCOUNT_ID.pack())
         .args(args)
         .build();
     let db = store.begin_transaction();

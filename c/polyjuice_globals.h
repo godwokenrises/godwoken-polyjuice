@@ -11,7 +11,7 @@
 
 /** Polyjuice contract account (normal/create2) script args size */
 #define CONTRACT_ACCOUNT_SCRIPT_ARGS_LEN 56 /* 32 + 4 + 20 */
-#define CREATOR_SCRIPT_ARGS_LEN 40			/* 32 + 4 + 4  */
+#define CREATOR_SCRIPT_ARGS_LEN 36			/* 32 + 4 */
 
 static uint8_t g_rollup_script_hash[32] = {0};
 static uint32_t g_sudt_id = UINT32_MAX;

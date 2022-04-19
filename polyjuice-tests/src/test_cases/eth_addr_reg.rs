@@ -1,10 +1,8 @@
 use crate::helper::{
-    self, build_eth_l2_script, new_block_info, setup, CKB_SUDT_ACCOUNT_ID,
-    ETH_ADDRESS_REGISTRY_ACCOUNT_ID, L2TX_MAX_CYCLES,
+    self, build_eth_l2_script, new_block_info, setup, CKB_SUDT_ACCOUNT_ID, ETH_REGISTRY_ACCOUNT_ID,
+    L2TX_MAX_CYCLES,
 };
-use gw_common::{
-    builtins::ETH_REGISTRY_ACCOUNT_ID, registry_address::RegistryAddress, state::State,
-};
+use gw_common::{registry_address::RegistryAddress, state::State};
 use gw_generator::{error::TransactionError, traits::StateExt};
 use gw_store::{chain_view::ChainView, traits::chain_store::ChainStore};
 use gw_types::{packed::RawL2Transaction, prelude::*};
@@ -138,7 +136,7 @@ fn test_update_eth_addr_reg_by_contract() {
         .build();
     let raw_l2tx = RawL2Transaction::new_builder()
         .from_id(from_id.pack())
-        .to_id(ETH_ADDRESS_REGISTRY_ACCOUNT_ID.pack())
+        .to_id(ETH_REGISTRY_ACCOUNT_ID.pack())
         .args(args.pack())
         .build();
     let tip_block_hash = store.get_tip_block_hash().unwrap();
@@ -162,7 +160,7 @@ fn test_update_eth_addr_reg_by_contract() {
         .build();
     let raw_l2tx = RawL2Transaction::new_builder()
         .from_id(from_id.pack())
-        .to_id(ETH_ADDRESS_REGISTRY_ACCOUNT_ID.pack())
+        .to_id(ETH_REGISTRY_ACCOUNT_ID.pack())
         .args(args.pack())
         .build();
     let db = store.begin_transaction();
@@ -259,7 +257,7 @@ fn test_batch_set_mapping_by_contract() {
             .build();
         let raw_l2tx = RawL2Transaction::new_builder()
             .from_id(from_id.pack())
-            .to_id(ETH_ADDRESS_REGISTRY_ACCOUNT_ID.pack())
+            .to_id(ETH_REGISTRY_ACCOUNT_ID.pack())
             .args(args.pack())
             .build();
         let tip_block_hash = store.get_tip_block_hash().unwrap();
@@ -283,7 +281,7 @@ fn test_batch_set_mapping_by_contract() {
             .build();
         let raw_l2tx = RawL2Transaction::new_builder()
             .from_id(from_id.pack())
-            .to_id(ETH_ADDRESS_REGISTRY_ACCOUNT_ID.pack())
+            .to_id(ETH_REGISTRY_ACCOUNT_ID.pack())
             .args(args.pack())
             .build();
         let db = store.begin_transaction();
