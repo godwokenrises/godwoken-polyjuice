@@ -52,5 +52,5 @@ jobs:
     with:
       # github.ref: The branch or tag ref that triggered the workflow run. For branches this is the format refs/heads/<branch_name>, and for tags it is refs/tags/<tag_name>.
       polyjuice_ref: ${{ github.ref }}
-      kicker_ref: refs/pull/226/head # https://github.com/RetricSu/godwoken-kicker/pull/226
+      kicker_ref: refs/pull/235/head # https://github.com/RetricSu/godwoken-kicker/pull/235
       tests_ref: develop  # https://github.com/nervosnetwork/godwoken-tests/commits/develop
