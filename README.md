@@ -2,7 +2,7 @@
 # Godwoken Polyjuice
 An Ethereum compatible backend for [Godwoken](https://github.com/nervosnetwork/godwoken) (a generic optimistic rollup framework). It includes [generator](./c/generator.c) and [validator](./c/validator.c) implementations.
 
-Polyjuice provides an [Ethereum](https://ethereum.org/en/) compatible layer on [Nervos CKB](https://github.com/nervosnetwork/ckb). It leverages account model as well as scalability provided by [Godwoken](https://github.com/nervosnetwork/godwoken/blob/v1.0.0-rc1/docs/life_of_a_godwoken_transaction.md), then integrates [evmone](https://github.com/ethereum/evmone) as an EVM engine for running Ethereum smart contracts.
+Polyjuice provides an [Ethereum](https://ethereum.org/en/) compatible layer on [Nervos CKB](https://github.com/nervosnetwork/ckb). It leverages account model as well as scalability provided by [Godwoken](https://github.com/nervosnetwork/godwoken/blob/develop/docs/life_of_a_godwoken_transaction.md), then integrates [evmone](https://github.com/ethereum/evmone) as an EVM engine for running Ethereum smart contracts.
 
 Polyjuice aims at 100% EVM compatibility as a goal, meaning we plan to support all smart contracts supported by the latest Ethereum hardfork version. See [EVM-compatible.md](docs/EVM-compatible.md) and [Addition-Features.md](docs/Addition-Features.md) for more details.
 
@@ -87,14 +87,9 @@ info_data:
 ### Address used in Polyjuice
 In the latest version of Polyjuice, the [EOA](https://ethereum.org/en/glossary/#eoa) address is native `eth_address`, which is the rightmost 160 bits of a Keccak hash of an ECDSA public key. While the address for an Polyjuice contract is deterministically computed from the address of its creator (sender) and how many transactions the creator has sent (nonce). The sender and nonce are RLP encoded and then hashed with Keccak-256.
 
-> In the previous version of Polyjuice, all the addresses are `short_godwoken_account_script_hash`, which is:
-```rust
-short_godwoken_account_script_hash = blake2b(script.as_slice())[0..20]
-```
 
-
-[rawl2tx-args]: https://github.com/nervosnetwork/godwoken/blob/9a3d921/crates/types/schemas/godwoken.mol#L60
-[meta-contract]: https://github.com/nervosnetwork/godwoken-scripts/blob/86b299f/c/contracts/meta_contract.c
+[rawl2tx-args]: https://github.com/nervosnetwork/godwoken/blob/develop/crates/types/schemas/godwoken.mol#L60
+[meta-contract]: https://github.com/nervosnetwork/godwoken-scripts/blob/master/c/contracts/meta_contract.c
 
 ## More docs
 * [EVM compatible](docs/EVM-compatible.md)
