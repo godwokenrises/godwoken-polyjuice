@@ -309,11 +309,6 @@ struct evmc_tx_context get_tx_context(struct evmc_host_context* context) {
   /* gas price = 1 */
   ctx.tx_gas_price.bytes[31] = 0x01;
 
-  gw_reg_addr_t *block_producer = &context->gw_ctx->block_info.block_producer;
-  debug_print_data("load block_coinbase address:",
-                   block_producer->addr, ETH_ADDRESS_LEN);
-  memcpy(ctx.block_coinbase.bytes, block_producer->addr, ETH_ADDRESS_LEN);
-
   ctx.block_number = context->gw_ctx->block_info.number;
   /*
     block_timestamp      => second
@@ -338,6 +333,19 @@ struct evmc_tx_context get_tx_context(struct evmc_host_context* context) {
   ctx.chain_id.bytes[26] = chain_id_ptr[5];
   ctx.chain_id.bytes[25] = chain_id_ptr[6];
   ctx.chain_id.bytes[24] = chain_id_ptr[7];
+
+  /* block_coinbase */
+  gw_reg_addr_t *block_producer = &context->gw_ctx->block_info.block_producer;
+  if (block_producer->reg_id != GW_DEFAULT_ETH_REGISTRY_ACCOUNT_ID
+   || block_producer->addr_len != ETH_ADDRESS_LEN) {
+    ckb_debug("[get_tx_context] Error: block_producer is not an Ethereum EOA.");
+    ckb_debug("[get_tx_context] failed to load block_coinbase address");
+    context->error_code = GW_FATAL_INVALID_CONTEXT;
+  } else {
+    debug_print_data("load block_coinbase eth_address:",
+                     block_producer->addr, ETH_ADDRESS_LEN);
+    memcpy(ctx.block_coinbase.bytes, block_producer->addr, ETH_ADDRESS_LEN);
+  }
 
   return ctx;
 }
