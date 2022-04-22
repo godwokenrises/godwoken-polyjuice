@@ -2,8 +2,8 @@
 //!   See ./evm-contracts/FallbackFunction.sol
 
 use crate::helper::{
-    self, build_eth_l2_script, new_account_script, new_block_info, setup, simple_storage_get,
-    PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID, L2TX_MAX_CYCLES,
+    self, create_block_producer, new_block_info, setup, simple_storage_get, MockContractInfo,
+    PolyjuiceArgsBuilder, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
@@ -15,23 +15,16 @@ const INIT_CODE: &str = include_str!("./evm-contracts/FallbackFunction.bin");
 
 #[test]
 fn test_fallback_function() {
-    let (store, mut state, generator, creator_account_id) = setup();
-    let block_producer_script = build_eth_l2_script([0x99u8; 20]);
-    let _block_producer_id = state
-        .create_account_from_script(block_producer_script)
-        .unwrap();
+    let (store, mut state, generator) = setup();
+    let block_producer = create_block_producer(&mut state);
 
-    let from_script = build_eth_l2_script([1u8; 20]);
-    let from_script_hash = from_script.hash();
-    let from_short_address = &from_script_hash[0..20];
-    let from_id = state.create_account_from_script(from_script).unwrap();
-    state
-        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_short_address, 200000)
-        .unwrap();
+    let from_eth_address = [1u8; 20];
+    let (from_id, _from_script_hash) =
+        crate::helper::create_eth_eoa_account(&mut state, &from_eth_address, 200000);
 
     {
         // Deploy FallbackFunction Contract
-        let block_info = new_block_info(0, 1, 0);
+        let block_info = new_block_info(block_producer.clone(), 1, 0);
         let input = hex::decode(INIT_CODE).unwrap();
         let args = PolyjuiceArgsBuilder::default()
             .do_create(true)
@@ -42,7 +35,7 @@ fn test_fallback_function() {
             .build();
         let raw_tx = RawL2Transaction::new_builder()
             .from_id(from_id.pack())
-            .to_id(creator_account_id.pack())
+            .to_id(CREATOR_ACCOUNT_ID.pack())
             .args(Bytes::from(args).pack())
             .build();
         let db = store.begin_transaction();
@@ -54,17 +47,17 @@ fn test_fallback_function() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .expect("construct");
         // [Deploy FallbackFunction] used cycles: 587271 < 590K
-        helper::check_cycles("Deploy FallbackFunction", run_result.used_cycles, 590_000);
+        helper::check_cycles("Deploy FallbackFunction", run_result.used_cycles, 920_000);
         state.apply_run_result(&run_result).expect("update state");
     }
 
-    let contract_account_script =
-        new_account_script(&mut state, creator_account_id, from_id, false);
+    let contract_account = MockContractInfo::create(&from_eth_address, 0);
     let new_account_id = state
-        .get_account_id_by_script_hash(&contract_account_script.hash().into())
+        .get_account_id_by_script_hash(&contract_account.script_hash)
         .unwrap()
         .unwrap();
     let run_result = simple_storage_get(&store, &state, &generator, 0, from_id, new_account_id);
@@ -75,7 +68,7 @@ fn test_fallback_function() {
 
     {
         // Call fallback()
-        let block_info = new_block_info(0, 2, 0);
+        let block_info = new_block_info(block_producer, 2, 0);
         let input = hex::decode("3333").unwrap();
         let args = PolyjuiceArgsBuilder::default()
             .gas_limit(21000)
@@ -97,10 +90,11 @@ fn test_fallback_function() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .expect("construct");
         // [Call fallback()] used cycles: 514059 < 520K
-        helper::check_cycles("Call fallback()", run_result.used_cycles, 520_000);
+        helper::check_cycles("Call fallback()", run_result.used_cycles, 625_000);
         assert!(run_result.return_data.is_empty());
         state.apply_run_result(&run_result).expect("update state");
     }

@@ -1,6 +1,6 @@
 [package]
 name = "polyjuice-tests"
-version = "0.1.1"
+version = "1.1.0"
 authors = ["Linfeng Qian <thewawar@gmail.com>"]
 edition = "2018"
 
@@ -13,8 +13,7 @@ gw-db = { path = "../integration-test/godwoken/crates/db" }
 gw-store = { path = "../integration-test/godwoken/crates/store" }
 gw-config = { path = "../integration-test/godwoken/crates/config" }
 gw-traits = { path = "../integration-test/godwoken/crates/traits" }
-
-gw-generator = { path = "../integration-test/godwoken/crates/generator", features = ["aot"]}
+gw-generator = { path = "../integration-test/godwoken/crates/generator"}
 ckb-vm = { version = "=0.20.0-rc5", features = ["detect-asm"] }
 
 lazy_static = "1.4"

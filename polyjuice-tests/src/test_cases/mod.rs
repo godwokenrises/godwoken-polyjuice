@@ -1,3 +1,4 @@
+pub(crate) mod address;
 pub(crate) mod call_multiple_times;
 pub(crate) mod call_selfdestruct;
 pub(crate) mod contract_call_contract;
@@ -19,10 +20,11 @@ pub(crate) mod simple_wallet;
 pub(crate) mod account_already_exists;
 
 pub(crate) mod ecrecover;
-pub(crate) mod eth_to_godwoken_addr;
 pub(crate) mod pre_compiled_contracts;
 pub(crate) mod recover_account;
 pub(crate) mod rlp;
 //  Special pre-compiled contract to support transfer to any sudt
 pub(crate) mod invalid_sudt_erc20_proxy;
 pub(crate) mod sudt_erc20_proxy;
+
+mod eth_addr_reg;

@@ -2,8 +2,8 @@
 //!   See ./evm-contracts/CallContract.sol
 
 use crate::helper::{
-    self, build_eth_l2_script, contract_script_to_eth_address, deploy, new_account_script,
-    new_block_info, setup, simple_storage_get, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
+    self, create_eth_eoa_account, deploy, eth_addr_to_ethabi_addr, new_block_info, setup,
+    simple_storage_get, MockContractInfo, PolyjuiceArgsBuilder, CREATOR_ACCOUNT_ID,
     L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
@@ -18,74 +18,64 @@ const CALL_NON_EXISTS_INIT_CODE: &str = include_str!("./evm-contracts/CallNonExi
 
 #[test]
 fn test_contract_call_contract() {
-    let (store, mut state, generator, creator_account_id) = setup();
-    let block_producer_script = build_eth_l2_script([0x99u8; 20]);
-    let block_producer_id = state
-        .create_account_from_script(block_producer_script)
-        .unwrap();
+    let (store, mut state, generator) = setup();
+    let block_producer = helper::create_block_producer(&mut state);
 
-    let from_script = build_eth_l2_script([1u8; 20]);
-    let from_script_hash = from_script.hash();
-    let from_short_address = &from_script_hash[0..20];
-    let from_id = state.create_account_from_script(from_script).unwrap();
-    state
-        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_short_address, 200000)
-        .unwrap();
-    let mut block_number = 1;
+    let from_eth_address = [1u8; 20];
+    let (from_id, _from_script_hash) =
+        helper::create_eth_eoa_account(&mut state, &from_eth_address, 200000);
 
     // Deploy SimpleStorage
+    let mut block_number = 1;
     let _run_result = deploy(
         &generator,
         &store,
         &mut state,
-        creator_account_id,
+        CREATOR_ACCOUNT_ID,
         from_id,
         SS_INIT_CODE,
         122000,
         0,
-        block_producer_id,
+        block_producer.clone(),
         block_number,
     );
-    block_number += 1;
-    let ss_account_script = new_account_script(&mut state, creator_account_id, from_id, false);
+
+    let ss_account = MockContractInfo::create(&from_eth_address, 0);
+    let ss_eth_abi_addr = ss_account.eth_abi_addr;
+    let ss_script_hash = ss_account.script_hash;
     let ss_account_id = state
-        .get_account_id_by_script_hash(&ss_account_script.hash().into())
+        .get_account_id_by_script_hash(&ss_script_hash)
         .unwrap()
         .unwrap();
 
-    // Deploy CreateContract
-    let input = format!(
-        "{}{}",
-        INIT_CODE,
-        hex::encode(contract_script_to_eth_address(&ss_account_script, true)),
-    );
+    // Deploy CallContract
+    block_number += 1;
+    let input = format!("{}{}", INIT_CODE, hex::encode(&ss_eth_abi_addr));
     let run_result = deploy(
         &generator,
         &store,
         &mut state,
-        creator_account_id,
+        CREATOR_ACCOUNT_ID,
         from_id,
         input.as_str(),
         122000,
         0,
-        block_producer_id,
+        block_producer.clone(),
         block_number,
     );
-    block_number += 1;
-    // [Deploy CreateContract] used cycles: 600288 < 610K
-    helper::check_cycles("Deploy CreateContract", run_result.used_cycles, 610_000);
-
     // println!(
     //     "result {}",
     //     serde_json::to_string_pretty(&RunResult::from(run_result)).unwrap()
     // );
-    let contract_account_script =
-        new_account_script(&mut state, creator_account_id, from_id, false);
-    let new_account_id = state
-        .get_account_id_by_script_hash(&contract_account_script.hash().into())
+    // [Deploy CreateContract] used cycles: 600288 < 610K
+    helper::check_cycles("Deploy CreateContract", run_result.used_cycles, 880_000);
+    let cc_account = MockContractInfo::create(&from_eth_address, 1);
+    let cc_contract_id = state
+        .get_account_id_by_script_hash(&cc_account.script_hash)
         .unwrap()
         .unwrap();
 
+    block_number += 1;
     let run_result = simple_storage_get(
         &store,
         &state,
@@ -95,16 +85,17 @@ fn test_contract_call_contract() {
         ss_account_id,
     );
     assert_eq!(
-        run_result.return_data,
+        run_result.return_data, // default storedData = 123
         hex::decode("000000000000000000000000000000000000000000000000000000000000007b").unwrap()
     );
 
     {
-        // CallContract.proxySet(222); => SimpleStorage.set(x+3)
-        let block_info = new_block_info(0, block_number, block_number);
+        // CallContract.proxySet(222) => SimpleStorage.set(x+3)
+        block_number += 1;
+        let block_info = new_block_info(block_producer, block_number, block_number);
         let input =
             hex::decode("28cc7b2500000000000000000000000000000000000000000000000000000000000000de")
-                .unwrap();
+                .unwrap(); // 0xde = 222
         let args = PolyjuiceArgsBuilder::default()
             .gas_limit(51000)
             .gas_price(1)
@@ -113,7 +104,7 @@ fn test_contract_call_contract() {
             .build();
         let raw_tx = RawL2Transaction::new_builder()
             .from_id(from_id.pack())
-            .to_id(new_account_id.pack())
+            .to_id(cc_contract_id.pack())
             .args(Bytes::from(args).pack())
             .build();
         let db = store.begin_transaction();
@@ -125,11 +116,12 @@ fn test_contract_call_contract() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
-            .expect("construct");
+            .expect("CallContract.proxySet");
         state.apply_run_result(&run_result).expect("update state");
         // [CallContract.proxySet(222)] used cycles: 961599 -> 980564 < 981K
-        helper::check_cycles("CallContract.proxySet()", run_result.used_cycles, 981_000);
+        helper::check_cycles("CallContract.proxySet()", run_result.used_cycles, 1_170_000);
     }
 
     let run_result = simple_storage_get(
@@ -141,63 +133,58 @@ fn test_contract_call_contract() {
         ss_account_id,
     );
     assert_eq!(
-        run_result.return_data,
+        run_result.return_data, // 0xe1 = 225
         hex::decode("00000000000000000000000000000000000000000000000000000000000000e1").unwrap()
     );
 
     assert_eq!(state.get_nonce(from_id).unwrap(), 3);
     assert_eq!(state.get_nonce(ss_account_id).unwrap(), 0);
-    assert_eq!(state.get_nonce(new_account_id).unwrap(), 0);
+    assert_eq!(state.get_nonce(cc_contract_id).unwrap(), 0);
 }
 
 #[test]
 fn test_contract_call_non_exists_contract() {
-    let (store, mut state, generator, creator_account_id) = setup();
-    let block_producer_script = build_eth_l2_script([0x99u8; 20]);
-    let block_producer_id = state
-        .create_account_from_script(block_producer_script)
-        .unwrap();
+    let (store, mut state, generator) = setup();
+    let block_producer_id = helper::create_block_producer(&mut state);
 
-    let from_script = build_eth_l2_script([1u8; 20]);
-    let from_script_hash = from_script.hash();
-    let from_short_address = &from_script_hash[0..20];
-    let from_id = state.create_account_from_script(from_script).unwrap();
-    state
-        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_short_address, 200000)
-        .unwrap();
-    let block_number = 1;
+    let from_eth_address = [1u8; 20];
+    let (from_id, _from_script_hash) =
+        helper::create_eth_eoa_account(&mut state, &from_eth_address, 200000);
 
     // Deploy CallNonExistsContract
+    let block_number = 1;
     let run_result = deploy(
         &generator,
         &store,
         &mut state,
-        creator_account_id,
+        CREATOR_ACCOUNT_ID,
         from_id,
         CALL_NON_EXISTS_INIT_CODE,
         122000,
         0,
-        block_producer_id,
+        block_producer_id.clone(),
         block_number,
     );
     // [Deploy CallNonExistsContract] used cycles: 657243 < 670K
     helper::check_cycles(
         "Deploy CallNonExistsContract",
         run_result.used_cycles,
-        670_000,
+        950_000,
     );
 
-    let contract_account_script =
-        new_account_script(&mut state, creator_account_id, from_id, false);
-    let new_account_id = state
-        .get_account_id_by_script_hash(&contract_account_script.hash().into())
+    let contract = MockContractInfo::create(&from_eth_address, 0);
+    let contract_script_hash = contract.script_hash;
+    let contract_account_id = state
+        .get_account_id_by_script_hash(&contract_script_hash)
         .unwrap()
         .unwrap();
+    let block_info = new_block_info(block_producer_id, block_number, block_number);
     {
-        // Call CallNonExistsContract.rawCall(addr)
-        let block_info = new_block_info(0, block_number, block_number);
+        // Call CallNonExistsContract.rawCall(address addr)
+        /* abi.encodeWithSignature("rawCall") => 56c94e70
+        ethabi_addr: 000000000000000000000000ffffffffffffffffffffffffffffffffffffffff" */
         let input =
-            hex::decode("56c94e70000000000000000000000000000000000fffffffffffffffffffffffffffffff")
+            hex::decode("56c94e70000000000000000000000000ffffffffffffffffffffffffffffffffffffffff")
                 .unwrap();
         let args = PolyjuiceArgsBuilder::default()
             .gas_limit(51000)
@@ -207,11 +194,12 @@ fn test_contract_call_non_exists_contract() {
             .build();
         let raw_tx = RawL2Transaction::new_builder()
             .from_id(from_id.pack())
-            .to_id(new_account_id.pack())
+            .to_id(contract_account_id.pack())
             .args(Bytes::from(args).pack())
             .build();
         let db = store.begin_transaction();
         let tip_block_hash = db.get_tip_block_hash().unwrap();
+        // [contract debug]: [handle_message] Warn: Call non-exists address
         let run_result = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
@@ -219,15 +207,9 @@ fn test_contract_call_non_exists_contract() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
-            .expect("construct");
-        // [CallNonExistsContract.rawCall(addr)] used cycles: 862060 < 870K
-        helper::check_cycles(
-            "CallNonExistsContract.rawCall(addr)",
-            run_result.used_cycles,
-            870_000,
-        );
-
+            .expect("non_existing_account_address => success with '0x' return_data");
         assert_eq!(
             run_result.return_data,
             vec![
@@ -235,6 +217,57 @@ fn test_contract_call_non_exists_contract() {
                 0, 0, 0, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
                 0, 0, 0, 0, 0, 0, 0, 0, 0
             ]
+        );
+    }
+    {
+        // Call CallNonExistsContract.rawCall(address eoa_addr)
+        let eoa_addr = [2u8; 20];
+        let (_, _script_hash) = create_eth_eoa_account(&mut state, &eoa_addr, 0);
+        let eoa_ethabi_addr = eth_addr_to_ethabi_addr(&eoa_addr);
+        let input = hex::decode(format!("56c94e70{}", hex::encode(eoa_ethabi_addr))).unwrap();
+        println!("{}", hex::encode(&input));
+        let args = PolyjuiceArgsBuilder::default()
+            .gas_limit(51000)
+            .gas_price(1)
+            .value(0)
+            .input(&input)
+            .build();
+        let raw_tx = RawL2Transaction::new_builder()
+            .from_id(from_id.pack())
+            .to_id(contract_account_id.pack())
+            .args(Bytes::from(args).pack())
+            .build();
+        let db = store.begin_transaction();
+        let tip_block_hash = db.get_tip_block_hash().unwrap();
+        // [handle_message] Don't run evm and return empty data
+        let run_result = generator
+            .execute_transaction(
+                &ChainView::new(&db, tip_block_hash),
+                &state,
+                &block_info,
+                &raw_tx,
+                L2TX_MAX_CYCLES,
+                None,
+            )
+            .expect("empty contract code for account (EoA account)");
+        /* The functions call, delegatecall and staticcall all take a single bytes memory parameter
+           and return the success condition (as a bool) and the returned data (bytes memory).
+        > https://docs.soliditylang.org/en/latest/types.html?highlight=address#members-of-addresses
+        */
+        assert_eq!(
+            run_result.return_data,
+            vec![
+                0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 32, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
+                0, 0, 0, 0, 0, 0, 0, 0, 0
+            ]
+        );
+        // debug mode: [execute tx] VM machine_run time: 16ms, exit code: 0 used_cycles: 1107696
+        // [CallNonExistsContract.rawCall(address eoa_addr)] used cycles: 862060 < 870K
+        helper::check_cycles(
+            "CallNonExistsContract.rawCall(address eoa_addr)",
+            run_result.used_cycles,
+            1_100_000,
         );
     }
 }

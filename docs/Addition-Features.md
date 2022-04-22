@@ -1,10 +1,9 @@
 
 ## Addition Features
-* pre-compiled contract
-  - Add `recover_account` for recover any supported signature
-  - Add `balance_of_any_sudt` for query the balance of any sudt_id account
-  - Add `transfer_to_any_sudt` for transfer value by sudt_id (Must collaborate with SudtErc20Proxy.sol contract)
-  - Add `eth_to_godwoken_addr` for convert ETH address to polyjuice contract address (godwoken short address)
+* pre-compiled contracts
+  - Add `recover_account` to recover any supported signature
+  - Add `balance_of_any_sudt` to query the balance of any sudt_id account
+  - Add `transfer_to_any_sudt` to transfer value by sudt_id (Must collaborate with SudtERC20Proxy_UserDefinedDecimals.sol contract)
 
 ### `recover_account` Spec
 
@@ -34,14 +33,14 @@ See: [Example](../polyjuice-tests/src/test_cases/evm-contracts/RecoverAccount.so
    input:
    ======
      input[ 0..32] => sudt_id (big endian)
-     input[32..64] => address (short_address)
+     input[32+12..64] => address (eth_address)
 
    output:
    =======
      output[0..32] => amount
 ```
 
-See: [Example](../solidity/erc20/SudtERC20Proxy.sol)
+See: [Example](../solidity/erc20/SudtERC20Proxy_UserDefinedDecimals.sol)
 
 ### `transfer_to_any_sudt` Spec
 
@@ -49,31 +48,16 @@ See: [Example](../solidity/erc20/SudtERC20Proxy.sol)
   Transfer `sudt_id` token from `from_id` to `to_id` with `amount` balance.
 
   NOTE: This pre-compiled contract need caller to check permission of `from_id`,
-  currently only `solidity/erc20/SudtERC20Proxy.sol` is allowed to call this contract.
+  currently only `solidity/erc20/SudtERC20Proxy_UserDefinedDecimals.sol` is allowed to call this contract.
 
    input:
    ======
      input[ 0..32 ] => sudt_id (big endian)
-     input[32..64 ] => from_addr (short address)
-     input[64..96 ] => to_addr (short address)
+     input[32+12..64 ] => from_addr (eth address)
+     input[64+12..96 ] => to_addr (eth address)
      input[96..128] => amount (big endian)
 
    output: []
 ```
 
-See: [Example](../solidity/erc20/SudtERC20Proxy.sol)
-
-### `eth_to_godwoken_addr` Spec
-
-```
- Calculate godwoken short address of an contract account by it's corresponding ETH address
-
- input:
- ======
-   input[12..32] => ETH address
-
- output:
-   output[12..32] => godwoken short address
-```
-
-See: [Example](../polyjuice-tests/src/test_cases/evm-contracts/EthToGodwokenAddr.sol)
+See: [Example](../solidity/erc20/SudtERC20Proxy_UserDefinedDecimals.sol)

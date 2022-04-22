@@ -38,7 +38,7 @@ interface IERC20 {
     /**
      * @dev Returns the amount of tokens in existence.
      */
-    function totalSupply() external view returns (uint256);
+    function totalSupply() external returns (uint256);
 
     /**
      * @dev Returns the amount of tokens owned by `account`.
@@ -201,8 +201,18 @@ contract ERC20 is Context, IERC20 {
     /**
      * @dev See {IERC20-totalSupply}.
      */
-    function totalSupply() public view virtual override returns (uint256) {
-        return _totalSupply;
+    function totalSupply() public virtual override returns (uint256) {
+        uint256[1] memory input;
+        input[0] = _sudtId;
+        uint256[1] memory output;
+        
+        /* total_supply_of_any_sudt */
+        assembly {
+            if iszero(call(not(0), 0xf4, 0x0, input, 0x20, output, 0x20)) {
+                revert(0x0, 0x0)
+            }
+        }
+        return output[0];
     }
 
     /**

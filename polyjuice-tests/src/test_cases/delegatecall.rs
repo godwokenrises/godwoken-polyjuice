@@ -2,9 +2,9 @@
 //!   See ./evm-contracts/CallContract.sol
 
 use crate::helper::{
-    self, build_eth_l2_script, contract_script_to_eth_address, deploy, new_account_script,
-    new_account_script_with_nonce, new_block_info, setup, simple_storage_get, PolyjuiceArgsBuilder,
-    CKB_SUDT_ACCOUNT_ID, L2TX_MAX_CYCLES,
+    self, contract_script_to_eth_addr, deploy, new_block_info,
+    new_contract_account_script_with_nonce, setup, simple_storage_get, MockContractInfo,
+    PolyjuiceArgsBuilder, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
@@ -17,72 +17,70 @@ const INIT_CODE: &str = include_str!("./evm-contracts/DelegateCall.bin");
 
 #[test]
 fn test_delegatecall() {
-    let (store, mut state, generator, creator_account_id) = setup();
-    let block_producer_script = build_eth_l2_script([0x99u8; 20]);
-    let block_producer_id = state
-        .create_account_from_script(block_producer_script)
-        .unwrap();
+    let (store, mut state, generator) = setup();
+    let block_producer_id = helper::create_block_producer(&mut state);
 
-    let from_script = build_eth_l2_script([1u8; 20]);
-    let from_script_hash = from_script.hash();
-    let from_short_address = &from_script_hash[0..20];
-    let from_id = state.create_account_from_script(from_script).unwrap();
-    state
-        .mint_sudt(CKB_SUDT_ACCOUNT_ID, from_short_address, 280000)
-        .unwrap();
-    let mut block_number = 1;
+    let from_eth_address = [1u8; 20];
+    let (from_id, _from_script_hash) =
+        helper::create_eth_eoa_account(&mut state, &from_eth_address, 280000);
 
     // Deploy SimpleStorage
+    let mut block_number = 1;
     let _run_result = deploy(
         &generator,
         &store,
         &mut state,
-        creator_account_id,
+        CREATOR_ACCOUNT_ID,
         from_id,
         SS_INIT_CODE,
         122000,
         0,
-        block_producer_id,
+        block_producer_id.clone(),
         block_number,
     );
-    block_number += 1;
-    let ss_account_script = new_account_script_with_nonce(&state, creator_account_id, from_id, 0);
+    let ss_account_script = new_contract_account_script_with_nonce(&from_eth_address, 0);
     let ss_account_id = state
         .get_account_id_by_script_hash(&ss_account_script.hash().into())
         .unwrap()
         .unwrap();
 
     // Deploy DelegateCall
+    block_number += 1;
     let run_result = deploy(
         &generator,
         &store,
         &mut state,
-        creator_account_id,
+        CREATOR_ACCOUNT_ID,
         from_id,
         INIT_CODE,
         122000,
         0,
-        block_producer_id,
+        block_producer_id.clone(),
         block_number,
     );
     // [Deploy DelegateCall] used cycles: 753698 < 760K
-    helper::check_cycles("Deploy DelegateCall", run_result.used_cycles, 760_000);
-    block_number += 1;
+    helper::check_cycles("Deploy DelegateCall", run_result.used_cycles, 1_100_000);
     // println!(
     //     "result {}",
     //     serde_json::to_string_pretty(&RunResult::from(run_result)).unwrap()
     // );
-    let contract_account_script =
-        new_account_script(&mut state, creator_account_id, from_id, false);
-    let new_account_id = state
-        .get_account_id_by_script_hash(&contract_account_script.hash().into())
+    let delegate_contract = MockContractInfo::create(&from_eth_address, 1);
+    let delegate_contract_script_hash = delegate_contract.script_hash;
+    let delegate_contract_id = state
+        .get_account_id_by_script_hash(&delegate_contract_script_hash)
         .unwrap()
         .unwrap();
 
     assert_eq!(state.get_nonce(from_id).unwrap(), 2);
     assert_eq!(state.get_nonce(ss_account_id).unwrap(), 0);
-    assert_eq!(state.get_nonce(new_account_id).unwrap(), 0);
-
+    assert_eq!(state.get_nonce(delegate_contract_id).unwrap(), 0);
+    /*
+     * In a delegatecall, only the code of the given address is used, all other aspects (storage,
+     * balance, …) are taken from the current contract.
+     * The purpose of delegatecall is to use library code which is stored in another contract.
+     * The user has to ensure that the layout of storage in both contracts is suitable for
+     * delegatecall to be used.
+     */
     for (fn_sighash, expected_return_value) in [
         // DelegateCall.set(address, uint) => used cycles: 1002251
         (
@@ -102,11 +100,12 @@ fn test_delegatecall() {
     ]
     .iter()
     {
-        let block_info = new_block_info(0, block_number, block_number);
+        block_number += 1;
+        let block_info = new_block_info(block_producer_id.clone(), block_number, block_number);
         let input = hex::decode(format!(
             "{}{}{}",
             fn_sighash,
-            hex::encode(contract_script_to_eth_address(&ss_account_script, true)),
+            hex::encode(contract_script_to_eth_addr(&ss_account_script, true)),
             "0000000000000000000000000000000000000000000000000000000000000022",
         ))
         .unwrap();
@@ -118,7 +117,7 @@ fn test_delegatecall() {
             .build();
         let raw_tx = RawL2Transaction::new_builder()
             .from_id(from_id.pack())
-            .to_id(new_account_id.pack())
+            .to_id(delegate_contract_id.pack())
             .args(Bytes::from(args).pack())
             .build();
         let db = store.begin_transaction();
@@ -130,22 +129,24 @@ fn test_delegatecall() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .expect("construct");
         // [DelegateCall] used cycles: 1457344 < 1460K
-        helper::check_cycles("DelegateCall", run_result.used_cycles, 1_460_000);
+        helper::check_cycles("DelegateCall", run_result.used_cycles, 1_710_000);
         state.apply_run_result(&run_result).expect("update state");
         // println!(
         //     "result {}",
         //     serde_json::to_string_pretty(&RunResult::from(run_result)).unwrap()
         // );
+
         let run_result = simple_storage_get(
             &store,
             &state,
             &generator,
             block_number,
             from_id,
-            new_account_id,
+            delegate_contract_id,
         );
         assert_eq!(
             run_result.return_data,
@@ -155,7 +156,7 @@ fn test_delegatecall() {
 
     assert_eq!(state.get_nonce(from_id).unwrap(), 5);
     assert_eq!(state.get_nonce(ss_account_id).unwrap(), 0);
-    assert_eq!(state.get_nonce(new_account_id).unwrap(), 0);
+    assert_eq!(state.get_nonce(delegate_contract_id).unwrap(), 0);
 
     let run_result = simple_storage_get(
         &store,

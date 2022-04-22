@@ -870,37 +870,14 @@ int bn256_pairing_istanbul(gw_context_t* ctx,
                            const uint8_t* input_src,
                            const size_t input_size,
                            uint8_t** output, size_t* output_size) {
-  if (input_size % 192 > 0) {
-    return ERROR_BN256_PAIRING;
-  }
-
-  int ret;
-  size_t length = input_size / 192;
-  /* G1[] */
-  intx::uint256 *cs = (intx::uint256 *)malloc(length * 4 * sizeof(intx::uint256));
-  if (cs == NULL) {
-    return FATAL_PRECOMPILED_CONTRACTS;
-  }
-  /* G2[] */
-  intx::uint256 *ts = (intx::uint256 *)malloc(length * 4 * sizeof(intx::uint256));
-  if (ts == NULL) {
-    return FATAL_PRECOMPILED_CONTRACTS;
-  }
-  for (size_t i = 0; i < input_size; i += 192) {
-    ret = parse_curve_point((void *)(cs + i / 192 * 4), (uint8_t *)input_src + i);
-    if (ret != 0) {
-      return ret;
-    }
-    ret = parse_twist_point((void *)(ts + i / 192 * 4), (uint8_t *)input_src + i + 64);
-    if (ret != 0) {
-      return ret;
-    }
-  }
-  ckb_debug("pairing is unsupported yet due to very high cycle cost!");
+  ckb_debug("bn256_pairing is unsupported yet due to very high cycle cost!");
   return ERROR_BN256_PAIRING;
 }
 
-
+/**
+ * @brief Match Precompiled Contracts
+ * @see  - https://www.evm.codes/precompiled
+ */
 bool match_precompiled_address(const evmc_address* destination,
                                precompiled_contract_gas_fn* contract_gas,
                                precompiled_contract_fn* contract) {
@@ -959,9 +936,14 @@ bool match_precompiled_address(const evmc_address* destination,
     *contract_gas = recover_account_gas;
     *contract = recover_account;
     break;
-  case 0xf3:
-    *contract_gas = eth_to_godwoken_addr_gas;
-    *contract = eth_to_godwoken_addr;
+  // Use gw_get_script_hash_by_registry_address RPC instead of this precompiled contract
+  // Deprecated case 0xf3:
+  //   *contract_gas = eth_addr_to_gw_script_hash_gas;
+  //   *contract = eth_addr_to_gw_script_hash;
+  //   break;
+  case 0xf4:
+    *contract_gas = total_supply_of_any_sudt_gas;
+    *contract = total_supply_of_any_sudt;
     break;
   default:
     *contract_gas = NULL;

@@ -1,27 +1,21 @@
-
 #ifndef POLYJUICE_UTILS_H
 #define POLYJUICE_UTILS_H
 
+#include <evmc/evmc.h>
 #include <stddef.h>
 #include <stdint.h>
 
-#include <evmc/evmc.h>
 #include "ckb_syscalls.h"
 #include "polyjuice_errors.h"
+#include "polyjuice_globals.h"
 
-#ifdef NO_DEBUG_LOG
-#undef ckb_debug
-#define ckb_debug(s) do {} while (0)
-#define debug_print(s) do {} while (0)
-#define debug_print_int(prefix, value) do {} while (0)
-#define debug_print_data(prefix, data, data_len) do {} while (0)
-#else /* NO_DEBUG_LOG */
+#ifdef POLYJUICE_DEBUG_LOG
 /* 64 KB */
 #define DEBUG_BUFFER_SIZE 65536
 static char *g_debug_buffer;
 void debug_print_data(const char *prefix, const uint8_t *data,
                       uint32_t data_len) {
-  if (data_len > (DEBUG_BUFFER_SIZE - 1024) / 2 - 1) { // leave 1KB to prefix
+  if (data_len > (DEBUG_BUFFER_SIZE - 1024) / 2 - 1) {  // leave 1KB to prefix
     ckb_debug("warning: length of data is too large");
     return;
   }
@@ -38,28 +32,58 @@ void debug_print_data(const char *prefix, const uint8_t *data,
   g_debug_buffer[offset] = '\0';
   ckb_debug(g_debug_buffer);
 }
-void debug_print_int(const char* prefix, int64_t ret) {
+void debug_print_int(const char *prefix, int64_t ret) {
   sprintf(g_debug_buffer, "%s => %ld", prefix, ret);
   ckb_debug(g_debug_buffer);
 }
-#endif /* NO_DEBUG_LOG */
+// avoid VM(InvalidEcall(80))
+int printf(const char *format, ...) { return 0; }
+#else
+#undef ckb_debug
+#define ckb_debug(s) \
+  do {               \
+  } while (0)
+#define debug_print(s) \
+  do {                 \
+  } while (0)
+#define debug_print_int(prefix, value) \
+  do {                                 \
+  } while (0)
+#define debug_print_data(prefix, data, data_len) \
+  do {                                           \
+  } while (0)
+int printf(const char *format, ...) { return 0; }
+#endif /* POLYJUICE_DEBUG_LOG */
 
 #define memset(dest, c, n) _smt_fast_memset(dest, c, n)
 
-/* polyjuice contract account (normal/create2) script args size*/
-static const uint32_t CONTRACT_ACCOUNT_SCRIPT_ARGS_SIZE = 32 + 4 + 20;
+/* https://stackoverflow.com/a/1545079 */
+#pragma push_macro("errno")
+#undef errno
+bool is_errno_ok(mol_seg_res_t *script_res) {
+  return script_res->errno == MOL_OK;
+}
+#pragma pop_macro("errno")
+
+gw_reg_addr_t new_reg_addr(const uint8_t eth_addr[ETH_ADDRESS_LEN]) {
+  gw_reg_addr_t addr = {0};
+  addr.reg_id = GW_DEFAULT_ETH_REGISTRY_ACCOUNT_ID;
+  addr.addr_len = ETH_ADDRESS_LEN;
+  memcpy(addr.addr, eth_addr, ETH_ADDRESS_LEN);
+  return addr;
+}
 
 int build_script(const uint8_t code_hash[32], const uint8_t hash_type,
-                 const uint8_t* args, const uint32_t args_len,
-                 mol_seg_t* script_seg) {
+                 const uint8_t *args, const uint32_t args_len,
+                 mol_seg_t *script_seg) {
   /* 1. Build Script by receipt.return_data */
   mol_seg_t args_seg;
   args_seg.size = 4 + args_len;
-  args_seg.ptr = (uint8_t*)malloc(args_seg.size);
+  args_seg.ptr = (uint8_t *)malloc(args_seg.size);
   if (args_seg.ptr == NULL) {
     return FATAL_POLYJUICE;
   }
-  memcpy(args_seg.ptr, (uint8_t*)(&args_len), 4);
+  memcpy(args_seg.ptr, (uint8_t *)(&args_len), 4);
   memcpy(args_seg.ptr + 4, args, args_len);
   debug_print_int("script.hash_type", hash_type);
 
@@ -71,17 +95,12 @@ int build_script(const uint8_t code_hash[32], const uint8_t hash_type,
   mol_seg_res_t script_res = MolBuilder_Script_build(script_builder);
   free(args_seg.ptr);
 
-  /* https://stackoverflow.com/a/1545079 */
-#pragma push_macro("errno")
-#undef errno
-  if (script_res.errno != MOL_OK) {
+  if (!is_errno_ok(&script_res)) {
     ckb_debug("molecule build script failed");
     return FATAL_POLYJUICE;
   }
-#pragma pop_macro("errno")
 
   *script_seg = script_res.seg;
-
   if (MolReader_Script_verify(script_seg, false) != MOL_OK) {
     ckb_debug("built an invalid script");
     return FATAL_POLYJUICE;
@@ -89,10 +108,72 @@ int build_script(const uint8_t code_hash[32], const uint8_t hash_type,
   return 0;
 }
 
-int address_to_account_id(gw_context_t* ctx, const uint8_t address[20], uint32_t *account_id) {
-  uint8_t script_hash[32] = {0};
-  int ret = ctx->sys_get_script_hash_by_prefix(ctx, (uint8_t *)address, 20, script_hash);
+
+/**
+ * @param script_hash should have been initialed as zero_hash = {0}
+ *
+ * TODO: shall we cache the mapping data in Polyjuice memory?
+ */
+int load_script_hash_by_eth_address(gw_context_t *ctx,
+                                    const uint8_t eth_address[ETH_ADDRESS_LEN],
+                                    uint8_t script_hash[GW_VALUE_BYTES]) {
+  if (ctx == NULL) {
+    return GW_FATAL_INVALID_CONTEXT;
+  }
+
+  gw_reg_addr_t addr = new_reg_addr(eth_address);
+
+  int ret = ctx->sys_get_script_hash_by_registry_address(ctx, &addr, script_hash);
   if (ret != 0) {
+    return ret;
+  }
+  if (_is_zero_hash(script_hash)) {
+    return GW_ERROR_NOT_FOUND;
+  }
+  ckb_debug("load_script_hash_by_eth_address success");
+  return 0;
+}
+
+int load_eth_address_by_script_hash(gw_context_t *ctx,
+                                    uint8_t script_hash[GW_KEY_BYTES],
+                                    uint8_t eth_address[ETH_ADDRESS_LEN]) {
+  if (ctx == NULL) {
+    return GW_FATAL_INVALID_CONTEXT;
+  }
+
+  /* build addr */
+  gw_reg_addr_t addr = new_reg_addr(eth_address);
+
+  int ret = ctx->sys_get_registry_address_by_script_hash(ctx, script_hash, GW_DEFAULT_ETH_REGISTRY_ACCOUNT_ID, &addr);
+  if (ret != 0) {
+    return ret;
+  }
+  if (addr.addr_len == 0) {
+    return GW_ERROR_NOT_FOUND;
+  }
+
+  _gw_fast_memcpy(eth_address, addr.addr, ETH_ADDRESS_LEN);
+  return 0;
+}
+
+/**
+ * @brief
+ * TODO: test this function
+ * @param ctx
+ * @param address
+ * @param account_id
+ * @return int
+ */
+int load_account_id_by_eth_address(gw_context_t *ctx, const uint8_t address[20],
+                                   uint32_t *account_id) {
+  if (ctx == NULL) {
+    return GW_FATAL_INVALID_CONTEXT;
+  }
+  uint8_t script_hash[32] = {0};
+  int ret = load_script_hash_by_eth_address(ctx, address, script_hash);
+  if (ret != 0) {
+    debug_print_data("[load_account_id_by_eth_address] load_script_hash failed",
+                     address, ETH_ADDRESS_LEN);
     return ret;
   }
   return ctx->sys_get_account_id_by_script_hash(ctx, script_hash, account_id);
@@ -129,7 +210,8 @@ void rlp_encode_sender_and_nonce(const evmc_address *sender, uint32_t nonce,
     /* nonce header */
     data[2 + 20] = nonce_bytes_len + RLP_ITEM_OFFSET;
     /* nonce content */
-    memcpy(data + 2 + 20 + 1, nonce_be + (4 - nonce_bytes_len), nonce_bytes_len);
+    memcpy(data + 2 + 20 + 1, nonce_be + (4 - nonce_bytes_len),
+           nonce_bytes_len);
     *data_len = 2 + 20 + 1 + nonce_bytes_len;
   }
   /* list header */
@@ -137,7 +219,8 @@ void rlp_encode_sender_and_nonce(const evmc_address *sender, uint32_t nonce,
 }
 
 /* Parse uint32_t/uint128_t from big endian byte32 data */
-int parse_integer(const uint8_t data_be[32], uint8_t *value, size_t value_size) {
+int parse_integer(const uint8_t data_be[32], uint8_t *value,
+                  size_t value_size) {
   if (value_size > 32) {
     return -1;
   }
@@ -187,7 +270,8 @@ void put_u128(uint128_t value, uint8_t *output) {
  *   - polyjuice_globals.h   FATAL_PRECOMPILED_CONTRACTS -51
  */
 bool is_fatal_error(int error_code) {
-  return (error_code >= 50 && error_code < 80) || (error_code > -80 && error_code <= -50);
+  return (error_code >= 50 && error_code < 80) ||
+         (error_code > -80 && error_code <= -50);
 }
 
 /* See evmc.h evmc_status_code */
@@ -195,4 +279,4 @@ bool is_evmc_error(int error_code) {
   return error_code >= 1 && error_code <= 16;
 }
 
-#endif // POLYJUICE_UTILS_H
+#endif  // POLYJUICE_UTILS_H

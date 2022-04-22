@@ -8,8 +8,8 @@ LD := $(TARGET)-gcc
 OBJCOPY := $(TARGET)-objcopy
 
 SECP_DIR := deps/secp256k1-fix
+SECP256K1_SRC := $(SECP_DIR)/src/ecmult_static_pre_context.h
 CFLAGS_CKB_STD = -Ideps/ckb-c-stdlib -Ideps/ckb-c-stdlib/molecule
-# CFLAGS_CBMT := -isystem deps/merkle-tree
 CFLAGS_SECP := -isystem $(SECP_DIR)/src -isystem $(SECP_DIR)
 CFLAGS_INTX := -Ideps/intx/lib/intx -Ideps/intx/include
 CFLAGS_BN128 := -Ideps/bn128/include
@@ -31,7 +31,8 @@ CXXFLAGS := $(CFLAGS) -std=c++1z
 # 	systems, this option has no effect.
 LDFLAGS := -Wl,-static -Wl,--gc-sections -fdata-sections -ffunction-sections -Wall
 
-SECP256K1_SRC := $(SECP_DIR)/src/ecmult_static_pre_context.h
+GENERATOR_FLAGS := -DGW_GENERATOR
+VALIDATOR_FLAGS := -DGW_VALIDATOR
 
 MOLC := moleculec
 MOLC_VERSION := $(shell cat deps/godwoken-scripts/c/Makefile | egrep "MOLC_VERSION :=" | awk '{print $$3}')
@@ -49,16 +50,28 @@ VALIDATOR_DEPS := c/validator/secp256k1_helper.h $(BIN_DEPS)
 # BUILDER_DOCKER := nervos/ckb-riscv-gnu-toolchain@sha256:aae8a3f79705f67d505d1f1d5ddc694a4fd537ed1c7e9622420a470d59ba2ec3
 # docker pull nervos/ckb-riscv-gnu-toolchain:bionic-20190702
 BUILDER_DOCKER := nervos/ckb-riscv-gnu-toolchain@sha256:7b168b4b109a0f741078a71b7c4dddaf1d283a5244608f7851f5714fbad273ba
+# TODO: update to BUILDER_DOCKER := nervos/ckb-riscv-gnu-toolchain:bionic-20190702-newlib-debug-symbols
+# TODO: update to nervos/ckb-riscv-gnu-toolchain:bionic-20211214 => need more tests
 
-all: build/test_contracts build/test_rlp build/generator build/validator build/generator_log build/validator_log build/test_ripemd160 build/blockchain.h build/godwoken.h
+all: build/blockchain.h build/godwoken.h \
+  build/test_contracts build/test_rlp build/test_ripemd160 \
+  build/generator build/validator \
+  build/generator_log build/validator_log
 
-all-via-docker: generate-protocol
+all-via-docker: generate-protocol fetch-gw-scripts
 	mkdir -p build
 	docker run --rm -v `pwd`:/code -w /code ${BUILDER_DOCKER} make
 	make patch-generator && make patch-generator_log
 log-version-via-docker: generate-protocol
 	mkdir -p build
 	docker run --rm -v `pwd`:/code -w /code ${BUILDER_DOCKER} bash -c "make build/generator_log && make build/validator_log"
+
+all-via-docker-in-debug-mode: generate-protocol
+	docker run --rm -v `pwd`:/code -w /code ${BUILDER_DOCKER} make all-in-debug-mode
+# Be aware that a given prerequisite will only be built once per invocation of make, at most.
+all-in-debug-mode: LDFLAGS := -g # only use -O0 to decrease compile time while coding and debugging (O0 compile time: 1m58s)
+all-in-debug-mode: CFLAGS += -DPOLYJUICE_DEBUG_LOG
+all-in-debug-mode: all
 
 clean-via-docker:
 	mkdir -p build
@@ -95,28 +108,30 @@ patch-generator_log: build/ckb-binary-patcher
 
 build/generator: c/generator.c $(GENERATOR_DEPS)
 	cd $(SECP_DIR) && (git apply workaround-fix-g++-linking.patch || true) && cd - # apply patch
-	$(CXX) $(CFLAGS) $(LDFLAGS) -Ibuild -o $@ c/generator.c $(ALL_OBJS) -DNO_DEBUG_LOG
+	$(CXX) $(CFLAGS) $(LDFLAGS) -Ibuild -o $@ c/generator.c $(ALL_OBJS)
 	$(OBJCOPY) --only-keep-debug $@ $@.debug
 	$(OBJCOPY) --strip-debug --strip-all $@
 	cd $(SECP_DIR) && (git apply -R workaround-fix-g++-linking.patch || true) && cd - # revert patch
 
 build/validator: c/validator.c $(VALIDATOR_DEPS)
 	cd $(SECP_DIR) && (git apply workaround-fix-g++-linking.patch || true) && cd - # apply patch
-	$(CXX) $(CFLAGS) $(LDFLAGS) -Ibuild -o $@ c/validator.c $(ALL_OBJS) -DNO_DEBUG_LOG
+	$(CXX) $(CFLAGS) $(LDFLAGS) -Ibuild -o $@ c/validator.c $(ALL_OBJS)
 	$(OBJCOPY) --only-keep-debug $@ $@.debug
 	$(OBJCOPY) --strip-debug --strip-all $@
 	cd $(SECP_DIR) && (git apply -R workaround-fix-g++-linking.patch || true) && cd - # revert patch
 
 build/generator_log: c/generator.c $(GENERATOR_DEPS)
 	cd $(SECP_DIR) && (git apply workaround-fix-g++-linking.patch || true) && cd - # apply patch
-	$(CXX) $(CFLAGS) $(LDFLAGS) -Ibuild -o $@ c/generator.c $(ALL_OBJS)
+	$(CXX) $(CFLAGS) $(LDFLAGS) -Ibuild -o $@ c/generator.c $(ALL_OBJS) -DPOLYJUICE_DEBUG_LOG
+#	If we need the whole one for performance analysis, don't separate the executable here
 	$(OBJCOPY) --only-keep-debug $@ $@.debug
 	$(OBJCOPY) --strip-debug --strip-all $@
 	cd $(SECP_DIR) && (git apply -R workaround-fix-g++-linking.patch || true) && cd - # revert patch
 
 build/validator_log: c/validator.c $(VALIDATOR_DEPS)
 	cd $(SECP_DIR) && (git apply workaround-fix-g++-linking.patch || true) && cd - # apply patch
-	$(CXX) $(CFLAGS) $(LDFLAGS) -Ibuild -o $@ c/validator.c $(ALL_OBJS)
+	$(CXX) $(CFLAGS) $(LDFLAGS) -Ibuild -o $@ c/validator.c $(ALL_OBJS) -DPOLYJUICE_DEBUG_LOG
+#	If we need the whole one for performance analysis, don't separate the executable here
 	$(OBJCOPY) --only-keep-debug $@ $@.debug
 	$(OBJCOPY) --strip-debug --strip-all $@
 	cd $(SECP_DIR) && (git apply -R workaround-fix-g++-linking.patch || true) && cd - # revert patch
@@ -215,13 +230,22 @@ contract/sudt-erc20-proxy:
 	docker run --rm -v $$(pwd)/solidity/erc20:/contracts ethereum/solc:0.8.7 -o /contracts --bin --overwrite /contracts/SudtERC20Proxy_UserDefinedDecimals.sol
 	ERC20BIN_SHASUM="$$(ckb-cli util blake2b --binary-path solidity/erc20/ERC20.bin 2>&1 | head -n1)" && \
 	echo $$ERC20BIN_SHASUM && \
-	if [ "$$ERC20BIN_SHASUM" = "0xa63fcc117d9c73fcaaf65bd469e70bcfe5b3c46f61d1e7e13761c969fd261316" ]; \
+	if [ "$$ERC20BIN_SHASUM" = "0x4ae01d53e33a739ad261979f54efb066982b7d10a54166a245467756b85daa16" ]; \
 	then echo "ERC20BIN_SHASUM matches" ; \
 	else echo "ERC20BIN_SHASUM does not match" ; exit 1 ; fi
 # ERC20BIN_SHASUM="$$(shasum -a 256 solidity/erc20/ERC20.bin | cut -d' ' -f1)" && \
 # if [ "$$ERC20BIN_SHASUM" = "9f7bf1ab25b377ddc339e6de79a800d4c7dc83de7e12057a0129b467794ce3a3" ] ; \
 # then echo "ERC20BIN_SHASUM matches" ; \
 # else echo "ERC20BIN_SHASUM does not match" ; exit 1 ; fi
+
+# fetch godwoken-scripts from godwoken-prebuilds image,
+# including meta-contract and sudt-contract
+fetch-gw-scripts:
+	mkdir -p build
+	docker run --rm -v `pwd`/build:/build-dir \
+	   	ghcr.io/nervosnetwork/godwoken-prebuilds:v1.1 \
+		cp -r /scripts/godwoken-scripts /build-dir \
+		&& echo "Copy godwoken-scripts"
 
 fmt:
 	clang-format -i -style=Google c/**/*.*
