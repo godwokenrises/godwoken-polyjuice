@@ -1323,7 +1323,7 @@ int run_polyjuice() {
     debug_print_int("evmc_result.output_size", res.output_size);
     // The output contains data coming from REVERT opcode
     debug_print_data("evmc_result.output_data:", res.output_data,
-                     res.output_size > 64 ? 64 : res.output_size);
+                     res.output_size > 100 ? 100 : res.output_size);
   }
   
   ret = emit_evm_result_log(&context, gas_used, res.status_code);

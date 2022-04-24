@@ -67,10 +67,6 @@ fn test_update_eth_addr_reg_by_contract() {
     let eth_eoa_address = [0xeeu8; 20];
     let eth_eoa_account_script = build_eth_l2_script(&eth_eoa_address);
     let eth_eoa_account_script_hash = eth_eoa_account_script.hash();
-    // let reg_addr = RegistryAddress::new(ETH_REGISTRY_ACCOUNT_ID, eth_eoa_address.to_vec());
-    // state
-    // // .mapping_registry_address_to_script_hash(reg_addr, eth_eoa_account_script_hash.into())
-    // .expect("map reg addr to script hash");
     let eth_eoa_account_id = state
         .create_account_from_script(eth_eoa_account_script)
         .unwrap();

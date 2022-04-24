@@ -304,6 +304,7 @@ pub fn new_contract_account_script_with_nonce(from_addr: &[u8; 20], from_nonce: 
         .args(new_script_args.pack())
         .build()
 }
+
 pub fn new_contract_account_script(
     state: &DummyState,
     from_id: u32,
