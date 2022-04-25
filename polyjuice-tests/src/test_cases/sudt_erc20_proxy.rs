@@ -13,7 +13,7 @@ use gw_common::state::State;
 use gw_generator::{dummy_state::DummyState, error::TransactionError, traits::StateExt, Generator};
 use gw_store::traits::chain_store::ChainStore;
 use gw_store::{chain_view::ChainView, Store};
-use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
+use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*, U256};
 
 fn test_sudt_erc20_proxy_inner(
     generator: &Generator,
@@ -77,7 +77,7 @@ fn test_sudt_erc20_proxy_inner(
         .mint_sudt(
             new_sudt_id,
             &from_reg_addr1,
-            160000000000000000000000000000u128,
+            U256::from(160000000000000000000000000000u128),
         )
         .unwrap();
 
@@ -85,19 +85,19 @@ fn test_sudt_erc20_proxy_inner(
         state
             .get_sudt_balance(new_sudt_id, &from_reg_addr1)
             .unwrap(),
-        160000000000000000000000000000u128
+        U256::from(160000000000000000000000000000u128)
     );
     assert_eq!(
         state
             .get_sudt_balance(new_sudt_id, &from_reg_addr2)
             .unwrap(),
-        0
+        U256::zero()
     );
     assert_eq!(
         state
             .get_sudt_balance(new_sudt_id, &from_reg_addr3)
             .unwrap(),
-        0
+        U256::zero()
     );
 
     let total_supply = {

@@ -26,9 +26,10 @@ use gw_types::{
     offchain::RunResult,
     packed::{
         AllowedTypeHash, BatchSetMapping, BlockInfo, Fee, LogItem, RawL2Transaction, RollupConfig,
-        Script, Uint64,
+        Script, SetMapping, Uint64,
     },
     prelude::*,
+    U256,
 };
 use gw_types::{
     offchain::RollupContext,
@@ -126,13 +127,13 @@ pub enum Log {
         sudt_id: u32,
         from_addr: RegistryAddress,
         to_addr: RegistryAddress,
-        amount: u128,
+        amount: U256,
     },
     SudtPayFee {
         sudt_id: u32,
         from_addr: RegistryAddress,
         block_producer_addr: RegistryAddress,
-        amount: u128,
+        amount: U256,
     },
     PolyjuiceSystem {
         gas_used: u64,
@@ -147,13 +148,13 @@ pub enum Log {
     },
 }
 
-fn parse_sudt_log_data(data: &[u8]) -> (RegistryAddress, RegistryAddress, u128) {
+fn parse_sudt_log_data(data: &[u8]) -> (RegistryAddress, RegistryAddress, U256) {
     let from_addr = RegistryAddress::from_slice(&data[0..28]).expect("parse from_addr");
     let to_addr = RegistryAddress::from_slice(&data[28..56]).expect("parse to_addr");
 
-    let mut u128_bytes = [0u8; 16];
-    u128_bytes.copy_from_slice(&data[56..56 + 16]);
-    let amount = u128::from_le_bytes(u128_bytes);
+    let mut u256_bytes = [0u8; 32];
+    u256_bytes.copy_from_slice(&data[56..56 + 32]);
+    let amount = U256::from_little_endian(&mut u256_bytes);
     (from_addr, to_addr, amount)
 }
 
@@ -164,7 +165,7 @@ pub fn parse_log(item: &LogItem) -> Log {
     match service_flag {
         GW_LOG_SUDT_TRANSFER => {
             let sudt_id: u32 = item.account_id().unpack();
-            if data.len() != (28 + 28 + 16) {
+            if data.len() != (28 + 28 + 32) {
                 panic!("Invalid data length: {}", data.len());
             }
             let (from_addr, to_addr, amount) = parse_sudt_log_data(data);
@@ -177,7 +178,7 @@ pub fn parse_log(item: &LogItem) -> Log {
         }
         GW_LOG_SUDT_PAY_FEE => {
             let sudt_id: u32 = item.account_id().unpack();
-            if data.len() != (28 + 28 + 16) {
+            if data.len() != (28 + 28 + 32) {
                 panic!("Invalid data length: {}", data.len());
             }
             let (from_addr, block_producer_addr, amount) = parse_sudt_log_data(data);
@@ -686,7 +687,7 @@ pub(crate) fn create_block_producer(state: &mut DummyState) -> RegistryAddress {
 pub(crate) fn create_eth_eoa_account(
     state: &mut DummyState,
     eth_address: &[u8; 20],
-    mint_ckb: u128,
+    mint_ckb: impl Into<U256>,
 ) -> (u32, [u8; 32]) {
     let script = build_eth_l2_script(eth_address);
     let script_hash = script.hash();
@@ -736,38 +737,6 @@ pub(crate) fn register_eoa_account(
         .expect("map reg addr to script hash");
 }
 
-#[derive(Default)]
-struct SetMappingArgsBuilder {
-    method: u32,
-    gw_script_hash: [u8; 32],
-    fee: u64,
-}
-impl SetMappingArgsBuilder {
-    /// Set the SetMappingArgs builder's method.
-    fn method(mut self, method: u32) -> Self {
-        self.method = method;
-        self
-    }
-    /// Set the SetMappingArgs builder's gw script hash.
-    fn gw_script_hash(mut self, gw_script_hash: [u8; 32]) -> Self {
-        self.gw_script_hash = gw_script_hash;
-        self
-    }
-    /// Set the set mapping args‘s fee.
-    fn set_fee(mut self, fee: u64) -> Self {
-        self.fee = fee;
-        self
-    }
-    fn build(self) -> Vec<u8> {
-        let mut output: Vec<u8> = vec![0u8; 4];
-        output[0..4].copy_from_slice(&self.method.to_le_bytes()[..]);
-        output.extend(self.gw_script_hash);
-        output.extend(ETH_REGISTRY_ACCOUNT_ID.to_le_bytes());
-        output.extend(&self.fee.to_le_bytes()[..]);
-        output
-    }
-}
-
 pub enum SetMappingArgs {
     One(H256),
     Batch(Vec<H256>),
@@ -784,16 +753,24 @@ pub(crate) fn eth_address_regiser(
     set_mapping_args: SetMappingArgs,
 ) -> Result<RunResult, TransactionError> {
     let args = match set_mapping_args {
-        SetMappingArgs::One(gw_script_hash) => SetMappingArgsBuilder::default()
-            .method(2u32)
-            .gw_script_hash(gw_script_hash.into())
-            .set_fee(1000)
-            .build()
-            .pack(),
+        SetMappingArgs::One(gw_script_hash) => {
+            let fee = Fee::new_builder()
+                .registry_id(ETH_REGISTRY_ACCOUNT_ID.pack())
+                .amount(U256::from(1000u64).pack())
+                .build();
+            let set_mapping = SetMapping::new_builder()
+                .fee(fee)
+                .gw_script_hash(gw_script_hash.pack())
+                .build();
+            let args = ETHAddrRegArgs::new_builder()
+                .set(ETHAddrRegArgsUnion::SetMapping(set_mapping))
+                .build();
+            args.as_bytes().pack()
+        }
         SetMappingArgs::Batch(gw_script_hashes) => {
             let fee = Fee::new_builder()
                 .registry_id(ETH_REGISTRY_ACCOUNT_ID.pack())
-                .amount(1000u64.pack())
+                .amount(U256::from(1000u64).pack())
                 .build();
             let batch_set_mapping = BatchSetMapping::new_builder()
                 .fee(fee)

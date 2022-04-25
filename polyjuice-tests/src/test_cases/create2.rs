@@ -10,7 +10,7 @@ use gw_common::{builtins::ETH_REGISTRY_ACCOUNT_ID, state::State};
 use gw_generator::traits::StateExt;
 use gw_store::chain_view::ChainView;
 use gw_store::traits::chain_store::ChainStore;
-use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
+use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*, U256};
 
 const SS_INIT_CODE: &str = include_str!("./evm-contracts/SimpleStorage.bin");
 const CREATE2_IMPL_CODE: &str = include_str!("./evm-contracts/Create2Impl.bin");
@@ -59,7 +59,7 @@ fn test_create2() {
     let create2_contract_balance = state
         .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &address)
         .unwrap();
-    assert_eq!(create2_contract_balance, 0);
+    assert_eq!(create2_contract_balance, U256::zero());
 
     let input_value_u128: u128 = 0x9a;
     // bytes32 salt
@@ -128,7 +128,7 @@ fn test_create2() {
     let create2_account_balance = state
         .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &address)
         .unwrap();
-    assert_eq!(create2_account_balance, input_value_u128);
+    assert_eq!(create2_account_balance, U256::from(input_value_u128));
 
     let run_result = simple_storage_get(
         &store,

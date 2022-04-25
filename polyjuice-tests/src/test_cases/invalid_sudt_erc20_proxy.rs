@@ -9,7 +9,7 @@ use gw_common::{builtins::ETH_REGISTRY_ACCOUNT_ID, state::State};
 use gw_generator::{error::TransactionError, traits::StateExt};
 use gw_store::chain_view::ChainView;
 use gw_store::traits::chain_store::ChainStore;
-use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
+use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*, U256};
 
 const INVALID_SUDT_ERC20_PROXY_CODE: &str =
     include_str!("./evm-contracts/InvalidSudtERC20Proxy.bin");
@@ -82,10 +82,16 @@ fn test_invalid_sudt_erc20_proxy() {
 
     assert_eq!(
         state.get_sudt_balance(new_sudt_id, &address1).unwrap(),
-        160000000000000000000000000000u128
+        U256::from(160000000000000000000000000000u128)
     );
-    assert_eq!(state.get_sudt_balance(new_sudt_id, &address2).unwrap(), 0);
-    assert_eq!(state.get_sudt_balance(new_sudt_id, &address2).unwrap(), 0);
+    assert_eq!(
+        state.get_sudt_balance(new_sudt_id, &address2).unwrap(),
+        U256::zero()
+    );
+    assert_eq!(
+        state.get_sudt_balance(new_sudt_id, &address2).unwrap(),
+        U256::zero()
+    );
     for (_idx, (from_id, args_str, success, return_data_str)) in [
         // balanceOf(eoa1)
         (
