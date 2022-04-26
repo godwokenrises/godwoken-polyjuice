@@ -217,7 +217,7 @@ void rlp_encode_sender_and_nonce(const evmc_address *sender, uint32_t nonce,
   data[0] = *data_len - 1 + RLP_LIST_OFFSET;
 }
 
-/* Parse uint32_t/uint128_t from big endian byte32 data */
+/* Parse uint32_t/uint64_t/uint128_t/uint256_t from big endian byte32 data */
 int parse_integer(const uint8_t data_be[32], uint8_t *value,
                   size_t value_size) {
   if (value_size > 32) {
