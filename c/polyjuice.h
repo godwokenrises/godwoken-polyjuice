@@ -1365,7 +1365,7 @@ int run_polyjuice() {
   gw_reg_addr_t sender_addr = new_reg_addr(msg.sender.bytes);
 
   uint256_t fee_u256 = {0};
-  memcpy((uint8_t *)(&fee_u256), (uint8_t*)(&fee), 16)
+  memcpy((uint8_t *)(&fee_u256), (uint8_t*)(&fee), 16);
 
   ret = sudt_pay_fee(&context, g_sudt_id, /* g_sudt_id must already exists */
                      sender_addr, fee_u256);
