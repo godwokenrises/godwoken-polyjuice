@@ -108,7 +108,6 @@ int build_script(const uint8_t code_hash[32], const uint8_t hash_type,
   return 0;
 }
 
-
 /**
  * @param script_hash should have been initialed as zero_hash = {0}
  *
@@ -246,6 +245,9 @@ int parse_u64(const uint8_t data_be[32], uint64_t *value) {
 int parse_u128(const uint8_t data_be[32], uint128_t *value) {
   return parse_integer(data_be, (uint8_t *)value, sizeof(uint128_t));
 }
+int parse_u256(const uint8_t data_be[32], uint256_t *value) {
+  return parse_integer(data_be, (uint8_t *)value, sizeof(uint256_t));
+}
 
 /* serialize uint64_t to big endian byte32 */
 void put_u64(uint64_t value, uint8_t *output) {
@@ -259,6 +261,13 @@ void put_u64(uint64_t value, uint8_t *output) {
 void put_u128(uint128_t value, uint8_t *output) {
   uint8_t *value_le = (uint8_t *)(&value);
   for (size_t i = 0; i < 16; i++) {
+    *(output + 31 - i) = *(value_le + i);
+  }
+}
+
+void put_u256(uint256_t value, uint8_t *output) {
+  uint8_t *value_le = (uint8_t *)(&value);
+  for (size_t i = 0; i < 32; i++) {
     *(output + 31 - i) = *(value_le + i);
   }
 }

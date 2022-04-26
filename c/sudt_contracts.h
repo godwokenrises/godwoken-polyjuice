@@ -59,8 +59,8 @@ int balance_of_any_sudt(gw_context_t* ctx, const uint8_t* code_data,
   evmc_address address = *((evmc_address*)(input_src + 32 + 12));
 
   gw_reg_addr_t addr = new_reg_addr(address.bytes);
-  
-  uint128_t balance;
+
+  uint256_t balance;
   ret = sudt_get_balance(ctx, sudt_id, addr, &balance);
   if (ret == GW_ERROR_NOT_FOUND) {
     debug_print_int("[balance_of_any_sudt] sudt account not found", sudt_id);
@@ -73,7 +73,7 @@ int balance_of_any_sudt(gw_context_t* ctx, const uint8_t* code_data,
       return ERROR_BALANCE_OF_ANY_SUDT;
     }
   }
-  put_u128(balance, *output);
+  put_u256(balance, *output);
   return 0;
 }
 
@@ -118,8 +118,8 @@ int total_supply_of_any_sudt(gw_context_t* ctx, const uint8_t* code_data,
   *output_size = 32;
   memset(*output, 0, 32);
 
-  uint8_t total_supply_le[32] = {0};
-  ret = sudt_get_total_supply(ctx, sudt_id, total_supply_le);
+  uint256_t total_supply_le = {0};
+  ret = sudt_get_total_supply(ctx, sudt_id, &total_supply_le);
   if (ret == GW_ERROR_NOT_FOUND) {
     debug_print_int("sudt account not found", sudt_id);
     return 0;
@@ -132,8 +132,9 @@ int total_supply_of_any_sudt(gw_context_t* ctx, const uint8_t* code_data,
     }
   }
 
+  uint8_t* total_supply_le_bytes = (uint8_t*)&total_supply_le;
   for (size_t i = 0; i < 32; i++) {
-    (*output)[31 - i] = total_supply_le[i];
+    (*output)[31 - i] = total_supply_le_bytes[i];
   }
   return 0;
 }
@@ -198,12 +199,12 @@ int transfer_to_any_sudt(gw_context_t* ctx, const uint8_t* code_data,
   }
 
   uint32_t sudt_id = 0;
-  uint128_t amount = 0;
+  uint256_t amount = {0};
   ret = parse_u32(input_src, &sudt_id);
   if (ret != 0) {
     return ERROR_TRANSFER_TO_ANY_SUDT;
   }
-  ret = parse_u128(input_src + 96, &amount);
+  ret = parse_u256(input_src + 96, &amount);
   if (ret != 0) {
     return ERROR_TRANSFER_TO_ANY_SUDT;
   }
