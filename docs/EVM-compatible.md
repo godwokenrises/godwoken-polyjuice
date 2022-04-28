@@ -39,6 +39,12 @@ When you send an Ethereum transaction, the transaction is converted to Godwoken 
 | GASLIMIT | `block.gaslimit` | 12,500,000 | current block's gas limit |
 | DIFFICULTY | `block.difficulty` | 2,500,000,000,000,000 | current block's difficulty |
 
+### Restriction of memory usage
+
+Polyjuice runs EVM on ckb-vm. While EVM has no limit on memory usage (despite the limit of 1024 on stack depth for EVM), ckb-vm can use a maximum of 4MB of memory for now.
+Of which, 3MB for heap space and 1MB for stack space. See more details in [here](https://github.com/nervosnetwork/riscv-newlib/blob/00c6ae3c481bc62b4ac016b3e86c508cdf2e68d2/libgloss/riscv/sys_sbrk.c#L38-L56). 
+For some contracts that consume a lot of memory or that have deep call stacks, this may indicate a potential incompatibility on ckb-vm.
+
 ## Others
 
 * Transaction context
