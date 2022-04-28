@@ -13,10 +13,6 @@ Recall that in Ethereum, the gas of each smart contract is calculated. The trans
 
 Note when sending a transaction to a smart contract for certain behavior, the `value` of the transaction is `pCKB`.
 
-## Account Abstraction
-
-Polyjuice only provides [contract accounts](https://ethereum.org/en/glossary/#contract-account). Godwoken's user accounts are leveraged to act as [EOAs](https://ethereum.org/en/glossary/#eoa).
-
 ## All Tokens Are ERC20 Tokens
 
 Ethereum differs in the processing of ERC20 tokens, and native ETH tokens. This is also the reason why wETH is invented. Godwoken conceals this difference:

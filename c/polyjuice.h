@@ -862,7 +862,7 @@ int create_new_account(gw_context_t* ctx,
   /* contract account script.args
      Include:
      - [32 bytes] rollup type hash
-     - [ 4 bytes] creator account id (chain id)
+     - [ 4 bytes] little endian creator_account_id, it's Polyjuice Root Account
      - [20 bytes] keccak256(data)[12..]
   */
   memcpy(script_args, g_rollup_script_hash, 32);

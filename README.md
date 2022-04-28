@@ -58,34 +58,37 @@ Polyjuice creator account is a Godwoken account for creating Polyjuice contract 
 code_hash: polyjuice_validator_type_script_hash
 hash_type: type
 args:
-    rollup_type_hash   : [u8; 32]
-    creator_account_id : u32        (little endian, also chain id, and for reading 'sudt_id' from creator account script)
-    info_data_hash     : [u8; 20]   (The information to be hashed is depend on how the account been created: [normal, create2], 
-                                      the 20 bytes value is keccak256(info_data)[12..])
+    rollup_type_hash   : [u8; 32]   (the rollup type hash of the current Godwoken deployment)
+    creator_account_id : u32        (little endian, it's the ID of Polyjuice Root Account)
+    contract_address   : [u8; 20]   (this 20 bytes value is keccak256(info_data)[12..], and the
+                                     `info_data` to be hashed depends on how the account was
+                                     created: `CREATE` or `CREATE2`)
 ```
 
-#### Normal contract account script
+The `contract_address` could be calculated through 2 ways:
+
+#### 1. Normal contract account script
 The Polyjuice contract account created in Polyjuice by `CREATE` call kind or Opcode.
 ```
 info_content:
-    sender_address  : [u8; 20]   (the msg.sender: blake128(sender_script) + account id)
-    sender_nonce    : u32 
+    sender_address  : [u8; 20]   (the sender's eth_address)
+    sender_nonce    : u32        (the transaction counter of the sender account)
     
 info_data: rlp_encode(sender_address, sender_nonce)
 ```
 
-#### Create2 contract account script
+#### 2. Create2 contract account script
 The Polyjuice contract account created in Polyjuice by `CREATE2` Opcode.
 ```
 info_data:
     special_byte    : u8         (value is '0xff', refer to Ethereum)
-    sender_address  : [u8; 20]   (the msg.sender: blake128(sender_script) + account id)
+    sender_address  : [u8; 20]   (the sender's eth_address)
     create2_salt    : [u8; 32]   (create2 salt)
     init_code_hash  : [u8; 32]   (keccak256(init_code))
 ```
 
-### Address used in Polyjuice
-In the latest version of Polyjuice, the [EOA](https://ethereum.org/en/glossary/#eoa) address is native `eth_address`, which is the rightmost 160 bits of a Keccak hash of an ECDSA public key. While the address for an Polyjuice contract is deterministically computed from the address of its creator (sender) and how many transactions the creator has sent (nonce). The sender and nonce are RLP encoded and then hashed with Keccak-256.
+### EOA Address used in Polyjuice
+Polyjuice only provides contract accounts. Godwoken's user account is leveraged to act as externally owned account (EOA). In the latest version of Polyjuice, the EOA address is native `eth_address`, which is the rightmost 160 bits of a Keccak hash of an ECDSA public key.
 
 
 [rawl2tx-args]: https://github.com/nervosnetwork/godwoken/blob/develop/crates/types/schemas/godwoken.mol#L60
