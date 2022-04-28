@@ -4,8 +4,6 @@ Polyjuice aims at 100% EVM compatibility as a goal, meaning we plan to support a
 
 ## EVM revision
 The maximum EVM revision supported is `EVMC_BERLIN`.
-- [ ] support EVMC_LONDON
-- [ ] support EVMC_SHANGHAI
 
 ## pCKB
 
