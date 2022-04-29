@@ -23,12 +23,12 @@ fn test_selfdestruct() {
 
     let from_eth_address = [1u8; 20];
     let (from_id, _from_script_hash) =
-        create_eth_eoa_account(&mut state, &from_eth_address, 200000);
+        create_eth_eoa_account(&mut state, &from_eth_address, 200000u64.into());
 
     let beneficiary_eth_addr = [2u8; 20];
     let beneficiary_ethabi_addr = eth_addr_to_ethabi_addr(&beneficiary_eth_addr);
     let (_beneficiary_id, _beneficiary_script_hash) =
-        create_eth_eoa_account(&mut state, &beneficiary_eth_addr, 0);
+        create_eth_eoa_account(&mut state, &beneficiary_eth_addr, 0u64.into());
     let beneficiary_reg_addr =
         RegistryAddress::new(ETH_REGISTRY_ACCOUNT_ID, beneficiary_eth_addr.to_vec());
     assert_eq!(

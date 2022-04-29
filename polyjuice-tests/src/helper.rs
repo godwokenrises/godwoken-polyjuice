@@ -687,7 +687,7 @@ pub(crate) fn create_block_producer(state: &mut DummyState) -> RegistryAddress {
 pub(crate) fn create_eth_eoa_account(
     state: &mut DummyState,
     eth_address: &[u8; 20],
-    mint_ckb: impl Into<U256>,
+    mint_ckb: U256,
 ) -> (u32, [u8; 32]) {
     let script = build_eth_l2_script(eth_address);
     let script_hash = script.hash();
@@ -756,7 +756,7 @@ pub(crate) fn eth_address_regiser(
         SetMappingArgs::One(gw_script_hash) => {
             let fee = Fee::new_builder()
                 .registry_id(ETH_REGISTRY_ACCOUNT_ID.pack())
-                .amount(U256::from(1000u64).pack())
+                .amount(1000u128.pack())
                 .build();
             let set_mapping = SetMapping::new_builder()
                 .fee(fee)
@@ -770,7 +770,7 @@ pub(crate) fn eth_address_regiser(
         SetMappingArgs::Batch(gw_script_hashes) => {
             let fee = Fee::new_builder()
                 .registry_id(ETH_REGISTRY_ACCOUNT_ID.pack())
-                .amount(U256::from(1000u64).pack())
+                .amount(1000u128.pack())
                 .build();
             let batch_set_mapping = BatchSetMapping::new_builder()
                 .fee(fee)

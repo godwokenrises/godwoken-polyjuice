@@ -24,7 +24,7 @@ fn test_invalid_sudt_erc20_proxy() {
 
     let from_eth_address1 = [1u8; 20];
     let (from_id1, from_script_hash1) =
-        helper::create_eth_eoa_account(&mut state, &from_eth_address1, 2000000);
+        helper::create_eth_eoa_account(&mut state, &from_eth_address1, 2000000u64.into());
     let address1 = state
         .get_registry_address_by_script_hash(ETH_REGISTRY_ACCOUNT_ID, &from_script_hash1.into())
         .unwrap()
@@ -32,7 +32,7 @@ fn test_invalid_sudt_erc20_proxy() {
 
     let from_eth_address2 = [2u8; 20];
     let (_from_id2, from_script_hash2) =
-        helper::create_eth_eoa_account(&mut state, &from_eth_address2, 2000000);
+        helper::create_eth_eoa_account(&mut state, &from_eth_address2, 2000000u64.into());
     let address2 = state
         .get_registry_address_by_script_hash(ETH_REGISTRY_ACCOUNT_ID, &from_script_hash2.into())
         .unwrap()
@@ -40,7 +40,7 @@ fn test_invalid_sudt_erc20_proxy() {
 
     let from_eth_address3 = [3u8; 20];
     let (_from_id3, _from_script_hash3) =
-        helper::create_eth_eoa_account(&mut state, &from_eth_address3, 2000000);
+        helper::create_eth_eoa_account(&mut state, &from_eth_address3, 2000000u64.into());
 
     // Deploy InvalidSudtERC20Proxy
     // ethabi encode params -v string "test" -v string "tt" -v uint256 000000000000000000000000000000000000000204fce5e3e250261100000000 -v uint256 0000000000000000000000000000000000000000000000000000000000000001
@@ -77,7 +77,11 @@ fn test_invalid_sudt_erc20_proxy() {
     let eoa2_hex = hex::encode(eth_addr_to_ethabi_addr(&from_eth_address2));
 
     state
-        .mint_sudt(new_sudt_id, &address1, 160000000000000000000000000000u128)
+        .mint_sudt(
+            new_sudt_id,
+            &address1,
+            U256::from(160000000000000000000000000000u128),
+        )
         .unwrap();
 
     assert_eq!(

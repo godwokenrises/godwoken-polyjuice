@@ -20,7 +20,7 @@ fn test_parse_log_event() {
 
     let from_eth_addr = [1u8; 20];
     let (from_id, from_script_hash) =
-        crate::helper::create_eth_eoa_account(&mut state, &from_eth_addr, 200000);
+        crate::helper::create_eth_eoa_account(&mut state, &from_eth_addr, 200000u64.into());
     let address = state
         .get_registry_address_by_script_hash(ETH_REGISTRY_ACCOUNT_ID, &from_script_hash.into())
         .unwrap()

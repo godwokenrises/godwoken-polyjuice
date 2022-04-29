@@ -17,7 +17,7 @@ fn test_account_already_exists() {
 
     let from_eth_address = [1u8; 20];
     let (from_id, _from_script_hash) =
-        helper::create_eth_eoa_account(&mut state, &from_eth_address, 400000);
+        helper::create_eth_eoa_account(&mut state, &from_eth_address, 400000u64.into());
 
     let created_ss_account_script = new_contract_account_script_with_nonce(&from_eth_address, 0);
     let created_ss_account_id = state

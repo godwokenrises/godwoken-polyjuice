@@ -61,7 +61,7 @@ fn test_update_eth_addr_reg_by_contract() {
     // init accounts
     let from_eth_address = [1u8; 20];
     let (from_id, _from_script_hash) =
-        helper::create_eth_eoa_account(&mut state, &from_eth_address, 400000);
+        helper::create_eth_eoa_account(&mut state, &from_eth_address, U256::from(400000u64));
 
     // create a new EOA which is not registered
     let eth_eoa_address = [0xeeu8; 20];
@@ -78,7 +78,7 @@ fn test_update_eth_addr_reg_by_contract() {
         U256::zero()
     );
     state /* mint CKB to pay fee */
-        .mint_sudt(CKB_SUDT_ACCOUNT_ID, &address, 52000)
+        .mint_sudt(CKB_SUDT_ACCOUNT_ID, &address, U256::from(52000u64))
         .unwrap();
     assert_eq!(
         state
@@ -199,7 +199,7 @@ fn test_batch_set_mapping_by_contract() {
     // init accounts
     let from_eth_address = [1u8; 20];
     let (from_id, _from_script_hash) =
-        helper::create_eth_eoa_account(&mut state, &from_eth_address, 400000u64);
+        helper::create_eth_eoa_account(&mut state, &from_eth_address, U256::from(400000u64));
 
     // create new EOAs which is not registered
     let eth_eoa_addresses = vec![[0xeeu8; 20], [0xefu8; 20]];
@@ -218,7 +218,7 @@ fn test_batch_set_mapping_by_contract() {
             U256::zero()
         );
         state /* mint CKB to pay fee */
-            .mint_sudt(CKB_SUDT_ACCOUNT_ID, &address, 200000u64)
+            .mint_sudt(CKB_SUDT_ACCOUNT_ID, &address, U256::from(200000u64))
             .unwrap();
         assert_eq!(
             state

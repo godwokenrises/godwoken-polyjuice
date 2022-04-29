@@ -42,7 +42,7 @@ fn test_get_block_info() {
 
     let from_eth_address = [1u8; 20];
     let (from_id, _from_script_hash) =
-        crate::helper::create_eth_eoa_account(&mut state, &from_eth_address, 400000);
+        crate::helper::create_eth_eoa_account(&mut state, &from_eth_address, 400000u64.into());
 
     // Deploy BlockInfo
     let mut block_number = 0x05;
