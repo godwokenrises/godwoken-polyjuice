@@ -9,7 +9,7 @@ use gw_common::{builtins::ETH_REGISTRY_ACCOUNT_ID, state::State};
 use gw_generator::traits::StateExt;
 use gw_store::chain_view::ChainView;
 use gw_store::traits::chain_store::ChainStore;
-use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
+use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*, U256};
 
 const INIT_CODE: &str = include_str!("./evm-contracts/LogEvents.bin");
 
@@ -20,7 +20,7 @@ fn test_parse_log_event() {
 
     let from_eth_addr = [1u8; 20];
     let (from_id, from_script_hash) =
-        crate::helper::create_eth_eoa_account(&mut state, &from_eth_addr, 200000);
+        crate::helper::create_eth_eoa_account(&mut state, &from_eth_addr, 200000u64.into());
     let address = state
         .get_registry_address_by_script_hash(ETH_REGISTRY_ACCOUNT_ID, &from_script_hash.into())
         .unwrap()
@@ -29,7 +29,7 @@ fn test_parse_log_event() {
     let from_balance1 = state
         .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &address)
         .unwrap();
-    assert_eq!(from_balance1, 200000);
+    assert_eq!(from_balance1, U256::from(200000u64));
 
     let mut block_number = 0;
     let deploy_value = 0xfa;
@@ -75,7 +75,7 @@ fn test_parse_log_event() {
         {
             assert_eq!(&the_from_addr, &address);
             assert_eq!(&the_to_addr, &contract_addr);
-            assert_eq!(amount, deploy_value);
+            assert_eq!(amount, U256::from(deploy_value));
         } else {
             panic!("unexpected polyjuice log");
         }
@@ -142,7 +142,7 @@ fn test_parse_log_event() {
             assert_eq!(&the_from_addr, &address);
             // The block producer id is `0`
             assert_eq!(&the_to_addr, &block_producer);
-            assert_eq!(amount, 1814);
+            assert_eq!(amount, U256::from(1814u64));
         } else {
             panic!("unexpected polyjuice log");
         }

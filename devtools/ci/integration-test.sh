@@ -15,8 +15,8 @@ else
     git clone --depth=1 https://github.com/nervosnetwork/godwoken.git $GODWOKEN_DIR
 fi
 cd $GODWOKEN_DIR
-# checkout https://github.com/nervosnetwork/godwoken/pull/659/head
-git fetch origin 0dd1500455ca81c23addadff05399925921aa352
+# checkout https://github.com/nervosnetwork/godwoken/pull/675/merge
+git fetch origin pull/675/merge
 git checkout FETCH_HEAD 
 git submodule update --init --recursive --depth=1
 

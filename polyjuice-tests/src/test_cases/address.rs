@@ -18,7 +18,7 @@ fn test_get_contract_code() {
 
     let from_eth_address = [1u8; 20];
     let (from_id, _from_script_hash) =
-        helper::create_eth_eoa_account(&mut state, &from_eth_address, 400000);
+        helper::create_eth_eoa_account(&mut state, &from_eth_address, 400000u64.into());
 
     // Deploy contract
     let mut block_number = 1;

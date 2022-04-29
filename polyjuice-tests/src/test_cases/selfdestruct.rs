@@ -12,7 +12,7 @@ use gw_common::{
 use gw_generator::traits::StateExt;
 use gw_store::chain_view::ChainView;
 use gw_store::traits::chain_store::ChainStore;
-use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
+use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*, U256};
 
 const INIT_CODE: &str = include_str!("./evm-contracts/SelfDestruct.bin");
 
@@ -23,19 +23,19 @@ fn test_selfdestruct() {
 
     let from_eth_address = [1u8; 20];
     let (from_id, _from_script_hash) =
-        create_eth_eoa_account(&mut state, &from_eth_address, 200000);
+        create_eth_eoa_account(&mut state, &from_eth_address, 200000u64.into());
 
     let beneficiary_eth_addr = [2u8; 20];
     let beneficiary_ethabi_addr = eth_addr_to_ethabi_addr(&beneficiary_eth_addr);
     let (_beneficiary_id, _beneficiary_script_hash) =
-        create_eth_eoa_account(&mut state, &beneficiary_eth_addr, 0);
+        create_eth_eoa_account(&mut state, &beneficiary_eth_addr, 0u64.into());
     let beneficiary_reg_addr =
         RegistryAddress::new(ETH_REGISTRY_ACCOUNT_ID, beneficiary_eth_addr.to_vec());
     assert_eq!(
         state
             .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &beneficiary_reg_addr)
             .unwrap(),
-        0
+        U256::zero()
     );
 
     {
@@ -87,13 +87,13 @@ fn test_selfdestruct() {
         state
             .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &contract_reg_addr)
             .unwrap(),
-        200
+        U256::from(200)
     );
     assert_eq!(
         state
             .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &beneficiary_reg_addr)
             .unwrap(),
-        0
+        U256::zero()
     );
     {
         // call SelfDestruct.done();
@@ -130,13 +130,13 @@ fn test_selfdestruct() {
         state
             .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &contract_reg_addr)
             .unwrap(),
-        0
+        U256::zero()
     );
     assert_eq!(
         state
             .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &beneficiary_reg_addr)
             .unwrap(),
-        200
+        U256::from(200u64)
     );
 
     {

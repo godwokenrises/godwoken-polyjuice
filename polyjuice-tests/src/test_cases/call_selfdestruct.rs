@@ -11,7 +11,7 @@ use gw_common::{
 use gw_generator::traits::StateExt;
 use gw_store::chain_view::ChainView;
 use gw_store::traits::chain_store::ChainStore;
-use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
+use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*, U256};
 
 const SD_INIT_CODE: &str = include_str!("./evm-contracts/SelfDestruct.bin");
 const CALL_SD_INIT_CODE: &str = include_str!("./evm-contracts/CallSelfDestruct.bin");
@@ -22,18 +22,20 @@ fn test_selfdestruct() {
     let block_producer_id = helper::create_block_producer(&mut state);
 
     let from_eth_address = [1u8; 20];
-    let (from_id, _) = helper::create_eth_eoa_account(&mut state, &from_eth_address, 300000);
+    let (from_id, _) =
+        helper::create_eth_eoa_account(&mut state, &from_eth_address, 300000u64.into());
 
     let beneficiary_eth_addr = [2u8; 20];
     let beneficiary_ethabi_addr = eth_addr_to_ethabi_addr(&beneficiary_eth_addr);
-    let (_beneficiary_id, _) = helper::create_eth_eoa_account(&mut state, &beneficiary_eth_addr, 0);
+    let (_beneficiary_id, _) =
+        helper::create_eth_eoa_account(&mut state, &beneficiary_eth_addr, 0u64.into());
     let beneficiary_address =
         RegistryAddress::new(ETH_REGISTRY_ACCOUNT_ID, beneficiary_eth_addr.to_vec());
     assert_eq!(
         state
             .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &beneficiary_address)
             .unwrap(),
-        0
+        U256::zero()
     );
 
     // deploy SelfDestruct
@@ -71,13 +73,13 @@ fn test_selfdestruct() {
         state
             .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &sd_address)
             .unwrap(),
-        200
+        U256::from(200u64)
     );
     assert_eq!(
         state
             .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &beneficiary_address)
             .unwrap(),
-        0
+        U256::zero()
     );
 
     // deploy CallSelfDestruct
@@ -152,13 +154,13 @@ fn test_selfdestruct() {
         state
             .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &sd_address)
             .unwrap(),
-        0
+        U256::zero()
     );
     assert_eq!(
         state
             .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &beneficiary_address)
             .unwrap(),
-        200
+        U256::from(200u64)
     );
 
     block_number += 1;

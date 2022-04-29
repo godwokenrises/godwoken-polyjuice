@@ -20,15 +20,15 @@ fn test_erc20() {
 
     let from_eth_address1 = [1u8; 20];
     let (from_id1, _from_script_hash1) =
-        helper::create_eth_eoa_account(&mut state, &from_eth_address1, 2000000);
+        helper::create_eth_eoa_account(&mut state, &from_eth_address1, 2000000u64.into());
 
     let from_eth_address2 = [2u8; 20];
     let (_from_id2, _from_script_hash2) =
-        helper::create_eth_eoa_account(&mut state, &from_eth_address2, 0);
+        helper::create_eth_eoa_account(&mut state, &from_eth_address2, 0u64.into());
 
     let from_eth_address3 = [3u8; 20];
     let (from_id3, _from_script_hash3) =
-        helper::create_eth_eoa_account(&mut state, &from_eth_address3, 80000);
+        helper::create_eth_eoa_account(&mut state, &from_eth_address3, 80000u64.into());
 
     // Deploy ERC20
     let run_result = deploy(

@@ -5,23 +5,24 @@
 #include <string.h>
 
 #include "ckb_syscalls.h"
-#include "godwoken.h"
-#include "gw_eth_addr_reg.h"
 
 #include <ethash/keccak.hpp>
 #include <evmc/evmc.h>
 #include <evmc/evmc.hpp>
 #include <evmone/evmone.h>
 
+#include "uint256.h"
+
 /* https://stackoverflow.com/a/1545079 */
 #pragma push_macro("errno")
 #undef errno
+#include "godwoken.h"
+#include "gw_eth_addr_reg.h"
 #include "gw_syscalls.h"
+#include "sudt_utils.h"
 #pragma pop_macro("errno")
 
 #include "common.h"
-
-#include "sudt_utils.h"
 #include "polyjuice_errors.h"
 #include "polyjuice_utils.h"
 
@@ -31,7 +32,6 @@
 #include "validator/secp256k1_helper.h"
 #endif
 #include "contracts.h"
-
 
 #define is_create(kind) ((kind) == EVMC_CREATE || (kind) == EVMC_CREATE2)
 #define is_special_call(kind) \
@@ -124,6 +124,7 @@ int load_account_script(gw_context_t* gw_ctx, uint32_t account_id,
   return 0;
 }
 
+// TODO: change gas_limit, gas_price, value to u256
 /**
    Message = [
      header     : [u8; 8]            0xff, 0xff, 0xff, "POLY", call_kind
@@ -508,22 +509,22 @@ evmc_uint256be get_balance(struct evmc_host_context* context,
 
   gw_reg_addr_t addr = new_reg_addr(address->bytes);
 
-  uint128_t value_u128 = 0;
+  uint256_t value = {0};
   int ret = sudt_get_balance(context->gw_ctx,
                              g_sudt_id, /* g_sudt_id account must exists */
-                             addr, &value_u128);
+                             addr, &value);
   if (ret != 0) {
     ckb_debug("sudt_get_balance failed");
     context->error_code = FATAL_POLYJUICE;
     return balance;
   }
 
-  uint8_t* value_ptr = (uint8_t*)(&value_u128);
-  for (int i = 0; i < 16; i++) {
+  uint8_t* value_ptr = (uint8_t*)(&value);
+  for (int i = 0; i < 32; i++) {
     balance.bytes[31 - i] = *(value_ptr + i);
   }
   debug_print_data("address", address->bytes, 20);
-  debug_print_int("balance", value_u128);
+  debug_print_data("balance", (uint8_t*)&value, 32);
   ckb_debug("END get_balance");
   return balance;
 }
@@ -533,7 +534,7 @@ void selfdestruct(struct evmc_host_context* context,
                   const evmc_address* beneficiary) {
   gw_reg_addr_t from_addr = new_reg_addr(address->bytes);
 
-  uint128_t balance;
+  uint256_t balance;
   int ret = sudt_get_balance(context->gw_ctx,
                              g_sudt_id, /* g_sudt_id account must exists */
                              from_addr, &balance);
@@ -543,7 +544,8 @@ void selfdestruct(struct evmc_host_context* context,
     return;
   }
 
-  if (balance > 0) {
+  uint256_t zero = {0};
+  if (uint256_cmp(balance, zero) == LARGER) {
     gw_reg_addr_t to_addr = new_reg_addr(beneficiary->bytes);
 
     ret = sudt_transfer(context->gw_ctx, g_sudt_id,
@@ -906,18 +908,14 @@ int create_new_account(gw_context_t* ctx,
 int handle_transfer(gw_context_t* ctx,
                     const evmc_message* msg,
                     bool to_address_is_eoa) {
-  uint8_t value_u128_bytes[16];
-  for (int i = 0; i < 16; i++) {
-    if (msg->value.bytes[i] != 0) {
-      ckb_debug("[handle_transfer] transfer value can not larger than u128::max()");
-      return FATAL_POLYJUICE;
-    }
-    value_u128_bytes[i] = msg->value.bytes[31 - i];
+  uint256_t value;
+  uint8_t* value_ptr = (uint8_t*)&value;
+  for (int i = 0; i < 32; i++) {
+    value_ptr[i] = msg->value.bytes[31 - i];
   }
-  uint128_t value_u128 = *(uint128_t*)value_u128_bytes;
   debug_print_data("[handle_transfer] sender", msg->sender.bytes, 20);
   debug_print_data("[handle_transfer] destination", msg->destination.bytes, 20);
-  debug_print_int("[handle_transfer] msg->value", value_u128);
+  debug_print_data("[handle_transfer] msg->value", (uint8_t*)&value, 32);
 
   if (msg->kind == EVMC_CALL
    && memcmp(msg->sender.bytes, g_tx_origin.bytes, 20) == 0
@@ -929,13 +927,11 @@ int handle_transfer(gw_context_t* ctx,
   gw_reg_addr_t from_addr = new_reg_addr(msg->sender.bytes);
   gw_reg_addr_t to_addr = new_reg_addr(msg->destination.bytes);
 
-  if (value_u128 == 0) {
+  uint256_t zero = {0};
+  if (uint256_cmp(value, zero) == EQUAL) {
     return 0;
   }
-  int ret = sudt_transfer(ctx, g_sudt_id,
-                      from_addr,
-                      to_addr,
-                      value_u128);
+  int ret = sudt_transfer(ctx, g_sudt_id, from_addr, to_addr, value);
   if (ret != 0) {
     ckb_debug("[handle_transfer] sudt_transfer failed");
     return ret;
@@ -1368,9 +1364,11 @@ int run_polyjuice() {
 
   gw_reg_addr_t sender_addr = new_reg_addr(msg.sender.bytes);
 
-  ret = sudt_pay_fee(&context,
-                     g_sudt_id, /* g_sudt_id must already exists */
-                     sender_addr, fee);
+  uint256_t fee_u256 = {0};
+  memcpy((uint8_t *)(&fee_u256), (uint8_t*)(&fee), 16);
+
+  ret = sudt_pay_fee(&context, g_sudt_id, /* g_sudt_id must already exists */
+                     sender_addr, fee_u256);
   if (ret != 0) {
     debug_print_int("[run_polyjuice] pay fee to block_producer failed", ret);
     return clean_evmc_result_and_return(&res, ret);
@@ -1378,7 +1376,7 @@ int run_polyjuice() {
 
   // call the SYS_PAY_FEE syscall to record the fee
   // NOTICE: this function do not actually execute the transfer of assets
-  ret = sys_pay_fee(&context, sender_addr, g_sudt_id, fee);
+  ret = sys_pay_fee(&context, sender_addr, g_sudt_id, fee_u256);
   if (ret != 0) {
     debug_print_int("[run_polyjuice] Record fee payment failed", ret);
     return clean_evmc_result_and_return(&res, ret);

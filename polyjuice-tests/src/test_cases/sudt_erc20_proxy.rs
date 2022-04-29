@@ -13,7 +13,7 @@ use gw_common::state::State;
 use gw_generator::{dummy_state::DummyState, error::TransactionError, traits::StateExt, Generator};
 use gw_store::traits::chain_store::ChainStore;
 use gw_store::{chain_view::ChainView, Store};
-use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
+use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*, U256};
 
 fn test_sudt_erc20_proxy_inner(
     generator: &Generator,
@@ -27,17 +27,17 @@ fn test_sudt_erc20_proxy_inner(
 
     let from_eth_address1 = [1u8; 20];
     let (from_id1, _from_script_hash1) =
-        helper::create_eth_eoa_account(state, &from_eth_address1, 2000000);
+        helper::create_eth_eoa_account(state, &from_eth_address1, 2000000u64.into());
     let from_reg_addr1 = RegistryAddress::new(ETH_REGISTRY_ACCOUNT_ID, from_eth_address1.to_vec());
 
     let from_eth_address2 = [2u8; 20];
     let (_from_id2, _from_script_hash2) =
-        helper::create_eth_eoa_account(state, &from_eth_address2, 2000000);
+        helper::create_eth_eoa_account(state, &from_eth_address2, 2000000u64.into());
     let from_reg_addr2 = RegistryAddress::new(ETH_REGISTRY_ACCOUNT_ID, from_eth_address2.to_vec());
 
     let from_eth_address3 = [3u8; 20];
     let (from_id3, _from_script_hash3) =
-        helper::create_eth_eoa_account(state, &from_eth_address3, 2000000);
+        helper::create_eth_eoa_account(state, &from_eth_address3, 2000000u64.into());
     let from_reg_addr3 = RegistryAddress::new(ETH_REGISTRY_ACCOUNT_ID, from_eth_address3.to_vec());
 
     // Deploy SudtERC20Proxy_UserDefinedDecimals
@@ -77,7 +77,7 @@ fn test_sudt_erc20_proxy_inner(
         .mint_sudt(
             new_sudt_id,
             &from_reg_addr1,
-            160000000000000000000000000000u128,
+            U256::from(160000000000000000000000000000u128),
         )
         .unwrap();
 
@@ -85,19 +85,19 @@ fn test_sudt_erc20_proxy_inner(
         state
             .get_sudt_balance(new_sudt_id, &from_reg_addr1)
             .unwrap(),
-        160000000000000000000000000000u128
+        U256::from(160000000000000000000000000000u128)
     );
     assert_eq!(
         state
             .get_sudt_balance(new_sudt_id, &from_reg_addr2)
             .unwrap(),
-        0
+        U256::zero()
     );
     assert_eq!(
         state
             .get_sudt_balance(new_sudt_id, &from_reg_addr3)
             .unwrap(),
-        0
+        U256::zero()
     );
 
     let total_supply = {

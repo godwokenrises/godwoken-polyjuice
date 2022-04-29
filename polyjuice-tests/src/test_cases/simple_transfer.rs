@@ -12,7 +12,7 @@ use gw_common::{
 use gw_generator::traits::StateExt;
 use gw_store::chain_view::ChainView;
 use gw_store::traits::chain_store::ChainStore;
-use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
+use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*, U256};
 use std::convert::TryInto;
 
 const SS_INIT_CODE: &str = include_str!("./evm-contracts/SimpleStorage.bin");
@@ -23,15 +23,15 @@ fn test_simple_transfer() {
     let (store, mut state, generator) = setup();
     let block_producer_id = helper::create_block_producer(&mut state);
 
-    let mint_balance: u128 = 400000;
+    let mint_balance = U256::from(400000u128);
     let from_eth_address = [1u8; 20];
     let (from_id, _from_script_hash) =
-        helper::create_eth_eoa_account(&mut state, &from_eth_address, mint_balance);
+        helper::create_eth_eoa_account(&mut state, &from_eth_address, mint_balance.into());
     let from_addr = RegistryAddress::new(ETH_REGISTRY_ACCOUNT_ID, from_eth_address.to_vec());
 
     let target_eth_addr = [2u8; 20];
     let (target_id, _target_script_hash) =
-        helper::create_eth_eoa_account(&mut state, &target_eth_addr, 0);
+        helper::create_eth_eoa_account(&mut state, &target_eth_addr, 0u64.into());
     let target_reg_addr = RegistryAddress::new(ETH_REGISTRY_ACCOUNT_ID, target_eth_addr.to_vec());
 
     let from_balance = state
@@ -41,7 +41,7 @@ fn test_simple_transfer() {
     let target_balance = state
         .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &target_reg_addr)
         .unwrap();
-    assert_eq!(target_balance, 0);
+    assert_eq!(target_balance, U256::zero());
 
     // Deploy SimpleStorage
     let mut block_number = 0;
@@ -79,7 +79,7 @@ fn test_simple_transfer() {
     let ss_balance = state
         .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &ss_reg_addr)
         .unwrap();
-    assert_eq!(ss_balance, 0);
+    assert_eq!(ss_balance, U256::zero());
     let run_result = simple_storage_get(
         &store,
         &state,
@@ -128,7 +128,7 @@ fn test_simple_transfer() {
     let st_contract_balance = state
         .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &st_contract_reg_addr)
         .unwrap();
-    assert_eq!(st_contract_balance, deploy_value);
+    assert_eq!(st_contract_balance, U256::from(deploy_value));
 
     println!("================");
     println!(
@@ -178,11 +178,11 @@ fn test_simple_transfer() {
         let new_balance = state
             .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &st_contract_reg_addr)
             .unwrap();
-        assert_eq!(new_balance, old_balance - 1);
+        assert_eq!(new_balance, old_balance - 1u64);
         let target_balance = state
             .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &target_reg_addr)
             .unwrap();
-        assert_eq!(target_balance, 1);
+        assert_eq!(target_balance, U256::one());
     }
 
     // TODO: check this logic: can't transfer to zero_address{0}
@@ -285,11 +285,11 @@ fn test_simple_transfer() {
         let new_balance = state
             .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &st_contract_reg_addr)
             .unwrap();
-        assert_eq!(new_balance, old_balance - 1);
+        assert_eq!(new_balance, old_balance - 1u64);
         let ss_balance = state
             .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &ss_reg_addr)
             .unwrap();
-        assert_eq!(ss_balance, 1);
+        assert_eq!(ss_balance, U256::one());
         println!("================");
         let run_result = simple_storage_get(
             &store,
@@ -344,11 +344,11 @@ fn test_simple_transfer() {
         let new_balance = state
             .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &st_contract_reg_addr)
             .unwrap();
-        assert_eq!(new_balance, old_balance - 1);
+        assert_eq!(new_balance, old_balance - 1u64);
         let ss_balance = state
             .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &ss_reg_addr)
             .unwrap();
-        assert_eq!(ss_balance, 2);
+        assert_eq!(ss_balance, U256::from(2u64));
         let run_result = simple_storage_get(
             &store,
             &state,

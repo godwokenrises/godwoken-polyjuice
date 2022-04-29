@@ -5,7 +5,7 @@ use crate::helper::{
 use gw_common::{registry_address::RegistryAddress, state::State};
 use gw_generator::{error::TransactionError, traits::StateExt};
 use gw_store::{chain_view::ChainView, traits::chain_store::ChainStore};
-use gw_types::{packed::RawL2Transaction, prelude::*};
+use gw_types::{packed::RawL2Transaction, prelude::*, U256};
 
 const SS_INIT_CODE: &str = include_str!("./evm-contracts/SimpleStorage.bin");
 
@@ -61,7 +61,7 @@ fn test_update_eth_addr_reg_by_contract() {
     // init accounts
     let from_eth_address = [1u8; 20];
     let (from_id, _from_script_hash) =
-        helper::create_eth_eoa_account(&mut state, &from_eth_address, 400000);
+        helper::create_eth_eoa_account(&mut state, &from_eth_address, U256::from(400000u64));
 
     // create a new EOA which is not registered
     let eth_eoa_address = [0xeeu8; 20];
@@ -75,16 +75,16 @@ fn test_update_eth_addr_reg_by_contract() {
         state
             .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &address)
             .unwrap(),
-        0u128
+        U256::zero()
     );
     state /* mint CKB to pay fee */
-        .mint_sudt(CKB_SUDT_ACCOUNT_ID, &address, 52000)
+        .mint_sudt(CKB_SUDT_ACCOUNT_ID, &address, U256::from(52000u64))
         .unwrap();
     assert_eq!(
         state
             .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &address)
             .unwrap(),
-        52000u128
+        U256::from(52000u128)
     );
 
     // update_eth_address_registry by `ETH Address Registry` layer2 contract
@@ -106,7 +106,7 @@ fn test_update_eth_addr_reg_by_contract() {
         state
             .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &address)
             .unwrap(),
-        51000u128
+        U256::from(51000u128)
     );
 
     // try to register the same account again
@@ -199,7 +199,7 @@ fn test_batch_set_mapping_by_contract() {
     // init accounts
     let from_eth_address = [1u8; 20];
     let (from_id, _from_script_hash) =
-        helper::create_eth_eoa_account(&mut state, &from_eth_address, 400000);
+        helper::create_eth_eoa_account(&mut state, &from_eth_address, U256::from(400000u64));
 
     // create new EOAs which is not registered
     let eth_eoa_addresses = vec![[0xeeu8; 20], [0xefu8; 20]];
@@ -215,16 +215,16 @@ fn test_batch_set_mapping_by_contract() {
             state
                 .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &address)
                 .unwrap(),
-            0u128
+            U256::zero()
         );
         state /* mint CKB to pay fee */
-            .mint_sudt(CKB_SUDT_ACCOUNT_ID, &address, 200000)
+            .mint_sudt(CKB_SUDT_ACCOUNT_ID, &address, U256::from(200000u64))
             .unwrap();
         assert_eq!(
             state
                 .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &address)
                 .unwrap(),
-            200000u128
+            U256::from(200000u128)
         );
     }
 

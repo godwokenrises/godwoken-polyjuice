@@ -26,7 +26,7 @@ fn test_recover_account() {
 
     let from_eth_address = [1u8; 20];
     let (from_id, _from_script_hash) =
-        helper::create_eth_eoa_account(&mut state, &from_eth_address, 200000);
+        helper::create_eth_eoa_account(&mut state, &from_eth_address, 200000u64.into());
 
     // Deploy RecoverAccount Contract
     let run_result = deploy(

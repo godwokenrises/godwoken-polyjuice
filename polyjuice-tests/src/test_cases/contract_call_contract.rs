@@ -23,7 +23,7 @@ fn test_contract_call_contract() {
 
     let from_eth_address = [1u8; 20];
     let (from_id, _from_script_hash) =
-        helper::create_eth_eoa_account(&mut state, &from_eth_address, 200000);
+        helper::create_eth_eoa_account(&mut state, &from_eth_address, 200000u64.into());
 
     // Deploy SimpleStorage
     let mut block_number = 1;
@@ -149,7 +149,7 @@ fn test_contract_call_non_exists_contract() {
 
     let from_eth_address = [1u8; 20];
     let (from_id, _from_script_hash) =
-        helper::create_eth_eoa_account(&mut state, &from_eth_address, 200000);
+        helper::create_eth_eoa_account(&mut state, &from_eth_address, 200000u64.into());
 
     // Deploy CallNonExistsContract
     let block_number = 1;
@@ -222,7 +222,7 @@ fn test_contract_call_non_exists_contract() {
     {
         // Call CallNonExistsContract.rawCall(address eoa_addr)
         let eoa_addr = [2u8; 20];
-        let (_, _script_hash) = create_eth_eoa_account(&mut state, &eoa_addr, 0);
+        let (_, _script_hash) = create_eth_eoa_account(&mut state, &eoa_addr, 0u64.into());
         let eoa_ethabi_addr = eth_addr_to_ethabi_addr(&eoa_addr);
         let input = hex::decode(format!("56c94e70{}", hex::encode(eoa_ethabi_addr))).unwrap();
         println!("{}", hex::encode(&input));

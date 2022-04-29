@@ -20,7 +20,7 @@ fn test_recursion_contract_call() {
 
     let from_eth_address = [1u8; 20];
     let (from_id, _from_script_hash) =
-        helper::create_eth_eoa_account(&mut state, &from_eth_address, 200000);
+        helper::create_eth_eoa_account(&mut state, &from_eth_address, 200000u64.into());
     let mut block_number = 1;
 
     // Deploy RecursionContract

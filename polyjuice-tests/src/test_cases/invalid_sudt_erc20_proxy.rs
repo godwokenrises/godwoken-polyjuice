@@ -9,7 +9,7 @@ use gw_common::{builtins::ETH_REGISTRY_ACCOUNT_ID, state::State};
 use gw_generator::{error::TransactionError, traits::StateExt};
 use gw_store::chain_view::ChainView;
 use gw_store::traits::chain_store::ChainStore;
-use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
+use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*, U256};
 
 const INVALID_SUDT_ERC20_PROXY_CODE: &str =
     include_str!("./evm-contracts/InvalidSudtERC20Proxy.bin");
@@ -24,7 +24,7 @@ fn test_invalid_sudt_erc20_proxy() {
 
     let from_eth_address1 = [1u8; 20];
     let (from_id1, from_script_hash1) =
-        helper::create_eth_eoa_account(&mut state, &from_eth_address1, 2000000);
+        helper::create_eth_eoa_account(&mut state, &from_eth_address1, 2000000u64.into());
     let address1 = state
         .get_registry_address_by_script_hash(ETH_REGISTRY_ACCOUNT_ID, &from_script_hash1.into())
         .unwrap()
@@ -32,7 +32,7 @@ fn test_invalid_sudt_erc20_proxy() {
 
     let from_eth_address2 = [2u8; 20];
     let (_from_id2, from_script_hash2) =
-        helper::create_eth_eoa_account(&mut state, &from_eth_address2, 2000000);
+        helper::create_eth_eoa_account(&mut state, &from_eth_address2, 2000000u64.into());
     let address2 = state
         .get_registry_address_by_script_hash(ETH_REGISTRY_ACCOUNT_ID, &from_script_hash2.into())
         .unwrap()
@@ -40,7 +40,7 @@ fn test_invalid_sudt_erc20_proxy() {
 
     let from_eth_address3 = [3u8; 20];
     let (_from_id3, _from_script_hash3) =
-        helper::create_eth_eoa_account(&mut state, &from_eth_address3, 2000000);
+        helper::create_eth_eoa_account(&mut state, &from_eth_address3, 2000000u64.into());
 
     // Deploy InvalidSudtERC20Proxy
     // ethabi encode params -v string "test" -v string "tt" -v uint256 000000000000000000000000000000000000000204fce5e3e250261100000000 -v uint256 0000000000000000000000000000000000000000000000000000000000000001
@@ -77,15 +77,25 @@ fn test_invalid_sudt_erc20_proxy() {
     let eoa2_hex = hex::encode(eth_addr_to_ethabi_addr(&from_eth_address2));
 
     state
-        .mint_sudt(new_sudt_id, &address1, 160000000000000000000000000000u128)
+        .mint_sudt(
+            new_sudt_id,
+            &address1,
+            U256::from(160000000000000000000000000000u128),
+        )
         .unwrap();
 
     assert_eq!(
         state.get_sudt_balance(new_sudt_id, &address1).unwrap(),
-        160000000000000000000000000000u128
+        U256::from(160000000000000000000000000000u128)
     );
-    assert_eq!(state.get_sudt_balance(new_sudt_id, &address2).unwrap(), 0);
-    assert_eq!(state.get_sudt_balance(new_sudt_id, &address2).unwrap(), 0);
+    assert_eq!(
+        state.get_sudt_balance(new_sudt_id, &address2).unwrap(),
+        U256::zero()
+    );
+    assert_eq!(
+        state.get_sudt_balance(new_sudt_id, &address2).unwrap(),
+        U256::zero()
+    );
     for (_idx, (from_id, args_str, success, return_data_str)) in [
         // balanceOf(eoa1)
         (
