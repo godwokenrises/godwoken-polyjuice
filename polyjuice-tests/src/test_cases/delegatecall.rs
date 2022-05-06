@@ -6,7 +6,7 @@ use crate::helper::{
     new_contract_account_script_with_nonce, setup, simple_storage_get, MockContractInfo,
     PolyjuiceArgsBuilder, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
-use gw_common::state::State;
+use gw_common::{state::State, builtins::CKB_SUDT_ACCOUNT_ID};
 use gw_generator::traits::StateExt;
 use gw_store::chain_view::ChainView;
 use gw_store::traits::chain_store::ChainStore;
@@ -18,7 +18,7 @@ const INIT_CODE: &str = include_str!("./evm-contracts/DelegateCall.bin");
 #[test]
 fn test_delegatecall() {
     let (store, mut state, generator) = setup();
-    let block_producer_id = helper::create_block_producer(&mut state);
+    let block_producer = helper::create_block_producer(&mut state);
 
     let from_eth_address = [1u8; 20];
     let (from_id, _from_script_hash) =
@@ -35,7 +35,7 @@ fn test_delegatecall() {
         SS_INIT_CODE,
         122000,
         0,
-        block_producer_id.clone(),
+        block_producer.clone(),
         block_number,
     );
     let ss_account_script = new_contract_account_script_with_nonce(&from_eth_address, 0);
@@ -55,7 +55,7 @@ fn test_delegatecall() {
         INIT_CODE,
         122000,
         0,
-        block_producer_id.clone(),
+        block_producer.clone(),
         block_number,
     );
     // [Deploy DelegateCall] used cycles: 753698 < 760K
@@ -74,6 +74,7 @@ fn test_delegatecall() {
     assert_eq!(state.get_nonce(from_id).unwrap(), 2);
     assert_eq!(state.get_nonce(ss_account_id).unwrap(), 0);
     assert_eq!(state.get_nonce(delegate_contract_id).unwrap(), 0);
+
     /*
      * In a delegatecall, only the code of the given address is used, all other aspects (storage,
      * balance, …) are taken from the current contract.
@@ -81,6 +82,7 @@ fn test_delegatecall() {
      * The user has to ensure that the layout of storage in both contracts is suitable for
      * delegatecall to be used.
      */
+    const MSG_VALUE: u128 = 17;
     for (fn_sighash, expected_return_value) in [
         // DelegateCall.set(address, uint) => used cycles: 1002251
         (
@@ -101,7 +103,7 @@ fn test_delegatecall() {
     .iter()
     {
         block_number += 1;
-        let block_info = new_block_info(block_producer_id.clone(), block_number, block_number);
+        let block_info = new_block_info(block_producer.clone(), block_number, block_number);
         let input = hex::decode(format!(
             "{}{}{}",
             fn_sighash,
@@ -112,7 +114,7 @@ fn test_delegatecall() {
         let args = PolyjuiceArgsBuilder::default()
             .gas_limit(200000)
             .gas_price(1)
-            .value(0)
+            .value(MSG_VALUE)
             .input(&input)
             .build();
         let raw_tx = RawL2Transaction::new_builder()
@@ -153,7 +155,11 @@ fn test_delegatecall() {
             hex::decode(expected_return_value).unwrap()
         );
     }
-
+    // check the balance of DelegateCall contract
+    let delegate_contract_balance = state
+        .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &delegate_contract.reg_addr)
+        .unwrap();
+    assert_eq!(delegate_contract_balance, gw_types::U256::from(MSG_VALUE * 3));
     assert_eq!(state.get_nonce(from_id).unwrap(), 5);
     assert_eq!(state.get_nonce(ss_account_id).unwrap(), 0);
     assert_eq!(state.get_nonce(delegate_contract_id).unwrap(), 0);
@@ -168,6 +174,7 @@ fn test_delegatecall() {
     );
     assert_eq!(
         run_result.return_data,
-        hex::decode("000000000000000000000000000000000000000000000000000000000000007b").unwrap()
+        hex::decode("000000000000000000000000000000000000000000000000000000000000007b").unwrap(),
+        "The storedData in SimepleStorage contract won't be changed."
     );
 }

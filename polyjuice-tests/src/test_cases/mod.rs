@@ -27,5 +27,6 @@ pub(crate) mod rlp;
 pub(crate) mod invalid_sudt_erc20_proxy;
 pub(crate) mod sudt_erc20_proxy;
 
+mod beacon_proxy;
 mod error;
 mod eth_addr_reg;
