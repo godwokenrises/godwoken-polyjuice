@@ -72,17 +72,18 @@ fn test_delegatecall() {
     //     "result {}",
     //     serde_json::to_string_pretty(&RunResult::from(run_result)).unwrap()
     // );
-    let contract_account_script =
+    let delegate_contract_script =
         new_account_script(&mut state, creator_account_id, from_id, false);
-    let new_account_id = state
-        .get_account_id_by_script_hash(&contract_account_script.hash().into())
+    let delegate_contract_id = state
+        .get_account_id_by_script_hash(&delegate_contract_script.hash().into())
         .unwrap()
         .unwrap();
 
     assert_eq!(state.get_nonce(from_id).unwrap(), 2);
     assert_eq!(state.get_nonce(ss_account_id).unwrap(), 0);
-    assert_eq!(state.get_nonce(new_account_id).unwrap(), 0);
+    assert_eq!(state.get_nonce(delegate_contract_id).unwrap(), 0);
 
+    const MSG_VALUE: u128 = 17;
     for (fn_sighash, expected_return_value) in [
         // DelegateCall.set(address, uint) => used cycles: 1002251
         (
@@ -113,12 +114,12 @@ fn test_delegatecall() {
         let args = PolyjuiceArgsBuilder::default()
             .gas_limit(200000)
             .gas_price(1)
-            .value(0)
+            .value(MSG_VALUE)
             .input(&input)
             .build();
         let raw_tx = RawL2Transaction::new_builder()
             .from_id(from_id.pack())
-            .to_id(new_account_id.pack())
+            .to_id(delegate_contract_id.pack())
             .args(Bytes::from(args).pack())
             .build();
         let db = store.begin_transaction();
@@ -146,7 +147,7 @@ fn test_delegatecall() {
             &generator,
             block_number,
             from_id,
-            new_account_id,
+            delegate_contract_id,
         );
         assert_eq!(
             run_result.return_data,
@@ -154,9 +155,15 @@ fn test_delegatecall() {
         );
     }
 
+    // check the balance of DelegateCall contract
+    let delegate_contract_balance = state
+        .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &delegate_contract_script.hash()[..20])
+        .unwrap();
+    assert_eq!(delegate_contract_balance, MSG_VALUE * 3);
+
     assert_eq!(state.get_nonce(from_id).unwrap(), 5);
     assert_eq!(state.get_nonce(ss_account_id).unwrap(), 0);
-    assert_eq!(state.get_nonce(new_account_id).unwrap(), 0);
+    assert_eq!(state.get_nonce(delegate_contract_id).unwrap(), 0);
 
     let run_result = simple_storage_get(
         &store,
@@ -168,6 +175,7 @@ fn test_delegatecall() {
     );
     assert_eq!(
         run_result.return_data,
-        hex::decode("000000000000000000000000000000000000000000000000000000000000007b").unwrap()
+        hex::decode("000000000000000000000000000000000000000000000000000000000000007b").unwrap(),
+        "The storedData in SimepleStorage contract won't be changed."
     );
 }

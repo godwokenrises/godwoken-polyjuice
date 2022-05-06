@@ -28,7 +28,7 @@ make all-via-docker
 # including meta-contract and sudt-contract
 GW_SCRIPTS_DIR=$PROJECT_ROOT/build
 mkdir -p $GW_SCRIPTS_DIR && echo "Create dir"
-IMAGE=nervos/godwoken-prebuilds:v0.10.3
+IMAGE=nervos/godwoken-prebuilds:v0.10.4
 docker pull $IMAGE
 docker run --rm -v $GW_SCRIPTS_DIR:/build-dir $IMAGE \
   cp -r /scripts/godwoken-scripts /build-dir \
