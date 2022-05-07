@@ -545,7 +545,7 @@ void selfdestruct(struct evmc_host_context* context,
   }
 
   uint256_t zero = {0};
-  if (uint256_cmp(balance, zero) == LARGER) {
+  if (gw_uint256_cmp(balance, zero) == GW_UINT256_LARGER) {
     gw_reg_addr_t to_addr = new_reg_addr(beneficiary->bytes);
 
     ret = sudt_transfer(context->gw_ctx, g_sudt_id,
@@ -928,7 +928,7 @@ int handle_transfer(gw_context_t* ctx,
   gw_reg_addr_t to_addr = new_reg_addr(msg->destination.bytes);
 
   uint256_t zero = {0};
-  if (uint256_cmp(value, zero) == EQUAL) {
+  if (gw_uint256_cmp(value, zero) == GW_UINT256_EQUAL) {
     return 0;
   }
   int ret = sudt_transfer(ctx, g_sudt_id, from_addr, to_addr, value);
