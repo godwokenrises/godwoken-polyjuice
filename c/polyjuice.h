@@ -713,8 +713,11 @@ int check_address_collision(gw_context_t* ctx, const uint8_t eth_addr[ETH_ADDRES
   gw_reg_addr_t addr = new_reg_addr(eth_addr);
   uint8_t script_hash[32] = {0};
   int ret = ctx->sys_get_script_hash_by_registry_address(ctx, &addr, script_hash);
-  if (ret != 0) {
+  if (ret == GW_ERROR_NOT_FOUND) {
     return 0;
+  }
+  if (ret != 0) {
+    return ret;
   }
   uint32_t account_id;
   ret = ctx->sys_get_account_id_by_script_hash(ctx, script_hash, &account_id);
@@ -724,9 +727,15 @@ int check_address_collision(gw_context_t* ctx, const uint8_t eth_addr[ETH_ADDRES
   // account exists
   uint32_t nonce;
   ret = ctx->sys_get_account_nonce(ctx, account_id, &nonce);
+  if (ret != 0) {
+    return ret;
+  }
   uint8_t code[MAX_DATA_SIZE];
   uint64_t code_size = MAX_DATA_SIZE;
   ret = load_account_code(ctx, account_id, &code_size, 0, code);
+  if (ret != 0) {
+    return ret;
+  }
   // check nonce and EOA
   if (nonce > 0 || (ret == 0 && code_size > 0)) {
     return ERROR_CONTRACT_ADDRESS_COLLISION;
