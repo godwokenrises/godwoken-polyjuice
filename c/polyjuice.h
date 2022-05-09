@@ -702,6 +702,41 @@ void emit_log(struct evmc_host_context* context, const evmc_address* address,
 }
 
 /**
+ * check address collision
+ * check existence of eth_addr
+ * - if exists, then check nonce > 0 or it's NOT an EOA: return AddressCollision error
+ * - else, we can overwrite addr mapping
+ * @param overwrite true if there is a collision but we can continue to create a new account
+ * @return 0 means success
+*/
+int check_address_collision(gw_context_t* ctx, const uint8_t eth_addr[ETH_ADDRESS_LEN], bool* overwrite) {
+  gw_reg_addr_t addr = new_reg_addr(eth_addr);
+  uint8_t script_hash[32] = {0};
+  int ret = ctx->sys_get_script_hash_by_registry_address(ctx, &addr, script_hash);
+  if (ret != 0) {
+    return 0;
+  }
+  uint32_t account_id;
+  ret = ctx->sys_get_account_id_by_script_hash(ctx, script_hash, &account_id);
+  if (ret != 0) {
+    return ret;
+  }
+  // account exists
+  uint32_t nonce;
+  ret = ctx->sys_get_account_nonce(ctx, account_id, &nonce);
+  uint8_t code[MAX_DATA_SIZE];
+  uint64_t code_size = MAX_DATA_SIZE;
+  ret = load_account_code(ctx, account_id, &code_size, 0, code);
+  // check nonce and EOA
+  if (nonce > 0 || (ret == 0 && code_size > 0)) {
+    return ERROR_CONTRACT_ADDRESS_COLLISION;
+  }
+  // There is a collision. We can create a new account and re-map.
+  *overwrite = true;
+  ckb_debug("[address collision] continue and re-map");
+  return 0;
+}
+/**
  * @return 0 if the `to_id` account is not destructed
  */
 int check_destructed(gw_context_t* ctx, uint32_t to_id) {
@@ -871,6 +906,12 @@ int create_new_account(gw_context_t* ctx,
   uint8_t *eth_addr = data_hash_result.bytes + 12;
   memcpy(script_args + 32 + 4, eth_addr, ETH_ADDRESS_LEN);
 
+  bool overwrite = false;
+  ret = check_address_collision(ctx, eth_addr, &overwrite);
+  if (ret != 0) {
+    return ret;
+  }
+
   mol_seg_t new_script_seg;
   uint32_t new_account_id;
   ret = build_script(g_script_code_hash, g_script_hash_type, script_args,
@@ -896,7 +937,7 @@ int create_new_account(gw_context_t* ctx,
   debug_print_int(">> new to id", *to_id);
 
   // register a created contract account into `ETH Address Registry`
-  ret = gw_update_eth_address_register(ctx, eth_addr, script_hash);
+  ret = gw_update_eth_address_register(ctx, eth_addr, script_hash, overwrite);
   if (ret != 0) {
     ckb_debug("[create_new_account] failed to register a contract account");
     return ret;

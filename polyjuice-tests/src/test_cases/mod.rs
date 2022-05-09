@@ -24,6 +24,7 @@ pub(crate) mod pre_compiled_contracts;
 pub(crate) mod recover_account;
 pub(crate) mod rlp;
 //  Special pre-compiled contract to support transfer to any sudt
+pub(crate) mod address_collision;
 pub(crate) mod invalid_sudt_erc20_proxy;
 pub(crate) mod sudt_erc20_proxy;
 
