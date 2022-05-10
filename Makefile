@@ -54,7 +54,7 @@ BUILDER_DOCKER := nervos/ckb-riscv-gnu-toolchain@sha256:7b168b4b109a0f741078a71b
 # TODO: update to nervos/ckb-riscv-gnu-toolchain:bionic-20211214 => need more tests
 
 all: build/blockchain.h build/godwoken.h \
-  build/test_contracts build/test_rlp build/test_ripemd160 \
+  build/test_contracts build/test_rlp build/test_ripemd160 build/test_calc_fee \
   build/generator build/validator \
   build/generator_log build/validator_log
 
@@ -149,6 +149,9 @@ build/test_rlp: c/tests/test_rlp.c $(VALIDATOR_DEPS)
 	$(OBJCOPY) --only-keep-debug $@ $@.debug
 	$(OBJCOPY) --strip-debug --strip-all $@
 	cd $(SECP_DIR) && (git apply -R workaround-fix-g++-linking.patch || true) && cd - # revert patch
+
+build/test_calc_fee: c/tests/test_calc_fee.c $(VALIDATOR_DEPS)
+	$(CXX) $(CFLAGS) $(LDFLAGS) -Ibuild -o $@ c/tests/test_calc_fee.c $(ALL_OBJS)
 
 build/test_ripemd160: c/ripemd160/test_ripemd160.c c/ripemd160/ripemd160.h c/ripemd160/memzero.h $(ALL_OBJS)
 	$(CXX) $(CFLAGS) $(LDFLAGS) -Ibuild -o $@ c/ripemd160/test_ripemd160.c $(ALL_OBJS)

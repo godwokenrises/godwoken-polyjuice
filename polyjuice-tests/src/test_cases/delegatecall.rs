@@ -6,7 +6,7 @@ use crate::helper::{
     new_contract_account_script_with_nonce, setup, simple_storage_get, MockContractInfo,
     PolyjuiceArgsBuilder, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
-use gw_common::{state::State, builtins::CKB_SUDT_ACCOUNT_ID};
+use gw_common::{builtins::CKB_SUDT_ACCOUNT_ID, state::State};
 use gw_generator::traits::StateExt;
 use gw_store::chain_view::ChainView;
 use gw_store::traits::chain_store::ChainStore;
@@ -159,7 +159,10 @@ fn test_delegatecall() {
     let delegate_contract_balance = state
         .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &delegate_contract.reg_addr)
         .unwrap();
-    assert_eq!(delegate_contract_balance, gw_types::U256::from(MSG_VALUE * 3));
+    assert_eq!(
+        delegate_contract_balance,
+        gw_types::U256::from(MSG_VALUE * 3)
+    );
     assert_eq!(state.get_nonce(from_id).unwrap(), 5);
     assert_eq!(state.get_nonce(ss_account_id).unwrap(), 0);
     assert_eq!(state.get_nonce(delegate_contract_id).unwrap(), 0);

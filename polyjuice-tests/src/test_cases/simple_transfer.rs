@@ -26,7 +26,7 @@ fn test_simple_transfer() {
     let mint_balance = U256::from(400000u128);
     let from_eth_address = [1u8; 20];
     let (from_id, _from_script_hash) =
-        helper::create_eth_eoa_account(&mut state, &from_eth_address, mint_balance.into());
+        helper::create_eth_eoa_account(&mut state, &from_eth_address, mint_balance);
     let from_addr = RegistryAddress::new(ETH_REGISTRY_ACCOUNT_ID, from_eth_address.to_vec());
 
     let target_eth_addr = [2u8; 20];

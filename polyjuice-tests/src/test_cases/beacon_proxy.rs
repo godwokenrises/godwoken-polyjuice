@@ -9,7 +9,8 @@ use gw_store::{chain_view::ChainView, traits::chain_store::ChainStore};
 use gw_types::{
     bytes::Bytes,
     packed::RawL2Transaction,
-    prelude::{Builder, Entity, Pack}, U256,
+    prelude::{Builder, Entity, Pack},
+    U256,
 };
 
 const CONTRACT_CODE: &str = include_str!("./evm-contracts/BeaconProxy.bin");
