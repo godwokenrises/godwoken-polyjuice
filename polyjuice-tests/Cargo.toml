@@ -1,6 +1,6 @@
 [package]
 name = "polyjuice-tests"
-version = "1.1.0"
+version = "1.1.5"
 authors = ["Linfeng Qian <thewawar@gmail.com>"]
 edition = "2018"
 

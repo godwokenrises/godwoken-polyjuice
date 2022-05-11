@@ -1350,6 +1350,10 @@ int run_polyjuice() {
     return clean_evmc_result_and_return(&res, ret_handle_message);
   }
 
+  uint32_t used_memory;
+  memcpy(&used_memory, res.padding, sizeof(uint32_t));
+  debug_print_int("[run_polyjuice] used_memory(Bytes)", used_memory);
+
   /* Handle transaction fee */
   if (res.gas_left < 0) {
     ckb_debug("gas not enough");
@@ -1361,33 +1365,16 @@ int run_polyjuice() {
     ckb_debug("unreachable!");
     return clean_evmc_result_and_return(&res, -1);
   }
-  uint128_t fee = gas_price * (uint128_t)gas_used;
+
   debug_print_int("gas limit", msg.gas);
   debug_print_int("gas left", res.gas_left);
-  debug_print_int("gas price", gas_price);
-  debug_print_int("fee", fee);
-
-  uint32_t used_memory;
-  memcpy(&used_memory, res.padding, sizeof(uint32_t));
-  debug_print_int("[run_polyjuice] used_memory(Bytes)", used_memory);
+  uint256_t fee_u256 = calculate_fee(gas_price, gas_used);
 
   gw_reg_addr_t sender_addr = new_reg_addr(msg.sender.bytes);
-
-  uint256_t fee_u256 = {0};
-  memcpy((uint8_t *)(&fee_u256), (uint8_t*)(&fee), 16);
-
   ret = sudt_pay_fee(&context, g_sudt_id, /* g_sudt_id must already exists */
                      sender_addr, fee_u256);
   if (ret != 0) {
     debug_print_int("[run_polyjuice] pay fee to block_producer failed", ret);
-    return clean_evmc_result_and_return(&res, ret);
-  }
-
-  // call the SYS_PAY_FEE syscall to record the fee
-  // NOTICE: this function do not actually execute the transfer of assets
-  ret = sys_pay_fee(&context, sender_addr, g_sudt_id, fee_u256);
-  if (ret != 0) {
-    debug_print_int("[run_polyjuice] Record fee payment failed", ret);
     return clean_evmc_result_and_return(&res, ret);
   }
 

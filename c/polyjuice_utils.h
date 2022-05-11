@@ -249,6 +249,36 @@ int parse_u256(const uint8_t data_be[32], uint256_t *value) {
   return parse_integer(data_be, (uint8_t *)value, sizeof(uint256_t));
 }
 
+uint128_t hi(uint128_t x) {
+  return x >> 64;
+}
+
+uint128_t lo(uint128_t x) {
+  return 0xFFFFFFFFFFFFFFFF & x;
+}
+
+/**
+ * @brief calculate fee => gas_price * gas_used
+ * 
+ * Multiplication Algorithm
+ * https://en.wikipedia.org/wiki/Multiplication_algorithm
+ * 
+ * @param gas_price  msg.gas_price
+ * @param gas_used = msg.gas_limit - res.gas_left
+ * @return uint256_t 
+ */
+uint256_t calculate_fee(uint128_t gas_price, uint64_t gas_used) {
+  uint128_t price_high = hi(gas_price);
+  uint128_t price_low = lo(gas_price);
+  uint128_t fee_low = price_low * gas_used;
+  uint128_t fee_high = hi(fee_low) + price_high * gas_used;
+
+  uint256_t fee_u256 = {0};
+  _gw_fast_memcpy((uint8_t *)(&fee_u256), (uint8_t*)(&fee_low), 8);
+  _gw_fast_memcpy((uint8_t *)(&fee_u256) + 8, (uint8_t*)(&fee_high), 16);
+  return fee_u256;
+}
+
 /* serialize uint64_t to big endian byte32 */
 void put_u64(uint64_t value, uint8_t *output) {
   uint8_t *value_le = (uint8_t *)(&value);

@@ -154,7 +154,7 @@ fn parse_sudt_log_data(data: &[u8]) -> (RegistryAddress, RegistryAddress, U256) 
 
     let mut u256_bytes = [0u8; 32];
     u256_bytes.copy_from_slice(&data[56..56 + 32]);
-    let amount = U256::from_little_endian(&mut u256_bytes);
+    let amount = U256::from_little_endian(&u256_bytes);
     (from_addr, to_addr, amount)
 }
 
