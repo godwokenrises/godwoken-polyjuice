@@ -1378,15 +1378,6 @@ int run_polyjuice() {
     return clean_evmc_result_and_return(&res, ret);
   }
 
-  // TODO: duplicate call? 
-  // call the SYS_PAY_FEE syscall to record the fee
-  // NOTICE: this function do not actually execute the transfer of assets
-  ret = sys_pay_fee(&context, sender_addr, g_sudt_id, fee_u256);
-  if (ret != 0) {
-    debug_print_int("[run_polyjuice] Record fee payment failed", ret);
-    return clean_evmc_result_and_return(&res, ret);
-  }
-
   ckb_debug("[run_polyjuice] finalize");
   ret = gw_finalize(&context);
   if (ret != 0) {
