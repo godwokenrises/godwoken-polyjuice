@@ -742,6 +742,7 @@ int check_address_collision(gw_context_t* ctx, const uint8_t eth_addr[ETH_ADDRES
   }
   // There is a collision. We can create a new account and re-map.
   *overwrite = true;
+  
   ckb_debug("[address collision] continue and re-map");
   return 0;
 }
