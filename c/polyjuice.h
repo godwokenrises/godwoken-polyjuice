@@ -767,10 +767,12 @@ int load_globals(gw_context_t* ctx, uint32_t to_id, evmc_call_kind call_kind) {
     return FATAL_POLYJUICE;
   }
 
+  /** read rollup_script_hash and g_sudt_id from creator account */
   memcpy(g_rollup_script_hash, creator_raw_args_seg.ptr, 32);
   memcpy(&g_sudt_id, creator_raw_args_seg.ptr + 32, sizeof(uint32_t));
   debug_print_data("rollup_script_hash", g_rollup_script_hash, 32);
   debug_print_int("sudt id", g_sudt_id);
+
   return 0;
 }
 
@@ -1104,7 +1106,8 @@ int handle_message(gw_context_t* ctx,
    * 2. CALLCODE/DELEGATECALL should skip `handle_transfer`, otherwise
    *    `value transfer` of CALLCODE/DELEGATECALL will be executed twice
    */
-  if (!is_special_call(msg.kind)) {
+  if (!is_special_call(msg.kind) ||
+     (is_testnet_v0() && ctx->block_info.number < TESTNET_V0_FORK1_BLOCK)) {
     bool to_address_is_eoa = !to_address_exists
                           || (to_address_exists && code_size == 0);
     ret = handle_transfer(ctx, &msg, (uint8_t *)g_tx_origin.bytes,
