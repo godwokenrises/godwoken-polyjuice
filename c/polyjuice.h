@@ -704,8 +704,7 @@ void emit_log(struct evmc_host_context* context, const evmc_address* address,
 /**
  * check address collision
  * check existence of eth_addr
- * - if exists, then check nonce > 0 or it's NOT an EOA: return AddressCollision error
- * - else, we can overwrite addr mapping
+ * If it's an EoA address with non-zero nonce or it's an contract address, it can't be overwrite.
  * @param overwrite true if there is a collision but we can continue to create a new account
  * @return 0 means success
 */
@@ -737,7 +736,7 @@ int check_address_collision(gw_context_t* ctx, const uint8_t eth_addr[ETH_ADDRES
     return ret;
   }
   // check nonce and EOA
-  if (nonce > 0 || (ret == 0 && code_size > 0)) {
+  if (nonce > 0 || code_size > 0) {
     return ERROR_CONTRACT_ADDRESS_COLLISION;
   }
   // There is a collision. We can create a new account and re-map.
