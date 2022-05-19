@@ -42,7 +42,7 @@ pub const SUDT_VALIDATOR_SCRIPT_TYPE_HASH: [u8; 32] = [0xa2u8; 32];
 pub const SECP_DATA: &[u8] = include_bytes!("../../build/secp256k1_data");
 // polyjuice
 pub const BIN_DIR: &str = "../build";
-pub const GENERATOR_NAME: &str = "generator.aot";
+pub const GENERATOR_NAME: &str = "generator_log";
 pub const VALIDATOR_NAME: &str = "validator";
 
 pub const ROLLUP_SCRIPT_HASH: [u8; 32] = [0xa9u8; 32];
@@ -606,6 +606,10 @@ pub fn build_eth_l2_script(args: [u8; 20]) -> Script {
 }
 
 pub fn check_cycles(l2_tx_label: &str, used_cycles: u64, warning_cycles: u64) {
+    if GENERATOR_NAME.contains("_log") {
+        return; // disable cycles check
+    }
+
     println!("[check_cycles] used_cycles: {}", used_cycles);
     assert!(
         used_cycles < warning_cycles,

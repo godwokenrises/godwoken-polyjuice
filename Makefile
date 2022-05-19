@@ -52,7 +52,7 @@ BUILDER_DOCKER := nervos/ckb-riscv-gnu-toolchain@sha256:7b168b4b109a0f741078a71b
 
 all: build/test_contracts build/test_rlp build/generator build/validator build/generator_log build/validator_log build/test_ripemd160 build/blockchain.h build/godwoken.h
 
-all-via-docker: generate-protocol
+all-via-docker: generate-protocol fetch-gw-scripts
 	mkdir -p build
 	docker run --rm -v `pwd`:/code -w /code ${BUILDER_DOCKER} make
 	make patch-generator && make patch-generator_log
@@ -222,6 +222,16 @@ contract/sudt-erc20-proxy:
 # if [ "$$ERC20BIN_SHASUM" = "9f7bf1ab25b377ddc339e6de79a800d4c7dc83de7e12057a0129b467794ce3a3" ] ; \
 # then echo "ERC20BIN_SHASUM matches" ; \
 # else echo "ERC20BIN_SHASUM does not match" ; exit 1 ; fi
+
+# fetch godwoken-scripts from godwoken-prebuilds image,
+# including meta-contract and sudt-contract
+PREBUILDS := ghcr.io/nervosnetwork/godwoken-prebuilds:v0.10.7-alphanet
+fetch-gw-scripts:
+	mkdir -p build
+	docker run --rm -v `pwd`/build:/build-dir \
+	   	$(PREBUILDS) \
+		cp -r /scripts/godwoken-scripts /build-dir \
+		&& echo "Copy godwoken-scripts"
 
 fmt:
 	clang-format -i -style=Google c/**/*.*
