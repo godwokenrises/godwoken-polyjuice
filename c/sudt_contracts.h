@@ -31,6 +31,7 @@ int balance_of_any_sudt_gas(const uint8_t* input_src,
 int balance_of_any_sudt(gw_context_t* ctx,
                         const uint8_t* code_data,
                         const size_t code_size,
+                        const enum evmc_call_kind parent_kind,
                         bool is_static_call,
                         const uint8_t* input_src,
                         const size_t input_size,
@@ -104,6 +105,7 @@ int transfer_to_any_sudt_gas(const uint8_t* input_src,
 int transfer_to_any_sudt(gw_context_t* ctx,
                          const uint8_t* code_data,
                          const size_t code_size,
+                         const enum evmc_call_kind parent_kind,
                          bool is_static_call,
                          const uint8_t* input_src,
                          const size_t input_size,
@@ -144,6 +146,10 @@ int transfer_to_any_sudt(gw_context_t* ctx,
   int ret;
   if (is_static_call) {
     ckb_debug("static call to transfer to any sudt is forbidden");
+    return ERROR_TRANSFER_TO_ANY_SUDT;
+  }
+  if (parent_kind == EVMC_CALLCODE || parent_kind == EVMC_DELEGATECALL) {
+    ckb_debug("delegatecall/callcode to transfer to any sudt is forbidden");
     return ERROR_TRANSFER_TO_ANY_SUDT;
   }
   if (input_size != (32 + 32 + 32 + 32)) {

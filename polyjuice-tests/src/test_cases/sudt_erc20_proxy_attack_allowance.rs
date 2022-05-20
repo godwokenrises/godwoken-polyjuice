@@ -177,11 +177,17 @@ fn test_attack_allowance() {
                 None,
             )
             .expect("construct");
+        // 0 means the delegate call failed
+        assert_eq!(
+            run_result.return_data,
+            hex::decode("0000000000000000000000000000000000000000000000000000000000000000")
+                .unwrap()
+        );
         state.apply_run_result(&run_result).expect("update state");
     }
 
     let target_balance = state
         .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, target_short_address)
         .unwrap();
-    assert_eq!(target_balance, 1000);
+    assert_eq!(target_balance, 0);
 }
