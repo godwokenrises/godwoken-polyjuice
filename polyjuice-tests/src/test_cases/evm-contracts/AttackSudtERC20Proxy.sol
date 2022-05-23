@@ -17,11 +17,12 @@ contract AttackContract {
     constructor(uint256 sudtId_) public {
         _sudtId = sudtId_;
     }
-    function attack1(address logicContractAddr,address from,address to ,uint256 amount) public {
+    function attack1(address logicContractAddr,address from,address to ,uint256 amount) public returns(bool) {
         bool r;
         bytes memory s;
         (r, s) = logicContractAddr.delegatecall(abi.encodeWithSignature("transferFrom(address,address,uint256)", from,to,amount));
         emit Log("delegatecall return ", r);  // r为true或false
+        return r;
         /* uint256 result = bytesToUint(s); */
         /* emit Log2("return ", result); */
     }

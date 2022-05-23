@@ -193,6 +193,11 @@ fn test_attack_allowance() {
                 None,
             )
             .expect("construct");
+        assert_eq!(
+            run_result.return_data,
+            hex::decode("0000000000000000000000000000000000000000000000000000000000000000")
+                .unwrap()
+        );
         state.apply_run_result(&run_result).expect("update state");
     }
 
@@ -200,6 +205,6 @@ fn test_attack_allowance() {
         state
             .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &target_reg_addr)
             .unwrap(),
-        U256::from(1000u64)
+        U256::zero()
     );
 }
