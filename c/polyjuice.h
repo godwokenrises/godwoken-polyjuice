@@ -1200,7 +1200,7 @@ int handle_message(gw_context_t* ctx,
 
   debug_print_int("[handle_message] msg.kind", msg.kind);
   /* NOTE: msg and res are updated */
-  if (to_address_exists && code_size > 0 && (is_create(msg.kind) || msg.input_size > 0)) {
+  if (to_address_exists && code_size > 0) {
     ret = execute_in_evmone(ctx, &msg, parent_from_id, from_id, to_id, code_data, code_size, res);
     if (ret != 0) {
       return ret;
