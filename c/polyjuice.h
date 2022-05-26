@@ -44,6 +44,8 @@
 #define POLYJUICE_SYSTEM_PREFIX 0xFF
 #define POLYJUICE_CONTRACT_CODE 0x01
 #define POLYJUICE_DESTRUCTED 0x02
+/* Min transfer transaction gas cost: 21000 */
+#define MIN_TRANSACTION_GAS 21000
 
 void polyjuice_build_system_key(uint32_t id, uint8_t polyjuice_field_type,
                                 uint8_t key[GW_KEY_BYTES]) {
@@ -1159,7 +1161,7 @@ int handle_message(gw_context_t* ctx,
     ckb_debug("[handle_message] Don't run evm and return empty data");
     res->output_data = NULL;
     res->output_size = 0;
-    res->gas_left = msg.gas;
+    res->gas_left = msg.gas - MIN_TRANSACTION_GAS;
     res->status_code = EVMC_SUCCESS;
   }
 
