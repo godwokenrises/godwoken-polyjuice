@@ -14,7 +14,7 @@ use gw_types::{
 
 use crate::helper::{
     create_block_producer, create_eth_eoa_account, deploy, new_block_info, setup, MockContractInfo,
-    PolyjuiceArgsBuilder, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
+    PolyjuiceArgsBuilder, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES, compute_create2_script, contract_script_to_eth_addr,
 };
 
 const INIT_CODE: &str = include_str!("./evm-contracts/CreateContract.bin");
@@ -168,13 +168,14 @@ fn create2_address_collision_overwrite() -> Result<()> {
     // Create2Impl.deploy(uint256 value, bytes32 salt, bytes memory code)
     let block_number = 2;
     let block_info = new_block_info(block_producer_id, block_number, block_number);
-    // uint256 value: 0x000000000000000000000000000000000000000000000000000000000000009a
-    let input_value = format!(
-        "00000000000000000000000000000000000000000000000000000000000000{:2x}",
-        input_value_u128
-    );
-    let input = hex::decode(format!("66cfa057{}{}00000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000101{}00000000000000000000000000000000000000000000000000000000000000", input_value, input_salt, SS_CODE)).unwrap();
+    
+    //consturct input:
+    //0x9a
+    //input_salt
+    //SS_INIT_CODE
+    let input = hex::decode("66cfa057000000000000000000000000000000000000000000000000000000000000009a1111111111111111111111111111111111111111111111111111111111111111000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000ea6080604052607b60008190555060d08061001a6000396000f3fe60806040526004361060295760003560e01c806360fe47b11460345780636d4ce63c14605f57602f565b36602f57005b600080fd5b605d60048036036020811015604857600080fd5b81019080803590602001909291905050506087565b005b348015606a57600080fd5b5060716091565b6040518082815260200191505060405180910390f35b8060008190555050565b6000805490509056fea2646970667358221220b796688cdcda21059332f8ef75088337063fcf7a8ab96bb23bc06ec8623d679064736f6c6343000602003300000000000000000000000000000000000000000000")?;
 
+    // Create2Impl.deploy(uint256 value, bytes32 salt, bytes memory code)
     let args = PolyjuiceArgsBuilder::default()
         .gas_limit(91000)
         .gas_price(1)
@@ -200,9 +201,26 @@ fn create2_address_collision_overwrite() -> Result<()> {
         .expect("Create2Impl.deploy(uint256 value, bytes32 salt, bytes memory code)");
     state.apply_run_result(&run_result).expect("update state");
 
+    let create2_script = compute_create2_script(
+        create2_contract.eth_addr.as_slice(),
+        &hex::decode(input_salt).unwrap()[..],
+        &hex::decode(SS_CODE).unwrap()[..],
+    );
+    let create2_script_hash = create2_script.hash();
+    let create2_ethabi_addr = contract_script_to_eth_addr(&create2_script, true);
+    println!(
+        "computed create2_ethabi_addr: {}",
+        hex::encode(&create2_ethabi_addr)
+    );
+    println!(
+        "create2_address: 0x{}",
+        hex::encode(&run_result.return_data)
+    );
+    assert_eq!(run_result.return_data, create2_ethabi_addr);
+    
     let script_hash = state.get_script_hash_by_registry_address(&create2_eth_reg_addr)?;
     assert!(script_hash.is_some());
-    let create_account_id = state.get_account_id_by_script_hash(&script_hash.unwrap())?;
+    let create_account_id = state.get_account_id_by_script_hash(&create2_script_hash.into())?;
     assert_eq!(create_account_id, Some(8));
     Ok(())
 }
@@ -216,7 +234,7 @@ fn create2_address_collision_duplicate() -> Result<()> {
     let (from_id, _from_script_hash) =
         create_eth_eoa_account(&mut state, &from_eth_address, 200000u64.into());
 
-    let create2_eth_addr = hex::decode("d78e81d86aeace84ff6311db7b134c1231a4a402")?;
+    let create2_eth_addr = hex::decode("9267e505e0af739a9c434744d14a442792be98ef")?;
     //create EOA account with create_account address first
     let (eoa_id, _) = create_eth_eoa_account(
         &mut state,
@@ -259,17 +277,15 @@ fn create2_address_collision_duplicate() -> Result<()> {
         .get_account_id_by_script_hash(&create2_contract_script_hash)?
         .unwrap();
     let input_value_u128: u128 = 0x9a;
-    // bytes32 salt
-    let input_salt = "1111111111111111111111111111111111111111111111111111111111111111";
+
+    //consturct input:
+    //0x9a
+    //input_salt "1111111111111111111111111111111111111111111111111111111111111111"
+    //SS_INIT_CODE
     // Create2Impl.deploy(uint256 value, bytes32 salt, bytes memory code)
     let block_number = 2;
     let block_info = new_block_info(block_producer_id, block_number, block_number);
-    // uint256 value: 0x000000000000000000000000000000000000000000000000000000000000009a
-    let input_value = format!(
-        "00000000000000000000000000000000000000000000000000000000000000{:2x}",
-        input_value_u128
-    );
-    let input = hex::decode(format!("66cfa057{}{}00000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000101{}00000000000000000000000000000000000000000000000000000000000000", input_value, input_salt, SS_CODE)).unwrap();
+    let input = hex::decode("66cfa057000000000000000000000000000000000000000000000000000000000000009a1111111111111111111111111111111111111111111111111111111111111111000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000ea6080604052607b60008190555060d08061001a6000396000f3fe60806040526004361060295760003560e01c806360fe47b11460345780636d4ce63c14605f57602f565b36602f57005b600080fd5b605d60048036036020811015604857600080fd5b81019080803590602001909291905050506087565b005b348015606a57600080fd5b5060716091565b6040518082815260200191505060405180910390f35b8060008190555050565b6000805490509056fea2646970667358221220b796688cdcda21059332f8ef75088337063fcf7a8ab96bb23bc06ec8623d679064736f6c6343000602003300000000000000000000000000000000000000000000").unwrap();
 
     let args = PolyjuiceArgsBuilder::default()
         .gas_limit(91000)
