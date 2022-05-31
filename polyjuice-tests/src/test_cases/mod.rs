@@ -29,5 +29,6 @@ pub(crate) mod sudt_erc20_proxy;
 
 mod beacon_proxy;
 mod error;
+mod address_collision;
 mod eth_addr_reg;
 mod utils;

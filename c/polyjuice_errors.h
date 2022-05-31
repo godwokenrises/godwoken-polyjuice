@@ -21,5 +21,6 @@
 #define ERROR_RECOVER_ACCOUNT                   -89
 
 #define ERROR_TOTAL_SUPPLY_OF_ANY_SUDT          -91
+#define ERROR_CONTRACT_ADDRESS_COLLISION	    -92
 
 #endif // POLYJUICE_ERRORS_H
