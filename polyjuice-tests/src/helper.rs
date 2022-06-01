@@ -287,10 +287,10 @@ pub fn new_contract_account_script_with_nonce(from_addr: &[u8; 20], from_nonce: 
     let mut stream = RlpStream::new_list(2);
     stream.append(&from_addr.to_vec());
     stream.append(&from_nonce);
-    println!(
-        "rlp data of (eoa_address + nonce): {}",
-        hex::encode(stream.as_raw())
-    );
+    // println!(
+    //     "rlp data of (eoa_address + nonce): {}",
+    //     hex::encode(stream.as_raw())
+    // );
     let data_hash = tiny_keccak::keccak256(stream.as_raw());
 
     let mut new_script_args = vec![0u8; 32 + 4 + 20];
@@ -798,4 +798,23 @@ pub(crate) fn eth_address_regiser(
         L2TX_MAX_CYCLES,
         None,
     )
+}
+
+pub(crate) fn print_gas_used(operation: &str, logs: &Vec<LogItem>) {
+    let mut gas_used: Option<u64> = None;
+    for log in logs {
+        gas_used = match parse_log(log) {
+            crate::helper::Log::PolyjuiceSystem {
+                gas_used,
+                cumulative_gas_used: _,
+                created_address: _,
+                status_code: _,
+            } => Some(gas_used),
+            _ => None
+        };
+        if gas_used.is_some() {
+            break;
+        }
+    }
+    println!("{}: {} gas used", operation, gas_used.unwrap());
 }

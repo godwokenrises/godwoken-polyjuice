@@ -69,6 +69,7 @@ fn test_get_contract_code() {
         )
         .expect("call createMemoryArray function");
     let mut expect_result = [0u8; 32];
+    #[allow(clippy::needless_range_loop)]
     for i in 0..32 {
         expect_result[i] = i as u8;
     }

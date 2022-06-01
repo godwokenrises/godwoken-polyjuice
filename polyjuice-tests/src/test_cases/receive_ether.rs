@@ -11,7 +11,7 @@ use gw_types::{
 
 use crate::helper::{
     check_cycles, create_block_producer, deploy, eth_addr_to_ethabi_addr, new_block_info,
-    parse_log, setup, MockContractInfo, PolyjuiceArgsBuilder, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
+    parse_log, setup, MockContractInfo, PolyjuiceArgsBuilder, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES, print_gas_used,
 };
 
 const INIT_CODE: &str = include_str!("./evm-contracts/EtherReceiverMock.bin");
@@ -46,7 +46,7 @@ fn receive_ether_test() -> anyhow::Result<()> {
         .get_account_id_by_script_hash(&contract_account.script_hash)?
         .unwrap();
 
-    //call receive()
+    // call receive()
     let block_info = new_block_info(block_producer, 1, 0);
     let args = PolyjuiceArgsBuilder::default()
         .gas_limit(2100)
@@ -73,8 +73,8 @@ fn receive_ether_test() -> anyhow::Result<()> {
         .expect("Call receive()");
     check_cycles("receive()", run_result.used_cycles, 710_100);
     assert!(run_result.return_data.is_empty());
-    let log = parse_log(&run_result.logs[1]);
-    let receive_data = match log {
+
+    let receive_data = match parse_log(&run_result.logs[1]) {
         crate::helper::Log::PolyjuiceUser {
             address: _,
             data,
@@ -85,6 +85,9 @@ fn receive_ether_test() -> anyhow::Result<()> {
     let mut expect = [7u8; 8];
     expect[1..].copy_from_slice(b"receive");
     assert_eq!(receive_data, Some(expect.to_vec()));
+
+    print_gas_used("A simplest receive() call: ", &run_result.logs);
+
     state.apply_run_result(&run_result).expect("update state");
     Ok(())
 }
@@ -99,7 +102,7 @@ fn without_receive_fallback_test() -> anyhow::Result<()> {
         crate::helper::create_eth_eoa_account(&mut state, &from_eth_address, 200000000u64.into());
 
     // Deploy SimpleTrasfer Contract
-    let _run_result = deploy(
+    let run_result = deploy(
         &generator,
         &store,
         &mut state,
@@ -111,6 +114,8 @@ fn without_receive_fallback_test() -> anyhow::Result<()> {
         block_producer.clone(),
         0,
     );
+    print_gas_used("Deploy SimpleTrasfer Contract: ", &run_result.logs);
+
     let st_contract_account = MockContractInfo::create(&from_eth_address, 0);
     let st_account_id = state
         .get_account_id_by_script_hash(&st_contract_account.script_hash)?
@@ -129,12 +134,14 @@ fn without_receive_fallback_test() -> anyhow::Result<()> {
         block_producer.clone(),
         0,
     );
+    print_gas_used("Deploy RejectedSimpleStorage Contract: ", &run_result.logs);
+
     let ss_contract_account = MockContractInfo::create(&from_eth_address, 1);
     let _ss_account_id = state
         .get_account_id_by_script_hash(&ss_contract_account.script_hash)?
         .unwrap();
 
-    // SimpleTransfer.transferToSimpleStorage1();
+    // SimpleTransfer.transferToSimpleStorage1() -> target_addr.transfer(1 wei);
     let block_info = new_block_info(block_producer, 1, 1);
 
     let input = hex::decode(format!(
@@ -170,6 +177,10 @@ fn without_receive_fallback_test() -> anyhow::Result<()> {
         run_result.unwrap_err(),
         TransactionError::InvalidExitCode(2)
     );
+
+    // TODO: read the log of a failed transaction
+    // print!("SimpleTransfer.transferToSimpleStorage1(): ");
+    // print_gas_used(&run_result.logs[0]);
 
     Ok(())
 }
