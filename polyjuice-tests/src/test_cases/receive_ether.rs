@@ -173,3 +173,92 @@ fn without_receive_fallback_test() -> anyhow::Result<()> {
 
     Ok(())
 }
+
+#[test]
+fn over_transfer_test() -> anyhow::Result<()> {
+    let (store, mut state, generator) = setup();
+    let block_producer = create_block_producer(&mut state);
+
+    let from_eth_address = [1u8; 20];
+    let (from_id, _from_script_hash) =
+        crate::helper::create_eth_eoa_account(&mut state, &from_eth_address, 200000000u64.into());
+
+    // Deploy SimpleTrasfer Contract
+    let _run_result = deploy(
+        &generator,
+        &store,
+        &mut state,
+        CREATOR_ACCOUNT_ID,
+        from_id,
+        ST_CODE,
+        50000,
+        1000,
+        block_producer.clone(),
+        0,
+    );
+    let st_contract_account = MockContractInfo::create(&from_eth_address, 0);
+    let st_account_id = state
+        .get_account_id_by_script_hash(&st_contract_account.script_hash)?
+        .unwrap();
+
+    // Deploy RejectedSimpleStorage Contract
+    let _run_result = deploy(
+        &generator,
+        &store,
+        &mut state,
+        CREATOR_ACCOUNT_ID,
+        from_id,
+        INIT_CODE,
+        40000,
+        0,
+        block_producer.clone(),
+        0,
+    );
+    let receive_contract_account = MockContractInfo::create(&from_eth_address, 1);
+    println!(
+        "eth addr: {}",
+        hex::encode(&receive_contract_account.eth_addr)
+    );
+    let _ss_account_id = state
+        .get_account_id_by_script_hash(&receive_contract_account.script_hash)?
+        .unwrap();
+
+    let block_info = new_block_info(block_producer, 1, 1);
+
+    // SimpleTransfer.justTransfer(to, 1000000000000000);
+    let input = hex::decode(format!(
+        "d2ea8ea5{}00000000000000000000000000000000000000000000000000038d7ea4c68000",
+        hex::encode(eth_addr_to_ethabi_addr(
+            &receive_contract_account.eth_addr.try_into().unwrap()
+        ))
+    ))?;
+    let args = PolyjuiceArgsBuilder::default()
+        .gas_limit(80000)
+        .gas_price(1)
+        .value(0)
+        .input(&input)
+        .build();
+    let raw_tx = RawL2Transaction::new_builder()
+        .from_id(from_id.pack())
+        .to_id(st_account_id.pack())
+        .args(Bytes::from(args).pack())
+        .build();
+    let db = store.begin_transaction();
+    let tip_block_hash = store.get_tip_block_hash().unwrap();
+    let run_result = generator.execute_transaction(
+        &ChainView::new(&db, tip_block_hash),
+        &state,
+        &block_info,
+        &raw_tx,
+        L2TX_MAX_CYCLES,
+        None,
+    );
+
+    // expect transfer failed
+    assert_eq!(
+        run_result.unwrap_err(),
+        TransactionError::InvalidExitCode(2)
+    );
+
+    Ok(())
+}
