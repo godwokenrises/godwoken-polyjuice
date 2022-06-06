@@ -49,7 +49,7 @@ fn receive_ether_test() -> anyhow::Result<()> {
     // call receive()
     let block_info = new_block_info(block_producer, 1, 0);
     let args = PolyjuiceArgsBuilder::default()
-        .gas_limit(2100)
+        .gas_limit(21000)
         .gas_price(1)
         .value(1000)
         .input(&[])

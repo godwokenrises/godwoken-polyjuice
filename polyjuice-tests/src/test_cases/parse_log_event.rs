@@ -142,7 +142,7 @@ fn test_parse_log_event() {
             assert_eq!(&the_from_addr, &address);
             // The block producer id is `0`
             assert_eq!(&the_to_addr, &block_producer);
-            assert_eq!(amount, U256::from(1814u64));
+            assert_eq!(amount, U256::from(21000u64));
         } else {
             panic!("unexpected polyjuice log");
         }

@@ -51,7 +51,7 @@ fn test_error_handling() {
     let block_info = helper::new_block_info(block_producer.to_owned(), block_number, block_number);
     let input = hex::decode("2b813bc0").expect("testAssert() method ID");
     let args = helper::PolyjuiceArgsBuilder::default()
-        .gas_limit(1000)
+        .gas_limit(21000)
         .gas_price(1)
         .value(0)
         .input(&input)
