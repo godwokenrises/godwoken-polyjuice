@@ -175,7 +175,7 @@ fn test_recursion_contract_call() {
                 L2TX_MAX_CYCLES,
                 None,
             )
-            .expect_err("EVMC_OUT_OF_GAS = 3");
-        assert_eq!(err, TransactionError::InvalidExitCode(3));
+            .expect_err("Insufficient transaction gas");
+        assert_eq!(err, TransactionError::InvalidExitCode(-93));
     }
 }
