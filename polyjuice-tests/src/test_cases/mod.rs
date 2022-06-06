@@ -21,6 +21,7 @@ pub(crate) mod account_already_exists;
 
 pub(crate) mod ecrecover;
 pub(crate) mod pre_compiled_contracts;
+pub(crate) mod receive_ether;
 pub(crate) mod recover_account;
 pub(crate) mod rlp;
 //  Special pre-compiled contract to support transfer to any sudt

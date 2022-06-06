@@ -2,8 +2,8 @@
 //!   See ./evm-contracts/CallContract.sol
 
 use crate::helper::{
-    self, compute_create2_script, contract_script_to_eth_addr, deploy, new_block_info, setup,
-    simple_storage_get, MockContractInfo, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
+    self, compute_create2_script, contract_script_to_eth_addr, deploy, new_block_info, parse_log,
+    setup, simple_storage_get, Log, MockContractInfo, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
     CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::{builtins::ETH_REGISTRY_ACCOUNT_ID, state::State};
@@ -69,12 +69,11 @@ fn test_create2() {
     let run_result = {
         block_number += 1;
         let block_info = new_block_info(block_producer_id, block_number, block_number);
-        // uint256 value: 0x000000000000000000000000000000000000000000000000000000000000009a
-        let input_value = format!(
-            "00000000000000000000000000000000000000000000000000000000000000{:2x}",
-            input_value_u128
-        );
-        let input = hex::decode(format!("66cfa057{}{}00000000000000000000000000000000000000000000000000000000000000600000000000000000000000000000000000000000000000000000000000000101{}00000000000000000000000000000000000000000000000000000000000000", input_value, input_salt, SS_INIT_CODE)).unwrap();
+        //consturct input:
+        //0x92
+        //input_salt
+        //SS_INIT_CODE
+        let input = hex::decode("66cfa05700000000000000000000000000000000000000000000000000000000000000921111111111111111111111111111111111111111111111111111111111111111000000000000000000000000000000000000000000000000000000000000006000000000000000000000000000000000000000000000000000000000000000ea6080604052607b60008190555060d08061001a6000396000f3fe60806040526004361060295760003560e01c806360fe47b11460345780636d4ce63c14605f57602f565b36602f57005b600080fd5b605d60048036036020811015604857600080fd5b81019080803590602001909291905050506087565b005b348015606a57600080fd5b5060716091565b6040518082815260200191505060405180910390f35b8060008190555050565b6000805490509056fea2646970667358221220b796688cdcda21059332f8ef75088337063fcf7a8ab96bb23bc06ec8623d679064736f6c6343000602003300000000000000000000000000000000000000000000").unwrap();
 
         let args = PolyjuiceArgsBuilder::default()
             .gas_limit(91000)
@@ -113,6 +112,10 @@ fn test_create2() {
     let create2_script_hash = create2_script.hash();
     let create2_ethabi_addr = contract_script_to_eth_addr(&create2_script, true);
     println!(
+        "computed create2_ethabi_addr: {}",
+        hex::encode(&create2_ethabi_addr)
+    );
+    println!(
         "create2_address: 0x{}",
         hex::encode(&run_result.return_data)
     );
@@ -128,7 +131,27 @@ fn test_create2() {
     let create2_account_balance = state
         .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &address)
         .unwrap();
-    assert_eq!(create2_account_balance, U256::from(input_value_u128));
+
+    let log = parse_log(&run_result.logs[1]);
+
+    let balance = match log {
+        Log::SudtTransfer {
+            sudt_id: _,
+            from_addr,
+            to_addr,
+            amount,
+        } => {
+            println!(
+                "transfer from: {}, to: {}, amount: {}",
+                hex::encode(&from_addr.address),
+                hex::encode(&to_addr.address),
+                amount
+            );
+            Some(amount)
+        }
+        _ => None,
+    };
+    assert_eq!(Some(create2_account_balance), balance);
 
     let run_result = simple_storage_get(
         &store,

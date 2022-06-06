@@ -25,4 +25,9 @@ contract SimpleTransfer {
     SimpleStorage target = SimpleStorage(_target);
     target.set(3);
   }
+
+  /* just transfer */
+  function justTransfer(address payable to, uint amount) public payable {
+    to.transfer(amount);
+  }
 }
