@@ -106,9 +106,13 @@ struct evmc_host_context {
   gw_context_t* gw_ctx;
   const uint8_t* code_data;
   const size_t code_size;
+  // parent level call kind
+  enum evmc_call_kind kind;
   uint32_t from_id;
   uint32_t to_id;
+  // parent level sender
   evmc_address sender;
+  // parent level destination
   evmc_address destination;
   int error_code;
 };
@@ -599,6 +603,7 @@ struct evmc_result call(struct evmc_host_context* context,
     res.gas_left = msg->gas - (int64_t)gas_cost;
     ret = contract(gw_ctx,
                    context->code_data, context->code_size,
+                   context->kind,
                    msg->flags == EVMC_STATIC,
                    msg->input_data, msg->input_size,
                    (uint8_t**)&res.output_data, &res.output_size);
@@ -910,7 +915,7 @@ int execute_in_evmone(gw_context_t* ctx,
   int ret = 0;
   evmc_address sender = msg->sender;
   evmc_address destination = msg->destination;
-  struct evmc_host_context context {ctx, code_data, code_size, from_id, to_id, sender, destination, 0};
+  struct evmc_host_context context {ctx, code_data, code_size, msg->kind, from_id, to_id, sender, destination, 0};
   struct evmc_vm* vm = evmc_create_evmone();
   struct evmc_host_interface interface = {account_exists, get_storage,    set_storage,    get_balance,
                                           get_code_size,  get_code_hash,  copy_code,      selfdestruct,
