@@ -27,7 +27,9 @@ int balance_of_any_sudt_gas(const uint8_t* input_src, const size_t input_size,
      output[0..32] => amount
  */
 int balance_of_any_sudt(gw_context_t* ctx, const uint8_t* code_data,
-                        const size_t code_size, bool is_static_call,
+                        const size_t code_size,
+                        const enum evmc_call_kind parent_kind,
+                        bool is_static_call,
                         const uint8_t* input_src, const size_t input_size,
                         uint8_t** output, size_t* output_size) {
   int ret;
@@ -95,7 +97,9 @@ int total_supply_of_any_sudt_gas(const uint8_t* input_src,
      output[0..32] => amount
  */
 int total_supply_of_any_sudt(gw_context_t* ctx, const uint8_t* code_data,
-                             const size_t code_size, bool is_static_call,
+                             const size_t code_size,
+                             const enum evmc_call_kind parent_kind,
+                             bool is_static_call,
                              const uint8_t* input_src, const size_t input_size,
                              uint8_t** output, size_t* output_size) {
   int ret;
@@ -162,7 +166,9 @@ int transfer_to_any_sudt_gas(const uint8_t* input_src, const size_t input_size,
    output: []
  */
 int transfer_to_any_sudt(gw_context_t* ctx, const uint8_t* code_data,
-                         const size_t code_size, bool is_static_call,
+                         const size_t code_size,
+                         const enum evmc_call_kind parent_kind,
+                         bool is_static_call,
                          const uint8_t* input_src, const size_t input_size,
                          uint8_t** output, size_t* output_size) {
   /* Contract code hash of `SudtERC20Proxy_UserDefinedDecimals.ContractCode`
@@ -192,6 +198,10 @@ int transfer_to_any_sudt(gw_context_t* ctx, const uint8_t* code_data,
   int ret;
   if (is_static_call) {
     ckb_debug("static call to transfer to any sudt is forbidden");
+    return ERROR_TRANSFER_TO_ANY_SUDT;
+  }
+  if (parent_kind == EVMC_CALLCODE || parent_kind == EVMC_DELEGATECALL) {
+    ckb_debug("delegatecall/callcode to transfer to any sudt is forbidden");
     return ERROR_TRANSFER_TO_ANY_SUDT;
   }
   if (input_size != (32 + 32 + 32 + 32)) {
