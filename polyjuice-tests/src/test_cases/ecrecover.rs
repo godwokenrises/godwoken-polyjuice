@@ -64,7 +64,7 @@ fn test_ecrecover() {
             signed_hash,
         )).unwrap();
         let args = PolyjuiceArgsBuilder::default()
-            .gas_limit(21000)
+            .gas_limit(37487)
             .gas_price(1)
             .value(0)
             .input(&input)

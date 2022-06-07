@@ -52,7 +52,7 @@ fn test_sudt_erc20_proxy_inner(
         CREATOR_ACCOUNT_ID,
         from_id1,
         init_code.as_str(),
-        122000,
+        152000,
         0,
         block_producer_id.clone(),
         1,

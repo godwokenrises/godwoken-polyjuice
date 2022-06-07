@@ -45,7 +45,7 @@ fn test_selfdestruct() {
         input.extend(beneficiary_ethabi_addr);
         let args = PolyjuiceArgsBuilder::default()
             .do_create(true)
-            .gas_limit(22000)
+            .gas_limit(42061)
             .gas_price(1)
             .value(200)
             .input(&input)

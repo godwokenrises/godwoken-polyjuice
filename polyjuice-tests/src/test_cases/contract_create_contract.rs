@@ -33,7 +33,7 @@ fn test_contract_create_contract() {
         CREATOR_ACCOUNT_ID,
         from_id,
         INIT_CODE,
-        122000,
+        132018,
         0,
         block_producer_id.clone(),
         1,
@@ -81,7 +81,7 @@ fn test_contract_create_contract() {
         let block_info = new_block_info(block_producer_id, 2, 0);
         let input = hex::decode("6d4ce63c").unwrap();
         let args = PolyjuiceArgsBuilder::default()
-            .gas_limit(21000)
+            .gas_limit(22030)
             .gas_price(1)
             .value(0)
             .input(&input)

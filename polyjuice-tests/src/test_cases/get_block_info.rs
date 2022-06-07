@@ -51,7 +51,7 @@ fn test_get_block_info() {
     let input = hex::decode(INIT_CODE).unwrap();
     let args = PolyjuiceArgsBuilder::default()
         .do_create(true)
-        .gas_limit(160000)
+        .gas_limit(144749)
         .gas_price(1)
         .value(0)
         .input(&input)
@@ -121,7 +121,7 @@ fn test_get_block_info() {
         let block_info = new_block_info(block_producer.clone(), block_number + 1, timestamp + 1);
         let input = hex::decode(fn_sighash).unwrap();
         let args = PolyjuiceArgsBuilder::default()
-            .gas_limit(21000)
+            .gas_limit(31000)
             .gas_price(1)
             .value(0)
             .input(&input)

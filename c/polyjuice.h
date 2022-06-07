@@ -1216,7 +1216,7 @@ int handle_message(gw_context_t* ctx,
     ckb_debug("[handle_message] Don't run evm and return empty data");
     res->output_data = NULL;
     res->output_size = 0;
-    res->gas_left = msg.gas - MIN_TRANSACTION_GAS;
+    res->gas_left = msg.gas;
     res->status_code = EVMC_SUCCESS;
   }
 
@@ -1358,8 +1358,7 @@ int run_polyjuice() {
     return ret;
   }
 
-  //check gas limit
-  if (msg.gas < MIN_TRANSACTION_GAS) {
+  if (msg.gas < MIN_TRANSACTION_GAS) { // check gas_limit >= MIN_TRANSACTION_GAS
     debug_print_int("Min gas limit is 21000. Insufficient gas limit", msg.gas);
     return ERROR_INSUFFICIENT_GAS_LIMIT;
   }
@@ -1379,9 +1378,13 @@ int run_polyjuice() {
   uint8_t evm_memory[MAX_EVM_MEMORY_SIZE];
   init_evm_memory(evm_memory, MAX_EVM_MEMORY_SIZE);
 
+  /* init EVM execution result */
   struct evmc_result res;
   memset(&res, 0, sizeof(evmc_result));
-  res.status_code = EVMC_FAILURE; // Generic execution failure
+  res.status_code = EVMC_FAILURE;      // Generic execution failure
+  debug_print_int("[run_polyjuice] initial gas limit", msg.gas);
+  int64_t initial_gas = msg.gas;
+  msg.gas -= MIN_TRANSACTION_GAS;      // subtract IntrinsicGas
 
   int ret_handle_message = handle_message(&context, UINT32_MAX, UINT32_MAX, NULL, &msg, &res);
   // debug_print evmc_result.output_data if the execution failed
@@ -1392,13 +1395,10 @@ int run_polyjuice() {
                      res.output_size > 100 ? 100 : res.output_size);
   }
 
-  debug_print_int("gas limit", msg.gas);
-  debug_print_int("gas left", res.gas_left);
+  debug_print_int("[run_polyjuice] gas left", res.gas_left);
   uint64_t gas_used =
-      (uint64_t)(res.gas_left <= 0 ? msg.gas : msg.gas - res.gas_left);
-  if (gas_used < MIN_TRANSACTION_GAS) {
-    gas_used = MIN_TRANSACTION_GAS;
-  }
+      (uint64_t)(res.gas_left <= 0 ? initial_gas : initial_gas - res.gas_left);
+  debug_print_int("[run_polyjuice] gas_used", gas_used);
 
   /* emit POLYJUICE_SYSTEM log to Godwoken */
   ret = emit_evm_result_log(&context, gas_used, res.status_code);

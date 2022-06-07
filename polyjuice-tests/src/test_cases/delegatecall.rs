@@ -22,7 +22,7 @@ fn test_delegatecall() {
 
     let from_eth_address = [1u8; 20];
     let (from_id, _from_script_hash) =
-        helper::create_eth_eoa_account(&mut state, &from_eth_address, 280000u64.into());
+        helper::create_eth_eoa_account(&mut state, &from_eth_address, 300000u64.into());
 
     // Deploy SimpleStorage
     let mut block_number = 1;
@@ -33,7 +33,7 @@ fn test_delegatecall() {
         CREATOR_ACCOUNT_ID,
         from_id,
         SS_INIT_CODE,
-        122000,
+        132000,
         0,
         block_producer.clone(),
         block_number,
@@ -53,7 +53,7 @@ fn test_delegatecall() {
         CREATOR_ACCOUNT_ID,
         from_id,
         INIT_CODE,
-        122000,
+        132000,
         0,
         block_producer.clone(),
         block_number,

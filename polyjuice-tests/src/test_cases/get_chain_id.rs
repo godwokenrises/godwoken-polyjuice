@@ -78,7 +78,7 @@ fn test_get_chain_id() {
         let block_info = new_block_info(block_producer, 3, 0);
         let input = hex::decode("6d4ce63c").unwrap();
         let args = PolyjuiceArgsBuilder::default()
-            .gas_limit(21000)
+            .gas_limit(31000)
             .gas_price(1)
             .value(0)
             .input(&input)

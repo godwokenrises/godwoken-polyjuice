@@ -40,7 +40,7 @@ fn test_parse_log_event() {
         CREATOR_ACCOUNT_ID,
         from_id,
         INIT_CODE,
-        50000,
+        22814,
         deploy_value,
         block_producer.clone(),
         block_number,
@@ -142,7 +142,7 @@ fn test_parse_log_event() {
             assert_eq!(&the_from_addr, &address);
             // The block producer id is `0`
             assert_eq!(&the_to_addr, &block_producer);
-            assert_eq!(amount, U256::from(21000u64));
+            assert_eq!(amount, U256::from(22814u64));
         } else {
             panic!("unexpected polyjuice log");
         }
@@ -155,7 +155,7 @@ fn test_parse_log_event() {
         let input = hex::decode("51973ec9").unwrap();
         let call_value = 0xac;
         let args = PolyjuiceArgsBuilder::default()
-            .gas_limit(21000)
+            .gas_limit(22839)
             .gas_price(1)
             .value(call_value)
             .input(&input)

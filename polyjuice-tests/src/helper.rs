@@ -620,7 +620,7 @@ pub fn simple_storage_get(
     let block_info = new_block_info(addr, block_number, block_number);
     let input = hex::decode("6d4ce63c").unwrap();
     let args = PolyjuiceArgsBuilder::default()
-        .gas_limit(21000)
+        .gas_limit(30000)
         .gas_price(1)
         .value(0)
         .input(&input)

@@ -28,7 +28,7 @@ fn test_fallback_function() {
         let input = hex::decode(INIT_CODE).unwrap();
         let args = PolyjuiceArgsBuilder::default()
             .do_create(true)
-            .gas_limit(22000)
+            .gas_limit(41144)
             .gas_price(1)
             .value(0)
             .input(&input)
@@ -71,7 +71,7 @@ fn test_fallback_function() {
         let block_info = new_block_info(block_producer, 2, 0);
         let input = hex::decode("3333").unwrap();
         let args = PolyjuiceArgsBuilder::default()
-            .gas_limit(21000)
+            .gas_limit(51144)
             .gas_price(1)
             .value(0)
             .input(&input)

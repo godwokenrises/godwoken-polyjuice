@@ -31,7 +31,7 @@ fn test_error_handling() {
         helper::CREATOR_ACCOUNT_ID,
         from_id,
         CONTRACT_CODE,
-        80000,
+        96978,
         0,
         block_producer.to_owned(),
         4,
@@ -51,7 +51,7 @@ fn test_error_handling() {
     let block_info = helper::new_block_info(block_producer.to_owned(), block_number, block_number);
     let input = hex::decode("2b813bc0").expect("testAssert() method ID");
     let args = helper::PolyjuiceArgsBuilder::default()
-        .gas_limit(21000)
+        .gas_limit(30000)
         .gas_price(1)
         .value(0)
         .input(&input)
@@ -80,7 +80,7 @@ fn test_error_handling() {
     let block_info = helper::new_block_info(block_producer.to_owned(), block_number, block_number);
     let input = hex::decode("67478cc9").expect("mockAssertPayable() method ID");
     let args = helper::PolyjuiceArgsBuilder::default()
-        .gas_limit(21319)
+        .gas_limit(30001)
         .gas_price(1)
         .value(0)
         .input(&input)
@@ -119,7 +119,7 @@ fn test_error_handling() {
         hex::decode("8a8a9b640000000000000000000000000000000000000000000000000000000000000001")
             .expect("decode the function selector and arg of testOverflowError(1)");
     let args = helper::PolyjuiceArgsBuilder::default()
-        .gas_limit(21319)
+        .gas_limit(30002)
         .gas_price(1)
         .value(0)
         .input(&input)
@@ -154,7 +154,7 @@ fn test_error_handling() {
         hex::decode("b8bd717f0000000000000000000000000000000000000000000000000000000000000009")
             .expect("decode the function selector and arg of testRequire(9)");
     let args = helper::PolyjuiceArgsBuilder::default()
-        .gas_limit(21986)
+        .gas_limit(30003)
         .gas_price(1)
         .value(0)
         .input(&input)
@@ -191,7 +191,7 @@ fn test_error_handling() {
         hex::decode("209877670000000000000000000000000000000000000000000000000000000000000008")
             .expect("decode the function selector and arg of testRevert(8)");
     let args = helper::PolyjuiceArgsBuilder::default()
-        .gas_limit(21921)
+        .gas_limit(30004)
         .gas_price(1)
         .value(0)
         .input(&input)
@@ -226,7 +226,7 @@ fn test_error_handling() {
         hex::decode("5729f42c000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000137465737420726576657274206d65737361676500000000000000000000000000")
             .expect("decode the function selector and arg of testRevertMsg('test revert message')");
     let args = helper::PolyjuiceArgsBuilder::default()
-        .gas_limit(23264)
+        .gas_limit(30005)
         .gas_price(1)
         .value(0)
         .input(&input)

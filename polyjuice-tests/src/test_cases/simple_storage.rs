@@ -33,7 +33,7 @@ fn test_simple_storage() {
         let input = hex::decode(INIT_CODE).unwrap();
         let args = PolyjuiceArgsBuilder::default()
             .do_create(true)
-            .gas_limit(22000)
+            .gas_limit(41083)
             .gas_price(1)
             .value(0)
             .input(&input)
@@ -86,7 +86,7 @@ fn test_simple_storage() {
             hex::decode("60fe47b10000000000000000000000000000000000000000000000000000000000000d10")
                 .unwrap();
         let args = PolyjuiceArgsBuilder::default()
-            .gas_limit(21000)
+            .gas_limit(41196)
             .gas_price(1)
             .value(0)
             .input(&input)
@@ -118,7 +118,7 @@ fn test_simple_storage() {
         let block_info = new_block_info(block_producer, 3, 0);
         let input = hex::decode("6d4ce63c").unwrap();
         let args = PolyjuiceArgsBuilder::default()
-            .gas_limit(21000)
+            .gas_limit(22013)
             .gas_price(1)
             .value(0)
             .input(&input)
