@@ -1379,8 +1379,6 @@ int run_polyjuice() {
   res.status_code = EVMC_FAILURE; // Generic execution failure
 
   int ret_handle_message = handle_message(&context, UINT32_MAX, UINT32_MAX, NULL, &msg, &res);
-  uint64_t gas_used = (uint64_t)(msg.gas - res.gas_left);
-
   // debug_print evmc_result.output_data if the execution failed
   if (res.status_code != 0) {
     debug_print_int("evmc_result.output_size", res.output_size);
@@ -1388,17 +1386,23 @@ int run_polyjuice() {
     debug_print_data("evmc_result.output_data:", res.output_data,
                      res.output_size > 100 ? 100 : res.output_size);
   }
-  
+
+  debug_print_int("gas limit", msg.gas);
+  debug_print_int("gas left", res.gas_left);
+  uint64_t gas_used =
+      (uint64_t)(res.gas_left <= 0 ? msg.gas : msg.gas - res.gas_left);
   if (gas_used < MIN_TRANSACTION_GAS) {
     gas_used = MIN_TRANSACTION_GAS;
   }
 
+  /* emit POLYJUICE_SYSTEM log to Godwoken */
   ret = emit_evm_result_log(&context, gas_used, res.status_code);
   if (ret != 0) {
     ckb_debug("emit_evm_result_log failed");
     return clean_evmc_result_and_return(&res, ret);
   }
 
+  /* Godwoken syscall: SET_RETURN_DATA */
   ret = context.sys_set_program_return_data(&context,
                                             (uint8_t *)res.output_data,
                                             res.output_size);
@@ -1422,16 +1426,10 @@ int run_polyjuice() {
     return clean_evmc_result_and_return(&res, -1);
   }
   if (msg.gas < res.gas_left) {
-    debug_print_int("msg.gas", msg.gas);
-    debug_print_int("res.gas_left", res.gas_left);
-    ckb_debug("unreachable!");
+    ckb_debug("(msg.gas < res.gas_left) => unreachable!");
     return clean_evmc_result_and_return(&res, -1);
   }
-
-  debug_print_int("gas limit", msg.gas);
-  debug_print_int("gas left", res.gas_left);
   uint256_t fee_u256 = calculate_fee(gas_price, gas_used);
-
   gw_reg_addr_t sender_addr = new_reg_addr(msg.sender.bytes);
   ret = sudt_pay_fee(&context, g_sudt_id, /* g_sudt_id must already exists */
                      sender_addr, fee_u256);
@@ -1440,10 +1438,12 @@ int run_polyjuice() {
     return clean_evmc_result_and_return(&res, ret);
   }
 
+  /* finalize state */
   ckb_debug("[run_polyjuice] finalize");
   ret = gw_finalize(&context);
   if (ret != 0) {
     return clean_evmc_result_and_return(&res, ret);
   }
+
   return clean_evmc_result_and_return(&res, 0);
 }
