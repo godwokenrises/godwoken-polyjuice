@@ -38,7 +38,7 @@ fn test_erc20() {
         CREATOR_ACCOUNT_ID,
         from_id1,
         INIT_CODE,
-        132000,
+        199694,
         0,
         block_producer_id.clone(),
         1,

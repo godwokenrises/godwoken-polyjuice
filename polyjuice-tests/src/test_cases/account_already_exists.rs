@@ -32,7 +32,7 @@ fn test_account_already_exists() {
         CREATOR_ACCOUNT_ID,
         from_id,
         SS_INIT_CODE,
-        50000,
+        77659,
         0,
         block_producer_id,
         0,

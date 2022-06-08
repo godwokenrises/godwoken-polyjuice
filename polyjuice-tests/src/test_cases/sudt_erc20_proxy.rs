@@ -52,7 +52,7 @@ fn test_sudt_erc20_proxy_inner(
         CREATOR_ACCOUNT_ID,
         from_id1,
         init_code.as_str(),
-        152000,
+        255908,
         0,
         block_producer_id.clone(),
         1,
@@ -286,7 +286,7 @@ fn test_sudt_erc20_proxy_inner(
         println!(">> [input]: {}", args_str);
         let input = hex::decode(args_str).unwrap();
         let args = PolyjuiceArgsBuilder::default()
-            .gas_limit(80000)
+            .gas_limit(89915)
             .gas_price(1)
             .value(0)
             .input(&input)

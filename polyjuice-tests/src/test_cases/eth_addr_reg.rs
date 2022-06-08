@@ -78,13 +78,13 @@ fn test_update_eth_addr_reg_by_contract() {
         U256::zero()
     );
     state /* mint CKB to pay fee */
-        .mint_sudt(CKB_SUDT_ACCOUNT_ID, &address, U256::from(52000u64))
+        .mint_sudt(CKB_SUDT_ACCOUNT_ID, &address, U256::from(600000u64))
         .unwrap();
     assert_eq!(
         state
             .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &address)
             .unwrap(),
-        U256::from(52000u128)
+        U256::from(600000u128)
     );
 
     // update_eth_address_registry by `ETH Address Registry` layer2 contract
@@ -106,7 +106,7 @@ fn test_update_eth_addr_reg_by_contract() {
         state
             .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &address)
             .unwrap(),
-        U256::from(51000u128)
+        U256::from(599000u128)
     );
 
     // try to register the same account again
@@ -184,7 +184,7 @@ fn test_update_eth_addr_reg_by_contract() {
         helper::CREATOR_ACCOUNT_ID,
         eth_eoa_account_id,
         SS_INIT_CODE,
-        50000,
+        77659,
         0,
         block_producer_id,
         4,

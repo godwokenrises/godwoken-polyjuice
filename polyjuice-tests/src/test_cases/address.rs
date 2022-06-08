@@ -46,7 +46,7 @@ fn test_get_contract_code() {
     let block_info = new_block_info(block_producer_id.clone(), block_number, block_number);
     let input = hex::decode("c59083f5").expect("createMemoryArray function");
     let args = PolyjuiceArgsBuilder::default()
-        .gas_limit(30233)
+        .gas_limit(30297)
         .gas_price(1)
         .value(0)
         .input(&input)
@@ -81,7 +81,7 @@ fn test_get_contract_code() {
     let block_info = new_block_info(block_producer_id, block_number, block_number);
     let input = hex::decode("ea879634").expect("getCode function");
     let args = PolyjuiceArgsBuilder::default()
-        .gas_limit(25375)
+        .gas_limit(25439)
         .gas_price(1)
         .value(0)
         .input(&input)

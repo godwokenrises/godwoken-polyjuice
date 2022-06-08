@@ -35,7 +35,7 @@ fn receive_ether_test() -> anyhow::Result<()> {
         CREATOR_ACCOUNT_ID,
         from_id,
         INIT_CODE,
-        50000,
+        59712,
         0,
         block_producer.clone(),
         0,
@@ -109,7 +109,7 @@ fn without_receive_fallback_test() -> anyhow::Result<()> {
         CREATOR_ACCOUNT_ID,
         from_id,
         ST_CODE,
-        50000,
+        70000,
         0,
         block_producer.clone(),
         0,
@@ -129,7 +129,7 @@ fn without_receive_fallback_test() -> anyhow::Result<()> {
         CREATOR_ACCOUNT_ID,
         from_id,
         REJECT_SS_CODE,
-        50000,
+        77527,
         0,
         block_producer.clone(),
         0,
@@ -152,7 +152,7 @@ fn without_receive_fallback_test() -> anyhow::Result<()> {
     ))
     .unwrap();
     let args = PolyjuiceArgsBuilder::default()
-        .gas_limit(80000)
+        .gas_limit(29997)
         .gas_price(1)
         .value(0)
         .input(&input)
@@ -202,7 +202,7 @@ fn over_transfer_test() -> anyhow::Result<()> {
         CREATOR_ACCOUNT_ID,
         from_id,
         ST_CODE,
-        50000,
+        69640,
         1000,
         block_producer.clone(),
         0,
@@ -220,7 +220,7 @@ fn over_transfer_test() -> anyhow::Result<()> {
         CREATOR_ACCOUNT_ID,
         from_id,
         INIT_CODE,
-        40000,
+        59712,
         0,
         block_producer.clone(),
         0,

@@ -20,7 +20,7 @@ fn test_ecrecover() {
 
     let from_eth_address = [1u8; 20];
     let (from_id, _from_script_hash) =
-        helper::create_eth_eoa_account(&mut state, &from_eth_address, 200000u64.into());
+        helper::create_eth_eoa_account(&mut state, &from_eth_address, 500000u64.into());
 
     // Deploy HeadTail Contract
     let run_result = deploy(
@@ -30,7 +30,7 @@ fn test_ecrecover() {
         CREATOR_ACCOUNT_ID,
         from_id,
         INIT_CODE,
-        122000,
+        187881,
         0,
         block_producer_id.clone(),
         1,
@@ -64,7 +64,7 @@ fn test_ecrecover() {
             signed_hash,
         )).unwrap();
         let args = PolyjuiceArgsBuilder::default()
-            .gas_limit(37487)
+            .gas_limit(50000)
             .gas_price(1)
             .value(0)
             .input(&input)

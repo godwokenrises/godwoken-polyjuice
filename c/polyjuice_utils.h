@@ -318,4 +318,42 @@ bool is_evmc_error(int error_code) {
   return error_code >= 1 && error_code <= 16;
 }
 
+/**
+ * @brief computes the 'intrinsic gas' for a message with the given data
+ * 
+ * @param msg evmc_message: transaction message
+ * @param is_create bool: isContractCreation
+ * @param min_gas the result of calculated intrinsic gas
+ * @return int 
+ */
+int intrinsic_gas(const evmc_message *msg, const bool is_create,
+                  uint64_t *min_gas) {
+  // Set the starting gas for the raw transaction
+  *min_gas = is_create ? MIN_CONTRACT_CREATION_TX_GAS : MIN_TX_GAS;
+
+  // Bump the required gas by the size of transactional data
+  if (msg->input_size > 0) {
+    // Zero and non-zero bytes are priced differently
+    uint64_t non_zero_bytes = 0;
+    for (size_t i = 0; i < msg->input_size; i++) {
+      if (*(msg->input_data + i) != 0)
+        non_zero_bytes++;
+    }
+
+    // Make sure we don't exceed uint64 for all data combinations
+    if ((UINT64_MAX - *min_gas) / DATA_NONE_ZERO_TX_GAS < non_zero_bytes) {
+      return ERROR_INSUFFICIENT_GAS_LIMIT;
+    }
+    *min_gas += non_zero_bytes * DATA_NONE_ZERO_TX_GAS;
+
+    uint64_t zero_bytes = msg->input_size - non_zero_bytes;
+    if ((UINT64_MAX - *min_gas) / DATA_ZERO_TX_GAS < zero_bytes) {
+      return ERROR_INSUFFICIENT_GAS_LIMIT;
+    }
+    *min_gas += zero_bytes * DATA_ZERO_TX_GAS;
+  }
+
+  return 0;
+}
+
 #endif  // POLYJUICE_UTILS_H

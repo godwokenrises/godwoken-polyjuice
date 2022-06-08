@@ -38,4 +38,13 @@ static evmc_address g_tx_origin = {0};
 static uint8_t g_script_code_hash[32] = {0};
 static uint8_t g_script_hash_type = 0xff;
 
+/* Minimal gas of a normal transaction*/
+#define MIN_TX_GAS                      21000
+/* Minimal gas of a transaction that creates a contract */
+#define MIN_CONTRACT_CREATION_TX_GAS    53000
+/* Gas per byte of non zero data attached to a transaction */
+#define	DATA_NONE_ZERO_TX_GAS           16
+/* Gas per byte of data attached to a transaction */
+#define	DATA_ZERO_TX_GAS                4
+
 #endif // POLYJUICE_GLOBALS_H

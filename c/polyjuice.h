@@ -44,8 +44,6 @@
 #define POLYJUICE_SYSTEM_PREFIX 0xFF
 #define POLYJUICE_CONTRACT_CODE 0x01
 #define POLYJUICE_DESTRUCTED 0x02
-/* Min transfer transaction gas cost: 21000 */
-#define MIN_TRANSACTION_GAS 21000
 
 void polyjuice_build_system_key(uint32_t id, uint8_t polyjuice_field_type,
                                 uint8_t key[GW_KEY_BYTES]) {
@@ -1358,8 +1356,14 @@ int run_polyjuice() {
     return ret;
   }
 
-  if (msg.gas < MIN_TRANSACTION_GAS) { // check gas_limit >= MIN_TRANSACTION_GAS
-    debug_print_int("Min gas limit is 21000. Insufficient gas limit", msg.gas);
+  /* Ensure the transaction has more gas than the basic tx fee. */
+  uint64_t min_gas;
+  ret = intrinsic_gas(&msg, is_create(msg.kind), &min_gas);
+  if (ret != 0) {
+    return ret;
+  }
+  if ((uint64_t)msg.gas < min_gas) {
+    debug_print_int("Insufficient gas limit, should exceed", min_gas);
     return ERROR_INSUFFICIENT_GAS_LIMIT;
   }
 
@@ -1384,7 +1388,7 @@ int run_polyjuice() {
   res.status_code = EVMC_FAILURE;      // Generic execution failure
   debug_print_int("[run_polyjuice] initial gas limit", msg.gas);
   int64_t initial_gas = msg.gas;
-  msg.gas -= MIN_TRANSACTION_GAS;      // subtract IntrinsicGas
+  msg.gas -= min_gas;                  // subtract IntrinsicGas
 
   int ret_handle_message = handle_message(&context, UINT32_MAX, UINT32_MAX, NULL, &msg, &res);
   // debug_print evmc_result.output_data if the execution failed
@@ -1393,6 +1397,11 @@ int run_polyjuice() {
     // The output contains data coming from REVERT opcode
     debug_print_data("evmc_result.output_data:", res.output_data,
                      res.output_size > 100 ? 100 : res.output_size);
+
+    // record the used memory of a failed transaction
+    uint32_t used_memory;
+    memcpy(&used_memory, res.padding, sizeof(uint32_t));
+    debug_print_int("[run_polyjuice] used_memory(Bytes)", used_memory);
   }
 
   debug_print_int("[run_polyjuice] gas left", res.gas_left);
@@ -1420,10 +1429,6 @@ int run_polyjuice() {
     ckb_debug("handle message failed");
     return clean_evmc_result_and_return(&res, ret_handle_message);
   }
-
-  uint32_t used_memory;
-  memcpy(&used_memory, res.padding, sizeof(uint32_t));
-  debug_print_int("[run_polyjuice] used_memory(Bytes)", used_memory);
 
   /* Handle transaction fee */
   if (res.gas_left < 0) {

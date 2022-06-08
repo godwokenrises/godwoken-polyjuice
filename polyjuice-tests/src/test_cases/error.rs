@@ -31,7 +31,7 @@ fn test_error_handling() {
         helper::CREATOR_ACCOUNT_ID,
         from_id,
         CONTRACT_CODE,
-        96978,
+        233474,
         0,
         block_producer.to_owned(),
         4,

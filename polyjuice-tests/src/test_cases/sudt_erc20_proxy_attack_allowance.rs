@@ -21,7 +21,7 @@ fn test_attack_allowance() {
     let (store, mut state, generator) = setup();
     let block_producer_id = crate::helper::create_block_producer(&mut state);
 
-    let mint_balance: u128 = 400000;
+    let mint_balance: u128 = 600000;
     let from_eth_addr = [1u8; 20];
     let (from_id, _from_script_hash) =
         helper::create_eth_eoa_account(&mut state, &from_eth_addr, mint_balance.into());
@@ -61,7 +61,7 @@ fn test_attack_allowance() {
             CREATOR_ACCOUNT_ID,
             from_id,
             init_code.as_str(),
-            150000,
+            1253495,
             0,
             block_producer_id.clone(),
             block_number,
@@ -95,7 +95,7 @@ fn test_attack_allowance() {
             CREATOR_ACCOUNT_ID,
             from_id,
             init_code.as_str(),
-            50000,
+            1012616,
             0,
             block_producer_id.clone(),
             block_number,
@@ -127,7 +127,7 @@ fn test_attack_allowance() {
         ))
         .unwrap();
         let args = PolyjuiceArgsBuilder::default()
-            .gas_limit(40000)
+            .gas_limit(44037)
             .gas_price(1)
             .value(0)
             .input(&input)

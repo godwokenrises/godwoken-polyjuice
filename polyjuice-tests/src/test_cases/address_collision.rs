@@ -49,7 +49,7 @@ fn create_address_collision_overwrite() -> Result<()> {
         CREATOR_ACCOUNT_ID,
         from_id,
         INIT_CODE,
-        132018,
+        170000,
         0,
         block_producer_id,
         1,

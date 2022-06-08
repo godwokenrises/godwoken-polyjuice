@@ -55,7 +55,7 @@ fn test_invalid_sudt_erc20_proxy() {
         CREATOR_ACCOUNT_ID,
         from_id1,
         init_code.as_str(),
-        122000,
+        239912,
         0,
         block_producer_id.clone(),
         block_number,
