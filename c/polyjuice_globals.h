@@ -1,7 +1,7 @@
 #ifndef POLYJUICE_GLOBALS_H
 #define POLYJUICE_GLOBALS_H
 
-#define POLYJUICE_VERSION "v1.1.6-beta"
+#define POLYJUICE_VERSION "v1.2.0"
 
 #define ETH_ADDRESS_LEN 20
 
