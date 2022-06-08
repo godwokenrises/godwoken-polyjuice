@@ -1430,10 +1430,6 @@ int run_polyjuice() {
     ckb_debug("gas not enough");
     return clean_evmc_result_and_return(&res, -1);
   }
-  if (msg.gas < res.gas_left) {
-    ckb_debug("(msg.gas < res.gas_left) => unreachable!");
-    return clean_evmc_result_and_return(&res, -1);
-  }
   uint256_t fee_u256 = calculate_fee(gas_price, gas_used);
   gw_reg_addr_t sender_addr = new_reg_addr(msg.sender.bytes);
   ret = sudt_pay_fee(&context, g_sudt_id, /* g_sudt_id must already exists */
