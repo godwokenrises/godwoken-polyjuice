@@ -20,7 +20,7 @@ fn test_call_multiple_times() {
     let block_producer_id = crate::helper::create_block_producer(&mut state);
 
     let from_eth_address = [1u8; 20];
-    let (from_id, _) = create_eth_eoa_account(&mut state, &from_eth_address, 300000u64.into());
+    let (from_id, _) = create_eth_eoa_account(&mut state, &from_eth_address, 500000u64.into());
 
     // Deploy two SimpleStorage
     let mut block_number = 1;
@@ -126,7 +126,7 @@ fn test_call_multiple_times() {
         ))
         .unwrap();
         let args = PolyjuiceArgsBuilder::default()
-            .gas_limit(200000)
+            .gas_limit(163263)
             .gas_price(1)
             .value(0)
             .input(&input)

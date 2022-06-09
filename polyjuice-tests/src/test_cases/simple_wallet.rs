@@ -24,7 +24,7 @@ fn test_simple_wallet() {
         CREATOR_ACCOUNT_ID,
         from_id,
         BIN_CODE,
-        122000,
+        252898,
         0,
         block_producer_id,
         block_number,

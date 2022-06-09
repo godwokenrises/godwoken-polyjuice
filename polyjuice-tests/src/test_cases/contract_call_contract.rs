@@ -23,7 +23,7 @@ fn test_contract_call_contract() {
 
     let from_eth_address = [1u8; 20];
     let (from_id, _from_script_hash) =
-        helper::create_eth_eoa_account(&mut state, &from_eth_address, 200000u64.into());
+        helper::create_eth_eoa_account(&mut state, &from_eth_address, 400000u64.into());
 
     // Deploy SimpleStorage
     let mut block_number = 1;
@@ -34,7 +34,7 @@ fn test_contract_call_contract() {
         CREATOR_ACCOUNT_ID,
         from_id,
         SS_INIT_CODE,
-        122000,
+        77659,
         0,
         block_producer.clone(),
         block_number,
@@ -58,7 +58,7 @@ fn test_contract_call_contract() {
         CREATOR_ACCOUNT_ID,
         from_id,
         input.as_str(),
-        122000,
+        84209,
         0,
         block_producer.clone(),
         block_number,
@@ -97,7 +97,7 @@ fn test_contract_call_contract() {
             hex::decode("28cc7b2500000000000000000000000000000000000000000000000000000000000000de")
                 .unwrap(); // 0xde = 222
         let args = PolyjuiceArgsBuilder::default()
-            .gas_limit(51000)
+            .gas_limit(71000)
             .gas_price(1)
             .value(0)
             .input(&input)
@@ -160,7 +160,7 @@ fn test_contract_call_non_exists_contract() {
         CREATOR_ACCOUNT_ID,
         from_id,
         CALL_NON_EXISTS_INIT_CODE,
-        122000,
+        1220000,
         0,
         block_producer_id.clone(),
         block_number,
@@ -187,7 +187,7 @@ fn test_contract_call_non_exists_contract() {
             hex::decode("56c94e70000000000000000000000000ffffffffffffffffffffffffffffffffffffffff")
                 .unwrap();
         let args = PolyjuiceArgsBuilder::default()
-            .gas_limit(51000)
+            .gas_limit(73000)
             .gas_price(1)
             .value(0)
             .input(&input)
@@ -227,7 +227,7 @@ fn test_contract_call_non_exists_contract() {
         let input = hex::decode(format!("56c94e70{}", hex::encode(eoa_ethabi_addr))).unwrap();
         println!("{}", hex::encode(&input));
         let args = PolyjuiceArgsBuilder::default()
-            .gas_limit(51000)
+            .gas_limit(73000)
             .gas_price(1)
             .value(0)
             .input(&input)

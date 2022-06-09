@@ -28,7 +28,7 @@ fn test_erc20() {
 
     let from_eth_address3 = [3u8; 20];
     let (from_id3, _from_script_hash3) =
-        helper::create_eth_eoa_account(&mut state, &from_eth_address3, 80000u64.into());
+        helper::create_eth_eoa_account(&mut state, &from_eth_address3, 100000u64.into());
 
     // Deploy ERC20
     let run_result = deploy(
@@ -38,7 +38,7 @@ fn test_erc20() {
         CREATOR_ACCOUNT_ID,
         from_id1,
         INIT_CODE,
-        122000,
+        199694,
         0,
         block_producer_id.clone(),
         1,
@@ -137,7 +137,7 @@ fn test_erc20() {
         println!(">> [input]: {}", args_str);
         let input = hex::decode(args_str).unwrap();
         let args = PolyjuiceArgsBuilder::default()
-            .gas_limit(80000)
+            .gas_limit(100000)
             .gas_price(1)
             .value(0)
             .input(&input)

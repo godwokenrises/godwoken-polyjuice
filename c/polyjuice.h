@@ -1356,6 +1356,17 @@ int run_polyjuice() {
     return ret;
   }
 
+  /* Ensure the transaction has more gas than the basic tx fee. */
+  uint64_t min_gas;
+  ret = intrinsic_gas(&msg, is_create(msg.kind), &min_gas);
+  if (ret != 0) {
+    return ret;
+  }
+  if ((uint64_t)msg.gas < min_gas) {
+    debug_print_int("Insufficient gas limit, should exceed", min_gas);
+    return ERROR_INSUFFICIENT_GAS_LIMIT;
+  }
+
   /* Load: validator_code_hash, hash_type, g_sudt_id */
   ret = load_globals(&context, context.transaction_context.to_id);
   if (ret != 0) {
@@ -1371,27 +1382,41 @@ int run_polyjuice() {
   uint8_t evm_memory[MAX_EVM_MEMORY_SIZE];
   init_evm_memory(evm_memory, MAX_EVM_MEMORY_SIZE);
 
+  /* init EVM execution result */
   struct evmc_result res;
   memset(&res, 0, sizeof(evmc_result));
-  res.status_code = EVMC_FAILURE; // Generic execution failure
+  res.status_code = EVMC_FAILURE;      // Generic execution failure
+  debug_print_int("[run_polyjuice] initial gas limit", msg.gas);
+  int64_t initial_gas = msg.gas;
+  msg.gas -= min_gas;                  // subtract IntrinsicGas
 
   int ret_handle_message = handle_message(&context, UINT32_MAX, UINT32_MAX, NULL, &msg, &res);
-  uint64_t gas_used = (uint64_t)(msg.gas - res.gas_left);
-
   // debug_print evmc_result.output_data if the execution failed
   if (res.status_code != 0) {
     debug_print_int("evmc_result.output_size", res.output_size);
     // The output contains data coming from REVERT opcode
     debug_print_data("evmc_result.output_data:", res.output_data,
                      res.output_size > 100 ? 100 : res.output_size);
+
+    // record the used memory of a failed transaction
+    uint32_t used_memory;
+    memcpy(&used_memory, res.padding, sizeof(uint32_t));
+    debug_print_int("[run_polyjuice] used_memory(Bytes)", used_memory);
   }
-  
+
+  debug_print_int("[run_polyjuice] gas left", res.gas_left);
+  uint64_t gas_used =
+      (uint64_t)(res.gas_left <= 0 ? initial_gas : initial_gas - res.gas_left);
+  debug_print_int("[run_polyjuice] gas_used", gas_used);
+
+  /* emit POLYJUICE_SYSTEM log to Godwoken */
   ret = emit_evm_result_log(&context, gas_used, res.status_code);
   if (ret != 0) {
     ckb_debug("emit_evm_result_log failed");
     return clean_evmc_result_and_return(&res, ret);
   }
 
+  /* Godwoken syscall: SET_RETURN_DATA */
   ret = context.sys_set_program_return_data(&context,
                                             (uint8_t *)res.output_data,
                                             res.output_size);
@@ -1405,26 +1430,12 @@ int run_polyjuice() {
     return clean_evmc_result_and_return(&res, ret_handle_message);
   }
 
-  uint32_t used_memory;
-  memcpy(&used_memory, res.padding, sizeof(uint32_t));
-  debug_print_int("[run_polyjuice] used_memory(Bytes)", used_memory);
-
   /* Handle transaction fee */
   if (res.gas_left < 0) {
     ckb_debug("gas not enough");
     return clean_evmc_result_and_return(&res, -1);
   }
-  if (msg.gas < res.gas_left) {
-    debug_print_int("msg.gas", msg.gas);
-    debug_print_int("res.gas_left", res.gas_left);
-    ckb_debug("unreachable!");
-    return clean_evmc_result_and_return(&res, -1);
-  }
-
-  debug_print_int("gas limit", msg.gas);
-  debug_print_int("gas left", res.gas_left);
   uint256_t fee_u256 = calculate_fee(gas_price, gas_used);
-
   gw_reg_addr_t sender_addr = new_reg_addr(msg.sender.bytes);
   ret = sudt_pay_fee(&context, g_sudt_id, /* g_sudt_id must already exists */
                      sender_addr, fee_u256);
@@ -1433,10 +1444,12 @@ int run_polyjuice() {
     return clean_evmc_result_and_return(&res, ret);
   }
 
+  /* finalize state */
   ckb_debug("[run_polyjuice] finalize");
   ret = gw_finalize(&context);
   if (ret != 0) {
     return clean_evmc_result_and_return(&res, ret);
   }
+
   return clean_evmc_result_and_return(&res, 0);
 }

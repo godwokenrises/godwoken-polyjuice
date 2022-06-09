@@ -72,7 +72,7 @@ fn test_recover_account() {
         ))
         .unwrap();
         let args = PolyjuiceArgsBuilder::default()
-            .gas_limit(21000)
+            .gas_limit(31000)
             .gas_price(1)
             .value(0)
             .input(&input)
@@ -127,7 +127,7 @@ fn test_recover_account() {
         ))
         .unwrap();
         let args = PolyjuiceArgsBuilder::default()
-            .gas_limit(21000)
+            .gas_limit(32000)
             .gas_price(1)
             .value(0)
             .input(&input)
@@ -167,7 +167,7 @@ fn test_recover_account() {
         ))
         .unwrap();
         let args = PolyjuiceArgsBuilder::default()
-            .gas_limit(21000)
+            .gas_limit(33000)
             .gas_price(1)
             .value(0)
             .input(&input)
@@ -177,7 +177,7 @@ fn test_recover_account() {
             .to_id(new_account_id.pack())
             .args(Bytes::from(args).pack())
             .build();
-        let db = store.begin_transaction();
+    let db = store.begin_transaction();
         let tip_block_hash = db.get_tip_block_hash().unwrap();
         let err = generator
             .execute_transaction(

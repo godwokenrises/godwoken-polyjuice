@@ -35,7 +35,7 @@ fn test_beacon_proxy() {
         helper::CREATOR_ACCOUNT_ID,
         from_id,
         CONTRACT_CODE,
-        80000,
+        233000,
         0,
         block_producer.to_owned(),
         block_number,
