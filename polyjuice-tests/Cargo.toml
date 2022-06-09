@@ -20,7 +20,7 @@ lazy_static = "1.4"
 tiny-keccak = "1.4"
 rlp = "0.5.0"
 hex = "0.4.2"
-env_logger = "0.8.3"
+env_logger = "0.9"
 anyhow = "1.0"
 
 # ethabi = "^17.0.0"
