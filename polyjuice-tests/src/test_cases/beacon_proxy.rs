@@ -71,11 +71,12 @@ fn test_beacon_proxy() {
             &block_info,
             &raw_tx,
             L2TX_MAX_CYCLES,
-            None,
         )
         .expect("invode initializaion");
     assert_eq!(run_result.exit_code, EVMC_SUCCESS);
-    state.apply_run_result(&run_result).expect("update state");
+    state
+        .apply_run_result(&run_result.write)
+        .expect("update state");
 
     state
         .mint_sudt(CKB_SUDT_ACCOUNT_ID, &contract.reg_addr, U256::from(200u64))
@@ -109,11 +110,12 @@ fn test_beacon_proxy() {
             &block_info,
             &raw_tx,
             L2TX_MAX_CYCLES,
-            None,
         )
         .expect("Call deployBeaconProxy");
     assert_eq!(run_result.exit_code, EVMC_SUCCESS);
-    state.apply_run_result(&run_result).expect("update state");
+    state
+        .apply_run_result(&run_result.write)
+        .expect("update state");
 
     // get BeaconProxy public bpx and check it's balance
     block_number += 1;
@@ -139,11 +141,12 @@ fn test_beacon_proxy() {
             &block_info,
             &raw_tx,
             L2TX_MAX_CYCLES,
-            None,
         )
         .expect("get BeaconProxy contract address");
     assert_eq!(run_result.exit_code, EVMC_SUCCESS);
-    state.apply_run_result(&run_result).expect("update state");
+    state
+        .apply_run_result(&run_result.write)
+        .expect("update state");
     assert_eq!(run_result.return_data.len(), 32);
     let beacon_proxy_ethabi_addr = &run_result.return_data[12..];
     let beacon_reg_addr =

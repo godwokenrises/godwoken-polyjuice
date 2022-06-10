@@ -83,12 +83,13 @@ fn test_ecrecover() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
-                None,
             )
             .expect("construct");
         // [recover] used cycles: 2604412 < 2660K
         helper::check_cycles("verify|recover", run_result.used_cycles, 2_960_000);
-        state.apply_run_result(&run_result).expect("update state");
+        state
+            .apply_run_result(&run_result.write)
+            .expect("update state");
         assert_eq!(
             run_result.return_data,
             hex::decode("000000000000000000000000f175db82ceaaadd50a606d70e389e9a1284a6690")

@@ -3,9 +3,9 @@
 
 use crate::helper::{
     self, build_eth_l2_script, build_l2_sudt_script, deploy, eth_addr_to_ethabi_addr,
-    new_block_info, new_contract_account_script, setup, PolyjuiceArgsBuilder, CKB_SUDT_ACCOUNT_ID,
-    CREATOR_ACCOUNT_ID, FATAL_PRECOMPILED_CONTRACTS, L2TX_MAX_CYCLES,
-    SUDT_ERC20_PROXY_USER_DEFINED_DECIMALS_CODE, print_gas_used,
+    new_block_info, new_contract_account_script, print_gas_used, setup, PolyjuiceArgsBuilder,
+    CKB_SUDT_ACCOUNT_ID, CREATOR_ACCOUNT_ID, FATAL_PRECOMPILED_CONTRACTS, L2TX_MAX_CYCLES,
+    SUDT_ERC20_PROXY_USER_DEFINED_DECIMALS_CODE,
 };
 use gw_common::builtins::ETH_REGISTRY_ACCOUNT_ID;
 use gw_common::registry_address::RegistryAddress;
@@ -57,12 +57,12 @@ fn test_sudt_erc20_proxy_inner(
         block_producer_id.clone(),
         1,
     );
-    print!("SudtERC20Proxy_UserDefinedDecimals.ContractCode.hex: 0x");
+    // print!("SudtERC20Proxy_UserDefinedDecimals.ContractCode.hex: 0x");
     for byte in run_result.return_data {
         print!("{:02x}", byte);
     }
     println!();
-    print_gas_used("Deploy SUDT_ERC20_PROXY contract: ", &run_result.logs);
+    print_gas_used("Deploy SUDT_ERC20_PROXY contract: ", &run_result.write.logs);
 
     let contract_account_script =
         new_contract_account_script(state, from_id1, &from_eth_address1, false);
@@ -305,9 +305,11 @@ fn test_sudt_erc20_proxy_inner(
             &block_info,
             &raw_tx,
             L2TX_MAX_CYCLES,
-            None,
         )?;
-        print_gas_used(&format!("SudtERC20Proxy {}: ", action), &run_result.logs);
+        if run_result.exit_code != 0 {
+            return Err(TransactionError::InvalidExitCode(run_result.exit_code));
+        }
+        print_gas_used(&format!("SudtERC20Proxy {}: ", action), &run_result.write.logs);
 
         println!(
             "[execute_transaction] {} {}ms",
@@ -315,8 +317,8 @@ fn test_sudt_erc20_proxy_inner(
             t.elapsed().as_millis()
         );
         println!("used_cycles: {}", run_result.used_cycles);
-        println!("write_values.len: {}", run_result.write_values.len());
-        state.apply_run_result(&run_result).expect("update state");
+        println!("write_values.len: {}", run_result.write.write_values.len());
+        state.apply_run_result(&run_result.write).expect("update state");
         assert_eq!(
             run_result.return_data,
             hex::decode(return_data_str).unwrap()
@@ -346,18 +348,17 @@ fn test_sudt_erc20_proxy_inner(
             .build();
         let db = store.begin_transaction();
         let tip_block_hash = store.get_tip_block_hash().unwrap();
-        let err = generator
+        let err_run_result = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
                 state,
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
-                None,
             )
-            .expect_err("err");
+            .unwrap();
         // by: `revert(0, 0)`
-        assert_eq!(err, TransactionError::InvalidExitCode(2));
+        assert_eq!(err_run_result.exit_code, 2);
     }
 
     // transfer to self insufficient balance
@@ -383,18 +384,17 @@ fn test_sudt_erc20_proxy_inner(
             .build();
         let db = store.begin_transaction();
         let tip_block_hash = db.get_tip_block_hash().unwrap();
-        let err = generator
+        let err_run_result = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
                 state,
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
-                None,
             )
-            .expect_err("err");
+            .unwrap();
         // by: `revert(0, 0)`
-        assert_eq!(err, TransactionError::InvalidExitCode(2));
+        assert_eq!(err_run_result.exit_code, 2);
     }
     Ok(())
 }

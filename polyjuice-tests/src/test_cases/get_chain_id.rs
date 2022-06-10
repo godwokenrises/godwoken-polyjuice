@@ -55,10 +55,11 @@ fn test_get_chain_id() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
-                None,
             )
             .expect("construct");
-        state.apply_run_result(&run_result).expect("update state");
+        state
+            .apply_run_result(&run_result.write)
+            .expect("update state");
         // println!("result {:?}", run_result);
         println!("return_data: {}", hex::encode(&run_result.return_data[..]));
     }
@@ -97,10 +98,11 @@ fn test_get_chain_id() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
-                None,
             )
             .expect("construct");
-        state.apply_run_result(&run_result).expect("update state");
+        state
+            .apply_run_result(&run_result.write)
+            .expect("update state");
 
         /* chain_id = GodwokenRollupConfig#chain_id(u64) */
         let mut expected_chain_id = vec![0u8; 32];

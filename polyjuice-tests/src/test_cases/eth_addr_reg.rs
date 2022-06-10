@@ -3,7 +3,7 @@ use crate::helper::{
     L2TX_MAX_CYCLES,
 };
 use gw_common::{registry_address::RegistryAddress, state::State};
-use gw_generator::{error::TransactionError, traits::StateExt};
+use gw_generator::traits::StateExt;
 use gw_store::{chain_view::ChainView, traits::chain_store::ChainStore};
 use gw_types::{packed::RawL2Transaction, prelude::*, U256};
 
@@ -98,7 +98,9 @@ fn test_update_eth_addr_reg_by_contract() {
     )
     .expect("execute the MSG_SET_MAPPING method of `ETH Address Registry` layer2 contract");
     assert_eq!(run_result.exit_code, 0);
-    state.apply_run_result(&run_result).expect("update state");
+    state
+        .apply_run_result(&run_result.write)
+        .expect("update state");
     // cycles(1176198)] < 1200k cycles
     helper::check_cycles("eth_address_regiser", run_result.used_cycles, 1_200_000);
     assert_eq!(
@@ -118,10 +120,9 @@ fn test_update_eth_addr_reg_by_contract() {
         new_block_info(block_producer_id.clone(), 2, 2),
         crate::helper::SetMappingArgs::One(eth_eoa_account_script_hash.into()),
     )
-    .expect_err("try to register the same account again");
+    .unwrap();
     assert_eq!(
-        run_err,
-        TransactionError::InvalidExitCode(101),
+        run_err.exit_code, 101,
         "GW_REGISTRY_ERROR_DUPLICATE_MAPPING"
     );
 
@@ -144,10 +145,9 @@ fn test_update_eth_addr_reg_by_contract() {
             &new_block_info(block_producer_id.clone(), 3, 3),
             &raw_l2tx,
             L2TX_MAX_CYCLES,
-            None,
         )
         .expect("execute Godwoken contract");
-    assert_eq!(run_result.return_data, eth_eoa_account_script_hash);
+    assert_eq!(run_result.return_data.as_ref(), eth_eoa_account_script_hash);
 
     // check result: gw_script_hash -> eth_address
     let args = GwToEthArgsBuilder::default()
@@ -169,10 +169,9 @@ fn test_update_eth_addr_reg_by_contract() {
             &block_info,
             &raw_l2tx,
             L2TX_MAX_CYCLES,
-            None,
         )
         .expect("execute Godwoken contract");
-    assert_eq!(run_result.return_data, eth_eoa_address);
+    assert_eq!(run_result.return_data.as_ref(), eth_eoa_address);
 
     // New Polyjuice conatract account will be registered in `create_new_account` of polyjuice.h
 
@@ -239,7 +238,9 @@ fn test_batch_set_mapping_by_contract() {
     )
     .expect("eth address registered");
     assert_eq!(run_result.exit_code, 0);
-    state.apply_run_result(&run_result).expect("update state");
+    state
+        .apply_run_result(&run_result.write)
+        .expect("update state");
 
     for (eth_eoa_address, eth_eoa_account_script_hash) in
         eth_eoa_addresses.into_iter().zip(eth_eoa_script_hashes)
@@ -265,10 +266,9 @@ fn test_batch_set_mapping_by_contract() {
                 &new_block_info(block_producer_id.clone(), 3, 3),
                 &raw_l2tx,
                 L2TX_MAX_CYCLES,
-                None,
             )
             .expect("execute Godwoken contract");
-        assert_eq!(run_result.return_data, eth_eoa_account_script_hash);
+        assert_eq!(run_result.return_data.as_ref(), eth_eoa_account_script_hash);
 
         // check result: gw_script_hash -> eth_address
         let args = GwToEthArgsBuilder::default()
@@ -289,10 +289,9 @@ fn test_batch_set_mapping_by_contract() {
                 &new_block_info(block_producer_id.clone(), 3, 3),
                 &raw_l2tx,
                 L2TX_MAX_CYCLES,
-                None,
             )
             .expect("execute Godwoken contract");
-        assert_eq!(run_result.return_data, eth_eoa_address);
+        assert_eq!(run_result.return_data.as_ref(), eth_eoa_address);
     }
 
     // New Polyjuice conatract account will be registered in `create_new_account` of polyjuice.h

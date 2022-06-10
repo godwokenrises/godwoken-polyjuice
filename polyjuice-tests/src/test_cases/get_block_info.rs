@@ -70,10 +70,11 @@ fn test_get_block_info() {
             &block_info,
             &raw_tx,
             L2TX_MAX_CYCLES,
-            None,
         )
         .expect("Deploy BlockInfo");
-    state.apply_run_result(&run_result).expect("update state");
+    state
+        .apply_run_result(&run_result.write)
+        .expect("update state");
     block_number += 1;
     // println!(
     //     "result {}",
@@ -140,7 +141,6 @@ fn test_get_block_info() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
-                None,
             )
             .expect(operation);
         assert_eq!(

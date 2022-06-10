@@ -25,7 +25,7 @@ fn test_call_multiple_times() {
     // Deploy two SimpleStorage
     let mut block_number = 1;
     for _ in 0..2 {
-        let _run_result = deploy(
+        let run_result = deploy(
             &generator,
             &store,
             &mut state,
@@ -37,7 +37,9 @@ fn test_call_multiple_times() {
             block_producer_id.clone(),
             block_number,
         );
-        state.apply_run_result(&_run_result).expect("update state");
+        state
+            .apply_run_result(&run_result.write)
+            .expect("update state");
         block_number += 1;
     }
 
@@ -145,10 +147,11 @@ fn test_call_multiple_times() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
-                None,
             )
             .expect("CallMultipleTimes.proxySet(20)");
-        state.apply_run_result(&run_result).expect("update state");
+        state
+            .apply_run_result(&run_result.write)
+            .expect("update state");
         // println!(
         //     "result {}",
         //     serde_json::to_string_pretty(&RunResult::from(run_result)).unwrap()

@@ -16,7 +16,7 @@ else
 fi
 cd $GODWOKEN_DIR
 # checkout https://github.com/nervosnetwork/godwoken/commits/f3cdd47b4460be37ed1
-git fetch origin f3cdd47b4460be37ed1a424e8ee77ce03fe0fd68
+git fetch origin develop
 git checkout FETCH_HEAD 
 git submodule update --init --recursive --depth=1
 

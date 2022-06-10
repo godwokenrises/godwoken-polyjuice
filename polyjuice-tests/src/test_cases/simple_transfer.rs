@@ -168,12 +168,13 @@ fn test_simple_transfer() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
-                None,
             )
             .expect("construct");
         // [SimpleTransfer to EoA] used cycles: 725217 < 736K
         helper::check_cycles("SimpleTransfer to EoA", run_result.used_cycles, 908_000);
-        state.apply_run_result(&run_result).expect("update state");
+        state
+            .apply_run_result(&run_result.write)
+            .expect("update state");
 
         let new_balance = state
             .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &st_contract_reg_addr)
@@ -271,7 +272,6 @@ fn test_simple_transfer() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
-                None,
             )
             .expect("SimpleTransfer.transferToSimpleStorage1()");
         // [SimpleTransfer.transferToSimpleStorage1] used cycles: 1203332 < 1210K
@@ -280,7 +280,9 @@ fn test_simple_transfer() {
             run_result.used_cycles,
             1_480_000,
         );
-        state.apply_run_result(&run_result).expect("update state");
+        state
+            .apply_run_result(&run_result.write)
+            .expect("update state");
 
         let new_balance = state
             .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &st_contract_reg_addr)
@@ -336,10 +338,11 @@ fn test_simple_transfer() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
-                None,
             )
             .expect("construct");
-        state.apply_run_result(&run_result).expect("update state");
+        state
+            .apply_run_result(&run_result.write)
+            .expect("update state");
 
         let new_balance = state
             .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &st_contract_reg_addr)

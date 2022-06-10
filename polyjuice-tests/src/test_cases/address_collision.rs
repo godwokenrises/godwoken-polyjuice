@@ -13,8 +13,9 @@ use gw_types::{
 };
 
 use crate::helper::{
-    create_block_producer, create_eth_eoa_account, deploy, new_block_info, setup, MockContractInfo,
-    PolyjuiceArgsBuilder, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES, compute_create2_script, contract_script_to_eth_addr,
+    compute_create2_script, contract_script_to_eth_addr, create_block_producer,
+    create_eth_eoa_account, deploy, new_block_info, setup, MockContractInfo, PolyjuiceArgsBuilder,
+    CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 
 const INIT_CODE: &str = include_str!("./evm-contracts/CreateContract.bin");
@@ -63,7 +64,6 @@ fn create_address_collision_overwrite() -> Result<()> {
 }
 
 #[test]
-#[should_panic(expected = "deploy Polyjuice contract")]
 fn create_address_collision_duplicate() {
     let (store, mut state, generator) = setup();
     let block_producer_id = create_block_producer(&mut state);
@@ -73,8 +73,6 @@ fn create_address_collision_duplicate() {
         create_eth_eoa_account(&mut state, &from_eth_address, 200000u64.into());
 
     let create_eth_addr = hex::decode("808bfd2069b1ca619a55585e7b1ac1b11d392af9").unwrap();
-    let create_eth_reg_addr =
-        RegistryAddress::new(ETH_REGISTRY_ACCOUNT_ID, create_eth_addr.clone());
     //create EOA account with create_account address first
     let (eoa_id, _) = create_eth_eoa_account(
         &mut state,
@@ -99,7 +97,7 @@ fn create_address_collision_duplicate() {
     let eoa_nonce = state.get_nonce(eoa_id);
     assert_eq!(eoa_nonce, Ok(1));
 
-    let _ = deploy(
+    let run_result = deploy(
         &generator,
         &store,
         &mut state,
@@ -112,14 +110,7 @@ fn create_address_collision_duplicate() {
         1,
     );
 
-    let script_hash = state
-        .get_script_hash_by_registry_address(&create_eth_reg_addr)
-        .unwrap();
-    assert!(script_hash.is_some());
-    let create_account_id = state
-        .get_account_id_by_script_hash(&script_hash.unwrap())
-        .unwrap();
-    assert_eq!(create_account_id, Some(8));
+    assert_eq!(run_result.exit_code, 2);
 }
 
 #[test]
@@ -168,7 +159,7 @@ fn create2_address_collision_overwrite() -> Result<()> {
     // Create2Impl.deploy(uint256 value, bytes32 salt, bytes memory code)
     let block_number = 2;
     let block_info = new_block_info(block_producer_id, block_number, block_number);
-    
+
     //consturct input:
     //0x9a
     //input_salt
@@ -196,10 +187,11 @@ fn create2_address_collision_overwrite() -> Result<()> {
             &block_info,
             &raw_tx,
             L2TX_MAX_CYCLES,
-            None,
         )
         .expect("Create2Impl.deploy(uint256 value, bytes32 salt, bytes memory code)");
-    state.apply_run_result(&run_result).expect("update state");
+    state
+        .apply_run_result(&run_result.write)
+        .expect("update state");
 
     let create2_script = compute_create2_script(
         create2_contract.eth_addr.as_slice(),
@@ -217,7 +209,7 @@ fn create2_address_collision_overwrite() -> Result<()> {
         hex::encode(&run_result.return_data)
     );
     assert_eq!(run_result.return_data, create2_ethabi_addr);
-    
+
     let script_hash = state.get_script_hash_by_registry_address(&create2_eth_reg_addr)?;
     assert!(script_hash.is_some());
     let create_account_id = state.get_account_id_by_script_hash(&create2_script_hash.into())?;
@@ -306,9 +298,8 @@ fn create2_address_collision_duplicate() -> Result<()> {
         &block_info,
         &raw_tx,
         L2TX_MAX_CYCLES,
-        None,
-    );
-    assert!(run_result.is_err());
+    )?;
+    assert_eq!(run_result.exit_code, 2);
 
     Ok(())
 }

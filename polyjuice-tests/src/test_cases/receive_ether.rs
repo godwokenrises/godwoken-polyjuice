@@ -2,7 +2,7 @@ use std::convert::TryInto;
 
 use ckb_vm::Bytes;
 use gw_common::state::State;
-use gw_generator::{error::TransactionError, traits::StateExt};
+use gw_generator::traits::StateExt;
 use gw_store::{chain_view::ChainView, traits::chain_store::ChainStore};
 use gw_types::{
     packed::RawL2Transaction,
@@ -11,7 +11,8 @@ use gw_types::{
 
 use crate::helper::{
     check_cycles, create_block_producer, deploy, eth_addr_to_ethabi_addr, new_block_info,
-    parse_log, setup, MockContractInfo, PolyjuiceArgsBuilder, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES, print_gas_used,
+    parse_log, print_gas_used, setup, MockContractInfo, PolyjuiceArgsBuilder, CREATOR_ACCOUNT_ID,
+    L2TX_MAX_CYCLES,
 };
 
 const INIT_CODE: &str = include_str!("./evm-contracts/EtherReceiverMock.bin");
@@ -68,13 +69,12 @@ fn receive_ether_test() -> anyhow::Result<()> {
             &block_info,
             &raw_tx,
             L2TX_MAX_CYCLES,
-            None,
         )
         .expect("Call receive()");
     check_cycles("receive()", run_result.used_cycles, 710_100);
     assert!(run_result.return_data.is_empty());
 
-    let receive_data = match parse_log(&run_result.logs[1]) {
+    let receive_data = match parse_log(&run_result.write.logs[1]) {
         crate::helper::Log::PolyjuiceUser {
             address: _,
             data,
@@ -86,9 +86,11 @@ fn receive_ether_test() -> anyhow::Result<()> {
     expect[1..].copy_from_slice(b"receive");
     assert_eq!(receive_data, Some(expect.to_vec()));
 
-    print_gas_used("A simplest receive() call: ", &run_result.logs);
+    print_gas_used("A simplest receive() call: ", &run_result.write.logs);
 
-    state.apply_run_result(&run_result).expect("update state");
+    state
+        .apply_run_result(&run_result.write)
+        .expect("update state");
     Ok(())
 }
 
@@ -114,7 +116,7 @@ fn without_receive_fallback_test() -> anyhow::Result<()> {
         block_producer.clone(),
         0,
     );
-    print_gas_used("Deploy SimpleTrasfer Contract: ", &run_result.logs);
+    print_gas_used("Deploy SimpleTrasfer Contract: ", &run_result.write.logs);
 
     let st_contract_account = MockContractInfo::create(&from_eth_address, 0);
     let st_account_id = state
@@ -134,7 +136,10 @@ fn without_receive_fallback_test() -> anyhow::Result<()> {
         block_producer.clone(),
         0,
     );
-    print_gas_used("Deploy RejectedSimpleStorage Contract: ", &run_result.logs);
+    print_gas_used(
+        "Deploy RejectedSimpleStorage Contract: ",
+        &run_result.write.logs,
+    );
 
     let ss_contract_account = MockContractInfo::create(&from_eth_address, 1);
     let _ss_account_id = state
@@ -170,13 +175,9 @@ fn without_receive_fallback_test() -> anyhow::Result<()> {
         &block_info,
         &raw_tx,
         L2TX_MAX_CYCLES,
-        None,
-    );
+    )?;
     //expect transfer failed
-    assert_eq!(
-        run_result.unwrap_err(),
-        TransactionError::InvalidExitCode(2)
-    );
+    assert_eq!(run_result.exit_code, 2);
 
     // TODO: read the log of a failed transaction
     // print!("SimpleTransfer.transferToSimpleStorage1(): ");
@@ -262,14 +263,10 @@ fn over_transfer_test() -> anyhow::Result<()> {
         &block_info,
         &raw_tx,
         L2TX_MAX_CYCLES,
-        None,
-    );
+    )?;
 
     // expect transfer failed
-    assert_eq!(
-        run_result.unwrap_err(),
-        TransactionError::InvalidExitCode(2)
-    );
+    assert_eq!(run_result.exit_code, 2);
 
     Ok(())
 }
