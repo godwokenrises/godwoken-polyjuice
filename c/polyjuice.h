@@ -87,6 +87,7 @@ int gw_increase_nonce(gw_context_t *ctx, uint32_t account_id, uint32_t *new_nonc
 int handle_message(gw_context_t* ctx,
                    uint32_t parent_from_id,
                    uint32_t parent_to_id,
+                   uint128_t gas_price,
                    evmc_address *parent_destination,
                    const evmc_message* msg, struct evmc_result* res);
 typedef int (*stream_data_loader_fn)(gw_context_t* ctx, long data_id,
@@ -106,6 +107,7 @@ struct evmc_host_context {
   // parent level destination
   evmc_address destination;
   int error_code;
+  uint128_t gas_price;
 };
 
 int load_account_script(gw_context_t* gw_ctx, uint32_t account_id,
@@ -310,9 +312,12 @@ int load_account_code(gw_context_t* gw_ctx, uint32_t account_id,
 struct evmc_tx_context get_tx_context(struct evmc_host_context* context) {
   struct evmc_tx_context ctx{0};
   memcpy(ctx.tx_origin.bytes, g_tx_origin.bytes, 20);
-
-  /* gas price = 1 */
-  ctx.tx_gas_price.bytes[31] = 0x01;
+  evmc_uint256be gas_price = {0};
+  uint8_t* gas_price_ptr = (uint8_t*)(&context->gas_price);
+  for (int i = 0; i < 16; i++) {
+    gas_price.bytes[31 - i] = *(gas_price_ptr + i);
+  }
+  ctx.tx_gas_price = gas_price;
 
   ctx.block_number = context->gw_ctx->block_info.number;
   /*
@@ -625,7 +630,8 @@ struct evmc_result call(struct evmc_host_context* context,
     }
     res.status_code = EVMC_SUCCESS;
   } else {
-    ret = handle_message(gw_ctx, context->from_id, context->to_id, &context->destination, msg, &res);
+    ret = handle_message(gw_ctx, context->from_id, context->to_id,
+                         context->gas_price, &context->destination, msg, &res);
     if (is_fatal_error(ret)) {
       /* stop as soon as possible */
       context->error_code = ret;
@@ -1002,11 +1008,12 @@ int execute_in_evmone(gw_context_t* ctx,
                       uint32_t to_id,
                       const uint8_t* code_data,
                       const size_t code_size,
-                      struct evmc_result* res) {
+                      struct evmc_result* res,
+                      uint128_t gas_price) {
   int ret = 0;
   evmc_address sender = msg->sender;
   evmc_address destination = msg->destination;
-  struct evmc_host_context context {ctx, code_data, code_size, msg->kind, from_id, to_id, sender, destination, 0};
+  struct evmc_host_context context {ctx, code_data, code_size, msg->kind, from_id, to_id, sender, destination, 0, gas_price};
   struct evmc_vm* vm = evmc_create_evmone();
   struct evmc_host_interface interface = {account_exists, get_storage,    set_storage,    get_balance,
                                           get_code_size,  get_code_hash,  copy_code,      selfdestruct,
@@ -1068,6 +1075,7 @@ int store_contract_code(gw_context_t* ctx,
 int handle_message(gw_context_t* ctx,
                    uint32_t parent_from_id,
                    uint32_t parent_to_id,
+                   uint128_t gas_price,
                    evmc_address *parent_destination,
                    const evmc_message* msg_origin, struct evmc_result* res) {
   static const evmc_address zero_address{0};
@@ -1206,7 +1214,7 @@ int handle_message(gw_context_t* ctx,
   debug_print_int("[handle_message] msg.kind", msg.kind);
   /* NOTE: msg and res are updated */
   if (to_address_exists && code_size > 0) {
-    ret = execute_in_evmone(ctx, &msg, parent_from_id, from_id, to_id, code_data, code_size, res);
+    ret = execute_in_evmone(ctx, &msg, parent_from_id, from_id, to_id, code_data, code_size, res, gas_price);
     if (ret != 0) {
       return ret;
     }
@@ -1390,7 +1398,7 @@ int run_polyjuice() {
   int64_t initial_gas = msg.gas;
   msg.gas -= min_gas;                  // subtract IntrinsicGas
 
-  int ret_handle_message = handle_message(&context, UINT32_MAX, UINT32_MAX, NULL, &msg, &res);
+  int ret_handle_message = handle_message(&context, UINT32_MAX, UINT32_MAX, gas_price, NULL, &msg, &res);
   // debug_print evmc_result.output_data if the execution failed
   if (res.status_code != 0) {
     debug_print_int("evmc_result.output_size", res.output_size);

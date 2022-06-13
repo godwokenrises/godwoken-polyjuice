@@ -29,8 +29,9 @@ pub(crate) mod invalid_sudt_erc20_proxy;
 pub(crate) mod sudt_erc20_proxy;
 pub(crate) mod sudt_erc20_proxy_attack_allowance;
 
+mod address_collision;
 mod beacon_proxy;
 mod error;
-mod address_collision;
 mod eth_addr_reg;
+mod gas_price;
 mod utils;
