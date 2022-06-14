@@ -6,7 +6,7 @@ pub use gw_common::{
     CKB_SUDT_SCRIPT_ARGS, H256,
 };
 
-use gw_config::{BackendConfig, BackendType};
+use gw_config::{BackendConfig, BackendSwitchConfig, BackendType};
 use gw_db::schema::{COLUMN_INDEX, COLUMN_META, META_TIP_BLOCK_HASH_KEY};
 use gw_generator::error::TransactionError;
 pub use gw_generator::{
@@ -426,34 +426,37 @@ pub fn setup() -> (Store, DummyState, Generator) {
         .expect("update secp data key");
 
     // ==== Build generator
-    let configs = vec![
-        BackendConfig {
-            backend_type: BackendType::Meta,
-            validator_path: META_VALIDATOR_PATH.into(),
-            generator_path: META_GENERATOR_PATH.into(),
-            validator_script_type_hash: META_VALIDATOR_SCRIPT_TYPE_HASH.into(),
-        },
-        BackendConfig {
-            backend_type: BackendType::Sudt,
-            validator_path: SUDT_VALIDATOR_PATH.into(),
-            generator_path: SUDT_GENERATOR_PATH.into(),
-            validator_script_type_hash: SUDT_VALIDATOR_SCRIPT_TYPE_HASH.into(),
-        },
-    ];
-    let mut backend_manage = BackendManage::from_config(configs).expect("default backend");
+    let configs = vec![BackendSwitchConfig {
+        switch_height: 0,
+        backends: vec![
+            BackendConfig {
+                backend_type: BackendType::Meta,
+                validator_path: META_VALIDATOR_PATH.into(),
+                generator_path: META_GENERATOR_PATH.into(),
+                validator_script_type_hash: META_VALIDATOR_SCRIPT_TYPE_HASH.into(),
+            },
+            BackendConfig {
+                backend_type: BackendType::Sudt,
+                validator_path: SUDT_VALIDATOR_PATH.into(),
+                generator_path: SUDT_GENERATOR_PATH.into(),
+                validator_script_type_hash: SUDT_VALIDATOR_SCRIPT_TYPE_HASH.into(),
+            },
+            BackendConfig {
+                backend_type: BackendType::Polyjuice,
+                validator_path: POLYJUICE_VALIDATOR_NAME.into(),
+                generator_path: POLYJUICE_GENERATOR_NAME.into(),
+                validator_script_type_hash: (*POLYJUICE_PROGRAM_CODE_HASH).into(),
+            },
+            BackendConfig {
+                backend_type: BackendType::EthAddrReg,
+                validator_path: ETH_ADDRESS_REGISTRY_VALIDATOR_NAME.into(),
+                generator_path: ETH_ADDRESS_REGISTRY_GENERATOR_NAME.into(),
+                validator_script_type_hash: (*ETH_ADDRESS_REGISTRY_PROGRAM_CODE_HASH).into(),
+            },
+        ],
+    }];
+    let backend_manage = BackendManage::from_config(configs).expect("default backend");
     // NOTICE in this test we won't need SUM validator
-    backend_manage.register_backend(Backend {
-        backend_type: BackendType::Polyjuice,
-        validator: POLYJUICE_VALIDATOR_PROGRAM.clone(),
-        generator: POLYJUICE_GENERATOR_PROGRAM.clone(),
-        validator_script_type_hash: (*POLYJUICE_PROGRAM_CODE_HASH).into(),
-    });
-    backend_manage.register_backend(Backend {
-        backend_type: BackendType::EthAddrReg,
-        validator: ETH_ADDRESS_REGISTRY_VALIDATOR_PROGRAM.clone(),
-        generator: ETH_ADDRESS_REGISTRY_GENERATOR_PROGRAM.clone(),
-        validator_script_type_hash: (*ETH_ADDRESS_REGISTRY_PROGRAM_CODE_HASH).into(),
-    });
     let mut account_lock_manage = AccountLockManage::default();
     account_lock_manage
         .register_lock_algorithm(SECP_LOCK_CODE_HASH.into(), Box::new(Secp256k1::default()));
@@ -543,10 +546,11 @@ pub fn deploy(
             &block_info,
             &raw_tx,
             L2TX_MAX_CYCLES,
-            None,
         )
         .expect("deploy Polyjuice contract");
-    state.apply_run_result(&run_result).expect("update state");
+    state
+        .apply_run_result(&run_result.write)
+        .expect("update state");
     // println!("[deploy contract] used cycles: {}", run_result.used_cycles);
     run_result
 }
@@ -639,7 +643,6 @@ pub fn simple_storage_get(
             &block_info,
             &raw_tx,
             L2TX_MAX_CYCLES,
-            None,
         )
         .expect("execute_transaction");
     // 491894, 571661 -> 586360 < 587K
@@ -796,7 +799,6 @@ pub(crate) fn eth_address_regiser(
         &block_info,
         &raw_l2tx,
         L2TX_MAX_CYCLES,
-        None,
     )
 }
 
@@ -810,7 +812,7 @@ pub(crate) fn print_gas_used(operation: &str, logs: &Vec<LogItem>) {
                 created_address: _,
                 status_code: _,
             } => Some(gas_used),
-            _ => None
+            _ => None,
         };
         if gas_used.is_some() {
             break;

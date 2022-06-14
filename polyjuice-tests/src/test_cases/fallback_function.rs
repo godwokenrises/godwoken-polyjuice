@@ -47,12 +47,13 @@ fn test_fallback_function() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
-                None,
             )
             .expect("construct");
         // [Deploy FallbackFunction] used cycles: 587271 < 590K
         helper::check_cycles("Deploy FallbackFunction", run_result.used_cycles, 920_000);
-        state.apply_run_result(&run_result).expect("update state");
+        state
+            .apply_run_result(&run_result.write)
+            .expect("update state");
     }
 
     let contract_account = MockContractInfo::create(&from_eth_address, 0);
@@ -90,13 +91,14 @@ fn test_fallback_function() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
-                None,
             )
             .expect("Call fallback()");
         // [Call fallback()] used cycles: 514059 < 520K
         helper::check_cycles("Call fallback()", run_result.used_cycles, 625_000);
         assert!(run_result.return_data.is_empty());
-        state.apply_run_result(&run_result).expect("update state");
+        state
+            .apply_run_result(&run_result.write)
+            .expect("update state");
     }
 
     let run_result = simple_storage_get(&store, &state, &generator, 0, from_id, new_account_id);

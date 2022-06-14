@@ -135,10 +135,11 @@ fn test_selfdestruct() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
-                None,
             )
             .expect("call CallSelfDestruct.proxyDone(sd_account_id)");
-        state.apply_run_result(&run_result).expect("update state");
+        state
+            .apply_run_result(&run_result.write)
+            .expect("update state");
         // [call CallSelfDestruct.proxyDone(sd_account_id)] used cycles: 1043108 < 1100K
         helper::check_cycles(
             "CallSelfDestruct.proxyDone(sd_account_id)",
@@ -182,16 +183,16 @@ fn test_selfdestruct() {
             .build();
         let db = store.begin_transaction();
         let tip_block_hash = db.get_tip_block_hash().unwrap();
-        let result = generator.execute_transaction(
-            &ChainView::new(&db, tip_block_hash),
-            &state,
-            &block_info,
-            &raw_tx,
-            L2TX_MAX_CYCLES,
-            None,
-        );
-        println!("result {:?}", result);
-        assert!(result.is_err(), "check_destructed");
+        let result = generator
+            .execute_transaction(
+                &ChainView::new(&db, tip_block_hash),
+                &state,
+                &block_info,
+                &raw_tx,
+                L2TX_MAX_CYCLES,
+            )
+            .unwrap();
+        assert_eq!(result.exit_code, -50);
     }
 
     {
@@ -212,15 +213,15 @@ fn test_selfdestruct() {
             .build();
         let db = store.begin_transaction();
         let tip_block_hash = db.get_tip_block_hash().unwrap();
-        let result = generator.execute_transaction(
-            &ChainView::new(&db, tip_block_hash),
-            &state,
-            &block_info,
-            &raw_tx,
-            L2TX_MAX_CYCLES,
-            None,
-        );
-        println!("result {:?}", result);
-        assert!(result.is_err(), "check_destructed");
+        let result = generator
+            .execute_transaction(
+                &ChainView::new(&db, tip_block_hash),
+                &state,
+                &block_info,
+                &raw_tx,
+                L2TX_MAX_CYCLES,
+            )
+            .unwrap();
+        assert_eq!(result.exit_code, -50);
     }
 }

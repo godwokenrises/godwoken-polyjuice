@@ -116,10 +116,11 @@ fn test_contract_call_contract() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
-                None,
             )
             .expect("CallContract.proxySet");
-        state.apply_run_result(&run_result).expect("update state");
+        state
+            .apply_run_result(&run_result.write)
+            .expect("update state");
         // [CallContract.proxySet(222)] used cycles: 961599 -> 980564 < 981K
         helper::check_cycles("CallContract.proxySet()", run_result.used_cycles, 1_170_000);
     }
@@ -207,7 +208,6 @@ fn test_contract_call_non_exists_contract() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
-                None,
             )
             .expect("non_existing_account_address => success with '0x' return_data");
         assert_eq!(
@@ -247,7 +247,6 @@ fn test_contract_call_non_exists_contract() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
-                None,
             )
             .expect("empty contract code for account (EoA account)");
         /* The functions call, delegatecall and staticcall all take a single bytes memory parameter

@@ -95,12 +95,13 @@ fn test_create2() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
-                None,
             )
             .expect("Create2Impl.deploy(uint256 value, bytes32 salt, bytes memory code)");
         // [Create2Impl.deploy(...)] used cycles: 1197555 < 1230K
         helper::check_cycles("Create2Impl.deploy(...)", run_result.used_cycles, 1_750_000);
-        state.apply_run_result(&run_result).expect("update state");
+        state
+            .apply_run_result(&run_result.write)
+            .expect("update state");
         run_result
     };
 
@@ -132,7 +133,7 @@ fn test_create2() {
         .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &address)
         .unwrap();
 
-    let log = parse_log(&run_result.logs[1]);
+    let log = parse_log(&run_result.write.logs[1]);
 
     let balance = match log {
         Log::SudtTransfer {

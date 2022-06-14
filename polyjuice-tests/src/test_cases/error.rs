@@ -1,5 +1,4 @@
 use gw_common::state::State;
-use gw_generator::error::TransactionError;
 use gw_store::{chain_view::ChainView, traits::chain_store::ChainStore};
 use gw_types::{
     bytes::Bytes,
@@ -70,7 +69,6 @@ fn test_error_handling() {
             &block_info,
             &raw_tx,
             L2TX_MAX_CYCLES,
-            None,
         )
         .expect("Call testAssert()");
     assert_eq!(run_result.exit_code, EVMC_SUCCESS);
@@ -99,7 +97,6 @@ fn test_error_handling() {
             &block_info,
             &raw_tx,
             L2TX_MAX_CYCLES,
-            None,
         )
         .expect("mockAssertPayable() => EVMC_REVERT: 2");
     assert_eq!(run_result.exit_code, EVMC_REVERT);
@@ -138,14 +135,13 @@ fn test_error_handling() {
             &block_info,
             &raw_tx,
             L2TX_MAX_CYCLES,
-            None,
         )
-        .expect_err("testOverflowError(1) => EVMC_REVERT: 2");
+        .unwrap();
     // The assert function creates an built-in error of type Panic(uint256) -> 0x4e487b71
     // 0x11: If an arithmetic operation results in underflow or overflow outside of an unchecked { ... } block.
     // evmc_result.output_size => 36
     // evmc_result.output_data: 0x4e487b710000000000000000000000000000000000000000000000000000000000000011
-    assert_eq!(err, TransactionError::InvalidExitCode(EVMC_REVERT));
+    assert_eq!(err.exit_code, EVMC_REVERT);
 
     // Call testRequire(9) -> 0xb8bd717f0000000000000000000000000000000000000000000000000000000000000009
     block_number += 1;
@@ -173,7 +169,6 @@ fn test_error_handling() {
             &block_info,
             &raw_tx,
             L2TX_MAX_CYCLES,
-            None,
         )
         .expect("testRequire(9) => EVMC_REVERT: 2");
     assert_eq!(run_result.exit_code, EVMC_REVERT);
@@ -210,7 +205,6 @@ fn test_error_handling() {
             &block_info,
             &raw_tx,
             L2TX_MAX_CYCLES,
-            None,
         )
         .expect("Call testRevert(8)");
     assert_eq!(run_result.exit_code, EVMC_REVERT);
@@ -245,7 +239,6 @@ fn test_error_handling() {
             &block_info,
             &raw_tx,
             L2TX_MAX_CYCLES,
-            None,
         )
         .expect("Call testRevertMsg('test revert message')");
     assert_eq!(run_result.exit_code, EVMC_REVERT);

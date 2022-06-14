@@ -7,7 +7,7 @@ use crate::helper::{
     ROLLUP_SCRIPT_HASH, SECP_LOCK_CODE_HASH,
 };
 use gw_common::state::State;
-use gw_generator::{error::TransactionError, traits::StateExt};
+use gw_generator::traits::StateExt;
 use gw_store::chain_view::ChainView;
 use gw_store::traits::chain_store::ChainStore;
 use gw_types::{
@@ -91,7 +91,6 @@ fn test_recover_account() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
-                None,
             )
             .expect("construct");
         // [RecoverAccount.recover(message, signature, code_hash)] used cycles: 648630 < 670K
@@ -100,7 +99,9 @@ fn test_recover_account() {
             run_result.used_cycles,
             800_000,
         );
-        state.apply_run_result(&run_result).expect("update state");
+        state
+            .apply_run_result(&run_result.write)
+            .expect("update state");
         let mut script_args = vec![0u8; 32 + 20];
         script_args[0..32].copy_from_slice(&ROLLUP_SCRIPT_HASH);
         script_args[32..32 + 20].copy_from_slice(&hex::decode(lock_args_hex).unwrap());
@@ -110,7 +111,7 @@ fn test_recover_account() {
             .args(Bytes::from(script_args).pack())
             .build()
             .hash();
-        assert_eq!(run_result.return_data, script_hash);
+        assert_eq!(run_result.return_data.as_ref(), script_hash);
     }
 
     // Wrong signature
@@ -146,11 +147,12 @@ fn test_recover_account() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
-                None,
             )
             .expect("construct");
-        state.apply_run_result(&run_result).expect("update state");
-        assert_eq!(run_result.return_data, [0u8; 32]);
+        state
+            .apply_run_result(&run_result.write)
+            .expect("update state");
+        assert_eq!(run_result.return_data.as_ref(), [0u8; 32]);
     }
 
     // Wrong code_hash
@@ -177,7 +179,7 @@ fn test_recover_account() {
             .to_id(new_account_id.pack())
             .args(Bytes::from(args).pack())
             .build();
-    let db = store.begin_transaction();
+        let db = store.begin_transaction();
         let tip_block_hash = db.get_tip_block_hash().unwrap();
         let err = generator
             .execute_transaction(
@@ -186,12 +188,8 @@ fn test_recover_account() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
-                None,
             )
-            .expect_err("construct");
-        assert_eq!(
-            err,
-            TransactionError::InvalidExitCode(FATAL_PRECOMPILED_CONTRACTS)
-        );
+            .unwrap();
+        assert_eq!(err.exit_code, FATAL_PRECOMPILED_CONTRACTS);
     }
 }

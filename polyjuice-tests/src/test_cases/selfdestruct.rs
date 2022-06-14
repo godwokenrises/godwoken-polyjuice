@@ -64,12 +64,13 @@ fn test_selfdestruct() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
-                None,
             )
             .expect("construct");
         // [Deploy SelfDestruct] used cycles: 570570 < 580K
         helper::check_cycles("Deploy SelfDestruct", run_result.used_cycles, 900_000);
-        state.apply_run_result(&run_result).expect("update state");
+        state
+            .apply_run_result(&run_result.write)
+            .expect("update state");
     }
 
     let contract_account_script =
@@ -84,10 +85,8 @@ fn test_selfdestruct() {
         .unwrap()
         .unwrap();
     assert_eq!(
-        state
-            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &contract_reg_addr)
-            .unwrap(),
-        U256::from(200)
+        state.get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &contract_reg_addr),
+        Ok(U256::from(200u64))
     );
     assert_eq!(
         state
@@ -119,12 +118,13 @@ fn test_selfdestruct() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
-                None,
             )
             .expect("construct");
         // [call SelfDestruct.done()] used cycles: 589657 < 600K
         helper::check_cycles("call SelfDestruct.done()", run_result.used_cycles, 740_000);
-        state.apply_run_result(&run_result).expect("update state");
+        state
+            .apply_run_result(&run_result.write)
+            .expect("update state");
     }
     assert_eq!(
         state
@@ -156,15 +156,15 @@ fn test_selfdestruct() {
             .build();
         let db = store.begin_transaction();
         let tip_block_hash = db.get_tip_block_hash().unwrap();
-        let result = generator.execute_transaction(
-            &ChainView::new(&db, tip_block_hash),
-            &state,
-            &block_info,
-            &raw_tx,
-            L2TX_MAX_CYCLES,
-            None,
-        );
-        println!("result {:?}", result);
-        assert!(result.is_err());
+        let result = generator
+            .execute_transaction(
+                &ChainView::new(&db, tip_block_hash),
+                &state,
+                &block_info,
+                &raw_tx,
+                L2TX_MAX_CYCLES,
+            )
+            .unwrap();
+        assert_eq!(result.exit_code, -50);
     }
 }

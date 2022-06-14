@@ -57,11 +57,11 @@ fn test_parse_log_event() {
         .get_account_id_by_script_hash(&contract_script.hash().into())
         .unwrap()
         .unwrap();
-    assert_eq!(run_result.logs.len(), 4);
+    assert_eq!(run_result.write.logs.len(), 4);
 
     // Log::SudtTransfer: EoA transfer to contract
     {
-        let log_item = &run_result.logs[0];
+        let log_item = &run_result.write.logs[0];
         let log_account_id: u32 = log_item.account_id().unpack();
         assert_eq!(log_account_id, CKB_SUDT_ACCOUNT_ID);
         let log = parse_log(log_item);
@@ -82,7 +82,7 @@ fn test_parse_log_event() {
     }
     // Log::PolyjuiceUser
     {
-        let log_item = &run_result.logs[1];
+        let log_item = &run_result.write.logs[1];
         let log_account_id: u32 = log_item.account_id().unpack();
         assert_eq!(log_account_id, contract_id);
         let log = parse_log(log_item);
@@ -106,7 +106,7 @@ fn test_parse_log_event() {
     }
     // EVM result log
     {
-        let log_item = &run_result.logs[2];
+        let log_item = &run_result.write.logs[2];
         let log_account_id: u32 = log_item.account_id().unpack();
         assert_eq!(log_account_id, contract_id);
         let log = parse_log(log_item);
@@ -127,7 +127,7 @@ fn test_parse_log_event() {
     }
     // Transaction pay fee log
     {
-        let log_item = &run_result.logs[3];
+        let log_item = &run_result.write.logs[3];
         let log_account_id: u32 = log_item.account_id().unpack();
         assert_eq!(log_account_id, CKB_SUDT_ACCOUNT_ID);
         let log = parse_log(log_item);
@@ -174,14 +174,15 @@ fn test_parse_log_event() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
-                None,
             )
             .expect("construct");
-        state.apply_run_result(&run_result).expect("update state");
+        state
+            .apply_run_result(&run_result.write)
+            .expect("update state");
 
-        assert_eq!(run_result.logs.len(), 4);
+        assert_eq!(run_result.write.logs.len(), 4);
         {
-            let log_item = &run_result.logs[1];
+            let log_item = &run_result.write.logs[1];
             let log_account_id: u32 = log_item.account_id().unpack();
             assert_eq!(log_account_id, contract_id);
             let log = parse_log(log_item);
@@ -204,7 +205,7 @@ fn test_parse_log_event() {
             }
         }
         {
-            let log_item = &run_result.logs[2];
+            let log_item = &run_result.write.logs[2];
             let log_account_id: u32 = log_item.account_id().unpack();
             assert_eq!(log_account_id, contract_id);
             let log = parse_log(log_item);

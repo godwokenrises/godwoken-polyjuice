@@ -38,7 +38,9 @@ fn test_contract_create_contract() {
         block_producer_id.clone(),
         1,
     );
-    state.apply_run_result(&run_result).expect("update state");
+    state
+        .apply_run_result(&run_result.write)
+        .expect("update state");
     // [Deploy CreateContract] used cycles: 2109521 < 2120K
     helper::check_cycles("Deploy CreateContract", run_result.used_cycles, 2_820_000);
     // println!(
@@ -100,10 +102,11 @@ fn test_contract_create_contract() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
-                None,
             )
             .expect("SimpleStorage.get()");
-        state.apply_run_result(&run_result).expect("update state");
+        state
+            .apply_run_result(&run_result.write)
+            .expect("update state");
         let mut expected_return_data = vec![0u8; 32];
         expected_return_data[31] = 0xff;
         assert_eq!(run_result.return_data, expected_return_data);

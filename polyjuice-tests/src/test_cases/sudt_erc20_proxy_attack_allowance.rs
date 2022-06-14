@@ -146,10 +146,11 @@ fn test_attack_allowance() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
-                None,
             )
             .expect("construct");
-        state.apply_run_result(&run_result).expect("update state");
+        state
+            .apply_run_result(&run_result.write)
+            .expect("update state");
     }
 
     assert_eq!(
@@ -190,7 +191,6 @@ fn test_attack_allowance() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
-                None,
             )
             .expect("construct");
         assert_eq!(
@@ -198,7 +198,9 @@ fn test_attack_allowance() {
             hex::decode("0000000000000000000000000000000000000000000000000000000000000000")
                 .unwrap()
         );
-        state.apply_run_result(&run_result).expect("update state");
+        state
+            .apply_run_result(&run_result.write)
+            .expect("update state");
     }
 
     assert_eq!(

@@ -6,7 +6,7 @@ use crate::helper::{
     CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
-use gw_generator::{error::TransactionError, traits::StateExt};
+use gw_generator::traits::StateExt;
 use gw_store::chain_view::ChainView;
 use gw_store::traits::chain_store::ChainStore;
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
@@ -70,16 +70,17 @@ fn test_recursion_contract_call() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
-                None,
             )
             .expect("recursive call depth to 32");
-        state.apply_run_result(&run_result).expect("update state");
+        state
+            .apply_run_result(&run_result.write)
+            .expect("update state");
         println!("\t call result {:?}", run_result.return_data);
         let expected_sum = [
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
             0, 1, 240,
         ];
-        assert_eq!(run_result.return_data, expected_sum);
+        assert_eq!(run_result.return_data.as_ref(), expected_sum);
     }
 
     // {
@@ -140,10 +141,9 @@ fn test_recursion_contract_call() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
-                None,
             )
-            .expect_err("EVMC_REVERT = 2");
-        assert_eq!(err, TransactionError::InvalidExitCode(2));
+            .unwrap();
+        assert_eq!(err.exit_code, 2);
     }
 
     {
@@ -173,9 +173,8 @@ fn test_recursion_contract_call() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
-                None,
             )
-            .expect_err("Insufficient transaction gas");
-        assert_eq!(err, TransactionError::InvalidExitCode(-93));
+            .unwrap();
+        assert_eq!(err.exit_code, -93);
     }
 }

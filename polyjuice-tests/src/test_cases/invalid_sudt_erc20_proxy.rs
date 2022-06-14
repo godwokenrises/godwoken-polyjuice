@@ -6,7 +6,7 @@ use crate::helper::{
     new_contract_account_script, setup, PolyjuiceArgsBuilder, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::{builtins::ETH_REGISTRY_ACCOUNT_ID, state::State};
-use gw_generator::{error::TransactionError, traits::StateExt};
+use gw_generator::traits::StateExt;
 use gw_store::chain_view::ChainView;
 use gw_store::traits::chain_store::ChainStore;
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*, U256};
@@ -148,7 +148,6 @@ fn test_invalid_sudt_erc20_proxy() {
             &block_info,
             &raw_tx,
             L2TX_MAX_CYCLES,
-            None,
         );
 
         if *success {
@@ -159,16 +158,18 @@ fn test_invalid_sudt_erc20_proxy() {
                 run_result.used_cycles,
                 1_011_000,
             );
-            state.apply_run_result(&run_result).expect("update state");
+            state
+                .apply_run_result(&run_result.write)
+                .expect("update state");
             assert_eq!(
                 run_result.return_data,
                 hex::decode(return_data_str).unwrap()
             );
-        } else if let Err(err) = result {
+        } else if let Ok(run_result) = result {
             // [contract debug]: The contract is not allowed to call transfer_to_any_sudt
             // ERROR_TRANSFER_TO_ANY_SUDT -31
             // by: revert(0, 0)
-            assert_eq!(err, TransactionError::InvalidExitCode(2));
+            assert_eq!(run_result.exit_code, 2);
         } else {
             unreachable!();
         }

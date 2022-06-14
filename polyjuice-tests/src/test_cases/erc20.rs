@@ -2,8 +2,8 @@
 //!   See ./evm-contracts/ERC20.bin
 
 use crate::helper::{
-    self, deploy, eth_addr_to_ethabi_addr, new_block_info, setup, MockContractInfo,
-    PolyjuiceArgsBuilder, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES, print_gas_used,
+    self, deploy, eth_addr_to_ethabi_addr, new_block_info, print_gas_used, setup, MockContractInfo,
+    PolyjuiceArgsBuilder, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
 use gw_generator::traits::StateExt;
@@ -43,7 +43,7 @@ fn test_erc20() {
         block_producer_id.clone(),
         1,
     );
-    print_gas_used("Deploy ERC20 contract: ", &run_result.logs);
+    print_gas_used("Deploy ERC20 contract: ", &run_result.write.logs);
     // [Deploy ERC20] used cycles: 1018075 < 1020K
     helper::check_cycles("Deploy ERC20", run_result.used_cycles, 1_400_000);
 
@@ -156,14 +156,15 @@ fn test_erc20() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
-                None,
             )
             .expect(operation);
-        print_gas_used(&format!("ERC20 {}: ", operation), &run_result.logs);
+        print_gas_used(&format!("ERC20 {}: ", operation), &run_result.write.logs);
 
         // [ERC20 contract method_x] used cycles: 942107 < 960K
         helper::check_cycles("ERC20 contract method_x", run_result.used_cycles, 1_400_000);
-        state.apply_run_result(&run_result).expect("update state");
+        state
+            .apply_run_result(&run_result.write)
+            .expect("update state");
         assert_eq!(
             run_result.return_data,
             hex::decode(return_data_str).unwrap(),
