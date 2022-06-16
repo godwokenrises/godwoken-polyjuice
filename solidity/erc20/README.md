@@ -1,3 +1,7 @@
+## sUDT-ERC20 Proxy Contract
+
+The [sUDT-ERC20 Proxy Contract](./SudtERC20Proxy_UserDefinedDecimals.sol) is a special smart contract written in Solidity, which is designed to utilize the Godwoken and Polyjuice frameworks. This contract provides a way for EVM code to interact with ERC20 standard interface that is interfacing directly with Polyjuice to control sUDT tokens on Layer 2 as if they were ERC20 tokens.
+
 For security reason, developers should only use this [SudtERC20Proxy_UserDefinedDecimals bytecode](./SudtERC20Proxy_UserDefinedDecimals.bin) which code hash will be checked in `transfer_to_any_sudt` pre-compiled contract.
 
 ## Compile Solidity Contract in ethereum/solc:0.8.7 docker image
