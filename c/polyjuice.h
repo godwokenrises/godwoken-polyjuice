@@ -1374,7 +1374,7 @@ int run_polyjuice() {
   }
 
   ret = fill_msg_sender_and_dest(&context, &msg);
-  if (ret !=0 ) {
+  if (ret != 0) {
     ckb_debug("failed to fill_msg_sender_and_dest");
     return ret;
   }
