@@ -1,7 +1,7 @@
 #ifndef POLYJUICE_GLOBALS_H
 #define POLYJUICE_GLOBALS_H
 
-#define POLYJUICE_VERSION "v1.2.0"
+#define POLYJUICE_VERSION "v1.3.0"
 
 #define ETH_ADDRESS_LEN 20
 
@@ -37,6 +37,8 @@ static evmc_address g_tx_origin = {0};
 
 static uint8_t g_script_code_hash[32] = {0};
 static uint8_t g_script_hash_type = 0xff;
+
+static uint128_t g_gas_price = 0xffffffffffffffffffffffffffffffffu;
 
 /* Minimal gas of a normal transaction*/
 #define MIN_TX_GAS                      21000

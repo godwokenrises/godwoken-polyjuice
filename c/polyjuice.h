@@ -139,8 +139,7 @@ int load_account_script(gw_context_t* gw_ctx, uint32_t account_id,
      input_data : [u8; input_size]
    ]
  */
-int parse_args(struct evmc_message* msg, uint128_t* gas_price,
-               gw_context_t* ctx) {
+int parse_args(struct evmc_message* msg, gw_context_t* ctx) {
   gw_transaction_context_t *tx_ctx = &ctx->transaction_context;
   debug_print_int("args_len", tx_ctx->args_len);
   if (tx_ctx->args_len < (8 + 8 + 16 + 16 + 4)) {
@@ -176,9 +175,9 @@ int parse_args(struct evmc_message* msg, uint128_t* gas_price,
   debug_print_int("[gas_limit]", gas_limit);
 
   /* args[16..32] gas price */
-  memcpy(gas_price, args + offset, sizeof(uint128_t));
+  memcpy(&g_gas_price, args + offset, sizeof(uint128_t));
   offset += 16;
-  debug_print_int("[gas_price]", (int64_t)(*gas_price));
+  debug_print_int("[gas_price]", (int64_t)(g_gas_price));
 
   /* args[32..48] transfer value */
   evmc_uint256be value{0};
@@ -310,9 +309,12 @@ int load_account_code(gw_context_t* gw_ctx, uint32_t account_id,
 struct evmc_tx_context get_tx_context(struct evmc_host_context* context) {
   struct evmc_tx_context ctx{0};
   memcpy(ctx.tx_origin.bytes, g_tx_origin.bytes, 20);
-
-  /* gas price = 1 */
-  ctx.tx_gas_price.bytes[31] = 0x01;
+  evmc_uint256be gas_price = {0};
+  uint8_t* gas_price_ptr = (uint8_t*)(&g_gas_price);
+  for (int i = 0; i < 16; i++) {
+    gas_price.bytes[31 - i] = *(gas_price_ptr + i);
+  }
+  ctx.tx_gas_price = gas_price;
 
   ctx.block_number = context->gw_ctx->block_info.number;
   /*
@@ -625,7 +627,8 @@ struct evmc_result call(struct evmc_host_context* context,
     }
     res.status_code = EVMC_SUCCESS;
   } else {
-    ret = handle_message(gw_ctx, context->from_id, context->to_id, &context->destination, msg, &res);
+    ret = handle_message(gw_ctx, context->from_id, context->to_id,
+                         &context->destination, msg, &res);
     if (is_fatal_error(ret)) {
       /* stop as soon as possible */
       context->error_code = ret;
@@ -1347,10 +1350,9 @@ int run_polyjuice() {
   }
 
   evmc_message msg;
-  uint128_t gas_price;
   /* Parse message */
   ckb_debug("BEGIN parse_message()");
-  ret = parse_args(&msg, &gas_price, &context);
+  ret = parse_args(&msg, &context);
   ckb_debug("END parse_message()");
   if (ret != 0) {
     return ret;
@@ -1435,7 +1437,7 @@ int run_polyjuice() {
     ckb_debug("gas not enough");
     return clean_evmc_result_and_return(&res, -1);
   }
-  uint256_t fee_u256 = calculate_fee(gas_price, gas_used);
+  uint256_t fee_u256 = calculate_fee(g_gas_price, gas_used);
   gw_reg_addr_t sender_addr = new_reg_addr(msg.sender.bytes);
   ret = sudt_pay_fee(&context, g_sudt_id, /* g_sudt_id must already exists */
                      sender_addr, fee_u256);
