@@ -29,6 +29,7 @@ pub(crate) mod invalid_sudt_erc20_proxy;
 pub(crate) mod sudt_erc20_proxy;
 pub(crate) mod sudt_erc20_proxy_attack_allowance;
 
+mod absent_address;
 mod address_collision;
 mod beacon_proxy;
 mod error;

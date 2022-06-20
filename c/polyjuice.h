@@ -416,6 +416,10 @@ size_t get_code_size(struct evmc_host_context* context,
   uint32_t account_id = 0;
   int ret = load_account_id_by_eth_address(context->gw_ctx,
                                            address->bytes, &account_id);
+  if (ret == GW_ERROR_NOT_FOUND) {
+    ckb_debug("END get_code_size");
+    return 0;
+  }
   if (ret != 0) {
     ckb_debug("get contract account id failed");
     return 0;
@@ -441,6 +445,10 @@ evmc_bytes32 get_code_hash(struct evmc_host_context* context,
   uint32_t account_id = 0;
   int ret = load_account_id_by_eth_address(context->gw_ctx,
                                            address->bytes, &account_id);
+  if (ret == GW_ERROR_NOT_FOUND) {
+    ckb_debug("END get_code_hash");
+    return hash;
+  }
   if (ret != 0) {
     ckb_debug("get contract account id failed");
     context->error_code = ret;
@@ -489,6 +497,10 @@ size_t copy_code(struct evmc_host_context* context, const evmc_address* address,
   uint32_t account_id = 0;
   int ret = load_account_id_by_eth_address(context->gw_ctx,
                                            address->bytes, &account_id);
+  if (ret == GW_ERROR_NOT_FOUND) {
+    ckb_debug("END copy_code");
+    return 0;
+  }
   if (ret != 0) {
     ckb_debug("get contract account id failed");
     context->error_code = ret;
