@@ -57,7 +57,7 @@ fn test_sudt_erc20_proxy_inner(
         block_producer_id.clone(),
         1,
     );
-    // print!("SudtERC20Proxy_UserDefinedDecimals.ContractCode.hex: 0x");
+    print!("SudtERC20Proxy_UserDefinedDecimals.ContractCode.hex: 0x");
     for byte in run_result.return_data {
         print!("{:02x}", byte);
     }

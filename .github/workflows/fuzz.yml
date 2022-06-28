@@ -48,6 +48,8 @@ jobs:
         version: "11.0"
         cached: ${{ steps.cache-llvm.outputs.cache-hit }}
 
+    - name: Run integration-test
+      run: bash devtools/ci/integration-test.sh
     - name: test_rlp on x86 with sanitizers
       working-directory: ./polyjuice-tests/fuzz
       run: make build/test_rlp && ./build/test_rlp
@@ -64,14 +66,17 @@ jobs:
         else
           echo "MAX_FUZZ_TIME=60" >> $GITHUB_ENV
         fi
-
+    - name: Prepare fuzz corpus
+      working-directory: ./polyjuice-tests
+      run: |
+        cargo run -- convert-deploy-tx --input src/test_cases/evm-contracts --output fuzz/corpus/deploy-tx
     - name: Fuzzing Polyjuice Generator 1 hour
       working-directory: polyjuice-tests/fuzz
       run: |
         mkdir -p corpus-cache
         ls corpus-cache
         make build/polyjuice_generator_fuzzer && \
-        ./build/polyjuice_generator_fuzzer corpus corpus-cache \
+        ./build/polyjuice_generator_fuzzer corpus/deploy-tx corpus-cache \
           -max_total_time=$MAX_FUZZ_TIME -timeout=120 \
           -max_len=25000 -rss_limit_mb=0
       # Max data buffer size: 24KB < 25000 bytes

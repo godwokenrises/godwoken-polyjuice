@@ -9,6 +9,9 @@
 using namespace std;
 using namespace evmc;
 
+#define GW_ETH_ADDRESS_LEN 20
+#define SUDT_KEY_FLAG_BALANCE 1
+
 class MockedGodwoken : public MockedHost {
 public:
   uint32_t account_count = 0;
@@ -119,8 +122,10 @@ extern "C" int gw_sys_load_data(uint8_t *addr,
 }
 
 void print_state() {
+  cout << "state size: " << gw_host->state.size() << endl;
+  int cnt = 0;
   for (auto kv : gw_host->state) {
-    cout << "\t key:\t" << kv.first << endl << "\t value:\t" << kv.second << endl;
+    cout << "idx: " << cnt++ << "\t key:\t" << kv.first << endl << "\t value:\t" << kv.second << endl;
   }
 }
 
@@ -172,6 +177,28 @@ extern "C" int gw_sys_load_blockinfo(uint8_t* bi_addr, uint64_t* len_ptr) {
   return 0;
 }
 
+extern "C" int gw_sys_load_script_hash_by_registry_address(
+  gw_reg_addr_t *addr,
+  uint8_t script_hash[GW_KEY_BYTES]) {
+  uint8_t key[32] = {0};
+  int ret = _gw_build_registry_address_to_script_hash_key(key, addr);
+  if (ret != 0) {
+    return ret;
+  }
+  uint8_t raw_key[GW_KEY_BYTES] = {0};
+  gw_build_account_key(GW_DEFAULT_ETH_REGISTRY_ACCOUNT_ID, key, 32, raw_key);
+  /* get value */
+  ret = gw_sys_load(raw_key, script_hash);
+  if (ret != 0) {
+    return ret;
+  }
+  if (_is_zero_hash(script_hash)) {
+    printf("failed to get script hash by registry address");
+    return GW_ERROR_NOT_FOUND;
+  }
+  return 0;
+
+}
 extern "C" int gw_sys_load_script_hash_by_account_id(const uint32_t account_id, uint8_t script_hash[GW_KEY_BYTES]) {
   // dbg_print("sys_get_script_hash_by_account_id account_id = %d", account_id);
 
@@ -232,21 +259,40 @@ extern "C" int gw_sys_load_rollup_config(uint8_t *addr,
   memcpy(addr, gw_host->rollup_config, *len_ptr);
   return 0;
 }
-
+int sudt_build_key(uint32_t key_flag, gw_reg_addr_t registry_address,
+                    uint8_t *key, uint32_t *key_len) {
+  if (*key_len < (4 + GW_REG_ADDR_SIZE(registry_address))) {
+    printf("_sudt_build_key: addr is large than buffer");
+    return GW_FATAL_BUFFER_OVERFLOW;
+  }
+  *key_len = 4 + GW_REG_ADDR_SIZE(registry_address);
+  _gw_fast_memcpy(key, (uint8_t *)(&key_flag), 4);
+  _gw_cpy_addr(key + 4, registry_address);
+  return 0;
+}
 /// mock_mint_sudt on layer2
-void mock_mint_sudt(uint32_t sudt_id, uint32_t account_id, uint128_t balance)
+int mock_mint_sudt(uint32_t sudt_id, gw_reg_addr_t reg_addr, uint128_t balance)
 {
   uint8_t script_hash[GW_KEY_BYTES] = {0};
-  gw_sys_load_script_hash_by_account_id(account_id, script_hash);
+  int ret = gw_sys_load_script_hash_by_registry_address(&reg_addr, script_hash);
+  if (ret != 0) {
+
+    return ret;
+  }
+  uint32_t account_id;
+  ret = gw_sys_load_account_id_by_script_hash(script_hash, &account_id);
+  if (ret != 0) {
+    return ret;
+  }
 
   // _sudt_build_key
-  uint8_t key[GW_KEY_BYTES + 8] = {0};
-  uint64_t key_len = DEFAULT_SHORT_SCRIPT_HASH_LEN + 8;
-  const uint32_t SUDT_KEY_FLAG_BALANCE = 1;
-  const uint32_t short_script_hash_len = DEFAULT_SHORT_SCRIPT_HASH_LEN;
-  memcpy(key, (uint8_t *)(&SUDT_KEY_FLAG_BALANCE), sizeof(uint32_t));
-  memcpy(key + 4, (uint8_t *)(&short_script_hash_len), sizeof(uint32_t));
-  memcpy(key + 8, script_hash, short_script_hash_len);
+  uint8_t key[64] = {0};
+  uint32_t key_len = 64;
+  ret = sudt_build_key(SUDT_KEY_FLAG_BALANCE, reg_addr, key, &key_len);
+  if (ret != 0) {
+    return ret;
+  }
+
   uint8_t raw_key[GW_KEY_BYTES];
   gw_build_account_key(sudt_id, key, key_len, raw_key);
 
@@ -255,6 +301,7 @@ void mock_mint_sudt(uint32_t sudt_id, uint32_t account_id, uint128_t balance)
 
   // sys_store balance
   gw_update_raw(raw_key, value);
+  return 0;
 }
 
 extern "C" int gw_sys_create(uint8_t *script, uint64_t script_len, uint32_t *account_id_ptr) {
@@ -361,15 +408,6 @@ extern "C" int gw_sys_create(uint8_t *script, uint64_t script_len, uint32_t *acc
   memcpy(script_hash_to_id_value, (uint8_t *)(&id), 4);
   gw_update_raw(script_hash_to_id_key, script_hash_to_id_value);
 
-  // store(script hash -> script_hash)
-  uint8_t short_script_hash_to_script_key[32] = {0};
-  ret = gw_build_short_script_hash_to_script_hash_key(
-    script_hash, GW_DEFAULT_SHORT_SCRIPT_HASH_LEN,
-    short_script_hash_to_script_key
-  );
-  if (ret != 0) return ret;
-  gw_update_raw(short_script_hash_to_script_key, script_hash);
-
   // insert script: store_data(script_hash -> script)
   ret = gw_store_data(script_len, script);
   if (ret != 0) return ret;
@@ -388,6 +426,9 @@ extern "C" int gw_sys_create(uint8_t *script, uint64_t script_len, uint32_t *acc
 // }
 
 // create account by script and return the new account id
+// insert script
+// create account
+// set mapping
 uint32_t create_account_from_script(uint8_t *script, uint64_t script_len) {
   // uint8_t script_hash_type;
   // memcpy(&script_hash_type, script + 8, sizeof(uint8_t));
@@ -423,14 +464,6 @@ uint32_t create_account_from_script(uint8_t *script, uint64_t script_len) {
   // FIXME: id may be more than 256
   memcpy(script_hash_to_id_value, (uint8_t *)(&id), 4);
   gw_update_raw(script_hash_to_id_key, script_hash_to_id_value);
-
-  /* init short script hash -> script_hash */
-  uint8_t short_script_hash_to_script_key[32] = {0};
-  gw_build_short_script_hash_to_script_hash_key(
-    script_hash, GW_DEFAULT_SHORT_SCRIPT_HASH_LEN,
-    short_script_hash_to_script_key
-  );
-  gw_update_raw(short_script_hash_to_script_key, script_hash);
 
   // account_count++
   dbg_print("new account id = %d was created.", id);
@@ -476,14 +509,45 @@ int init() {
 
   new_id = create_account_from_script((uint8_t *)build_eth_l2_script.data(),
                                       build_eth_l2_script.size());
-  mock_mint_sudt(1, new_id, 40000);
+  uint8_t script_hash[GW_KEY_BYTES];
+  blake2b_hash(script_hash, (uint8_t *)build_eth_l2_script.data(), build_eth_l2_script.size());
+  uint8_t eth_address[20] = {1};
+  gw_reg_addr_t addr = {0};
+  addr.reg_id = GW_DEFAULT_ETH_REGISTRY_ACCOUNT_ID;
+  addr.addr_len = GW_ETH_ADDRESS_LEN;
+  memcpy(addr.addr, eth_address, GW_ETH_ADDRESS_LEN);
+  // set mapping
+  // eth address -> script hash
+  uint8_t eth_to_script_hash_key[32] = {0};
+  int ret = _gw_build_registry_address_to_script_hash_key(eth_to_script_hash_key,
+                                                          &addr);
+  if (ret != 0) {
+    dbg_print("build reg addr to script hash key failed");
+    return ret;
+  }
+  uint8_t raw_key[GW_KEY_BYTES] = {0};
+  gw_build_account_key(GW_DEFAULT_ETH_REGISTRY_ACCOUNT_ID, eth_to_script_hash_key, 32, raw_key);
+  gw_update_raw(raw_key, script_hash);
+  // script hash -> eth address
+  uint8_t script_hash_to_eth_key[36] = {0};
+  _gw_build_script_hash_to_registry_address_key(script_hash_to_eth_key,
+                                                (uint8_t *)script_hash);
+  gw_build_account_key(GW_DEFAULT_ETH_REGISTRY_ACCOUNT_ID, script_hash_to_eth_key, 36, raw_key);
+  uint8_t addr_buf[32] = {0};
+  _gw_cpy_addr(addr_buf, addr);
+  gw_update_raw(raw_key, addr_buf);
+  
+  ret = mock_mint_sudt(1, addr, 40000);
+  if (ret != 0) {
+    return ret;
+  }
   
   // TODO: init destructed key
   const uint8_t zero_nonce[32] = {0};
   const uint8_t poly_destructed_key[32] = {5, 0, 0, 0, 255, 2, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
   gw_update_raw(poly_destructed_key, zero_nonce);
 
-  print_state();
+  // print_state();
 
   return 0;
 }

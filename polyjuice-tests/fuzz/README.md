@@ -54,3 +54,15 @@ TBD
 - https://llvm.org/docs/LibFuzzer.html
 - [What makes a good fuzz target](https://github.com/google/fuzzing/blob/master/docs/good-fuzz-target.md)
 - [Clang's source-based code coverage](https://clang.llvm.org/docs/SourceBasedCodeCoverage.html)
+
+### rus-fuzzer
+
+```sh
+cargo install cargo-fuzz
+rustup +nightly component add llvm-tools-preview
+rm -r fuzz/corpus/deploy 
+cd ../..
+cargo run -- convert-bin --input src/test_cases/evm-contracts --output fuzz/corpus/deploy
+cd polyjuice-tests/fuzz
+cargo fuzz run polyjuice-fuzz corpus/deploy  
+```

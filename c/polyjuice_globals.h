@@ -38,7 +38,9 @@ static evmc_address g_tx_origin = {0};
 static uint8_t g_script_code_hash[32] = {0};
 static uint8_t g_script_hash_type = 0xff;
 
-static uint128_t g_gas_price = 0xffffffffffffffffffffffffffffffffu;
+
+static uint128_t g_gas_price = {0};
+
 
 /* Minimal gas of a normal transaction*/
 #define MIN_TX_GAS                      21000

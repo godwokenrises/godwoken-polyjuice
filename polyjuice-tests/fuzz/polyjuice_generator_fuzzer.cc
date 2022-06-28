@@ -21,6 +21,7 @@ struct test_case {
   bytes expected_result{};
 };
 
+//TODO: tx bytes are outdated
 bool execute_predefined_transactions() {
   static int ret = init();
   // TODO: ASSERT_EQ(0, ret)
@@ -105,9 +106,9 @@ bool execute_predefined_transactions() {
   return all_good;
 }
 
-bool is_predefined_test_passed = execute_predefined_transactions();
-extern "C" int LLVMFuzzerTestOneInput(uint8_t *data, size_t size) {
-  dbg_print("Input Data Size: %d", size);
+
+
+extern "C" int LLVMFuzzerTestOneInput(uint8_t *data, size_t size) { 
 
   mol_seg_t l2transaction_seg;
   l2transaction_seg.ptr = data;

@@ -14,6 +14,7 @@ CC=clang
 CXX=clang++
 LLVM_PROFDATA=llvm-profdata
 LLVM_COV=llvm-cov
+OBJCOPY := llvm-objcopy
 
 DEPS := ../../deps
 BUILD := build
