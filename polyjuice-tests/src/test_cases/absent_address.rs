@@ -40,7 +40,8 @@ fn absent_address_test() -> anyhow::Result<()> {
         .get_account_id_by_script_hash(&contract_account.script_hash)?
         .unwrap();
 
-    //call getBalance("0xdB81D2b8154A10C6f25bC2a9225F403D954D0B65")
+    // 0xdB81D2b8154A10C6f25bC2a9225F403D954D0B65 is an unregistered eth_address.
+    // call getBalance("0xdB81D2b8154A10C6f25bC2a9225F403D954D0B65")
     let input =
         hex::decode("f8b2cb4f000000000000000000000000db81d2b8154a10c6f25bc2a9225f403d954d0b65")?;
     let block_info = new_block_info(block_producer.clone(), 1, 0);
