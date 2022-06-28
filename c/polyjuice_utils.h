@@ -129,8 +129,8 @@ int load_script_hash_by_eth_address(gw_context_t *ctx,
   if (_is_zero_hash(script_hash)) {
     return GW_ERROR_NOT_FOUND;
   }
-  ckb_debug("load_script_hash_by_eth_address success");
   return 0;
+  ckb_debug("load_script_hash_by_eth_address success");
 }
 
 int load_eth_address_by_script_hash(gw_context_t *ctx,
