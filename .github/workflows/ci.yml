@@ -48,7 +48,7 @@ jobs:
 
 
   integration-test:
-    uses: nervosnetwork/godwoken-tests/.github/workflows/reusable-integration-test-v1.yml@simplify-workflow
+    uses: nervosnetwork/godwoken-tests/.github/workflows/reusable-integration-test-v1.yml@develop
     with:
       extra_github_env: |
         MANUAL_BUILD_POLYJUICE=true
