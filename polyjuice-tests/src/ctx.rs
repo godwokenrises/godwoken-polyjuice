@@ -39,20 +39,18 @@ use gw_types::{
     U256,
 };
 
-use crate::helper::{PolyjuiceArgsBuilder, POLYJUICE_PROGRAM_CODE_HASH};
-pub const CREATOR_ACCOUNT_ID: u32 = 3;
-pub const CHAIN_ID: u64 = 202204;
-
-pub const L2TX_MAX_CYCLES: u64 = 7000_0000;
+use crate::helper::{
+    PolyjuiceArgsBuilder, CHAIN_ID, CREATOR_ACCOUNT_ID, ETH_ACCOUNT_LOCK_CODE_HASH,
+    L2TX_MAX_CYCLES, META_VALIDATOR_SCRIPT_TYPE_HASH, POLYJUICE_PROGRAM_CODE_HASH,
+    ROLLUP_SCRIPT_HASH, SECP_LOCK_CODE_HASH, SUDT_VALIDATOR_SCRIPT_TYPE_HASH,
+};
 
 // meta contract
 pub const META_VALIDATOR_PATH: &str = "build/godwoken-scripts/meta-contract-validator";
 pub const META_GENERATOR_PATH: &str = "build/godwoken-scripts/meta-contract-generator";
-pub const META_VALIDATOR_SCRIPT_TYPE_HASH: [u8; 32] = [0xa1u8; 32];
 // simple UDT
 pub const SUDT_VALIDATOR_PATH: &str = "build/godwoken-scripts/sudt-validator";
 pub const SUDT_GENERATOR_PATH: &str = "build/godwoken-scripts/sudt-generator";
-pub const SUDT_VALIDATOR_SCRIPT_TYPE_HASH: [u8; 32] = [0xa2u8; 32];
 pub const SECP_DATA_PATH: &str = "build/secp256k1_data";
 // pub const SECP_DATA: &[u8] = include_bytes!("../../build/secp256k1_data");
 
@@ -64,19 +62,6 @@ pub const ETH_ADDRESS_REGISTRY_GENERATOR_NAME: &str =
     "build/godwoken-scripts/eth-addr-reg-generator";
 pub const ETH_ADDRESS_REGISTRY_VALIDATOR_NAME: &str =
     "build/godwoken-scripts/eth-addr-reg-validator";
-
-pub const ROLLUP_SCRIPT_HASH: [u8; 32] = [0xa9u8; 32];
-pub const ETH_ACCOUNT_LOCK_CODE_HASH: [u8; 32] = [0xaau8; 32];
-pub const SECP_LOCK_CODE_HASH: [u8; 32] = [0xbbu8; 32];
-
-pub const GW_LOG_SUDT_TRANSFER: u8 = 0x0;
-pub const GW_LOG_SUDT_PAY_FEE: u8 = 0x1;
-pub const GW_LOG_POLYJUICE_SYSTEM: u8 = 0x2;
-pub const GW_LOG_POLYJUICE_USER: u8 = 0x3;
-
-// pub const FATAL_POLYJUICE: i8 = -50;
-pub const FATAL_PRECOMPILED_CONTRACTS: i8 = -51;
-
 fn load_program(program_name: &str) -> Bytes {
     let mut buf = Vec::new();
     let mut path = PathBuf::new();
