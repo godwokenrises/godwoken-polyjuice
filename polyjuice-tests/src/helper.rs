@@ -487,7 +487,12 @@ pub fn setup() -> (Store, DummyState, Generator) {
         rollup_script_hash: ROLLUP_SCRIPT_HASH.into(),
         rollup_config,
     };
-    let generator = Generator::new(backend_manage, account_lock_manage, rollup_context);
+    let generator = Generator::new(
+        backend_manage,
+        account_lock_manage,
+        rollup_context,
+        Default::default(),
+    );
 
     let tx = store.begin_transaction();
     let tip_block_number: Uint64 = 8.pack();

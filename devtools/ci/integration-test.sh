@@ -6,6 +6,7 @@ PROJECT_ROOT=$(dirname $(dirname $SCRIPT_DIR))
 TESTS_DIR=$PROJECT_ROOT/polyjuice-tests
 DEPS_DIR=$PROJECT_ROOT/integration-test
 GODWOKEN_DIR=$DEPS_DIR/godwoken
+ETHEREUM_TEST_DIR=$DEPS_DIR/test
 
 mkdir -p $DEPS_DIR
 if [ -d "$GODWOKEN_DIR" ]
@@ -13,6 +14,13 @@ then
     echo "godwoken project already exists"
 else
     git clone --depth=1 https://github.com/nervosnetwork/godwoken.git $GODWOKEN_DIR
+fi
+# clone ethereum/test
+if [ -d "$ETHEREUM_TEST_DIR" ]
+then
+    echo "ethereum test project already exists"
+else
+    git clone --depth=1 https://github.com/ethereum/tests.git $ETHEREUM_TEST_DIR
 fi
 cd $GODWOKEN_DIR
 # checkout https://github.com/nervosnetwork/godwoken/commits/f3cdd47b4460be37ed1
@@ -28,3 +36,6 @@ cd $TESTS_DIR
 export RUST_BACKTRACE=full
 cargo test -- --nocapture
 # TODO: cargo bench | egrep -v debug
+
+# run ethereum test
+cargo test -- ethereum_test  --nocapture
