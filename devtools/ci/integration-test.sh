@@ -34,8 +34,9 @@ make all-via-docker
 
 cd $TESTS_DIR
 export RUST_BACKTRACE=full
-cargo test -- --nocapture
+cargo test --lib -- --nocapture
 # TODO: cargo bench | egrep -v debug
 
 # run ethereum test
-cargo test -- ethereum_test  --nocapture
+RUST_LOG=info,gw_generator=debug cargo test --test ethereum_test  -- ethereum_test --nocapture
+

@@ -1,8 +1,5 @@
 use std::{
     collections::HashMap,
-    convert::TryInto,
-    fs,
-    io::Read,
     path::{Path, PathBuf},
     time::SystemTime,
 };
@@ -40,6 +37,7 @@ use gw_types::{
 };
 
 use crate::helper::{
+    build_eth_l2_script, build_l2_sudt_script, create_block_producer, load_program,
     PolyjuiceArgsBuilder, CHAIN_ID, CREATOR_ACCOUNT_ID, ETH_ACCOUNT_LOCK_CODE_HASH,
     L2TX_MAX_CYCLES, META_VALIDATOR_SCRIPT_TYPE_HASH, POLYJUICE_PROGRAM_CODE_HASH,
     ROLLUP_SCRIPT_HASH, SECP_LOCK_CODE_HASH, SUDT_VALIDATOR_SCRIPT_TYPE_HASH,
@@ -62,14 +60,6 @@ pub const ETH_ADDRESS_REGISTRY_GENERATOR_NAME: &str =
     "build/godwoken-scripts/eth-addr-reg-generator";
 pub const ETH_ADDRESS_REGISTRY_VALIDATOR_NAME: &str =
     "build/godwoken-scripts/eth-addr-reg-validator";
-fn load_program(program_name: &str) -> Bytes {
-    let mut buf = Vec::new();
-    let mut path = PathBuf::new();
-    path.push(program_name);
-    let mut f = fs::File::open(&path).unwrap_or_else(|_| panic!("load program {}", program_name));
-    f.read_to_end(&mut buf).expect("read program");
-    Bytes::from(buf.to_vec())
-}
 
 fn load_code_hash(path: &Path) -> [u8; 32] {
     let mut buf = [0u8; 32];
@@ -86,23 +76,6 @@ fn set_mapping(state: &mut DummyState, eth_address: &[u8; 20], script_hash: &[u8
         .expect("map reg addr to script hash");
 }
 
-fn create_block_producer(state: &mut DummyState) -> anyhow::Result<RegistryAddress> {
-    // This eth_address is hardcoded in src/test_cases/evm-contracts/BlockInfo.sol
-    let eth_address: [u8; 20] = hex::decode("a1ad227Ad369f593B5f3d0Cc934A681a50811CB2")?
-        .try_into()
-        .expect("decode");
-    let block_producer_script = build_eth_l2_script(&eth_address);
-    let block_producer_script_hash = block_producer_script.hash();
-    let _block_producer_id = state
-        .create_account_from_script(block_producer_script)
-        .expect("create_block_producer");
-    set_mapping(state, &eth_address, &block_producer_script_hash);
-    Ok(RegistryAddress::new(
-        ETH_REGISTRY_ACCOUNT_ID,
-        eth_address.to_vec(),
-    ))
-}
-
 pub struct MockChain {
     ctx: Context,
     block_producer: RegistryAddress,
@@ -117,7 +90,7 @@ impl MockChain {
      */
     pub fn setup(base_path: &str) -> anyhow::Result<Self> {
         let mut ctx = Context::setup(base_path)?;
-        let block_producer = create_block_producer(&mut ctx.state)?;
+        let block_producer = create_block_producer(&mut ctx.state);
         let timestamp = SystemTime::now();
         Ok(Self {
             ctx,
@@ -527,28 +500,6 @@ impl Config {
             secp_data_hash,
         }
     }
-}
-
-pub fn build_l2_sudt_script(args: [u8; 32]) -> Script {
-    let mut script_args = Vec::with_capacity(64);
-    script_args.extend(&ROLLUP_SCRIPT_HASH);
-    script_args.extend(&args[..]);
-    Script::new_builder()
-        .args(Bytes::from(script_args).pack())
-        .code_hash(SUDT_VALIDATOR_SCRIPT_TYPE_HASH.clone().pack())
-        .hash_type(ScriptHashType::Type.into())
-        .build()
-}
-
-pub fn build_eth_l2_script(args: &[u8; 20]) -> Script {
-    let mut script_args = Vec::with_capacity(32 + 20);
-    script_args.extend(&ROLLUP_SCRIPT_HASH);
-    script_args.extend(&args[..]);
-    Script::new_builder()
-        .args(Bytes::from(script_args).pack())
-        .code_hash(ETH_ACCOUNT_LOCK_CODE_HASH.clone().pack())
-        .hash_type(ScriptHashType::Type.into())
-        .build()
 }
 
 // port from poolyjuice.h#polyjuice_build_system_key

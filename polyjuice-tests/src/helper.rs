@@ -78,7 +78,7 @@ pub const FATAL_PRECOMPILED_CONTRACTS: i8 = -51;
 pub(crate) const SUDT_ERC20_PROXY_USER_DEFINED_DECIMALS_CODE: &str =
     include_str!("../../solidity/erc20/SudtERC20Proxy_UserDefinedDecimals.bin");
 
-fn load_program(program_name: &str) -> Bytes {
+pub fn load_program(program_name: &str) -> Bytes {
     let mut buf = Vec::new();
     let mut path = PathBuf::new();
     path.push(program_name);

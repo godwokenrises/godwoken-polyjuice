@@ -306,3 +306,29 @@ fn ethereum_test() -> anyhow::Result<()> {
     }
     Ok(())
 }
+
+#[test]
+fn ethereum_failure_test() -> anyhow::Result<()> {
+    let mut paths = Vec::new();
+    read_all_files(Path::new(TEST_CASE_DIR), &mut paths)?;
+    let mut err_cases = Vec::new();
+    for path in paths {
+        if let Some(filename) = path.file_name() {
+            if let Some(filename) = filename.to_str() {
+                if EXCLUDE_TEST_FILES.contains(&filename) {
+                    println!("Starting test with: {:?}", &path);
+                    let content = fs::read_to_string(&path)?;
+                    let test_cases: HashMap<String, TestCase> = serde_json::from_str(&content)?;
+                    for (testname, testcase) in test_cases {
+                        println!("test name: {}", testname);
+                        let runner = VMTestRunner::new(testcase)?;
+                        if let Err(_) = runner.run() {
+                            err_cases.push(path.clone());
+                        }
+                    }
+                }
+            }
+        }
+    }
+    Ok(())
+}
