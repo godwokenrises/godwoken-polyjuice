@@ -305,6 +305,7 @@ fn test_sudt_erc20_proxy_inner(
             &block_info,
             &raw_tx,
             L2TX_MAX_CYCLES,
+            None
         )?;
         if run_result.exit_code != 0 {
             return Err(TransactionError::InvalidExitCode(run_result.exit_code));
@@ -316,7 +317,7 @@ fn test_sudt_erc20_proxy_inner(
             action,
             t.elapsed().as_millis()
         );
-        println!("used_cycles: {}", run_result.used_cycles);
+        println!("used_cycles: {}", run_result.cycles.execution);
         println!("write_values.len: {}", run_result.write.write_values.len());
         state.apply_run_result(&run_result.write).expect("update state");
         assert_eq!(
@@ -355,6 +356,7 @@ fn test_sudt_erc20_proxy_inner(
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .unwrap();
         // by: `revert(0, 0)`
@@ -391,6 +393,7 @@ fn test_sudt_erc20_proxy_inner(
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .unwrap();
         // by: `revert(0, 0)`

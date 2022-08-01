@@ -283,6 +283,7 @@ impl MockChain {
             &block_info,
             &raw_tx,
             L2TX_MAX_CYCLES,
+            None,
         )?;
 
         self.block_number += 1;

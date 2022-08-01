@@ -44,7 +44,7 @@ fn test_recover_account() {
     // Deploy RecoverAccount Contract used cycles = 690541 < 700K
     helper::check_cycles(
         "Deploy RecoverAccount Contract",
-        run_result.used_cycles,
+        run_result.cycles.execution,
         970_000,
     );
     let contract_account_script =
@@ -91,12 +91,13 @@ fn test_recover_account() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .expect("construct");
         // [RecoverAccount.recover(message, signature, code_hash)] used cycles: 648630 < 670K
         helper::check_cycles(
             "RecoverAccount.recover(message, signature, code_hash)",
-            run_result.used_cycles,
+            run_result.cycles.execution,
             800_000,
         );
         state
@@ -147,6 +148,7 @@ fn test_recover_account() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .expect("construct");
         state
@@ -188,6 +190,7 @@ fn test_recover_account() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .unwrap();
         assert_eq!(err.exit_code, FATAL_PRECOMPILED_CONTRACTS);

@@ -70,10 +70,11 @@ fn test_heap_momory() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .expect("success to malloc memory");
         // [newMemory less than 512K] used cycles: 752,115 -> 883611 (increase 17.48%) < 890K
-        helper::check_cycles("new Memory", run_result.used_cycles, 997_000);
+        helper::check_cycles("new Memory", run_result.cycles.execution, 997_000);
         println!(
             "\t new byte(about {}K) => call result {:?}",
             16 * 32,
@@ -108,6 +109,7 @@ fn test_heap_momory() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .expect_err("OOM");
         println!("{:?}", err);

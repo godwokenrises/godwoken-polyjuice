@@ -70,6 +70,7 @@ fn test_recursion_contract_call() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .expect("recursive call depth to 32");
         state
@@ -141,6 +142,7 @@ fn test_recursion_contract_call() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .unwrap();
         assert_eq!(err.exit_code, 2);
@@ -173,6 +175,7 @@ fn test_recursion_contract_call() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .unwrap();
         assert_eq!(err.exit_code, -93);

@@ -59,7 +59,7 @@ fn test_selfdestruct() {
         block_number,
     );
     // 571282 < 580K
-    helper::check_cycles("deploy SelfDestruct", run_result.used_cycles, 900_000);
+    helper::check_cycles("deploy SelfDestruct", run_result.cycles.execution, 900_000);
 
     let mock_contract_info = MockContractInfo::create(&from_eth_address, 0);
     let sd_script_hash = mock_contract_info.script_hash;
@@ -97,7 +97,11 @@ fn test_selfdestruct() {
         block_number,
     );
     // [deploy CallSelfDestruct] used cycles: 551984 < 560K
-    helper::check_cycles("deploy CallSelfDestruct", run_result.used_cycles, 830_000);
+    helper::check_cycles(
+        "deploy CallSelfDestruct",
+        run_result.cycles.execution,
+        830_000,
+    );
 
     let ssd_account = MockContractInfo::create(&from_eth_address, 1);
     let ssd_account_script_hash = ssd_account.script_hash;
@@ -135,6 +139,7 @@ fn test_selfdestruct() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .expect("call CallSelfDestruct.proxyDone(sd_account_id)");
         state
@@ -143,7 +148,7 @@ fn test_selfdestruct() {
         // [call CallSelfDestruct.proxyDone(sd_account_id)] used cycles: 1043108 < 1100K
         helper::check_cycles(
             "CallSelfDestruct.proxyDone(sd_account_id)",
-            run_result.used_cycles,
+            run_result.cycles.execution,
             1_300_000,
         );
     }
@@ -190,6 +195,7 @@ fn test_selfdestruct() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .unwrap();
         assert_eq!(result.exit_code, -50);
@@ -220,6 +226,7 @@ fn test_selfdestruct() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .unwrap();
         assert_eq!(result.exit_code, -50);

@@ -55,6 +55,7 @@ fn test_get_chain_id() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .expect("construct");
         state
@@ -98,6 +99,7 @@ fn test_get_chain_id() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .expect("construct");
         state

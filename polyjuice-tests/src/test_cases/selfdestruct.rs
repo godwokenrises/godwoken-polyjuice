@@ -64,10 +64,11 @@ fn test_selfdestruct() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .expect("construct");
         // [Deploy SelfDestruct] used cycles: 570570 < 580K
-        helper::check_cycles("Deploy SelfDestruct", run_result.used_cycles, 900_000);
+        helper::check_cycles("Deploy SelfDestruct", run_result.cycles.execution, 900_000);
         state
             .apply_run_result(&run_result.write)
             .expect("update state");
@@ -118,10 +119,15 @@ fn test_selfdestruct() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .expect("construct");
         // [call SelfDestruct.done()] used cycles: 589657 < 600K
-        helper::check_cycles("call SelfDestruct.done()", run_result.used_cycles, 740_000);
+        helper::check_cycles(
+            "call SelfDestruct.done()",
+            run_result.cycles.execution,
+            740_000,
+        );
         state
             .apply_run_result(&run_result.write)
             .expect("update state");
@@ -163,6 +169,7 @@ fn test_selfdestruct() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .unwrap();
         assert_eq!(result.exit_code, -50);

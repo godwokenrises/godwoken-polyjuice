@@ -59,7 +59,11 @@ fn test_delegatecall() {
         block_number,
     );
     // [Deploy DelegateCall] used cycles: 753698 < 760K
-    helper::check_cycles("Deploy DelegateCall", run_result.used_cycles, 1_100_000);
+    helper::check_cycles(
+        "Deploy DelegateCall",
+        run_result.cycles.execution,
+        1_100_000,
+    );
     // println!(
     //     "result {}",
     //     serde_json::to_string_pretty(&RunResult::from(run_result)).unwrap()
@@ -131,10 +135,11 @@ fn test_delegatecall() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .expect("construct");
         // [DelegateCall] used cycles: 1457344 < 1460K
-        helper::check_cycles("DelegateCall", run_result.used_cycles, 1_710_000);
+        helper::check_cycles("DelegateCall", run_result.cycles.execution, 1_710_000);
         state
             .apply_run_result(&run_result.write)
             .expect("update state");

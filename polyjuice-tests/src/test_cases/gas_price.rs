@@ -64,6 +64,7 @@ fn gas_price_test() -> anyhow::Result<()> {
             &block_info,
             &raw_tx,
             L2TX_MAX_CYCLES,
+            None,
         )
         .expect("Call getCurrentGasPrice()");
     let mut arr = [0u8; 16];

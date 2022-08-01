@@ -551,6 +551,7 @@ pub fn deploy(
             &block_info,
             &raw_tx,
             L2TX_MAX_CYCLES,
+            None,
         )
         .expect("deploy Polyjuice contract");
     state
@@ -648,10 +649,11 @@ pub fn simple_storage_get(
             &block_info,
             &raw_tx,
             L2TX_MAX_CYCLES,
+            None,
         )
         .expect("execute_transaction");
     // 491894, 571661 -> 586360 < 587K
-    check_cycles("simple_storage_get", run_result.used_cycles, 700_000);
+    check_cycles("simple_storage_get", run_result.cycles.execution, 700_000);
     run_result
 }
 
@@ -804,6 +806,7 @@ pub(crate) fn eth_address_regiser(
         &block_info,
         &raw_l2tx,
         L2TX_MAX_CYCLES,
+        None,
     )
 }
 

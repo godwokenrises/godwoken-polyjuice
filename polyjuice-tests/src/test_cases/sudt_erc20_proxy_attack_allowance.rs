@@ -146,6 +146,7 @@ fn test_attack_allowance() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .expect("construct");
         state
@@ -191,6 +192,7 @@ fn test_attack_allowance() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .expect("construct");
         assert_eq!(

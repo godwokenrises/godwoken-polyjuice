@@ -71,6 +71,7 @@ fn test_beacon_proxy() {
             &block_info,
             &raw_tx,
             L2TX_MAX_CYCLES,
+            None,
         )
         .expect("invode initializaion");
     assert_eq!(run_result.exit_code, EVMC_SUCCESS);
@@ -110,6 +111,7 @@ fn test_beacon_proxy() {
             &block_info,
             &raw_tx,
             L2TX_MAX_CYCLES,
+            None,
         )
         .expect("Call deployBeaconProxy");
     assert_eq!(run_result.exit_code, EVMC_SUCCESS);
@@ -141,6 +143,7 @@ fn test_beacon_proxy() {
             &block_info,
             &raw_tx,
             L2TX_MAX_CYCLES,
+            None,
         )
         .expect("get BeaconProxy contract address");
     assert_eq!(run_result.exit_code, EVMC_SUCCESS);

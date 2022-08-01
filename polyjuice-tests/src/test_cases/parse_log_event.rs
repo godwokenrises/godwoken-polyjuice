@@ -174,6 +174,7 @@ fn test_parse_log_event() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .expect("construct");
         state
