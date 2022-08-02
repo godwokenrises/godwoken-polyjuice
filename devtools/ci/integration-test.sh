@@ -23,7 +23,6 @@ else
     git clone --depth=1 https://github.com/ethereum/tests.git $ETHEREUM_TEST_DIR
 fi
 cd $GODWOKEN_DIR
-# checkout https://github.com/nervosnetwork/godwoken/commits/f3cdd47b4460be37ed1
 git fetch origin develop
 git checkout FETCH_HEAD 
 git submodule update --init --recursive --depth=1
