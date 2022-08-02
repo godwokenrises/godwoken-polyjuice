@@ -10,7 +10,7 @@ use std::{
     u128,
 };
 
-const TEST_CASE_DIR: &'static str = "../integration-test/test/GeneralStateTests/VMTests/";
+const TEST_CASE_DIR: &'static str = "../integration-test/ethereum-tests/GeneralStateTests/VMTests/";
 const HARD_FORKS: &'static [&'static str] = &["Berlin", "Istanbul"];
 const EXCLUDE_TEST_FILES: &'static [&'static str] = &["loopMul.json", "loopExp.json"];
 
