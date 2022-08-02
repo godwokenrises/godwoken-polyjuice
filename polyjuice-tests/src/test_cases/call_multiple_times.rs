@@ -147,6 +147,7 @@ fn test_call_multiple_times() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .expect("CallMultipleTimes.proxySet(20)");
         state

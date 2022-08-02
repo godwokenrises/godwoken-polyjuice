@@ -65,6 +65,7 @@ fn test_get_contract_code() {
             &block_info,
             &raw_l2tx,
             gw_generator::constants::L2TX_MAX_CYCLES,
+            None,
         )
         .expect("call createMemoryArray function");
     let mut expect_result = [0u8; 32];
@@ -99,6 +100,7 @@ fn test_get_contract_code() {
             &block_info,
             &raw_l2tx,
             gw_generator::constants::L2TX_MAX_CYCLES,
+            None,
         )
         .expect("call getCode function");
     let expected_code = hex::decode(CONTRACT_CODE).expect("code hex to Vec<u8>");

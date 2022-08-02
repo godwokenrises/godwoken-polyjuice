@@ -52,6 +52,7 @@ fn test_simple_storage() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .expect("construct");
         state
@@ -59,7 +60,7 @@ fn test_simple_storage() {
             .expect("update state");
         println!("return_data: {}", hex::encode(&run_result.return_data[..]));
         // 557534 < 560K
-        helper::check_cycles("Deploy SimpleStorage", run_result.used_cycles, 830_000);
+        helper::check_cycles("Deploy SimpleStorage", run_result.cycles.execution, 830_000);
     }
 
     let contract_account_script =
@@ -106,11 +107,14 @@ fn test_simple_storage() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .expect("construct");
-        state.apply_run_result(&run_result.write).expect("update state");
+        state
+            .apply_run_result(&run_result.write)
+            .expect("update state");
         // 489767 < 500K
-        helper::check_cycles("SimpleStorage.set", run_result.used_cycles, 6_100_000);
+        helper::check_cycles("SimpleStorage.set", run_result.cycles.execution, 6_100_000);
     }
 
     {
@@ -137,9 +141,12 @@ fn test_simple_storage() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .expect("construct");
-        state.apply_run_result(&run_result.write).expect("update state");
+        state
+            .apply_run_result(&run_result.write)
+            .expect("update state");
         let mut expected_return_data = vec![0u8; 32];
         expected_return_data[30] = 0x0d;
         expected_return_data[31] = 0x10;

@@ -187,6 +187,7 @@ fn create2_address_collision_overwrite() -> Result<()> {
             &block_info,
             &raw_tx,
             L2TX_MAX_CYCLES,
+            None,
         )
         .expect("Create2Impl.deploy(uint256 value, bytes32 salt, bytes memory code)");
     state
@@ -298,6 +299,7 @@ fn create2_address_collision_duplicate() -> Result<()> {
         &block_info,
         &raw_tx,
         L2TX_MAX_CYCLES,
+        None,
     )?;
     assert_eq!(run_result.exit_code, 2);
 

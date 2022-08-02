@@ -68,7 +68,11 @@ fn test_contract_call_contract() {
     //     serde_json::to_string_pretty(&RunResult::from(run_result)).unwrap()
     // );
     // [Deploy CreateContract] used cycles: 600288 < 610K
-    helper::check_cycles("Deploy CreateContract", run_result.used_cycles, 880_000);
+    helper::check_cycles(
+        "Deploy CreateContract",
+        run_result.cycles.execution,
+        880_000,
+    );
     let cc_account = MockContractInfo::create(&from_eth_address, 1);
     let cc_contract_id = state
         .get_account_id_by_script_hash(&cc_account.script_hash)
@@ -116,13 +120,18 @@ fn test_contract_call_contract() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .expect("CallContract.proxySet");
         state
             .apply_run_result(&run_result.write)
             .expect("update state");
         // [CallContract.proxySet(222)] used cycles: 961599 -> 980564 < 981K
-        helper::check_cycles("CallContract.proxySet()", run_result.used_cycles, 1_170_000);
+        helper::check_cycles(
+            "CallContract.proxySet()",
+            run_result.cycles.execution,
+            1_170_000,
+        );
     }
 
     let run_result = simple_storage_get(
@@ -169,7 +178,7 @@ fn test_contract_call_non_exists_contract() {
     // [Deploy CallNonExistsContract] used cycles: 657243 < 670K
     helper::check_cycles(
         "Deploy CallNonExistsContract",
-        run_result.used_cycles,
+        run_result.cycles.execution,
         950_000,
     );
 
@@ -208,6 +217,7 @@ fn test_contract_call_non_exists_contract() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .expect("non_existing_account_address => success with '0x' return_data");
         assert_eq!(
@@ -247,6 +257,7 @@ fn test_contract_call_non_exists_contract() {
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .expect("empty contract code for account (EoA account)");
         /* The functions call, delegatecall and staticcall all take a single bytes memory parameter
@@ -265,7 +276,7 @@ fn test_contract_call_non_exists_contract() {
         // [CallNonExistsContract.rawCall(address eoa_addr)] used cycles: 862060 < 870K
         helper::check_cycles(
             "CallNonExistsContract.rawCall(address eoa_addr)",
-            run_result.used_cycles,
+            run_result.cycles.execution,
             1_100_000,
         );
     }

@@ -69,6 +69,7 @@ fn test_error_handling() {
             &block_info,
             &raw_tx,
             L2TX_MAX_CYCLES,
+            None,
         )
         .expect("Call testAssert()");
     assert_eq!(run_result.exit_code, EVMC_SUCCESS);
@@ -97,6 +98,7 @@ fn test_error_handling() {
             &block_info,
             &raw_tx,
             L2TX_MAX_CYCLES,
+            None,
         )
         .expect("mockAssertPayable() => EVMC_REVERT: 2");
     assert_eq!(run_result.exit_code, EVMC_REVERT);
@@ -135,6 +137,7 @@ fn test_error_handling() {
             &block_info,
             &raw_tx,
             L2TX_MAX_CYCLES,
+            None,
         )
         .unwrap();
     // The assert function creates an built-in error of type Panic(uint256) -> 0x4e487b71
@@ -169,6 +172,7 @@ fn test_error_handling() {
             &block_info,
             &raw_tx,
             L2TX_MAX_CYCLES,
+            None,
         )
         .expect("testRequire(9) => EVMC_REVERT: 2");
     assert_eq!(run_result.exit_code, EVMC_REVERT);
@@ -205,6 +209,7 @@ fn test_error_handling() {
             &block_info,
             &raw_tx,
             L2TX_MAX_CYCLES,
+            None,
         )
         .expect("Call testRevert(8)");
     assert_eq!(run_result.exit_code, EVMC_REVERT);
@@ -239,6 +244,7 @@ fn test_error_handling() {
             &block_info,
             &raw_tx,
             L2TX_MAX_CYCLES,
+            None,
         )
         .expect("Call testRevertMsg('test revert message')");
     assert_eq!(run_result.exit_code, EVMC_REVERT);

@@ -65,6 +65,7 @@ fn absent_address_test() -> anyhow::Result<()> {
             &block_info,
             &raw_tx,
             L2TX_MAX_CYCLES,
+            None,
         )
         .expect("Call getBalance");
     assert_eq!(run_result.return_data.as_ref(), &[0u8; 32]);
@@ -93,6 +94,7 @@ fn absent_address_test() -> anyhow::Result<()> {
             &block_info,
             &raw_tx,
             L2TX_MAX_CYCLES,
+            None,
         )
         .expect("Call getCodeSize");
     assert_eq!(run_result.return_data.as_ref(), &[0u8; 32]);
@@ -121,6 +123,7 @@ fn absent_address_test() -> anyhow::Result<()> {
             &block_info,
             &raw_tx,
             L2TX_MAX_CYCLES,
+            None,
         )
         .expect("Call getCodeHash");
     assert_eq!(run_result.return_data.as_ref(), &[0u8; 32]);
@@ -149,6 +152,7 @@ fn absent_address_test() -> anyhow::Result<()> {
             &block_info,
             &raw_tx,
             L2TX_MAX_CYCLES,
+            None,
         )
         .expect("Call getCode");
     let mut target = [0u8; 64];

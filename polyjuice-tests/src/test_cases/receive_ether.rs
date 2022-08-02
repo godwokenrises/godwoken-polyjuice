@@ -69,9 +69,10 @@ fn receive_ether_test() -> anyhow::Result<()> {
             &block_info,
             &raw_tx,
             L2TX_MAX_CYCLES,
+            None,
         )
         .expect("Call receive()");
-    check_cycles("receive()", run_result.used_cycles, 710_100);
+    check_cycles("receive()", run_result.cycles.execution, 710_100);
     assert!(run_result.return_data.is_empty());
 
     let receive_data = match parse_log(&run_result.write.logs[1]) {
@@ -175,6 +176,7 @@ fn without_receive_fallback_test() -> anyhow::Result<()> {
         &block_info,
         &raw_tx,
         L2TX_MAX_CYCLES,
+        None,
     )?;
     //expect transfer failed
     assert_eq!(run_result.exit_code, 2);
@@ -263,6 +265,7 @@ fn over_transfer_test() -> anyhow::Result<()> {
         &block_info,
         &raw_tx,
         L2TX_MAX_CYCLES,
+        None,
     )?;
 
     // expect transfer failed

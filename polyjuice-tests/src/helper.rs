@@ -78,7 +78,7 @@ pub const FATAL_PRECOMPILED_CONTRACTS: i8 = -51;
 pub(crate) const SUDT_ERC20_PROXY_USER_DEFINED_DECIMALS_CODE: &str =
     include_str!("../../solidity/erc20/SudtERC20Proxy_UserDefinedDecimals.bin");
 
-fn load_program(program_name: &str) -> Bytes {
+pub fn load_program(program_name: &str) -> Bytes {
     let mut buf = Vec::new();
     let mut path = PathBuf::new();
     path.push(program_name);
@@ -487,7 +487,12 @@ pub fn setup() -> (Store, DummyState, Generator) {
         rollup_script_hash: ROLLUP_SCRIPT_HASH.into(),
         rollup_config,
     };
-    let generator = Generator::new(backend_manage, account_lock_manage, rollup_context);
+    let generator = Generator::new(
+        backend_manage,
+        account_lock_manage,
+        rollup_context,
+        Default::default(),
+    );
 
     let tx = store.begin_transaction();
     let tip_block_number: Uint64 = 8.pack();
@@ -546,6 +551,7 @@ pub fn deploy(
             &block_info,
             &raw_tx,
             L2TX_MAX_CYCLES,
+            None,
         )
         .expect("deploy Polyjuice contract");
     state
@@ -643,10 +649,11 @@ pub fn simple_storage_get(
             &block_info,
             &raw_tx,
             L2TX_MAX_CYCLES,
+            None,
         )
         .expect("execute_transaction");
     // 491894, 571661 -> 586360 < 587K
-    check_cycles("simple_storage_get", run_result.used_cycles, 700_000);
+    check_cycles("simple_storage_get", run_result.cycles.execution, 700_000);
     run_result
 }
 
@@ -799,6 +806,7 @@ pub(crate) fn eth_address_regiser(
         &block_info,
         &raw_l2tx,
         L2TX_MAX_CYCLES,
+        None,
     )
 }
 

@@ -102,7 +102,11 @@ fn test_update_eth_addr_reg_by_contract() {
         .apply_run_result(&run_result.write)
         .expect("update state");
     // cycles(1176198)] < 1200k cycles
-    helper::check_cycles("eth_address_regiser", run_result.used_cycles, 1_200_000);
+    helper::check_cycles(
+        "eth_address_regiser",
+        run_result.cycles.execution,
+        1_200_000,
+    );
     assert_eq!(
         // make sure the fee was paid
         state
@@ -145,6 +149,7 @@ fn test_update_eth_addr_reg_by_contract() {
             &new_block_info(block_producer_id.clone(), 3, 3),
             &raw_l2tx,
             L2TX_MAX_CYCLES,
+            None,
         )
         .expect("execute Godwoken contract");
     assert_eq!(run_result.return_data.as_ref(), eth_eoa_account_script_hash);
@@ -169,6 +174,7 @@ fn test_update_eth_addr_reg_by_contract() {
             &block_info,
             &raw_l2tx,
             L2TX_MAX_CYCLES,
+            None,
         )
         .expect("execute Godwoken contract");
     assert_eq!(run_result.return_data.as_ref(), eth_eoa_address);
@@ -266,6 +272,7 @@ fn test_batch_set_mapping_by_contract() {
                 &new_block_info(block_producer_id.clone(), 3, 3),
                 &raw_l2tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .expect("execute Godwoken contract");
         assert_eq!(run_result.return_data.as_ref(), eth_eoa_account_script_hash);
@@ -289,6 +296,7 @@ fn test_batch_set_mapping_by_contract() {
                 &new_block_info(block_producer_id.clone(), 3, 3),
                 &raw_l2tx,
                 L2TX_MAX_CYCLES,
+                None,
             )
             .expect("execute Godwoken contract");
         assert_eq!(run_result.return_data.as_ref(), eth_eoa_address);
