@@ -6,7 +6,7 @@ PROJECT_ROOT=$(dirname $(dirname $SCRIPT_DIR))
 TESTS_DIR=$PROJECT_ROOT/polyjuice-tests
 DEPS_DIR=$PROJECT_ROOT/integration-test
 GODWOKEN_DIR=$DEPS_DIR/godwoken
-ETHEREUM_TEST_DIR=$DEPS_DIR/test
+ETHEREUM_TEST_DIR=$DEPS_DIR/ethereum-tests
 
 mkdir -p $DEPS_DIR
 if [ -d "$GODWOKEN_DIR" ]
