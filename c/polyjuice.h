@@ -137,7 +137,7 @@ int load_account_script(gw_context_t* gw_ctx, uint32_t account_id,
      value      : u128               (little endian)
      input_size : u32                (little endian)
      input_data : [u8; input_size
-     to_address : [u8; 20]	     optional, if it's not an EOA transfer tx
+     to_address : [u8; 20]	     optional, if it's not a transfer tx
    ]
  */
 int parse_args(struct evmc_message* msg, gw_context_t* ctx) {
@@ -202,7 +202,7 @@ int parse_args(struct evmc_message* msg, gw_context_t* ctx) {
   uint8_t* input_data = args + offset;
   offset += input_size;
 
-  // This is an EOA transfer tx.
+  // This is a transfer tx.
   if (offset + 20 == tx_ctx->args_len) {
     g_eoa_transfer_flag = true;
     memcpy(g_eoa_transfer_to_address.bytes, args + offset, 20);
@@ -1040,16 +1040,16 @@ int handle_native_token_transfer(gw_context_t* ctx, uint32_t from_id, uint256_t 
                         uint64_t gas_used) {
   if (g_creator_account_id == UINT32_MAX) {
     ckb_debug("[handle_native_token_transfer] g_creator_account_id wasn't set.");
-    return ERROR_EOA_TRANSFER;
+    return ERROR_NATIVE_TOKEN_TRANSFER;
   }
   if (!g_eoa_transfer_flag) {
     ckb_debug("[handle_native_token_transfer] g_eoa_transfer_flag wasn't set.");
-    return ERROR_EOA_TRANSFER;
+    return ERROR_NATIVE_TOKEN_TRANSFER;
   }
   evmc_address zero_address = {0};
   if (memcmp(zero_address.bytes, g_eoa_transfer_to_address.bytes, 20) == 0) {
     ckb_debug("[handle_native_token_transfer] g_eoa_transfer_to_address wasn't set.");
-    return ERROR_EOA_TRANSFER;
+    return ERROR_NATIVE_TOKEN_TRANSFER;
   }
 
   int ret = 0;

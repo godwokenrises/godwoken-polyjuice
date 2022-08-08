@@ -11,7 +11,7 @@ use crate::{
 };
 
 #[test]
-fn eoa_transfer_test() -> anyhow::Result<()> {
+fn native_token_transfer_test() -> anyhow::Result<()> {
     let mut chain = MockChain::setup("..")?;
     let mint = 100000.into();
     let from_addr = [1u8; 20];
@@ -44,7 +44,7 @@ fn eoa_transfer_test() -> anyhow::Result<()> {
 }
 
 #[test]
-fn eoa_transfer_unregistered_address_test() -> anyhow::Result<()> {
+fn native_token_transfer_unregistered_address_test() -> anyhow::Result<()> {
     let mut chain = MockChain::setup("..")?;
     let mint = 100000.into();
     let from_addr = [1u8; 20];
@@ -76,7 +76,7 @@ fn eoa_transfer_unregistered_address_test() -> anyhow::Result<()> {
 }
 
 #[test]
-fn eoa_transfer_contract_address_test() -> anyhow::Result<()> {
+fn native_token_transfer_contract_address_test() -> anyhow::Result<()> {
     let mut chain = MockChain::setup("..")?;
     let mint = 100000.into();
     let from_addr = [1u8; 20];
@@ -113,7 +113,7 @@ fn eoa_transfer_contract_address_test() -> anyhow::Result<()> {
 }
 
 #[test]
-fn eoa_transfer_invalid_to_id_test() -> anyhow::Result<()> {
+fn native_token_transfer_invalid_to_id_test() -> anyhow::Result<()> {
     let mut chain = MockChain::setup("..")?;
     let mint = 100000.into();
     let from_addr = [1u8; 20];
@@ -154,7 +154,7 @@ fn eoa_transfer_invalid_to_id_test() -> anyhow::Result<()> {
 }
 
 #[test]
-fn eoa_transfer_invalid_to_id_and_unregistered_address_test() -> anyhow::Result<()> {
+fn native_token_transfer_invalid_to_id_and_unregistered_address_test() -> anyhow::Result<()> {
     let mut chain = MockChain::setup("..")?;
     let mint = 100000.into();
     let from_addr = [1u8; 20];
