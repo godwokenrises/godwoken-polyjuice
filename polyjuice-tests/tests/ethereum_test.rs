@@ -1,6 +1,9 @@
 use gw_common::H256;
-use gw_types::U256;
-use lib::ctx::MockChain;
+use gw_types::{offchain::RunResult, U256};
+use lib::{
+    ctx::MockChain,
+    helper::{parse_log, Log},
+};
 use serde::Deserialize;
 use std::{
     collections::{BTreeMap, HashMap},
@@ -184,7 +187,10 @@ impl VMTestRunner {
             value: value.as_u128(),
         };
         let sub_test_case = SubTestCase { chain, tx };
-        sub_test_case.run()?;
+        let run_result = sub_test_case.run()?;
+        let logs_hash = rlp_log_hash(&run_result);
+        let expect_logs_hash = hex::decode(post.logs.trim_start_matches("0x"))?;
+        assert_eq!(logs_hash.as_slice(), &expect_logs_hash);
         Ok(())
     }
 }
@@ -204,7 +210,7 @@ struct SubTestCase<'a, 'b> {
 }
 
 impl<'a, 'b> SubTestCase<'a, 'b> {
-    fn run(self) -> anyhow::Result<()> {
+    fn run(self) -> anyhow::Result<RunResult> {
         let Tx {
             from_id,
             to_id,
@@ -219,8 +225,37 @@ impl<'a, 'b> SubTestCase<'a, 'b> {
         if run_result.exit_code != 0 {
             return Err(anyhow::anyhow!("Test case failed."));
         }
-        Ok(())
+        Ok(run_result)
     }
+}
+
+fn rlp_log_hash(run_result: &RunResult) -> H256 {
+    let mut stream = rlp::RlpStream::new();
+    stream.begin_unbounded_list();
+    run_result.write.logs.iter().for_each(|l| {
+        let log = parse_log(l);
+        if let Log::PolyjuiceUser {
+            address,
+            data,
+            topics,
+        } = log
+        {
+            stream.begin_list(3);
+            stream.append(&address.to_vec());
+            stream.begin_list(topics.len());
+            topics.iter().for_each(|t| {
+                stream.append(&t.as_slice());
+            });
+            if data.is_empty() {
+                stream.append_empty_data();
+            } else {
+                stream.append(&data);
+            }
+        }
+    });
+    stream.finalize_unbounded_list();
+    let log_hash = tiny_keccak::keccak256(&stream.out().freeze());
+    log_hash.into()
 }
 
 fn hex_to_h256(hex_str: &str) -> anyhow::Result<H256> {
