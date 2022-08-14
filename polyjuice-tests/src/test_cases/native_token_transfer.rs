@@ -149,6 +149,7 @@ fn native_token_transfer_invalid_to_id_test() -> anyhow::Result<()> {
     let to_balance = chain.get_balance(&to_addr)?;
     println!("from balance: {}, to balance: {}", from_balance, to_balance);
     assert_eq!(mint, to_balance);
+    assert_eq!(value, chain.get_balance(&contract_eth_addr)?.as_u128());
 
     Ok(())
 }
@@ -187,6 +188,7 @@ fn native_token_transfer_invalid_to_id_and_unregistered_address_test() -> anyhow
 
     let to_id = chain.get_account_id_by_eth_address(&to_addr)?;
     assert_eq!(None, to_id);
+    assert_eq!(value, chain.get_balance(&contract_eth_addr)?.as_u128());
 
     Ok(())
 }

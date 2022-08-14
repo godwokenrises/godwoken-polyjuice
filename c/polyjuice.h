@@ -1018,23 +1018,6 @@ int handle_transfer(gw_context_t* ctx,
   return 0;
 }
 
-// read eoa type hash from config
-int load_eoa_type_hash(gw_context_t* ctx, uint8_t eoa_type_hash[GW_KEY_BYTES]) {
-  mol_seg_t rollup_config_seg;
-  rollup_config_seg.ptr = ctx->rollup_config;
-  rollup_config_seg.size = ctx->rollup_config_size;
-
-  mol_seg_t allowed_eoa_list_seg =
-      MolReader_RollupConfig_get_allowed_eoa_type_hashes(&rollup_config_seg);
-  mol_seg_res_t allowed_type_hash_res =
-      MolReader_AllowedTypeHashVec_get(&allowed_eoa_list_seg, 0);
-
-  mol_seg_t code_hash_seg =
-      MolReader_AllowedTypeHash_get_hash(&allowed_type_hash_res.seg);
-  memcpy(eoa_type_hash, code_hash_seg.ptr, 32);
-  return 0;
-}
-
 int handle_native_token_transfer(gw_context_t* ctx, uint32_t from_id, uint256_t value,
                         uint64_t gas_used) {
   if (g_creator_account_id == UINT32_MAX) {
