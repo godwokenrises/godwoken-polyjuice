@@ -16,7 +16,8 @@ gw-store = { path = "../integration-test/godwoken/crates/store" }
 gw-config = { path = "../integration-test/godwoken/crates/config" }
 gw-traits = { path = "../integration-test/godwoken/crates/traits" }
 gw-generator = { path = "../integration-test/godwoken/crates/generator"}
-ckb-vm = { version = "=0.20.0-rc5", features = ["detect-asm"] }
+ckb-vm = { version = "=0.21.3", features = ["detect-asm"] }
+ckb-vm-definitions = "=0.21.3"
 
 lazy_static = "1.4"
 tiny-keccak = "1.4"
