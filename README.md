@@ -38,7 +38,7 @@ input_data : [u8; input_size]   (input data)
 to_address : [u8; 20] (optional) the `to` address of a native transfer transaction
 ```
 
-Every Polyjuice argument fields must been serialized one by one and put into Godwoken [`RawL2Transaction.args`][rawl2tx-args] for Polyjuice to read. If the `input_data` have 56 bytes, then the serialized data size is `8 + 8 + 16 + 16 + 4 + 56 = 108` bytes.
+Every Polyjuice argument fields must been serialized one by one and put into Godwoken [`RawL2Transaction.args`][rawl2tx-args] for Polyjuice to read. If the `input_data` of a contract call have 56 bytes, then the serialized data size is `8 + 8 + 16 + 16 + 4 + 56 = 108` bytes.
 
 
 ### Creator account script
