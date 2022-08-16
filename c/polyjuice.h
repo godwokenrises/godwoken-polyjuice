@@ -205,11 +205,9 @@ int parse_args(struct evmc_message* msg, gw_context_t* ctx) {
   if (offset + 20 == tx_ctx->args_len) { // This is a transfer tx.
     g_eoa_transfer_flag = true;
     memcpy(g_eoa_transfer_to_address.bytes, args + offset, 20);
-  } else {
-    if (tx_ctx->args_len != offset) {
-      ckb_debug("invalid polyjuice transaction");
-      return -1;
-    }
+  } else if (offset != tx_ctx->args_len) {
+    ckb_debug("invalid polyjuice transaction");
+    return -1;
   }
 
   msg->kind = kind;
@@ -1030,7 +1028,7 @@ int handle_native_token_transfer(gw_context_t* ctx, uint32_t from_id,
   }
   evmc_address zero_address = {0};
   if (memcmp(zero_address.bytes, g_eoa_transfer_to_address.bytes, 20) == 0) {
-    ckb_debug("[handle_native_token_transfer] g_eoa_transfer_to_address wasn't set.");
+    ckb_debug("[handle_native_token_transfer] not allow to transfer to zero address.");
     return ERROR_NATIVE_TOKEN_TRANSFER;
   }
 
@@ -1460,13 +1458,22 @@ int run_polyjuice() {
   }
 
   /**
-   * Only handle EOA transfer, if
+   * We seperate two branches: 
+   * - transfer native token to EOA account
+   * - the rest
+   *
+   * The part of transferring native tokens to EOA account is isolated. It will
+   * not enter into EVM. 
+   * Recognizing EOA transferring if conditions are satisfied below:
    * - to_id is g_creator_account_id
    * - not create contract
-   * - g_eoa_transfer_flag 
-   * - g_eoa_transfer_to_address
-   * are set.
-   * Transfer to contract address is not allowed.
+   * - g_eoa_transfer_flag is true
+   * - g_eoa_transfer_to_address is not zero address
+   * The `g_eoa_transfer_to_address` which is the true `to_address` that is
+   * going to transfer to, and must not be a contract address.
+   * 
+   * Regarding transfer to contract account, a normal polyjuice transaction
+   * which `to_id` is the contract account should be expected.
    *
    **/
   if (g_creator_account_id == context.transaction_context.to_id && 
