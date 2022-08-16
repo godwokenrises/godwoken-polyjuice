@@ -101,13 +101,12 @@ fn native_token_transfer_contract_address_test() -> anyhow::Result<()> {
         .args(ckb_vm::Bytes::from(args).pack())
         .build();
     let run_result = chain.execute_raw(raw_tx)?;
-    assert_eq!(run_result.exit_code, 0);
+    assert_eq!(run_result.exit_code, -94);
 
     let from_balance_after = chain.get_balance(&from_addr)?;
     let to_balance = chain.get_balance(&contract_eth_addr)?;
     println!("from balance: {}, to balance: {}", from_balance, to_balance);
-    assert_eq!(from_balance - 21000 - value, from_balance_after);
-    assert_eq!(value, to_balance.as_u128());
+    assert_eq!(from_balance - 21000, from_balance_after);
 
     Ok(())
 }
@@ -143,6 +142,7 @@ fn native_token_transfer_invalid_to_id_test() -> anyhow::Result<()> {
         .to_id(contract_account_id.pack())
         .args(ckb_vm::Bytes::from(args).pack())
         .build();
+
     let run_result = chain.execute_raw(raw_tx)?;
     assert_eq!(run_result.exit_code, 0);
 

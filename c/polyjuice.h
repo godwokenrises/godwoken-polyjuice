@@ -136,7 +136,7 @@ int load_account_script(gw_context_t* gw_ctx, uint32_t account_id,
      gas_price  : u128               (little endian)
      value      : u128               (little endian)
      input_size : u32                (little endian)
-     input_data : [u8; input_size
+     input_data : [u8; input_size]
      to_address : [u8; 20]	     optional, if it's not a transfer tx
    ]
  */
@@ -1018,8 +1018,8 @@ int handle_transfer(gw_context_t* ctx,
   return 0;
 }
 
-int handle_native_token_transfer(gw_context_t* ctx, uint32_t from_id, uint256_t value,
-                        uint64_t gas_used) {
+int handle_native_token_transfer(gw_context_t* ctx, uint32_t from_id,
+                                 uint256_t value, gw_reg_addr_t* from_addr) {
   if (g_creator_account_id == UINT32_MAX) {
     ckb_debug("[handle_native_token_transfer] g_creator_account_id wasn't set.");
     return ERROR_NATIVE_TOKEN_TRANSFER;
@@ -1035,35 +1035,51 @@ int handle_native_token_transfer(gw_context_t* ctx, uint32_t from_id, uint256_t 
   }
 
   int ret = 0;
-  gw_reg_addr_t to_addr = new_reg_addr(g_eoa_transfer_to_address.bytes);
-
   uint8_t from_script_hash[GW_KEY_BYTES] = {0};
   ret = ctx->sys_get_script_hash_by_account_id(ctx, from_id, from_script_hash);
   if (ret != 0) {
-      return ret;
+    return ret;
   }
-  gw_reg_addr_t from_addr = {0};
   ret = ctx->sys_get_registry_address_by_script_hash(ctx, from_script_hash,
-          GW_DEFAULT_ETH_REGISTRY_ACCOUNT_ID, &from_addr);
+                                                     GW_DEFAULT_ETH_REGISTRY_ACCOUNT_ID,
+                                                     from_addr);
   if (ret != 0) {
-      return ret;
+    return ret;
   }
 
-  ret = sudt_transfer(ctx, g_sudt_id, from_addr, to_addr, value);
+  gw_reg_addr_t to_addr = new_reg_addr(g_eoa_transfer_to_address.bytes);
+  // check to_addr is not a contract
+  uint8_t to_script_hash[GW_KEY_BYTES] = {0};
+  ret = ctx->sys_get_script_hash_by_registry_address(ctx, &to_addr, to_script_hash);
+  if (ret == 0) {
+    uint32_t to_id;
+    ret = ctx->sys_get_account_id_by_script_hash(ctx, to_script_hash, &to_id);
+    if (ret != 0) {
+        return ret;
+    }
+
+    uint8_t code[MAX_DATA_SIZE];
+    uint64_t code_size = MAX_DATA_SIZE;
+    ret = load_account_code(ctx, to_id, &code_size, 0, code);
+    if (ret != 0) {
+      return ret;
+    }
+    // to address is a contract
+    if (code_size > 0) {
+      ckb_debug("[handle_native_token_transfer] to_address is a contract");
+      return ERROR_NATIVE_TOKEN_TRANSFER;
+    }
+  } else if (ret != GW_ERROR_NOT_FOUND && ret != 0) {
+    return ret;
+  }
+
+  ret = sudt_transfer(ctx, g_sudt_id, *from_addr, to_addr, value);
   if (ret != 0) {
     ckb_debug("[handle_native_token_transfer] sudt_transfer failed");
     return ret;
   }
 
-  uint256_t gas_fee = calculate_fee(g_gas_price, gas_used);
-  ret = sudt_pay_fee(ctx, g_sudt_id, from_addr, gas_fee);
-  if (ret != 0) {
-    debug_print_int("[handle_native_token_transfer] pay fee to block_producer failed", ret);
-    return ret;
-  }
-
-  ckb_debug("[handle_native_token_transfer] finalize");
-  return gw_finalize(ctx);
+  return 0;
 }
 
 int execute_in_evmone(gw_context_t* ctx,
@@ -1450,6 +1466,7 @@ int run_polyjuice() {
    * - g_eoa_transfer_flag 
    * - g_eoa_transfer_to_address
    * are set.
+   * Transfer to contract address is not allowed.
    *
    **/
   if (g_creator_account_id == context.transaction_context.to_id && 
@@ -1461,10 +1478,33 @@ int run_polyjuice() {
     for (int i = 0; i < 32; i++) {
       value_ptr[i] = msg.value.bytes[31 - i];
     }
-    ret = handle_native_token_transfer(&context, context.transaction_context.from_id, 
-            value, min_gas);
+    gw_reg_addr_t from_addr = {0};
+    // handle error later
+    int transfer_ret = handle_native_token_transfer(&context, context.transaction_context.from_id,
+                                                    value, &from_addr);
     ckb_debug("END handle_native_token_transfer");
-    return ret;
+    // handle fee
+    uint256_t gas_fee = calculate_fee(g_gas_price, min_gas);
+    debug_print_int("[handle_native_token_transfer] gas_used", min_gas);
+    ret = sudt_pay_fee(&context, g_sudt_id, from_addr, gas_fee);
+    // handle native token transfer error
+    if (ret != 0) {
+      debug_print_int("[handle_native_token_transfer] pay fee to block_producer failed", ret);
+      return ret;
+    }
+    /* emit POLYJUICE_SYSTEM log to Godwoken */
+    ret = emit_evm_result_log(&context, min_gas, transfer_ret);
+    if (ret != 0) {
+      ckb_debug("emit_evm_result_log failed");
+      return ret;
+    }
+
+    ckb_debug("[handle_native_token_transfer] finalize");
+    gw_finalize(&context);
+    if (transfer_ret != 0) {
+        return transfer_ret;
+    }
+    return 0;
   }
 
   ret = fill_msg_sender_and_dest(&context, &msg);
