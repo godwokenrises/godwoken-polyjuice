@@ -137,7 +137,7 @@ int load_account_script(gw_context_t* gw_ctx, uint32_t account_id,
      value      : u128               (little endian)
      input_size : u32                (little endian)
      input_data : [u8; input_size]
-     to_address : [u8; 20]	     optional, if it's not a transfer tx
+     to_address : [u8; 20]	     optional, must be an EOA 
    ]
  */
 int parse_args(struct evmc_message* msg, gw_context_t* ctx) {
@@ -1466,7 +1466,7 @@ int run_polyjuice() {
    * not enter into EVM. 
    * Recognizing EOA transferring if conditions are satisfied below:
    * - to_id is g_creator_account_id
-   * - not create contract
+   * - only accept call_kind == EVMC_CALL
    * - g_eoa_transfer_flag is true
    * - g_eoa_transfer_to_address is not zero address
    * The `g_eoa_transfer_to_address` which is the true `to_address` that is
@@ -1477,7 +1477,7 @@ int run_polyjuice() {
    *
    **/
   if (g_creator_account_id == context.transaction_context.to_id && 
-          !is_create(msg.kind) &&
+          msg.kind == EVMC_CALL &&
           g_eoa_transfer_flag) {
     ckb_debug("BEGIN handle_native_token_transfer");
     uint256_t value;
