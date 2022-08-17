@@ -203,6 +203,10 @@ int parse_args(struct evmc_message* msg, gw_context_t* ctx) {
   offset += input_size;
  
   if (offset + 20 == tx_ctx->args_len) { // This is a transfer tx.
+    if (kind != EVMC_CALL) {
+        ckb_debug("Native token transfer transaction only accepts CALL.");
+        return -1;
+    }
     g_eoa_transfer_flag = true;
     memcpy(g_eoa_transfer_to_address.bytes, args + offset, 20);
   } else if (offset != tx_ctx->args_len) {
