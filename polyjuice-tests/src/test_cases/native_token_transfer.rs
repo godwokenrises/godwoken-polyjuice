@@ -101,7 +101,7 @@ fn native_token_transfer_contract_address_test() -> anyhow::Result<()> {
         .args(ckb_vm::Bytes::from(args).pack())
         .build();
     let run_result = chain.execute_raw(raw_tx)?;
-    assert_eq!(run_result.exit_code, -94);
+    assert_eq!(run_result.exit_code, -94); // ERROR_NATIVE_TOKEN_TRANSFER = -94
 
     let from_balance_after = chain.get_balance(&from_addr)?;
     let to_balance = chain.get_balance(&contract_eth_addr)?;
