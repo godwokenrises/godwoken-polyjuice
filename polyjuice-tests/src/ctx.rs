@@ -219,6 +219,12 @@ impl MockChain {
         Ok(run_result)
     }
 
+    pub fn execute_raw(&mut self, raw_tx: RawL2Transaction) -> anyhow::Result<RunResult> {
+        let run_result = self.call(raw_tx)?;
+        self.ctx.state.apply_run_result(&run_result.write)?;
+        Ok(run_result)
+    }
+
     pub fn execute(
         &mut self,
         from_id: u32,
@@ -301,6 +307,19 @@ impl MockChain {
     pub fn get_nonce(&self, account_id: u32) -> anyhow::Result<u32> {
         let nonce = self.ctx.state.get_nonce(account_id)?;
         Ok(nonce)
+    }
+
+    pub fn to_reg_addr(eth_address: &[u8; 20]) -> RegistryAddress {
+        RegistryAddress::new(ETH_REGISTRY_ACCOUNT_ID, eth_address.to_vec())
+    }
+
+    pub fn get_balance(&self, eth_address: &[u8; 20]) -> anyhow::Result<U256> {
+        let reg_addr = Self::to_reg_addr(eth_address);
+        let balance = self
+            .ctx
+            .state
+            .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &reg_addr)?;
+        Ok(balance)
     }
 }
 pub struct Context {

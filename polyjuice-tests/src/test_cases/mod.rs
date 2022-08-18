@@ -5,6 +5,7 @@ pub(crate) mod contract_call_contract;
 pub(crate) mod contract_create_contract;
 pub(crate) mod create2;
 pub(crate) mod delegatecall;
+pub(crate) mod eoa_transfer;
 pub(crate) mod erc20;
 pub(crate) mod fallback_function;
 pub(crate) mod get_block_info;

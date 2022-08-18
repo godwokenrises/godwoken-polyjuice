@@ -136,7 +136,8 @@ int load_account_script(gw_context_t* gw_ctx, uint32_t account_id,
      gas_price  : u128               (little endian)
      value      : u128               (little endian)
      input_size : u32                (little endian)
-     input_data : [u8; input_size]
+     input_data : [u8; input_size
+     to_address : [u8; 20]	     optional, if it's not an EOA transfer tx
    ]
  */
 int parse_args(struct evmc_message* msg, gw_context_t* ctx) {
@@ -196,13 +197,21 @@ int parse_args(struct evmc_message* msg, gw_context_t* ctx) {
     ckb_debug("input_size too large");
     return -1;
   }
-  if (tx_ctx->args_len != (input_size + offset)) {
-    ckb_debug("invalid polyjuice transaction");
-    return -1;
-  }
 
   /* args[52..52+input_size] */
   uint8_t* input_data = args + offset;
+  offset += input_size;
+
+  // This is an EOA transfer tx.
+  if (offset + 20 == tx_ctx->args_len) {
+    g_eoa_transfer_flag = true;
+    memcpy(g_eoa_transfer_to_address.bytes, args + offset, 20);
+  } else {
+    if (tx_ctx->args_len != offset) {
+      ckb_debug("invalid polyjuice transaction");
+      return -1;
+    }
+  }
 
   msg->kind = kind;
   msg->flags = 0;
@@ -1010,6 +1019,100 @@ int handle_transfer(gw_context_t* ctx,
   return 0;
 }
 
+//read eoa type hash from config
+int load_eoa_type_hash(gw_context_t* ctx, uint8_t eoa_type_hash[GW_KEY_BYTES]) {
+  mol_seg_t rollup_config_seg;
+  rollup_config_seg.ptr = ctx->rollup_config;
+  rollup_config_seg.size = ctx->rollup_config_size;
+
+  mol_seg_t allowed_eoa_list_seg =
+      MolReader_RollupConfig_get_allowed_eoa_type_hashes(&rollup_config_seg);
+  mol_seg_res_t allowed_type_hash_res =
+      MolReader_AllowedTypeHashVec_get(&allowed_eoa_list_seg, 0);
+
+  mol_seg_t code_hash_seg =
+      MolReader_AllowedTypeHash_get_hash(&allowed_type_hash_res.seg);
+  memcpy(eoa_type_hash, code_hash_seg.ptr, 32);
+  return 0;
+}
+
+int handle_native_token_transfer(gw_context_t* ctx, uint32_t from_id, uint256_t value,
+                        uint64_t gas_used) {
+  if (g_creator_account_id == UINT32_MAX) {
+    ckb_debug("[handle_native_token_transfer] g_creator_account_id wasn't set.");
+    return ERROR_EOA_TRANSFER;
+  }
+  if (!g_eoa_transfer_flag) {
+    ckb_debug("[handle_native_token_transfer] g_eoa_transfer_flag wasn't set.");
+    return ERROR_EOA_TRANSFER;
+  }
+  evmc_address zero_address = {0};
+  if (memcmp(zero_address.bytes, g_eoa_transfer_to_address.bytes, 20) == 0) {
+    ckb_debug("[handle_native_token_transfer] g_eoa_transfer_to_address wasn't set.");
+    return ERROR_EOA_TRANSFER;
+  }
+
+  int ret = 0;
+  //check to_address is created
+  gw_reg_addr_t to_addr = new_reg_addr(g_eoa_transfer_to_address.bytes);
+  uint8_t script_hash[GW_KEY_BYTES] = {0};
+  ret = ctx->sys_get_script_hash_by_registry_address(ctx, &to_addr,
+          script_hash);
+  if (ret == GW_ERROR_NOT_FOUND) {
+    //to_address not exists, create new EOA account first
+    //build eoa script
+    uint8_t eoa_type_hash[GW_KEY_BYTES] = {0};
+    ret = load_eoa_type_hash(ctx, eoa_type_hash);
+    if (ret != 0) {
+        return ret;
+    }
+    // EOA script args len: 32 + 20
+    int eoa_script_args_len = 32 + 20;
+    uint8_t script_args[eoa_script_args_len];
+    memcpy(script_args, g_rollup_script_hash, 32);
+    memcpy(script_args + 32, g_eoa_transfer_to_address.bytes, 20);
+    mol_seg_t new_script_seg;
+    ret = build_script(eoa_type_hash, g_script_hash_type, script_args,
+                       eoa_script_args_len, &new_script_seg);
+    if (ret != 0) {
+      return ret;
+    }
+    uint8_t script_hash[32];
+    blake2b_hash(script_hash, new_script_seg.ptr, new_script_seg.size);
+    uint32_t new_account_id;
+    ret = ctx->sys_create(ctx, new_script_seg.ptr, new_script_seg.size,
+            &new_account_id);
+  }
+
+  uint8_t from_script_hash[GW_KEY_BYTES] = {0};
+  ret = ctx->sys_get_script_hash_by_account_id(ctx, from_id, from_script_hash);
+  if (ret != 0) {
+      return ret;
+  }
+  gw_reg_addr_t from_addr = {0};
+  ret = ctx->sys_get_registry_address_by_script_hash(ctx, from_script_hash,
+          GW_DEFAULT_ETH_REGISTRY_ACCOUNT_ID, &from_addr);
+  if (ret != 0) {
+      return ret;
+  }
+
+  ret = sudt_transfer(ctx, g_sudt_id, from_addr, to_addr, value);
+  if (ret != 0) {
+    ckb_debug("transfer beneficiary failed");
+    return ret;
+  }
+
+  uint256_t gas_fee = calculate_fee(g_gas_price, gas_used);
+  ret = sudt_pay_fee(ctx, g_sudt_id, from_addr, gas_fee);
+  if (ret != 0) {
+    debug_print_int("[run_polyjuice] pay fee to block_producer failed", ret);
+    return ret;
+  }
+
+  ckb_debug("[run_polyjuice] finalize");
+  return gw_finalize(ctx);
+}
+
 int execute_in_evmone(gw_context_t* ctx,
                       evmc_message* msg,
                       uint32_t _parent_from_id,
@@ -1384,6 +1487,30 @@ int run_polyjuice() {
   /* Load: validator_code_hash, hash_type, g_sudt_id */
   ret = load_globals(&context, context.transaction_context.to_id);
   if (ret != 0) {
+    return ret;
+  }
+
+  /**
+   * Only handle EOA transfer, if
+   * - to_id is g_creator_account_id
+   * - not create contract
+   * - g_eoa_transfer_flag 
+   * - g_eoa_transfer_to_address
+   * are set.
+   *
+   **/
+  if (g_creator_account_id == context.transaction_context.to_id && 
+          !is_create(msg.kind) &&
+          g_eoa_transfer_flag) {
+    ckb_debug("BEGIN handle_native_token_transfer");
+    uint256_t value;
+    uint8_t* value_ptr = (uint8_t*)&value;
+    for (int i = 0; i < 32; i++) {
+      value_ptr[i] = msg.value.bytes[31 - i];
+    }
+    ret = handle_native_token_transfer(&context, context.transaction_context.from_id, 
+            value, min_gas);
+    ckb_debug("END handle_native_token_transfer");
     return ret;
   }
 

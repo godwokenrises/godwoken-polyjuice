@@ -35,6 +35,7 @@ gas_price  : u128     (little endian)
 value      : u128     (little endian)
 input_size : u32      (little endian)
 input_data : [u8; input_size]   (input data)
+to_address : [u8; 20] the EOA address transfer to, optional if it's not an EOA transfer tx
 ```
 
 Every Polyjuice argument fields must been serialized one by one and put into Godwoken [`RawL2Transaction.args`][rawl2tx-args] for Polyjuice to read. If the `input_data` have 56 bytes, then the serialized data size is `8 + 8 + 16 + 16 + 4 + 56 = 108` bytes.

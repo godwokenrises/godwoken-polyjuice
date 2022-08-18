@@ -333,6 +333,7 @@ pub struct PolyjuiceArgsBuilder {
     gas_price: u128,
     value: u128,
     input: Vec<u8>,
+    to_address: Option<[u8; 20]>,
 }
 
 impl PolyjuiceArgsBuilder {
@@ -356,6 +357,11 @@ impl PolyjuiceArgsBuilder {
         self.input = value.to_vec();
         self
     }
+
+    pub fn to_address(mut self, to_address: [u8; 20]) -> Self {
+        self.to_address = Some(to_address);
+        self
+    }
     pub fn build(self) -> Vec<u8> {
         let mut output: Vec<u8> = vec![0u8; 52];
         let call_kind: u8 = if self.is_create { 3 } else { 0 };
@@ -365,6 +371,9 @@ impl PolyjuiceArgsBuilder {
         output[32..48].copy_from_slice(&self.value.to_le_bytes()[..]);
         output[48..52].copy_from_slice(&(self.input.len() as u32).to_le_bytes()[..]);
         output.extend(self.input);
+        if let Some(to_address) = self.to_address {
+            output.extend_from_slice(&to_address);
+        }
         output
     }
 }
