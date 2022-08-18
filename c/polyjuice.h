@@ -1030,11 +1030,6 @@ int handle_native_token_transfer(gw_context_t* ctx, uint32_t from_id,
     ckb_debug("[handle_native_token_transfer] not a native transfer tx");
     return ERROR_NATIVE_TOKEN_TRANSFER;
   }
-  evmc_address zero_address = {0};
-  if (memcmp(zero_address.bytes, g_eoa_transfer_to_address.bytes, 20) == 0) {
-    ckb_debug("[handle_native_token_transfer] g_eoa_transfer_to_address wasn't set");
-    return ERROR_NATIVE_TOKEN_TRANSFER;
-  }
 
   int ret = 0;
   uint8_t from_script_hash[GW_KEY_BYTES] = {0};

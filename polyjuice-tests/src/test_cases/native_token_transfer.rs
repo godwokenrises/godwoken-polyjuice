@@ -192,3 +192,35 @@ fn native_token_transfer_invalid_to_id_and_unregistered_address_test() -> anyhow
 
     Ok(())
 }
+
+#[test]
+fn native_token_transfer_unregistered_zero_address_test() -> anyhow::Result<()> {
+    let mut chain = MockChain::setup("..")?;
+    let mint = 100000.into();
+    let from_addr = [1u8; 20];
+    let from_id = chain.create_eoa_account(&from_addr, mint)?;
+    let to_addr = [0u8; 20];
+
+    let value = 400;
+    let args = PolyjuiceArgsBuilder::default()
+        .gas_price(1)
+        .gas_limit(100000)
+        .value(value)
+        .to_address(to_addr)
+        .build();
+    let raw_tx = RawL2Transaction::new_builder()
+        .from_id(from_id.pack())
+        .to_id(CREATOR_ACCOUNT_ID.pack())
+        .args(ckb_vm::Bytes::from(args).pack())
+        .build();
+    let run_result = chain.execute_raw(raw_tx)?;
+    assert_eq!(run_result.exit_code, 0);
+
+    let from_balance = chain.get_balance(&from_addr)?;
+    let to_balance = chain.get_balance(&to_addr)?;
+    println!("from balance: {}, to balance: {}", from_balance, to_balance);
+    assert_eq!(mint - 21000 - value, from_balance);
+    assert_eq!(value, to_balance.as_u128());
+
+    Ok(())
+}
