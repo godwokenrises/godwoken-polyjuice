@@ -137,6 +137,7 @@ int load_account_script(gw_context_t* gw_ctx, uint32_t account_id,
      value      : u128               (little endian)
      input_size : u32                (little endian)
      input_data : [u8; input_size]
+     to_address : [u8; 20]	     optional, must be an EOA 
    ]
  */
 int parse_args(struct evmc_message* msg, gw_context_t* ctx) {
@@ -196,13 +197,22 @@ int parse_args(struct evmc_message* msg, gw_context_t* ctx) {
     ckb_debug("input_size too large");
     return -1;
   }
-  if (tx_ctx->args_len != (input_size + offset)) {
-    ckb_debug("invalid polyjuice transaction");
-    return -1;
-  }
 
   /* args[52..52+input_size] */
   uint8_t* input_data = args + offset;
+  offset += input_size;
+ 
+  if (offset + 20 == tx_ctx->args_len) { // This is a transfer tx.
+    if (kind != EVMC_CALL) {
+        ckb_debug("Native token transfer transaction only accepts CALL.");
+        return -1;
+    }
+    g_eoa_transfer_flag = true;
+    memcpy(g_eoa_transfer_to_address.bytes, args + offset, 20);
+  } else if (offset != tx_ctx->args_len) {
+    ckb_debug("invalid polyjuice transaction");
+    return -1;
+  }
 
   msg->kind = kind;
   msg->flags = 0;
@@ -1010,6 +1020,65 @@ int handle_transfer(gw_context_t* ctx,
   return 0;
 }
 
+int handle_native_token_transfer(gw_context_t* ctx, uint32_t from_id,
+                                 uint256_t value, gw_reg_addr_t* from_addr) {
+  if (g_creator_account_id == UINT32_MAX) {
+    ckb_debug("[handle_native_token_transfer] g_creator_account_id wasn't set.");
+    return ERROR_NATIVE_TOKEN_TRANSFER;
+  }
+  if (!g_eoa_transfer_flag) {
+    ckb_debug("[handle_native_token_transfer] not a native transfer tx");
+    return ERROR_NATIVE_TOKEN_TRANSFER;
+  }
+
+  int ret = 0;
+  uint8_t from_script_hash[GW_KEY_BYTES] = {0};
+  ret = ctx->sys_get_script_hash_by_account_id(ctx, from_id, from_script_hash);
+  if (ret != 0) {
+    return ret;
+  }
+  ret = ctx->sys_get_registry_address_by_script_hash(ctx, from_script_hash,
+                                                     GW_DEFAULT_ETH_REGISTRY_ACCOUNT_ID,
+                                                     from_addr);
+  if (ret != 0) {
+    return ret;
+  }
+
+  gw_reg_addr_t to_addr = new_reg_addr(g_eoa_transfer_to_address.bytes);
+  // check to_addr is not a contract
+  uint8_t to_script_hash[GW_KEY_BYTES] = {0};
+  ret = ctx->sys_get_script_hash_by_registry_address(ctx, &to_addr, to_script_hash);
+  if (ret == 0) {
+    uint32_t to_id;
+    ret = ctx->sys_get_account_id_by_script_hash(ctx, to_script_hash, &to_id);
+    if (ret != 0) {
+        return ret;
+    }
+
+    uint8_t code[MAX_DATA_SIZE];
+    uint64_t code_size = MAX_DATA_SIZE;
+    ret = load_account_code(ctx, to_id, &code_size, 0, code);
+    if (ret != 0) {
+      return ret;
+    }
+    // to address is a contract
+    if (code_size > 0) {
+      ckb_debug("[handle_native_token_transfer] to_address is a contract");
+      return ERROR_NATIVE_TOKEN_TRANSFER;
+    }
+  } else if (ret != GW_ERROR_NOT_FOUND && ret != 0) {
+    return ret;
+  }
+
+  ret = sudt_transfer(ctx, g_sudt_id, *from_addr, to_addr, value);
+  if (ret != 0) {
+    ckb_debug("[handle_native_token_transfer] sudt_transfer failed");
+    return ret;
+  }
+
+  return 0;
+}
+
 int execute_in_evmone(gw_context_t* ctx,
                       evmc_message* msg,
                       uint32_t _parent_from_id,
@@ -1385,6 +1454,63 @@ int run_polyjuice() {
   ret = load_globals(&context, context.transaction_context.to_id);
   if (ret != 0) {
     return ret;
+  }
+
+  /**
+   * We seperate two branches: 
+   * - transfer native token to EOA account
+   * - the rest
+   *
+   * The part of transferring native tokens to EOA account is isolated. It will
+   * not enter into EVM. 
+   * Recognizing EOA transferring if conditions are satisfied below:
+   * - to_id is g_creator_account_id
+   * - only accept call_kind == EVMC_CALL
+   * - g_eoa_transfer_flag is true
+   * - g_eoa_transfer_to_address is not zero address
+   * The `g_eoa_transfer_to_address` which is the true `to_address` that is
+   * going to transfer to, and must not be a contract address.
+   * 
+   * Regarding transfer to contract account, a normal polyjuice transaction
+   * which `to_id` is the contract account should be expected.
+   *
+   **/
+  if (g_creator_account_id == context.transaction_context.to_id && 
+          msg.kind == EVMC_CALL &&
+          g_eoa_transfer_flag) {
+    ckb_debug("BEGIN handle_native_token_transfer");
+    uint256_t value;
+    uint8_t* value_ptr = (uint8_t*)&value;
+    for (int i = 0; i < 32; i++) {
+      value_ptr[i] = msg.value.bytes[31 - i];
+    }
+    gw_reg_addr_t from_addr = {0};
+    // handle error later
+    int transfer_ret = handle_native_token_transfer(&context, context.transaction_context.from_id,
+                                                    value, &from_addr);
+    ckb_debug("END handle_native_token_transfer");
+    // handle fee
+    uint256_t gas_fee = calculate_fee(g_gas_price, min_gas);
+    debug_print_int("[handle_native_token_transfer] gas_used", min_gas);
+    ret = sudt_pay_fee(&context, g_sudt_id, from_addr, gas_fee);
+    // handle native token transfer error
+    if (ret != 0) {
+      debug_print_int("[handle_native_token_transfer] pay fee to block_producer failed", ret);
+      return ret;
+    }
+    /* emit POLYJUICE_SYSTEM log to Godwoken */
+    ret = emit_evm_result_log(&context, min_gas, transfer_ret);
+    if (ret != 0) {
+      ckb_debug("emit_evm_result_log failed");
+      return ret;
+    }
+
+    ckb_debug("[handle_native_token_transfer] finalize");
+    gw_finalize(&context);
+    if (transfer_ret != 0) {
+        return transfer_ret;
+    }
+    return 0;
   }
 
   ret = fill_msg_sender_and_dest(&context, &msg);

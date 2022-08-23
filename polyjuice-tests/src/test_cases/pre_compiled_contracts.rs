@@ -50,7 +50,7 @@ impl<Mac: SupportMachine> Syscalls<Mac> for L2Syscalls {
                 let value_addr = machine.registers()[A1].to_u64();
                 let value = self.tree.get(&key).ok_or_else(|| {
                     println!("can not found key: {:?}", key);
-                    VMError::Unexpected
+                    VMError::Unexpected("Cannot find key".to_string())
                 })?;
                 machine
                     .memory_mut()
@@ -93,7 +93,8 @@ impl L2Syscalls {
             addr += 1;
         }
 
-        let s = String::from_utf8(buffer).map_err(|_| VMError::ParseError)?;
+        let s = String::from_utf8(buffer)
+            .map_err(|_| VMError::Unexpected("Cannot convert to utf8".to_string()))?;
         println!("[contract debug]: {}", s);
         Ok(())
     }

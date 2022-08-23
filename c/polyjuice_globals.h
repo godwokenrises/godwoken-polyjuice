@@ -40,6 +40,12 @@ static uint8_t g_script_hash_type = 0xff;
 
 #define UINT128_MAX uint128_t(__int128_t(-1L));
 static uint128_t g_gas_price = UINT128_MAX;
+/**
+ * If g_eoa_transfer_flag = true, then this is an EOA transfer transaction.
+ * And, g_eoa_transfer_to_address should be set.
+ */
+static bool g_eoa_transfer_flag = false;
+static evmc_address g_eoa_transfer_to_address = {0};
 
 /* Minimal gas of a normal transaction*/
 #define MIN_TX_GAS                      21000

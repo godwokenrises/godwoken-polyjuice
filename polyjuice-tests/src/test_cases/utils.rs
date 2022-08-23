@@ -49,7 +49,8 @@ impl L2Syscalls {
             addr += 1;
         }
 
-        let s = String::from_utf8(buffer).map_err(|_| VMError::ParseError)?;
+        let s = String::from_utf8(buffer)
+            .map_err(|_| VMError::Unexpected("Cannot convert to utf-8".to_string()))?;
         println!("[debug]: {}", s);
         Ok(())
     }

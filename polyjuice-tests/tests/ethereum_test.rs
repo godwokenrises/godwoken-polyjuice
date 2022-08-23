@@ -13,9 +13,9 @@ use std::{
     u128,
 };
 
-const TEST_CASE_DIR: &'static str = "../integration-test/ethereum-tests/GeneralStateTests/VMTests/";
-const HARD_FORKS: &'static [&'static str] = &["Berlin", "Istanbul"];
-const EXCLUDE_TEST_FILES: &'static [&'static str] = &["loopMul.json", "loopExp.json"];
+const TEST_CASE_DIR: &str = "../integration-test/ethereum-tests/GeneralStateTests/VMTests/";
+const HARD_FORKS: &[&str] = &["Berlin", "Istanbul"];
+const EXCLUDE_TEST_FILES: &[&str] = &["loopMul.json", "loopExp.json"];
 
 #[allow(dead_code)]
 #[derive(Deserialize, Debug)]
@@ -324,7 +324,7 @@ fn ethereum_test() -> anyhow::Result<()> {
         for (testname, testcase) in test_cases {
             println!("test name: {}", testname);
             let runner = VMTestRunner::new(testcase)?;
-            if let Err(_) = runner.run() {
+            if runner.run().is_err() {
                 err_cases.push(path.clone());
             }
         }
@@ -357,7 +357,7 @@ fn ethereum_failure_test() -> anyhow::Result<()> {
                     for (testname, testcase) in test_cases {
                         println!("test name: {}", testname);
                         let runner = VMTestRunner::new(testcase)?;
-                        if let Err(_) = runner.run() {
+                        if runner.run().is_err() {
                             err_cases.push(path.clone());
                         }
                     }
