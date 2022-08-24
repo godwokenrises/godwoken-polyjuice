@@ -55,5 +55,7 @@ static evmc_address g_eoa_transfer_to_address = {0};
 #define	DATA_NONE_ZERO_TX_GAS           16
 /* Gas per byte of data attached to a transaction */
 #define	DATA_ZERO_TX_GAS                4
+/* Gas of new account creation*/
+#define NEW_ACCOUNT_GAS                 25000
 
 #endif // POLYJUICE_GLOBALS_H

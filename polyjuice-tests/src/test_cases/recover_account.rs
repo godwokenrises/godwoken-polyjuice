@@ -1,13 +1,18 @@
 //! Test RecoverAccount
 //!   See ./evm-contracts/RecoverAccount.sol
 
+use std::convert::TryInto;
+
 use crate::helper::{
     self, deploy, new_block_info, new_contract_account_script, setup, simple_storage_get,
     PolyjuiceArgsBuilder, CREATOR_ACCOUNT_ID, FATAL_PRECOMPILED_CONTRACTS, L2TX_MAX_CYCLES,
     ROLLUP_SCRIPT_HASH, SECP_LOCK_CODE_HASH,
 };
 use gw_common::state::State;
-use gw_generator::traits::StateExt;
+use gw_generator::{
+    account_lock_manage::{secp256k1::Secp256k1Eth, LockAlgorithm},
+    traits::StateExt,
+};
 use gw_store::chain_view::ChainView;
 use gw_store::traits::chain_store::ChainStore;
 use gw_types::{
@@ -58,9 +63,19 @@ fn test_recover_account() {
     let run_result = simple_storage_get(&store, &state, &generator, 0, from_id, new_account_id);
     println!("return bytes: {}", hex::encode(run_result.return_data));
 
-    let lock_args_hex = "404f90829ec0e5821aeba9bce7d5e841ce9f7fa5";
     let message_hex = "1cdeae55a5768fe14b628001c6247ae84c70310a7ddcfdc73ac68494251e46ec";
     let signature_hex = "28aa0c394487edf2211f445c47fb5f4fb5e3023920f62124d309f5bdf70d95045a934f278cec717300a5417313d1cdc390e761e37c0964b940c0a6f07b7361ed01";
+    let secp256k1 = Secp256k1Eth::default();
+    let message = hex::decode(&message_hex).unwrap();
+    let msg: [u8; 32] = message.try_into().unwrap();
+    let signature = hex::decode(&signature_hex).unwrap();
+
+    let lock_args = secp256k1
+        .recover(msg.into(), &signature)
+        .expect("get lock args");
+    let lock_args_hex = hex::encode(&lock_args);
+    println!("lock args: {}", &lock_args_hex);
+
     {
         // RecoverAccount.recover(message, signature, code_hash);
         let block_info = new_block_info(block_producer_id.clone(), 2, 0);

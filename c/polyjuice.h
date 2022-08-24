@@ -1020,6 +1020,22 @@ int handle_transfer(gw_context_t* ctx,
   return 0;
 }
 
+int load_eoa_type_hash(gw_context_t* ctx, uint8_t eoa_type_hash[GW_KEY_BYTES]) {
+  mol_seg_t rollup_config_seg;
+  rollup_config_seg.ptr = ctx->rollup_config;
+  rollup_config_seg.size = ctx->rollup_config_size;
+
+  mol_seg_t allowed_eoa_list_seg =
+      MolReader_RollupConfig_get_allowed_eoa_type_hashes(&rollup_config_seg);
+  mol_seg_res_t allowed_type_hash_res =
+      MolReader_AllowedTypeHashVec_get(&allowed_eoa_list_seg, 0);
+
+  mol_seg_t code_hash_seg =
+      MolReader_AllowedTypeHash_get_hash(&allowed_type_hash_res.seg);
+  memcpy(eoa_type_hash, code_hash_seg.ptr, 32);
+  return 0;
+ }
+
 int handle_native_token_transfer(gw_context_t* ctx, uint32_t from_id,
                                  uint256_t value, gw_reg_addr_t* from_addr) {
   if (g_creator_account_id == UINT32_MAX) {
@@ -1066,7 +1082,30 @@ int handle_native_token_transfer(gw_context_t* ctx, uint32_t from_id,
       ckb_debug("[handle_native_token_transfer] to_address is a contract");
       return ERROR_NATIVE_TOKEN_TRANSFER;
     }
-  } else if (ret != GW_ERROR_NOT_FOUND && ret != 0) {
+  } else if (ret == GW_ERROR_NOT_FOUND) {
+    //build eoa script
+    uint8_t eoa_type_hash[GW_KEY_BYTES] = {0};
+    ret = load_eoa_type_hash(ctx, eoa_type_hash);
+    if (ret != 0) {
+        return ret;
+    }
+    // EOA script args len: 32 + 20
+    int eoa_script_args_len = 32 + 20;
+    uint8_t script_args[eoa_script_args_len];
+    memcpy(script_args, g_rollup_script_hash, 32);
+    memcpy(script_args + 32, g_eoa_transfer_to_address.bytes, 20);
+    mol_seg_t new_script_seg;
+    ret = build_script(eoa_type_hash, g_script_hash_type, script_args,
+                       eoa_script_args_len, &new_script_seg);
+    if (ret != 0) {
+      return ret;
+    }
+    uint8_t script_hash[32];
+    blake2b_hash(script_hash, new_script_seg.ptr, new_script_seg.size);
+    uint32_t new_account_id;
+    ret = ctx->sys_create(ctx, new_script_seg.ptr, new_script_seg.size,
+                          &new_account_id);
+  } else {
     return ret;
   }
 
@@ -1484,14 +1523,25 @@ int run_polyjuice() {
     for (int i = 0; i < 32; i++) {
       value_ptr[i] = msg.value.bytes[31 - i];
     }
+
+    uint64_t gas_used = min_gas;
+    // charge gas fee of account creation if to_address is not registered
+    gw_reg_addr_t to_addr = new_reg_addr(g_eoa_transfer_to_address.bytes);
+    uint8_t to_script_hash[GW_KEY_BYTES] = {0};
+    ret = context.sys_get_script_hash_by_registry_address(&context, &to_addr, to_script_hash);
+    if (ret == GW_ERROR_NOT_FOUND) {
+        gas_used += NEW_ACCOUNT_GAS;
+    } else if (ret != 0) {
+        return ret;
+    }
     gw_reg_addr_t from_addr = {0};
     // handle error later
     int transfer_ret = handle_native_token_transfer(&context, context.transaction_context.from_id,
                                                     value, &from_addr);
     ckb_debug("END handle_native_token_transfer");
     // handle fee
-    uint256_t gas_fee = calculate_fee(g_gas_price, min_gas);
-    debug_print_int("[handle_native_token_transfer] gas_used", min_gas);
+    uint256_t gas_fee = calculate_fee(g_gas_price, gas_used);
+    debug_print_int("[handle_native_token_transfer] gas_used", gas_used);
     ret = sudt_pay_fee(&context, g_sudt_id, from_addr, gas_fee);
     // handle native token transfer error
     if (ret != 0) {

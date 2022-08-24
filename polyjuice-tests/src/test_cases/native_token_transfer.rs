@@ -69,7 +69,7 @@ fn native_token_transfer_unregistered_address_test() -> anyhow::Result<()> {
     let from_balance = chain.get_balance(&from_addr)?;
     let to_balance = chain.get_balance(&to_addr)?;
     println!("from balance: {}, to balance: {}", from_balance, to_balance);
-    assert_eq!(mint - 21000 - value, from_balance);
+    assert_eq!(mint - 21000 - 25000 - value, from_balance);
     assert_eq!(value, to_balance.as_u128());
 
     Ok(())
@@ -219,7 +219,7 @@ fn native_token_transfer_unregistered_zero_address_test() -> anyhow::Result<()> 
     let from_balance = chain.get_balance(&from_addr)?;
     let to_balance = chain.get_balance(&to_addr)?;
     println!("from balance: {}, to balance: {}", from_balance, to_balance);
-    assert_eq!(mint - 21000 - value, from_balance);
+    assert_eq!(mint - 21000 - 25000 - value, from_balance);
     assert_eq!(value, to_balance.as_u128());
 
     Ok(())
