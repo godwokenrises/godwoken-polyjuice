@@ -15,7 +15,7 @@ use gw_common::{
 use gw_config::{BackendConfig, BackendSwitchConfig, BackendType};
 use gw_db::schema::{COLUMN_INDEX, COLUMN_META, META_TIP_BLOCK_HASH_KEY};
 use gw_generator::{
-    account_lock_manage::{secp256k1::Secp256k1, AccountLockManage},
+    account_lock_manage::{secp256k1::Secp256k1Eth, AccountLockManage},
     backend_manage::BackendManage,
     dummy_state::DummyState,
     traits::StateExt,
@@ -388,8 +388,10 @@ impl Context {
             BackendManage::from_config(vec![config.backends.clone()]).expect("default backend");
         // NOTICE in this test we won't need SUM validator
         let mut account_lock_manage = AccountLockManage::default();
-        account_lock_manage
-            .register_lock_algorithm(SECP_LOCK_CODE_HASH.into(), Box::new(Secp256k1::default()));
+        account_lock_manage.register_lock_algorithm(
+            SECP_LOCK_CODE_HASH.into(),
+            Box::new(Secp256k1Eth::default()),
+        );
         let rollup_context = RollupContext {
             rollup_script_hash: ROLLUP_SCRIPT_HASH.into(),
             rollup_config: config.rollup,

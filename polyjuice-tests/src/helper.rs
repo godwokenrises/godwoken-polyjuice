@@ -10,7 +10,7 @@ use gw_config::{BackendConfig, BackendSwitchConfig, BackendType};
 use gw_db::schema::{COLUMN_INDEX, COLUMN_META, META_TIP_BLOCK_HASH_KEY};
 use gw_generator::error::TransactionError;
 pub use gw_generator::{
-    account_lock_manage::{secp256k1::Secp256k1, AccountLockManage},
+    account_lock_manage::{secp256k1::Secp256k1Eth, AccountLockManage},
     backend_manage::{Backend, BackendManage},
     dummy_state::DummyState,
     traits::StateExt,
@@ -467,8 +467,10 @@ pub fn setup() -> (Store, DummyState, Generator) {
     let backend_manage = BackendManage::from_config(configs).expect("default backend");
     // NOTICE in this test we won't need SUM validator
     let mut account_lock_manage = AccountLockManage::default();
-    account_lock_manage
-        .register_lock_algorithm(SECP_LOCK_CODE_HASH.into(), Box::new(Secp256k1::default()));
+    account_lock_manage.register_lock_algorithm(
+        SECP_LOCK_CODE_HASH.into(),
+        Box::new(Secp256k1Eth::default()),
+    );
     let rollup_config = RollupConfig::new_builder()
         .chain_id(CHAIN_ID.pack())
         .l2_sudt_validator_script_type_hash(SUDT_VALIDATOR_SCRIPT_TYPE_HASH.pack())
