@@ -1100,8 +1100,6 @@ int handle_native_token_transfer(gw_context_t* ctx, uint32_t from_id,
     if (ret != 0) {
       return ret;
     }
-    uint8_t script_hash[32];
-    blake2b_hash(script_hash, new_script_seg.ptr, new_script_seg.size);
     uint32_t new_account_id;
     ret = ctx->sys_create(ctx, new_script_seg.ptr, new_script_seg.size,
                           &new_account_id);
