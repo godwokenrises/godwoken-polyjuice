@@ -1125,7 +1125,7 @@ int handle_native_token_transfer(gw_context_t* ctx, uint32_t from_id,
         return ret;
     }
     // charge gas for new account
-    gas_used += NEW_ACCOUNT_GAS;
+    *gas_used += NEW_ACCOUNT_GAS;
   } else {
     return ret;
   }
