@@ -1020,24 +1020,41 @@ int handle_transfer(gw_context_t* ctx,
   return 0;
 }
 
-int load_eoa_type_hash(gw_context_t* ctx, uint8_t eoa_type_hash[GW_KEY_BYTES]) {
+#pragma push_macro("errno")
+#undef errno
+int load_eth_eoa_type_hash(gw_context_t* ctx, uint8_t eoa_type_hash[GW_KEY_BYTES]) {
   mol_seg_t rollup_config_seg;
   rollup_config_seg.ptr = ctx->rollup_config;
   rollup_config_seg.size = ctx->rollup_config_size;
 
   mol_seg_t allowed_eoa_list_seg =
       MolReader_RollupConfig_get_allowed_eoa_type_hashes(&rollup_config_seg);
-  mol_seg_res_t allowed_type_hash_res =
-      MolReader_AllowedTypeHashVec_get(&allowed_eoa_list_seg, 0);
+  uint32_t len = MolReader_AllowedTypeHashVec_length(&allowed_eoa_list_seg);
+  for (uint32_t i = 0; i < len; i++) {
+    mol_seg_res_t allowed_type_hash_res =
+        MolReader_AllowedTypeHashVec_get(&allowed_eoa_list_seg, i);
 
-  mol_seg_t code_hash_seg =
-      MolReader_AllowedTypeHash_get_hash(&allowed_type_hash_res.seg);
-  memcpy(eoa_type_hash, code_hash_seg.ptr, 32);
-  return 0;
+    if (allowed_type_hash_res.errno != MOL_OK) {
+      return GW_FATAL_INVALID_DATA;
+    }
+
+    mol_seg_t type_seg =
+        MolReader_AllowedTypeHash_get_type_(&allowed_type_hash_res.seg);
+    if (*(uint8_t *)type_seg.ptr == GW_ALLOWED_EOA_ETH) {
+      mol_seg_t eth_lock_code_hash_seg =
+          MolReader_AllowedTypeHash_get_hash(&allowed_type_hash_res.seg);
+      memcpy(eoa_type_hash, eth_lock_code_hash_seg.ptr, 32);
+      return 0;
+    }
+  }
+  ckb_debug("Cannot find EoA type hash of ETH.");
+  return -1;
  }
+#pragma pop_macro("errno")
 
 int handle_native_token_transfer(gw_context_t* ctx, uint32_t from_id,
-                                 uint256_t value, gw_reg_addr_t* from_addr) {
+                                 uint256_t value, gw_reg_addr_t* from_addr,
+                                 uint64_t* gas_used) {
   if (g_creator_account_id == UINT32_MAX) {
     ckb_debug("[handle_native_token_transfer] g_creator_account_id wasn't set.");
     return ERROR_NATIVE_TOKEN_TRANSFER;
@@ -1085,7 +1102,7 @@ int handle_native_token_transfer(gw_context_t* ctx, uint32_t from_id,
   } else if (ret == GW_ERROR_NOT_FOUND) {
     //build eoa script
     uint8_t eoa_type_hash[GW_KEY_BYTES] = {0};
-    ret = load_eoa_type_hash(ctx, eoa_type_hash);
+    ret = load_eth_eoa_type_hash(ctx, eoa_type_hash);
     if (ret != 0) {
         return ret;
     }
@@ -1103,6 +1120,12 @@ int handle_native_token_transfer(gw_context_t* ctx, uint32_t from_id,
     uint32_t new_account_id;
     ret = ctx->sys_create(ctx, new_script_seg.ptr, new_script_seg.size,
                           &new_account_id);
+    if (ret != 0) {
+        ckb_debug("[handle_native_token_transfer] create new account failed.");
+        return ret;
+    }
+    // charge gas for new account
+    gas_used += NEW_ACCOUNT_GAS;
   } else {
     return ret;
   }
@@ -1523,19 +1546,10 @@ int run_polyjuice() {
     }
 
     uint64_t gas_used = min_gas;
-    // charge gas fee of account creation if to_address is not registered
-    gw_reg_addr_t to_addr = new_reg_addr(g_eoa_transfer_to_address.bytes);
-    uint8_t to_script_hash[GW_KEY_BYTES] = {0};
-    ret = context.sys_get_script_hash_by_registry_address(&context, &to_addr, to_script_hash);
-    if (ret == GW_ERROR_NOT_FOUND) {
-        gas_used += NEW_ACCOUNT_GAS;
-    } else if (ret != 0) {
-        return ret;
-    }
     gw_reg_addr_t from_addr = {0};
     // handle error later
     int transfer_ret = handle_native_token_transfer(&context, context.transaction_context.from_id,
-                                                    value, &from_addr);
+                                                    value, &from_addr, &gas_used);
     ckb_debug("END handle_native_token_transfer");
     // handle fee
     uint256_t gas_fee = calculate_fee(g_gas_price, gas_used);
