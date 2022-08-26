@@ -66,6 +66,8 @@ fn native_token_transfer_unregistered_address_test() -> anyhow::Result<()> {
     let run_result = chain.execute_raw(raw_tx)?;
     assert_eq!(run_result.exit_code, 0);
 
+    let account_id = chain.get_account_id_by_eth_address(&to_addr)?;
+    assert_eq!(Some(6), account_id);
     let from_balance = chain.get_balance(&from_addr)?;
     let to_balance = chain.get_balance(&to_addr)?;
     println!("from balance: {}, to balance: {}", from_balance, to_balance);

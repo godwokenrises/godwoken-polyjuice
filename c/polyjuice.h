@@ -1020,8 +1020,6 @@ int handle_transfer(gw_context_t* ctx,
   return 0;
 }
 
-#pragma push_macro("errno")
-#undef errno
 int load_eth_eoa_type_hash(gw_context_t* ctx, uint8_t eoa_type_hash[GW_KEY_BYTES]) {
   mol_seg_t rollup_config_seg;
   rollup_config_seg.ptr = ctx->rollup_config;
@@ -1034,10 +1032,9 @@ int load_eth_eoa_type_hash(gw_context_t* ctx, uint8_t eoa_type_hash[GW_KEY_BYTES
     mol_seg_res_t allowed_type_hash_res =
         MolReader_AllowedTypeHashVec_get(&allowed_eoa_list_seg, i);
 
-    if (allowed_type_hash_res.errno != MOL_OK) {
+    if (!is_errno_ok(&allowed_type_hash_res)) {
       return GW_FATAL_INVALID_DATA;
     }
-
     mol_seg_t type_seg =
         MolReader_AllowedTypeHash_get_type_(&allowed_type_hash_res.seg);
     if (*(uint8_t *)type_seg.ptr == GW_ALLOWED_EOA_ETH) {
@@ -1048,9 +1045,8 @@ int load_eth_eoa_type_hash(gw_context_t* ctx, uint8_t eoa_type_hash[GW_KEY_BYTES
     }
   }
   ckb_debug("Cannot find EoA type hash of ETH.");
-  return -1;
+  return FATAL_POLYJUICE;
  }
-#pragma pop_macro("errno")
 
 int handle_native_token_transfer(gw_context_t* ctx, uint32_t from_id,
                                  uint256_t value, gw_reg_addr_t* from_addr,
@@ -1100,6 +1096,7 @@ int handle_native_token_transfer(gw_context_t* ctx, uint32_t from_id,
       return ERROR_NATIVE_TOKEN_TRANSFER;
     }
   } else if (ret == GW_ERROR_NOT_FOUND) {
+    ckb_debug("[handle_native_token_transfer] create new EoA account");
     //build eoa script
     uint8_t eoa_type_hash[GW_KEY_BYTES] = {0};
     ret = load_eth_eoa_type_hash(ctx, eoa_type_hash);
@@ -1122,6 +1119,19 @@ int handle_native_token_transfer(gw_context_t* ctx, uint32_t from_id,
                           &new_account_id);
     if (ret != 0) {
       ckb_debug("[handle_native_token_transfer] create new account failed.");
+      return ret;
+    }
+    uint8_t account_script_hash[32] = {0};
+    ret = ctx->sys_get_script_hash_by_account_id(ctx, new_account_id,
+                                                 account_script_hash);
+    if (ret != 0) {
+      ckb_debug("[handle_native_token_transfer] failed to get created eth account script hash");
+      return ret;
+    }
+
+    ret = gw_register_eth_address(ctx, account_script_hash);
+    if (ret != 0) {
+      ckb_debug("[handle_native_token_transfer] failed to register eth address");
       return ret;
     }
     // charge gas for new account
