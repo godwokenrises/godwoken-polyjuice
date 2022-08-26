@@ -1121,8 +1121,8 @@ int handle_native_token_transfer(gw_context_t* ctx, uint32_t from_id,
     ret = ctx->sys_create(ctx, new_script_seg.ptr, new_script_seg.size,
                           &new_account_id);
     if (ret != 0) {
-        ckb_debug("[handle_native_token_transfer] create new account failed.");
-        return ret;
+      ckb_debug("[handle_native_token_transfer] create new account failed.");
+      return ret;
     }
     // charge gas for new account
     *gas_used += NEW_ACCOUNT_GAS;
