@@ -92,7 +92,7 @@ info_data:
 Polyjuice only provides contract accounts. Godwoken's user account is leveraged to act as externally owned account (EOA). In the latest version of Polyjuice, the EOA address is native `eth_address`, which is the rightmost 160 bits of a Keccak hash of an ECDSA public key.
 
 
-[rawl2tx-args]: https://github.com/nervosnetwork/godwoken/blob/develop/crates/types/schemas/godwoken.mol#L60
+[rawl2tx-args]: https://github.com/nervosnetwork/godwoken/blob/v1.5.0/crates/types/schemas/godwoken.mol#L75
 [meta-contract]: https://github.com/nervosnetwork/godwoken-scripts/blob/master/c/contracts/meta_contract.c
 
 ## More docs
