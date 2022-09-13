@@ -17,7 +17,7 @@ Note when sending a transaction to a smart contract for certain behavior, the `v
 
 When you use a sUDT token type, it will be represented in Godwoken as a layer-2 sUDT type. Polyjuice ensures that all the layer-2 sUDT tokens on Godwoken are in compliance with the ERC20 standard by the [sUDT-ERC20 Proxy Contract](../solidity/erc20/README.md). This contract provides a way for EVM code to interact with ERC20 standard interface to operate sUDT tokens on Godwoken as if they were ERC20 tokens.
 
-All you have to deal with is the same ERC20 interface for all bridged sUDT tokens.
+In other words, all bridged sUDT tokens have the same ERC20 interface thanks to the 1-to-1 sUDT-ERC20 proxy contract:
 
 ### Bridged sUDT token list
 - mainnet_v1: https://github.com/nervosnetwork/godwoken-info/blob/main/mainnet_v1/bridged-token-list.json
