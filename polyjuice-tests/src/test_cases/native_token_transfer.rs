@@ -7,7 +7,7 @@ use gw_types::{
 
 use crate::{
     ctx::MockChain,
-    helper::{MockContractInfo, PolyjuiceArgsBuilder, CREATOR_ACCOUNT_ID},
+    helper::{parse_log, Log, MockContractInfo, PolyjuiceArgsBuilder, CREATOR_ACCOUNT_ID},
 };
 
 #[test]
@@ -65,6 +65,11 @@ fn native_token_transfer_unregistered_address_test() -> anyhow::Result<()> {
         .build();
     let run_result = chain.execute_raw(raw_tx)?;
     assert_eq!(run_result.exit_code, 0);
+
+    let system_log = run_result.write.logs.last().map(parse_log);
+    if let Some(Log::PolyjuiceSystem { gas_used, .. }) = system_log {
+        assert_eq!(gas_used, 21000 + 25000);
+    }
 
     let account_id = chain.get_account_id_by_eth_address(&to_addr)?;
     assert_eq!(Some(6), account_id);
