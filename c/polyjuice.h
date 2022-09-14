@@ -1571,7 +1571,7 @@ int run_polyjuice() {
       return ret;
     }
     /* emit POLYJUICE_SYSTEM log to Godwoken */
-    ret = emit_evm_result_log(&context, min_gas, transfer_ret);
+    ret = emit_evm_result_log(&context, gas_used, transfer_ret);
     if (ret != 0) {
       ckb_debug("emit_evm_result_log failed");
       return ret;
