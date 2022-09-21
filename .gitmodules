@@ -22,9 +22,6 @@
 [submodule "deps/mbedtls"]
 	path = deps/mbedtls
 	url = https://github.com/nervosnetwork/mbedtls.git
-[submodule "deps/bn128"]
-	path = deps/bn128
-	url = https://github.com/mohanson/bn128.git
 [submodule "deps/bn"]
 	path = deps/bn
 	url = https://github.com/mohanson/bn
