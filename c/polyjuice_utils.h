@@ -318,39 +318,6 @@ bool is_evmc_error(int error_code) {
   return error_code >= 1 && error_code <= 16;
 }
 
-/*
- * From: https://github.com/nervosnetwork/ckb-c-stdlib/pull/33
- *
- * A temporal patch to solve https://github.com/nervosnetwork/ckb-vm/issues/97.
- * If you use a ckb-vm >= 0.20.x, you can safely ignore it. A common practice
- * is that use CKB_SP_ALIGN in the first line of the main(), and then use
- * CKB_SP_ALIGN_END before exiting.
- *
- * Example:
- *   int main() {
- *     CKB_SP_ALIGN;
- *     ...
- *     if cond {
- *       CKB_SP_ALIGN_END;
- *       return 1;
- *     }
- *     ...
- *     CKB_SP_ALIGN_END;
- *     return 0;
- *   }
- */
-#define CKB_SP_ALIGN                                                           \
-  __asm__("addi t0, sp, 0\n\t"                                                 \
-          "andi sp, sp, 0xfffffffffffffff8\n\t"                                \
-          "sd t0, -8(sp)\n\t"                                                  \
-          "sd t0, -16(sp)\n\t"                                                 \
-          "addi sp, sp, -8\n\t"                                                \
-          "andi sp, sp, 0xfffffffffffffff0"                                    \
-          :                                                                    \
-          :                                                                    \
-          : "t0")
-#define CKB_SP_ALIGN_END __asm__("ld sp, 0(sp)")
-
 /**
  * @brief computes the 'intrinsic gas' for a message with the given data
  * 
