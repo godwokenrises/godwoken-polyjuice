@@ -9,7 +9,7 @@ Polyjuice aims at 100% EVM compatibility as a goal, meaning we plan to support a
 ## Features
 - [x] All [Ethereum Virtual Machine Opcodes](https://ethervm.io/)
 - [x] Value transfer
-- [ ] pre-compiled contracts
+- [x] pre-compiled contracts
   + [x] ecrecover
   + [x] sha256hash
   + [x] ripemd160hash
@@ -17,7 +17,7 @@ Polyjuice aims at 100% EVM compatibility as a goal, meaning we plan to support a
   + [x] bigModExp
   + [x] bn256AddIstanbul
   + [x] bn256ScalarMulIstanbul
-  + [ ] bn256PairingIstanbul (performance issue)
+  + [x] bn256PairingIstanbul
   + [x] blake2F
 
 
