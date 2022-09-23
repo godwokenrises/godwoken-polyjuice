@@ -78,7 +78,7 @@ jobs:
       working-directory: polyjuice-tests/fuzz2
       run: |
         mkdir -p corpus-new
-        ./build/polyjuice_generator_fuzzer -merge=1 corpus-new corpus-cache corpus
+        ./build/fuzzer -merge=1 corpus-new corpus-cache corpus
         rm -rf corpus-cache
         mv corpus-new corpus-cache
 
