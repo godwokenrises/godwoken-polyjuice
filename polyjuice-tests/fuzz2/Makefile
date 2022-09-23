@@ -62,7 +62,7 @@ endif
 EXTERNAL_HEADERS := $(DEPS)/ckb-c-stdlib-simulator/ckb_consts.hckb-c-stdlib-simulator-only
 
 build-gw-syscall-simulator:
-	cd $(DEPS)/gw-syscall-simulator/ && cargo build # Who doesn't like fast build?
+	cd $(DEPS)/gw-syscall-simulator/ && cargo build
 
 build/fuzzer: generate-protocol $(GENERATOR_DEPS) build-gw-syscall-simulator
 	$(CXX) $(CFLAGS) $(LDFLAGS) $(SANITIZER_FLAGS) $(LIMIT_ERROR) -L $(DEPS)/gw-syscall-simulator/target/debug -l gw_syscall_simluator -Ibuild -o $@ polyjuice_fuzzer.cc $(ALL_OBJS) 
@@ -71,6 +71,103 @@ build/fuzzer_log: generate-protocol $(GENERATOR_DEPS) build-gw-syscall-simulator
 
 clean:
 	rm -rf $(BUILD)/*
+
+build/generator: ../../c/generator.c $(GENERATOR_DEPS)
+	cd $(SECP_DIR) && (git apply workaround-fix-g++-linking.patch || true) && cd - # apply patch
+	$(CXX) $(SANITIZER_FLAGS) $(CFLAGS) $(LDFLAGS) -Ibuild -o $@ ../../c/generator.c $(ALL_OBJS)
+	$(OBJCOPY) --only-keep-debug $@ $@.debug
+	$(OBJCOPY) --strip-debug --strip-all $@
+	cd $(SECP_DIR) && (git apply -R workaround-fix-g++-linking.patch || true) && cd - # revert patch
+build/generator_log: ../../c/generator.c $(GENERATOR_DEPS)
+	cd $(SECP_DIR) && (git apply workaround-fix-g++-linking.patch || true) && cd - # apply patch
+	$(CXX) $(CFLAGS) $(LDFLAGS) $(SANITIZER_FLAGS) -Ibuild -o $@ ../../c/generator.c $(ALL_OBJS) -DPOLYJUICE_DEBUG_LOG
+	$(OBJCOPY) --only-keep-debug $@ $@.debug
+	$(OBJCOPY) --strip-debug --strip-all $@
+	cd $(SECP_DIR) && (git apply -R workaround-fix-g++-linking.patch || true) && cd - # revert patch
+build/validator: ../../c/validator.c $(VALIDATOR_DEPS)
+	cd $(SECP_DIR) && (git apply workaround-fix-g++-linking.patch || true) && cd - # apply patch
+	$(CXX) $(SANITIZER_FLAGS) $(CFLAGS) $(LDFLAGS) -Ibuild -o $@ ../../c/validator.c $(ALL_OBJS)
+	$(OBJCOPY) --only-keep-debug $@ $@.debug
+	$(OBJCOPY) --strip-debug --strip-all $@
+	cd $(SECP_DIR) && (git apply -R workaround-fix-g++-linking.patch || true) && cd - # revert patch
+build/validator_log: ../../c/validator.c $(VALIDATOR_DEPS)
+	cd $(SECP_DIR) && (git apply workaround-fix-g++-linking.patch || true) && cd - # apply patch
+	$(CXX) $(SANITIZER_FLAGS) $(CFLAGS) $(LDFLAGS) -Ibuild -o $@ ../../c/validator.c $(ALL_OBJS) -DPOLYJUICE_DEBUG_LOG
+	$(OBJCOPY) --only-keep-debug $@ $@.debug
+	$(OBJCOPY) --strip-debug --strip-all $@
+	cd $(SECP_DIR) && (git apply -R workaround-fix-g++-linking.patch || true) && cd - # revert patch
+
+build/test_contracts: generate-protocol ../../c/tests/test_contracts.c $(VALIDATOR_DEPS)
+	cd $(SECP_DIR) && (git apply workaround-fix-g++-linking.patch || true) && cd - # apply patch
+	${CXX} $(CFLAGS) $(LDFLAGS) $(SANITIZER_FLAGS) -Ibuild -o $@ ../../c/tests/test_contracts.c $(ALL_OBJS) -DFUZZING
+	$(OBJCOPY) --only-keep-debug $@ $@.debug
+	$(OBJCOPY) --strip-debug --strip-all $@
+	cd $(SECP_DIR) && (git apply -R workaround-fix-g++-linking.patch || true) && cd - # revert patch
+
+# test rlp_encode_sender_and_nonce
+# RLP (Recursive Length Prefix)
+build/test_rlp: generate-protocol ../../c/tests/test_rlp.c $(VALIDATOR_DEPS)
+	cd $(SECP_DIR) && (git apply workaround-fix-g++-linking.patch || true) && cd - # apply patch
+	$(CXX) $(CFLAGS) $(LDFLAGS) $(SANITIZER_FLAGS) -Ibuild -o $@ ../../c/tests/test_rlp.c $(ALL_OBJS)
+	$(OBJCOPY) --only-keep-debug $@ $@.debug
+	$(OBJCOPY) --strip-debug --strip-all $@
+	cd $(SECP_DIR) && (git apply -R workaround-fix-g++-linking.patch || true) && cd - # revert patch
+
+# evmone is a C++ implementation of the Ethereum Virtual Machine (EVM)
+build/evmone.o: $(DEPS)/evmone/lib/evmone/evmone.cpp
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -c -o $@ $< -DPROJECT_VERSION=\"0.5.0-dev\"
+build/baseline.o: $(DEPS)/evmone/lib/evmone/baseline.cpp
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -c -o $@ $<
+build/analysis.o: $(DEPS)/evmone/lib/evmone/analysis.cpp
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -c -o $@ $<
+build/execution.o: $(DEPS)/evmone/lib/evmone/execution.cpp
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -g -c -o $@ $<
+build/instructions.o: $(DEPS)/evmone/lib/evmone/instructions.cpp
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -c -o $@ $<
+build/instruction_metrics.o: $(DEPS)/evmone/evmc/lib/instructions/instruction_metrics.c
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -c -o $@ $<
+build/instruction_names.o: $(DEPS)/evmone/evmc/lib/instructions/instruction_names.c
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -c -o $@ $<
+build/instructions_calls.o: $(DEPS)/evmone/lib/evmone/instructions_calls.cpp
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -g -c -o $@ $<
+build/evmc_hex.o: $(DEPS)/evmone/evmc/lib/hex/hex.cpp
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -c -o $@ $<
+build/execution_state.o: $(DEPS)/evmone/lib/evmone/execution_state.cpp
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -c -o $@ $<
+
+# new SHA-3 encryption standard - Keccak algorithm
+build/keccak.o: $(DEPS)/ethash/lib/keccak/keccak.c build/keccakf800.o
+	$(CC) $(CFLAGS) $(LDFLAGS) -c -o $@ $<
+build/keccakf800.o: $(DEPS)/ethash/lib/keccak/keccakf800.c
+	mkdir -p build
+	$(CC) $(CFLAGS) $(LDFLAGS) -c -o $@ $<
+
+build/memzero.o: ../../c/ripemd160/memzero.c
+	$(CXX) $(CFLAGS) $(LDFLAGS) -c -o $@ $<
+build/ripemd160.o: ../../c/ripemd160/ripemd160.c
+	$(CXX) $(CFLAGS) $(LDFLAGS) -c -o $@ $<
+
+# Mbed TLS is a C library that implements cryptographic primitives,
+# X.509 certificate manipulation and the SSL/TLS and DTLS protocols.
+build/platform_util.o: $(DEPS)/mbedtls/library/platform_util.c
+	$(CC) $(CFLAGS) $(LDFLAGS) -c -o $@ $<
+build/bignum.o: $(DEPS)/mbedtls/library/bignum.c
+	$(CC) $(CFLAGS) $(LDFLAGS) -c -o $@ $<
+
+build/sha256.o: $(DEPS)/crypto-algorithms/sha256.c
+	$(CXX) $(CFLAGS) $(LDFLAGS) -c -o $@ $<
+
+# Secp256k1 refers to the parameters of the elliptic curve used in Bitcoin's public-key cryptography, and is defined in Standards for Efficient Cryptography (SEC)
+build/secp256k1_data_info.h: build/dump_secp256k1_data
+	$<
+build/dump_secp256k1_data: ../../c/dump_secp256k1_data.c $(SECP256K1_SRC)
+	#mkdir -p build
+	$(CC) $(CFLAGS) -o $@ $<
+$(SECP256K1_SRC):
+	cd $(SECP_DIR) && (git apply -R workaround-fix-g++-linking.patch || true) && \
+	chmod +x autogen.sh && ./autogen.sh && \
+	./configure --with-bignum=no --enable-ecmult-static-precomputation --enable-endomorphism --enable-module-recovery && \
+	make src/ecmult_static_pre_context.h src/ecmult_static_context.h
 
 generate-protocol: check-moleculec-version build/blockchain.h build/godwoken.h
 check-moleculec-version:

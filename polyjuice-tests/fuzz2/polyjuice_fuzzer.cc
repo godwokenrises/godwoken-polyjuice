@@ -84,11 +84,11 @@ void init_polyjuice_tx(mol_builder_t *b) {
 
 extern "C" int LLVMFuzzerTestOneInput(uint8_t *data, size_t size) {
 
-  if (size < 108) {
+  if (size < 76) {
     return -1; 
   }
   gw_reset();
-  uint8_t kind = ((data[0] >> 3) & 0b1) == 0 ? 0 : 3; // call: 0; create: 1
+  uint8_t kind = ((data[0] >> 3) & 0b1) == 0 ? 0 : 1; // call: 0; create: 1
   uint8_t native_transfer = (data[1] >> 3) & 0b1; // 1: native transfer tag
   
   evmc::address from_addr = generate_interesting_address(data[2]);
