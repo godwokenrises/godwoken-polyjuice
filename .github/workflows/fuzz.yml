@@ -65,6 +65,7 @@ jobs:
     - name: Fuzzing Polyjuice Generator 1 hour
       working-directory: polyjuice-tests/fuzz2
       run: |
+        mkdir -p corpus
         mkdir -p corpus-cache
         ls corpus-cache
         make build/fuzzer && \
