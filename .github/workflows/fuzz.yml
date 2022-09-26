@@ -61,13 +61,17 @@ jobs:
         else
           echo "MAX_FUZZ_TIME=60" >> $GITHUB_ENV
         fi
-
+        echo "trigger type: ${{ github.event.action }}"
+        if [[ ${{ github.event_name }} == 'schedule' ]]; then
+          echo "MAX_FUZZ_TIME=3600" >> $GITHUB_ENV
+        fi
     - name: Fuzzing Polyjuice Generator 1 hour
       working-directory: polyjuice-tests/fuzz2
       run: |
         mkdir -p corpus
         mkdir -p corpus-cache
         ls corpus-cache
+        echo "fuzz time: ${{ env.MAX_FUZZ_TIME }}"
         make build/fuzzer && \
         ./build/fuzzer corpus corpus-cache \
           -max_total_time=$MAX_FUZZ_TIME -timeout=120 \
