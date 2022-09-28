@@ -88,7 +88,7 @@ extern "C" int LLVMFuzzerTestOneInput(uint8_t *data, size_t size) {
     return -1; 
   }
   gw_reset();
-  uint8_t kind = ((data[0] >> 3) & 0b1) == 0 ? 0 : 1; // call: 0; create: 1
+  uint8_t kind = ((data[0] >> 3) & 0b1) == 0 ? 0 : 3; // call: 0; create: 3
   uint8_t native_transfer = (data[1] >> 3) & 0b1; // 1: native transfer tag
   
   evmc::address from_addr = generate_interesting_address(data[2]);
@@ -127,6 +127,7 @@ extern "C" int LLVMFuzzerTestOneInput(uint8_t *data, size_t size) {
   uint64_t chain_id = (uint64_t) CHAIN_ID;
   MolBuilder_RawL2Transaction_set_chain_id(&b, (uint8_t*)(&chain_id), 8);
   MolBuilder_RawL2Transaction_set_from_id(&b, (uint8_t*)(&from_id), 4);
+  MolBuilder_RawL2Transaction_set_to_id(&b, (uint8_t*)(&to_id), 4);
   uint32_t nonce = 0;
   MolBuilder_RawL2Transaction_set_nonce(&b, (uint8_t*)(&nonce), 4);
   uint8_t prefix[7] = {0xFF, 0xFF, 0xFF, 'P', 'O', 'L', 'Y'};

@@ -65,7 +65,7 @@ build-gw-syscall-simulator:
 	cd $(DEPS)/gw-syscall-simulator/ && cargo build
 
 build/fuzzer: generate-protocol $(GENERATOR_DEPS) build-gw-syscall-simulator
-	$(CXX) $(CFLAGS) $(LDFLAGS) $(SANITIZER_FLAGS) $(LIMIT_ERROR) -L $(DEPS)/gw-syscall-simulator/target/debug -l gw_syscall_simluator -Ibuild -o $@ polyjuice_fuzzer.cc $(ALL_OBJS) 
+	$(CXX) $(CFLAGS) $(LDFLAGS) $(SANITIZER_FLAGS) $(LIMIT_ERROR) -fprofile-instr-generate -fcoverage-mapping -L $(DEPS)/gw-syscall-simulator/target/debug -l gw_syscall_simluator -Ibuild -o $@ polyjuice_fuzzer.cc $(ALL_OBJS) 
 build/fuzzer_log: generate-protocol $(GENERATOR_DEPS) build-gw-syscall-simulator
 	$(CXX) $(CFLAGS) $(LDFLAGS) $(SANITIZER_FLAGS) $(LIMIT_ERROR) -L $(DEPS)/gw-syscall-simulator/target/debug -l gw_syscall_simluator -Ibuild -o $@ polyjuice_fuzzer.cc $(ALL_OBJS) -DPOLYJUICE_DEBUG_LOG
 
