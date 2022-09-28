@@ -62,7 +62,7 @@ endif
 EXTERNAL_HEADERS := $(DEPS)/ckb-c-stdlib-simulator/ckb_consts.hckb-c-stdlib-simulator-only
 
 build-gw-syscall-simulator:
-	cd $(DEPS)/gw-syscall-simulator/ && cargo update && cargo build
+	cd $(DEPS)/gw-syscall-simulator/ && cargo build
 
 build/fuzzer: generate-protocol $(GENERATOR_DEPS) build-gw-syscall-simulator
 	$(CXX) $(CFLAGS) $(LDFLAGS) $(SANITIZER_FLAGS) $(LIMIT_ERROR) -fprofile-instr-generate -fcoverage-mapping -L $(DEPS)/gw-syscall-simulator/target/debug -l gw_syscall_simluator -Ibuild -o $@ polyjuice_fuzzer.cc $(ALL_OBJS) 
