@@ -32,7 +32,7 @@ CFLAGS_CRYPTO_ALGORITHMS := -I$(DEPS)/crypto-algorithms
 CFLAGS_INTX := -I$(DEPS)/intx/lib/intx -I$(DEPS)/intx/include
 CFLAGS_BN128 := -I$(DEPS)/bn128/include
 CFLAGS_GW_SIM := -I$(DEPS)/gw-syscall-simulator/include
-CFLAGS := -Wall -O2 -I../../c -I../../c/ripemd160 $(CFLAGS_CKB_STD) $(CFLAGS_ETHASH) $(CFLAGS_EVMONE) $(CFLAGS_SMT) $(CFLAGS_GODWOKEN) $(CFLAGS_SECP) $(CFLAGS_MBEDTLS) $(CFLAGS_CRYPTO_ALGORITHMS) $(CFLAGS_INTX) $(CFLAGS_BN128) $(CFLAGS_GW_SIM)
+CFLAGS := -Wall -O3 -I../../c -I../../c/ripemd160 $(CFLAGS_CKB_STD) $(CFLAGS_ETHASH) $(CFLAGS_EVMONE) $(CFLAGS_SMT) $(CFLAGS_GODWOKEN) $(CFLAGS_SECP) $(CFLAGS_MBEDTLS) $(CFLAGS_CRYPTO_ALGORITHMS) $(CFLAGS_INTX) $(CFLAGS_BN128) $(CFLAGS_GW_SIM)
 CXXFLAGS := $(CFLAGS) -std=c++1z 
 LDFLAGS := -Wl,--gc-sections,-rpath,$(DEPS)/gw-syscall-simulator/target/debug
 SANITIZER_FLAGS := -g -O1 -fsanitize=fuzzer,address,undefined,leak -Wno-incompatible-pointer-types
