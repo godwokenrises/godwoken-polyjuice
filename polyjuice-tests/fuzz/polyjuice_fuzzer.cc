@@ -51,37 +51,6 @@ mol_seg_t build_Bytes(uint8_t* ptr, uint32_t len) {
   return res.seg;
 }
 
-
-void init_polyjuice_tx(mol_builder_t *b) {
-  uint64_t chain_id = 1;
-  MolBuilder_RawL2Transaction_set_chain_id(b, (uint8_t*)(&chain_id), 8);
-  uint32_t from_id = 32;
-  MolBuilder_RawL2Transaction_set_from_id(b, (uint8_t*)(&from_id), 4);
-  uint32_t to_id = 12;
-  MolBuilder_RawL2Transaction_set_to_id(b, (uint8_t*)(&to_id), 4);
-  uint32_t nonce = 0;
-  MolBuilder_RawL2Transaction_set_nonce(b, (uint8_t*)(&nonce), 4);
-  uint8_t prefix[7] = {0xFF, 0xFF, 0xFF, 'P', 'O', 'L', 'Y'};
-  uint8_t args[7+1+8+16+16+4+MAX_DATA_SIZE];
-  memcpy(args, prefix, 7); // prefix POLY
-  args[7] = 3; // EVMC_CREATE
-  uint32_t args_offset = 8;
-  uint64_t gas_limit = 210000;
-  memcpy(args+args_offset, &gas_limit, 8); // gas
-  args_offset += 8;
-  uint128_t gas_price = 10;
-  memcpy(args+args_offset, &gas_price, 16); // gas_price
-  args_offset += 16;
-  uint128_t value = 0;
-  memcpy(args+args_offset, &value, 16); // value
-  args_offset += 16;
-  uint32_t len = 0;
-  memcpy(args+args_offset, &len, 4);
-
-  mol_seg_t bytes = build_Bytes(args, args_offset);
-  MolBuilder_RawL2Transaction_set_args(b, bytes.ptr, bytes.size);
-}
-
 extern "C" int LLVMFuzzerTestOneInput(uint8_t *data, size_t size) {
 
   if (size < 76) {
@@ -102,9 +71,10 @@ extern "C" int LLVMFuzzerTestOneInput(uint8_t *data, size_t size) {
   offset += 16;
   uint32_t from_id;
   gw_create_eoa_account(from_addr.bytes, mint, &from_id);
-
+ 
   uint32_t to_id;
-  if (kind == 0) { //mock to_id by creating contract account with code
+  // mock to_id by creating contract account with code
+  if (kind == 0) {
     gw_create_contract_account(to_addr.bytes, mint, data, size, &to_id);
   } else {
     to_id = CREATOR_ID;
@@ -164,5 +134,5 @@ extern "C" int LLVMFuzzerTestOneInput(uint8_t *data, size_t size) {
     free(res.seg.ptr);
     return 0;
   }
-  return -1; //not add to corpus
+  return -1; // not add to corpus
 }

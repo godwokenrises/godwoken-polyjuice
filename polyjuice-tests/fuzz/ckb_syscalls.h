@@ -2,7 +2,6 @@
 #ifndef CKB_C_STDLIB_CKB_SYSCALLS_H_
 #define CKB_C_STDLIB_CKB_SYSCALLS_H_
 
-#include <cstdint>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdlib.h>
