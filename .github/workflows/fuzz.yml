@@ -66,7 +66,7 @@ jobs:
           echo "MAX_FUZZ_TIME=3600" >> $GITHUB_ENV
         fi
     - name: Fuzzing Polyjuice Generator 
-      working-directory: polyjuice-tests/fuzz2
+      working-directory: polyjuice-tests/fuzz
       run: |
         mkdir -p corpus
         mkdir -p corpus-cache
@@ -78,13 +78,13 @@ jobs:
           -max_len=25000 -rss_limit_mb=0
       # Max data buffer size: 24KB < 25000 bytes
     - name: Generate coverage report
-      working-directory: polyjuice-tests/fuzz2
+      working-directory: polyjuice-tests/fuzz
       run: |
         llvm-profdata merge -sparse build/fuzzer.profraw -o build/fuzzer.profdata
         llvm-cov report ./build/fuzzer -instr-profile=build/fuzzer.profdata
         
     - name: merge corpus
-      working-directory: polyjuice-tests/fuzz2
+      working-directory: polyjuice-tests/fuzz
       run: |
         mkdir -p corpus-new
         ./build/fuzzer -merge=1 corpus-new corpus-cache corpus
