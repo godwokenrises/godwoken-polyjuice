@@ -10,14 +10,6 @@
 #include "sudt_contracts.h"
 #include "other_contracts.h"
 
-/**
- * alt_bn128_staticlib
- * @see https://github.com/mohanson/bn/blob/d1c73cc198a14ca894a37ba99df88a9fb812a43c/alt_bn128_staticlib/src/ethereum.rs
- */
-extern "C" uint32_t alt_bn128_add(const uint8_t *data, uint32_t data_len, uint8_t *output);
-extern "C" uint32_t alt_bn128_mul(const uint8_t *data, uint32_t data_len, uint8_t *output);
-extern "C" uint32_t alt_bn128_pairing(const uint8_t *data, uint32_t data_len, uint8_t *output);
-
 /* Protocol Params:
    [Referenced]:
    https://github.com/ethereum/go-ethereum/blob/master/params/protocol_params.go
@@ -766,28 +758,36 @@ int bn256_add_istanbul_gas(const uint8_t* input_src,
   return 0;
 }
 
-int bn256_add_istanbul(gw_context_t* ctx,
-                       const uint8_t* code_data,
+/**
+ * Address of precompiled contract for point addition (ADD): 0x6
+ * 
+ * @brief Input: two curve points (x, y). Output: curve point x + y
+ * @param input_size if the input is shorter than expected, it is assumed to be 
+ *   virtually padded with zeros at the end (i.e. compatible with the semantics 
+ *   of the CALLDATALOAD opcode). If the input is longer than expected, surplus 
+ *   bytes at the end are ignored.
+ * @param output_size 64
+ * 
+ * For more information, see [EIP-196](https://eips.ethereum.org/EIPS/eip-196)
+ */
+int bn256_add_istanbul(gw_context_t *ctx,
+                       const uint8_t *code_data,
                        const size_t code_size,
                        const enum evmc_call_kind parent_kind,
                        bool is_static_call,
-                       const uint8_t* input_src,
+                       const uint8_t *input_src,
                        const size_t input_size,
-                       uint8_t** output, size_t* output_size) {
-  *output = (uint8_t *)malloc(64);
+                       uint8_t **output, size_t *output_size) {
+  const size_t OUTPUT_LEN = 64;
+  *output = (uint8_t *)malloc(OUTPUT_LEN);
   if (*output == NULL) {
     return FATAL_PRECOMPILED_CONTRACTS;
   }
-  *output_size = 64;
 
-  /* If the input_src is shorter than expected, it is assumed to be virtually padded
-     with zeros at the end (i.e. compatible with the semantics of the
-     CALLDATALOAD opcode). If the input_src is longer than expected, surplus bytes
-     at the end are ignored. */
-  if (alt_bn128_add(input_src, input_size, *output) != 0) {
+  if (ctx->sys_bn_add(input_src, input_size, *output) != 0) {
     return ERROR_BN256_ADD;
   }
-
+  *output_size = OUTPUT_LEN;
   return 0;
 }
 
@@ -799,24 +799,36 @@ int bn256_scalar_mul_istanbul_gas(const uint8_t* input_src,
   return 0;
 }
 
-int bn256_scalar_mul_istanbul(gw_context_t* ctx,
-                              const uint8_t* code_data,
+/**
+ * Address of precompiled contract for scalar multiplication (MUL): 0x7
+ * 
+ * @brief Input: curve point and scalar (x, s). Output: curve point s * x
+ * @param input_size if the input is shorter than expected, it is assumed to be 
+ *   virtually padded with zeros at the end (i.e. compatible with the semantics 
+ *   of the CALLDATALOAD opcode). If the input is longer than expected, surplus 
+ *   bytes at the end are ignored.
+ * @param output_size 64
+ * 
+ * For more information, see [EIP-196](https://eips.ethereum.org/EIPS/eip-196)
+ */
+int bn256_scalar_mul_istanbul(gw_context_t *ctx,
+                              const uint8_t *code_data,
                               const size_t code_size,
                               const enum evmc_call_kind parent_kind,
                               bool is_static_call,
-                              const uint8_t* input_src,
+                              const uint8_t *input_src,
                               const size_t input_size,
-                              uint8_t** output, size_t* output_size) {
-  *output = (uint8_t *)malloc(64);
+                              uint8_t **output, size_t *output_size) {
+  const size_t OUTPUT_LEN = 64;
+  *output = (uint8_t *)malloc(OUTPUT_LEN);
   if (*output == NULL) {
     return FATAL_PRECOMPILED_CONTRACTS;
   }
-  *output_size = 64;
 
-  if (alt_bn128_mul(input_src, input_size, *output) != 0) {
+  if (ctx->sys_bn_mul(input_src, input_size, *output) != 0) {
     return ERROR_BN256_SCALAR_MUL;
   }
-
+  *output_size = OUTPUT_LEN;
   return 0;
 }
 
@@ -829,25 +841,29 @@ int bn256_pairing_istanbul_gas(const uint8_t* input_src,
   return 0;
 }
 
-/* EIP-197 */
-int bn256_pairing_istanbul(gw_context_t* ctx,
-                           const uint8_t* code_data,
+/**
+ * Implements elliptic curve paring operation to perform zkSNARK verification
+ * 
+ * For more information, see [EIP-197](https://eips.ethereum.org/EIPS/eip-197)
+ */
+int bn256_pairing_istanbul(gw_context_t *ctx,
+                           const uint8_t *code_data,
                            const size_t code_size,
                            const enum evmc_call_kind parent_kind,
                            bool is_static_call,
-                           const uint8_t* input_src,
+                           const uint8_t *input_src,
                            const size_t input_size,
-                           uint8_t** output, size_t* output_size) {
-  *output = (uint8_t *)malloc(32);
+                           uint8_t **output, size_t *output_size) {
+  const size_t OUTPUT_LEN = 32;
+  *output = (uint8_t *)malloc(OUTPUT_LEN);
   if (*output == NULL) {
     return FATAL_PRECOMPILED_CONTRACTS;
   }
-  *output_size = 32;
 
-  if (0 != alt_bn128_pairing(input_src, input_size, *output)) {
+  if (0 != ctx->sys_bn_pairing(input_src, input_size, *output)) {
     return ERROR_BN256_PAIRING;
   }
-
+  *output_size = OUTPUT_LEN;
   return 0;
 }
 

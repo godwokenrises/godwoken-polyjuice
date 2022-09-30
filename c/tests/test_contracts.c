@@ -721,15 +721,16 @@ int main() {
   if (test_big_mod_exp() != 0) {
     return -5;
   }
-  if (test_bn256_add_istanbul() != 0) {
-    return -6;
-  }
-  if (test_bn256_scalar_mul_istanbul() != 0) {
-    return -7;
-  }
-  if (test_bn256_pairing_istanbul() != 0) {
-    return -8;
-  }
+  // TODO: move bn related tests to polyjuice-tests/src/test_cases/pre_compiled_contracts.rs
+  // if (test_bn256_add_istanbul() != 0) {
+  //   return -6;
+  // }
+  // if (test_bn256_scalar_mul_istanbul() != 0) {
+  //   return -7;
+  // }
+  // if (test_bn256_pairing_istanbul() != 0) {
+  //   return -8;
+  // }
   if (test_blake2f() != 0) {
     return -9;
   }

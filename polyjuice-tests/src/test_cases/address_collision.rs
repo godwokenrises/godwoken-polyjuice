@@ -110,7 +110,7 @@ fn create_address_collision_duplicate() {
         1,
     );
 
-    assert_eq!(run_result.exit_code, 2);
+    assert_eq!(run_result.exit_code, crate::constant::EVMC_REVERT);
 }
 
 #[test]
@@ -299,7 +299,7 @@ fn create2_address_collision_duplicate() -> Result<()> {
         L2TX_MAX_CYCLES,
         None,
     )?;
-    assert_eq!(run_result.exit_code, 2);
+    assert_eq!(run_result.exit_code, crate::constant::EVMC_REVERT);
 
     Ok(())
 }
