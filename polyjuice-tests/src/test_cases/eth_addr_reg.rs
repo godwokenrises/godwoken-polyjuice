@@ -97,7 +97,7 @@ fn test_update_eth_addr_reg_by_contract() {
         crate::helper::SetMappingArgs::One(eth_eoa_account_script_hash.into()),
     )
     .expect("execute the MSG_SET_MAPPING method of `ETH Address Registry` layer2 contract");
-    assert_eq!(run_result.exit_code, 0);
+    assert_eq!(run_result.exit_code, crate::constant::EVMC_SUCCESS);
     state.finalise().expect("update state");
     // cycles(1176198)] < 1200k cycles
     helper::check_cycles(
@@ -241,7 +241,7 @@ fn test_batch_set_mapping_by_contract() {
         crate::helper::SetMappingArgs::Batch(eth_eoa_script_hashes.clone()),
     )
     .expect("eth address registered");
-    assert_eq!(run_result.exit_code, 0);
+    assert_eq!(run_result.exit_code, crate::constant::EVMC_SUCCESS);
     state.finalise().expect("update state");
 
     for (eth_eoa_address, eth_eoa_account_script_hash) in

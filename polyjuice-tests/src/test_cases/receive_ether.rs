@@ -173,7 +173,7 @@ fn without_receive_fallback_test() -> anyhow::Result<()> {
         None,
     )?;
     //expect transfer failed
-    assert_eq!(run_result.exit_code, 2);
+    assert_eq!(run_result.exit_code, crate::constant::EVMC_REVERT);
 
     // TODO: read the log of a failed transaction
     // print!("SimpleTransfer.transferToSimpleStorage1(): ");
@@ -263,7 +263,7 @@ fn over_transfer_test() -> anyhow::Result<()> {
     )?;
 
     // expect transfer failed
-    assert_eq!(run_result.exit_code, 2);
+    assert_eq!(run_result.exit_code, crate::constant::EVMC_REVERT);
 
     Ok(())
 }

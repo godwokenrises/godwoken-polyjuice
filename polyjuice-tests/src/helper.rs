@@ -56,7 +56,7 @@ pub const SUDT_VALIDATOR_SCRIPT_TYPE_HASH: [u8; 32] = [0xa2u8; 32];
 pub const SECP_DATA: &[u8] = include_bytes!("../../build/secp256k1_data");
 
 // polyjuice
-pub const POLYJUICE_GENERATOR_NAME: &str = "../build/generator_log.aot";
+pub const POLYJUICE_GENERATOR_NAME: &str = "../build/generator_log";
 pub const POLYJUICE_VALIDATOR_NAME: &str = "../build/validator";
 // ETH Address Registry
 pub const ETH_ADDRESS_REGISTRY_GENERATOR_NAME: &str =
@@ -382,7 +382,7 @@ impl PolyjuiceArgsBuilder {
 pub fn setup() -> (Store, DummyState, Generator) {
     // If you want to watch the [contract debug] logs in Polyjuice,
     // please change the log level from `info` to `debug`.
-    // then run `cargo test -- [test_filter] --nocapture`, 
+    // then run `cargo test -- [test_filter] --nocapture`,
     // or run `RUST_LOG=gw=debug cargo test -- [test_filter] --nocapture` directly
     let _ = env_logger::try_init_from_env(env_logger::Env::default().default_filter_or("info"));
 

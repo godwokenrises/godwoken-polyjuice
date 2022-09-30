@@ -13,7 +13,6 @@ use gw_types::{
 };
 
 const CONTRACT_CODE: &str = include_str!("./evm-contracts/BeaconProxy.bin");
-const EVMC_SUCCESS: i8 = 0;
 
 #[test]
 fn test_beacon_proxy() {
@@ -39,7 +38,7 @@ fn test_beacon_proxy() {
         block_producer.to_owned(),
         block_number,
     );
-    assert_eq!(run_result.exit_code, EVMC_SUCCESS);
+    assert_eq!(run_result.exit_code, crate::constant::EVMC_SUCCESS);
     let contract = MockContractInfo::create(&from_eth_address, 0);
     let contract_account_id = state
         .get_account_id_by_script_hash(&contract.script_hash)
@@ -73,7 +72,7 @@ fn test_beacon_proxy() {
             None,
         )
         .expect("invode initializaion");
-    assert_eq!(run_result.exit_code, EVMC_SUCCESS);
+    assert_eq!(run_result.exit_code, crate::constant::EVMC_SUCCESS);
     state.finalise().expect("update state");
 
     state
@@ -111,7 +110,7 @@ fn test_beacon_proxy() {
             None,
         )
         .expect("Call deployBeaconProxy");
-    assert_eq!(run_result.exit_code, EVMC_SUCCESS);
+    assert_eq!(run_result.exit_code, crate::constant::EVMC_SUCCESS);
     state.finalise().expect("update state");
 
     // get BeaconProxy public bpx and check it's balance
@@ -141,7 +140,7 @@ fn test_beacon_proxy() {
             None,
         )
         .expect("get BeaconProxy contract address");
-    assert_eq!(run_result.exit_code, EVMC_SUCCESS);
+    assert_eq!(run_result.exit_code, crate::constant::EVMC_SUCCESS);
     state.finalise().expect("update state");
     assert_eq!(run_result.return_data.len(), 32);
     let beacon_proxy_ethabi_addr = &run_result.return_data[12..];

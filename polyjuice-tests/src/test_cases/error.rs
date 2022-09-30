@@ -9,8 +9,6 @@ use gw_types::{
 use crate::helper::{self, L2TX_MAX_CYCLES};
 
 const CONTRACT_CODE: &str = include_str!("./evm-contracts/Error.bin");
-const EVMC_SUCCESS: i8 = 0;
-const EVMC_REVERT: i8 = 2;
 
 #[test]
 fn test_error_handling() {
@@ -35,7 +33,7 @@ fn test_error_handling() {
         block_producer.to_owned(),
         4,
     );
-    assert_eq!(run_result.exit_code, 0);
+    assert_eq!(run_result.exit_code, crate::constant::EVMC_SUCCESS);
     let contract_script =
         helper::new_contract_account_script(&state, from_id, &from_eth_address, false);
     let contract_account_id = state
@@ -72,7 +70,7 @@ fn test_error_handling() {
             None,
         )
         .expect("Call testAssert()");
-    assert_eq!(run_result.exit_code, EVMC_SUCCESS);
+    assert_eq!(run_result.exit_code, crate::constant::EVMC_SUCCESS);
 
     // Panic via assert: Call mockAssertPayable() -> 0x67478cc9
     block_number += 1;
@@ -101,7 +99,7 @@ fn test_error_handling() {
             None,
         )
         .expect("mockAssertPayable() => EVMC_REVERT: 2");
-    assert_eq!(run_result.exit_code, EVMC_REVERT);
+    assert_eq!(run_result.exit_code, crate::constant::EVMC_REVERT);
     // The assert function creates an built-in error of type Panic(uint256) -> 0x4e487b71
     // 0x01: If you call assert with an argument that evaluates to false.
     // evmc_result.output_size => 36
@@ -144,7 +142,7 @@ fn test_error_handling() {
     // 0x11: If an arithmetic operation results in underflow or overflow outside of an unchecked { ... } block.
     // evmc_result.output_size => 36
     // evmc_result.output_data: 0x4e487b710000000000000000000000000000000000000000000000000000000000000011
-    assert_eq!(err.exit_code, EVMC_REVERT);
+    assert_eq!(err.exit_code, crate::constant::EVMC_REVERT);
 
     // Call testRequire(9) -> 0xb8bd717f0000000000000000000000000000000000000000000000000000000000000009
     block_number += 1;
@@ -175,7 +173,7 @@ fn test_error_handling() {
             None,
         )
         .expect("testRequire(9) => EVMC_REVERT: 2");
-    assert_eq!(run_result.exit_code, EVMC_REVERT);
+    assert_eq!(run_result.exit_code, crate::constant::EVMC_REVERT);
     // The require function creates an built-in error of type Error(string) -> 0x08c379a0
     // evmc_result.output_size => 100
     // evmc_result.output_data: 0x08c379a00000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000001d496e707574206d7573742062652067726561746572207468616e203130000000
@@ -212,7 +210,7 @@ fn test_error_handling() {
             None,
         )
         .expect("Call testRevert(8)");
-    assert_eq!(run_result.exit_code, EVMC_REVERT);
+    assert_eq!(run_result.exit_code, crate::constant::EVMC_REVERT);
     // The revert function creates an built-in error of type Error(string) -> 0x08c379a0
     // evmc_result.output_size => 100
     // evmc_result.output_data: 0x08c379a00000000000000000000000000000000000000000000000000000000000000020000000000000000000000000000000000000000000000000000000000000001d496e707574206d7573742062652067726561746572207468616e203130000000
@@ -247,7 +245,7 @@ fn test_error_handling() {
             None,
         )
         .expect("Call testRevertMsg('test revert message')");
-    assert_eq!(run_result.exit_code, EVMC_REVERT);
+    assert_eq!(run_result.exit_code, crate::constant::EVMC_REVERT);
     let expected_output = hex::decode("08c379a0000000000000000000000000000000000000000000000000000000000000002000000000000000000000000000000000000000000000000000000000000000137465737420726576657274206d65737361676500000000000000000000000000")
         .expect("decode Error('test revert message')");
     assert_eq!(run_result.return_data, expected_output);

@@ -32,7 +32,7 @@ fn native_token_transfer_test() -> anyhow::Result<()> {
         .args(ckb_vm::Bytes::from(args).pack())
         .build();
     let run_result = chain.execute_raw(raw_tx)?;
-    assert_eq!(run_result.exit_code, 0);
+    assert_eq!(run_result.exit_code, crate::constant::EVMC_SUCCESS);
 
     let from_balance = chain.get_balance(&from_addr)?;
     let to_balance = chain.get_balance(&to_addr)?;
@@ -64,7 +64,7 @@ fn native_token_transfer_unregistered_address_test() -> anyhow::Result<()> {
         .args(ckb_vm::Bytes::from(args).pack())
         .build();
     let run_result = chain.execute_raw(raw_tx)?;
-    assert_eq!(run_result.exit_code, 0);
+    assert_eq!(run_result.exit_code, crate::constant::EVMC_SUCCESS);
 
     let system_log = run_result.logs.last().map(parse_log);
     if let Some(Log::PolyjuiceSystem { gas_used, .. }) = system_log {
@@ -151,7 +151,7 @@ fn native_token_transfer_invalid_to_id_test() -> anyhow::Result<()> {
         .build();
 
     let run_result = chain.execute_raw(raw_tx)?;
-    assert_eq!(run_result.exit_code, 0);
+    assert_eq!(run_result.exit_code, crate::constant::EVMC_SUCCESS);
 
     let to_balance = chain.get_balance(&to_addr)?;
     println!("from balance: {}, to balance: {}", from_balance, to_balance);
@@ -191,7 +191,7 @@ fn native_token_transfer_invalid_to_id_and_unregistered_address_test() -> anyhow
         .args(ckb_vm::Bytes::from(args).pack())
         .build();
     let run_result = chain.execute_raw(raw_tx)?;
-    assert_eq!(run_result.exit_code, 0);
+    assert_eq!(run_result.exit_code, crate::constant::EVMC_SUCCESS);
 
     let to_id = chain.get_account_id_by_eth_address(&to_addr)?;
     assert_eq!(None, to_id);
@@ -221,7 +221,7 @@ fn native_token_transfer_unregistered_zero_address_test() -> anyhow::Result<()> 
         .args(ckb_vm::Bytes::from(args).pack())
         .build();
     let run_result = chain.execute_raw(raw_tx)?;
-    assert_eq!(run_result.exit_code, 0);
+    assert_eq!(run_result.exit_code, crate::constant::EVMC_SUCCESS);
 
     let from_balance = chain.get_balance(&from_addr)?;
     let to_balance = chain.get_balance(&to_addr)?;
