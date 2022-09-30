@@ -18,7 +18,7 @@ CFLAGS_MBEDTLS := -Ideps/mbedtls/include
 CFLAGS_EVMONE := -Ideps/evmone/lib/evmone -Ideps/evmone/include -Ideps/evmone/evmc/include
 CFLAGS_SMT := -Ideps/godwoken-scripts/c/deps/sparse-merkle-tree/c
 CFLAGS_GODWOKEN := -Ideps/godwoken-scripts/c
-CFLAGS := -O3 -Ic/ripemd160 $(CFLAGS_CKB_STD) $(CFLAGS_EVMONE) $(CFLAGS_INTX) $(CFLAGS_BN128) $(CFLAGS_ETHASH) $(CFLAGS_CRYPTO_ALGORITHMS) $(CFLAGS_MBEDTLS) $(CFLAGS_SMT) $(CFLAGS_GODWOKEN) $(CFLAGS_SECP)
+CFLAGS := -O3 -Ic/ripemd160 $(CFLAGS_CKB_STD) $(CFLAGS_EVMONE) $(CFLAGS_INTX) $(CFLAGS_ETHASH) $(CFLAGS_CRYPTO_ALGORITHMS) $(CFLAGS_MBEDTLS) $(CFLAGS_SMT) $(CFLAGS_GODWOKEN) $(CFLAGS_SECP)
 CXXFLAGS := $(CFLAGS) -std=c++1z
 # -Wl,<args> Pass the comma separated arguments in args to the linker(GNU linker)
 # --gc-sections
@@ -40,8 +40,7 @@ PROTOCOL_SCHEMA_URL := https://raw.githubusercontent.com/nervosnetwork/godwoken/
 
 ALL_OBJS := build/execution_state.o build/baseline.o build/analysis.o build/instruction_metrics.o build/instruction_names.o build/execution.o build/instructions.o build/instructions_calls.o build/evmone.o \
   build/keccak.o build/keccakf800.o \
-  build/sha256.o build/memzero.o build/ripemd160.o build/bignum.o build/platform_util.o \
-  build/libalt_bn128.a
+  build/sha256.o build/memzero.o build/ripemd160.o build/bignum.o build/platform_util.o
 BIN_DEPS := c/contracts.h c/sudt_contracts.h c/other_contracts.h c/polyjuice.h c/polyjuice_utils.h build/secp256k1_data_info.h $(ALL_OBJS)
 GENERATOR_DEPS := c/generator/secp256k1_helper.h $(BIN_DEPS)
 VALIDATOR_DEPS := c/validator/secp256k1_helper.h $(BIN_DEPS)
@@ -58,15 +57,15 @@ all: build/blockchain.h build/godwoken.h \
   build/generator build/validator \
   build/generator_log build/validator_log
 
-all-via-docker: generate-protocol fetch-gw-scripts build/libalt_bn128.a
+all-via-docker: generate-protocol fetch-gw-scripts
 	mkdir -p build
 	docker run --rm -v `pwd`:/code -w /code ${BUILDER_DOCKER} make
 	make patch-generator && make patch-generator_log
-log-version-via-docker: generate-protocol build/libalt_bn128.a
+log-version-via-docker: generate-protocol
 	mkdir -p build
 	docker run --rm -v `pwd`:/code -w /code ${BUILDER_DOCKER} bash -c "make build/generator_log && make build/validator_log"
 
-all-via-docker-in-debug-mode: generate-protocol build/libalt_bn128.a
+all-via-docker-in-debug-mode: generate-protocol
 	docker run --rm -v `pwd`:/code -w /code ${BUILDER_DOCKER} make all-in-debug-mode
 # Be aware that a given prerequisite will only be built once per invocation of make, at most.
 all-in-debug-mode: LDFLAGS := -g # only use -O0 to decrease compile time while coding and debugging (O0 compile time: 1m58s)
@@ -195,12 +194,6 @@ build/platform_util.o: deps/mbedtls/library/platform_util.c
 	$(CC) $(CFLAGS) $(LDFLAGS) -c -o $@ $<
 build/bignum.o: deps/mbedtls/library/bignum.c
 	$(CC) $(CFLAGS) $(LDFLAGS) -c -o $@ $<
-
-# Pairing cryptography library in Rust
-build/libalt_bn128.a:
-	cd deps/bn/alt_bn128_staticlib && rustup target add riscv64imac-unknown-none-elf
-	cd deps/bn/alt_bn128_staticlib && cargo build --release --target riscv64imac-unknown-none-elf
-	cp deps/bn/alt_bn128_staticlib/target/riscv64imac-unknown-none-elf/release/libalt_bn128.a build/
 
 build/sha256.o: deps/crypto-algorithms/sha256.c
 	$(CXX) $(CFLAGS) $(LDFLAGS) -c -o $@ $<
