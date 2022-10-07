@@ -18,16 +18,15 @@ CFLAGS_MBEDTLS := -Ideps/mbedtls/include
 CFLAGS_EVMONE := -Ideps/evmone/lib/evmone -Ideps/evmone/include -Ideps/evmone/evmc/include
 CFLAGS_SMT := -Ideps/godwoken-scripts/c/deps/sparse-merkle-tree/c
 CFLAGS_GODWOKEN := -Ideps/godwoken-scripts/c
-CFLAGS := -O3 -Ic/ripemd160 $(CFLAGS_CKB_STD) $(CFLAGS_EVMONE) $(CFLAGS_INTX) $(CFLAGS_ETHASH) $(CFLAGS_CRYPTO_ALGORITHMS) $(CFLAGS_MBEDTLS) $(CFLAGS_SMT) $(CFLAGS_GODWOKEN) $(CFLAGS_SECP)
+CFLAGS := -Os -Ic/ripemd160 $(CFLAGS_CKB_STD) $(CFLAGS_EVMONE) $(CFLAGS_ETHASH) $(CFLAGS_CRYPTO_ALGORITHMS) $(CFLAGS_MBEDTLS) $(CFLAGS_SMT) $(CFLAGS_GODWOKEN) $(CFLAGS_SECP)
 CXXFLAGS := $(CFLAGS) -std=c++1z
 # -Wl,<args> Pass the comma separated arguments in args to the linker(GNU linker)
 # --gc-sections
 #   This will perform a garbage collection of code and data never referenced.
 #   together with -ffunction-sections and -fdata-sections
 # -static
-# 	On systems that support dynamic linking, this  pre-
-# 	vents  linking with the shared libraries.  On other
-# 	systems, this option has no effect.
+# 	On systems that support dynamic linking, this prevents linking with the 
+#   shared libraries. On other systems, this option has no effect.
 LDFLAGS := -Wl,-static -Wl,--gc-sections -fdata-sections -ffunction-sections -Wall
 
 GENERATOR_FLAGS := -DGW_GENERATOR
@@ -107,7 +106,7 @@ patch-generator_log: build/ckb-binary-patcher
 
 build/generator: c/generator.c $(GENERATOR_DEPS)
 	cd $(SECP_DIR) && (git apply workaround-fix-g++-linking.patch || true) && cd - # apply patch
-	$(CXX) $(CFLAGS) $(LDFLAGS) -Ibuild -o $@ c/generator.c $(ALL_OBJS)
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -Ibuild -o $@ c/generator.c $(ALL_OBJS)
 	$(OBJCOPY) --only-keep-debug $@ $@.debug
 	$(OBJCOPY) --strip-debug --strip-all $@
 	cd $(SECP_DIR) && (git apply -R workaround-fix-g++-linking.patch || true) && cd - # revert patch
@@ -121,7 +120,7 @@ build/validator: c/validator.c $(VALIDATOR_DEPS)
 
 build/generator_log: c/generator.c $(GENERATOR_DEPS)
 	cd $(SECP_DIR) && (git apply workaround-fix-g++-linking.patch || true) && cd - # apply patch
-	$(CXX) $(CFLAGS) $(LDFLAGS) -Ibuild -o $@ c/generator.c $(ALL_OBJS) -DPOLYJUICE_DEBUG_LOG
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -Ibuild -o $@ c/generator.c $(ALL_OBJS) -DPOLYJUICE_DEBUG_LOG
 #	If we need the whole one for performance analysis, don't separate the executable here
 	$(OBJCOPY) --only-keep-debug $@ $@.debug
 	$(OBJCOPY) --strip-debug --strip-all $@
@@ -157,23 +156,23 @@ build/test_ripemd160: c/ripemd160/test_ripemd160.c c/ripemd160/ripemd160.h c/rip
 	riscv64-unknown-elf-run build/test_ripemd160
 
 build/execution_state.o: deps/evmone/lib/evmone/execution_state.cpp
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) -c -o $@ $<
+	$(CXX) $(CXXFLAGS) $(CFLAGS_INTX) $(LDFLAGS) -c -o $@ $<
 build/baseline.o: deps/evmone/lib/evmone/baseline.cpp
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) -c -o $@ $<
+	$(CXX) $(CXXFLAGS) $(CFLAGS_INTX) $(LDFLAGS) -c -o $@ $<
 build/analysis.o: deps/evmone/lib/evmone/analysis.cpp
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) -c -o $@ $<
+	$(CXX) $(CXXFLAGS) $(CFLAGS_INTX) $(LDFLAGS) -c -o $@ $<
 build/execution.o: deps/evmone/lib/evmone/execution.cpp
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) -c -o $@ $<
+	$(CXX) $(CXXFLAGS) $(CFLAGS_INTX) $(LDFLAGS) -c -o $@ $<
 build/instructions.o: deps/evmone/lib/evmone/instructions.cpp
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) -c -o $@ $<
+	$(CXX) $(CXXFLAGS) $(CFLAGS_INTX) $(LDFLAGS) -c -o $@ $<
 build/instruction_metrics.o: deps/evmone/evmc/lib/instructions/instruction_metrics.c
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -c -o $@ $<
 build/instruction_names.o: deps/evmone/evmc/lib/instructions/instruction_names.c
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -c -o $@ $<
 build/instructions_calls.o: deps/evmone/lib/evmone/instructions_calls.cpp
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) -c -o $@ $<
+	$(CXX) $(CXXFLAGS) $(CFLAGS_INTX) $(LDFLAGS) -c -o $@ $<
 build/evmone.o: deps/evmone/lib/evmone/evmone.cpp
-	$(CXX) $(CXXFLAGS) $(LDFLAGS) -c -o $@ $< -DPROJECT_VERSION=\"0.6.0-dev\"
+	$(CXX) $(CXXFLAGS) $(CFLAGS_INTX) $(LDFLAGS) -c -o $@ $< -DPROJECT_VERSION=\"0.6.0-dev\"
 
 build/keccak.o: deps/ethash/lib/keccak/keccak.c build/keccakf800.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -c -o $@ $<
@@ -181,9 +180,6 @@ build/keccak.o: deps/ethash/lib/keccak/keccak.c build/keccakf800.o
 # 	$(CC) $(CFLAGS) $(LDFLAGS) -c -o $@ $<
 build/keccakf800.o: deps/ethash/lib/keccak/keccakf800.c
 	$(CC) $(CFLAGS) $(LDFLAGS)  -c -o $@ $<
-
-# build/div.o: deps/intx/lib/intx/div.cpp
-# 	$(CXX) $(CFLAGS) $(LDFLAGS) -c -o $@ $<
 
 build/memzero.o: c/ripemd160/memzero.c
 	$(CXX) $(CFLAGS) $(LDFLAGS) -c -o $@ $<
