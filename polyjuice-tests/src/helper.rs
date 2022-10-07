@@ -742,7 +742,10 @@ pub(crate) fn check_cycles(l2_tx_label: &str, used_cycles: u64, warning_cycles: 
         );
     }
 
-    println!("[check_cycles] used_cycles: {}", used_cycles);
+    println!(
+        "[check_cycles] {l2_tx_label}'s used_cycles: {}",
+        used_cycles
+    );
     assert!(
         used_cycles < warning_cycles,
         "[Warning(cycles: {}): {} used too many cycles({})]",

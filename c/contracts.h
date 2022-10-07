@@ -4,7 +4,6 @@
 #include "mbedtls/bignum.h"
 #include "ripemd160.h"
 #include "sha256.h"
-#include <intx/intx.hpp>
 
 #include "polyjuice_utils.h"
 #include "sudt_contracts.h"
@@ -869,7 +868,7 @@ int bn256_pairing_istanbul(gw_context_t *ctx,
 
 /**
  * @brief Match Precompiled Contracts
- * @see  - https://www.evm.codes/precompiled
+ * @see - https://www.evm.codes/precompiled
  */
 bool match_precompiled_address(const evmc_address* destination,
                                precompiled_contract_gas_fn* contract_gas,

@@ -44,8 +44,7 @@ PROTOCOL_SCHEMA_URL := https://raw.githubusercontent.com/nervosnetwork/godwoken/
 
 ALL_OBJS := $(BUILD)/keccak.o $(BUILD)/keccakf800.o \
   $(BUILD)/execution_state.o $(BUILD)/evmc_hex.o $(BUILD)/baseline.o $(BUILD)/analysis.o $(BUILD)/instruction_metrics.o $(BUILD)/instruction_names.o $(BUILD)/execution.o $(BUILD)/instructions.o $(BUILD)/instructions_calls.o $(BUILD)/evmone.o \
-  $(BUILD)/sha256.o $(BUILD)/memzero.o $(BUILD)/ripemd160.o $(BUILD)/bignum.o $(BUILD)/platform_util.o \
-  $(BUILD)/libalt_bn128.o
+  $(BUILD)/sha256.o $(BUILD)/memzero.o $(BUILD)/ripemd160.o $(BUILD)/bignum.o $(BUILD)/platform_util.o
 BIN_DEPS := ../../c/contracts.h ../../c/sudt_contracts.h ../../c/other_contracts.h ../../c/polyjuice.h ../../c/polyjuice_utils.h $(BUILD)/secp256k1_data_info.h $(ALL_OBJS)
 GENERATOR_DEPS := ../../c/generator/secp256k1_helper.h $(BIN_DEPS)
 VALIDATOR_DEPS := ../../c/validator/secp256k1_helper.h $(BIN_DEPS)
@@ -171,13 +170,6 @@ build/platform_util.o: $(DEPS)/mbedtls/library/platform_util.c
 	$(CC) $(CFLAGS) $(LDFLAGS) -c -o $@ $<
 build/bignum.o: $(DEPS)/mbedtls/library/bignum.c
 	$(CC) $(CFLAGS) $(LDFLAGS) -c -o $@ $<
-
-# Pairing cryptography library in Rust
-build/libalt_bn128.o:
-# This output will create *.so files on Linux, *.dylib files on macOS.
-	cd $(DEPS)/bn/alt_bn128_cdylib && cargo build --release
-	cp $(DEPS)/bn/alt_bn128_cdylib/target/release/libalt_bn128.so build/libalt_bn128.o || \
-	cp $(DEPS)/bn/alt_bn128_cdylib/target/release/libalt_bn128.dylib build/libalt_bn128.o
 	
 build/sha256.o: $(DEPS)/crypto-algorithms/sha256.c
 	$(CXX) $(CFLAGS) $(LDFLAGS) -c -o $@ $<

@@ -42,9 +42,7 @@ contract PrecompiledContracts {
                 0x0180, // input length = 32 * 12 = 384bytes
                 input,  // store output over input
                 0x20)   // output length is 32bytes
-            ) {
-                revert(0, 0)
-            }
+            ) { revert(0, 0) }
         }
         return input[0];
     }
@@ -67,6 +65,15 @@ contract PrecompiledContracts {
     }
 
     // The address 0x06 implements a native elliptic curve point addition.
+    function bn256Add(bytes memory input) public returns (bytes32[2] memory result) {
+        uint256 len = input.length;
+        assembly {
+            if iszero(call(not(0), 0x06, 0, add(input, 0x20), len, result, 0x40)) {
+                // revert('0x06 precompiled contract error')
+                revert(0, 0)
+            }
+        }
+    }
     function callBn256Add(bytes32 ax, bytes32 ay, bytes32 bx, bytes32 by) public returns (bytes32[2] memory result) {
         bytes32[4] memory input;
         input[0] = ax;
@@ -83,6 +90,14 @@ contract PrecompiledContracts {
     }
 
     // The address 0x07 implements a native elliptic curve multiplication with a scalar value.
+    function bn256ScalarMul(bytes memory input) public returns (bytes32[2] memory result) {
+        uint256 len = input.length;
+        assembly {
+            if iszero(call(not(0), 0x07, 0, add(input, 0x20), len, result, 0x40)) {
+                revert(0, 0)
+            }
+        }
+    }
     function callBn256ScalarMul(bytes32 x, bytes32 y, bytes32 scalar) public returns (bytes32[2] memory result) {
         bytes32[3] memory input;
         input[0] = x;
