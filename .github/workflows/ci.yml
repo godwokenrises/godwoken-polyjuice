@@ -39,16 +39,18 @@ jobs:
 
     - name: Validate the checksum of SudtERC20Proxy Contract.bin
       run: make contract/sudt-erc20-proxy
-        
+
     - name: Run Integration-Test
       run: bash devtools/ci/integration-test.sh
+
+    - name: Run Ethereum Test
+      working-directory: polyjuice-tests
+      run: RUST_LOG=info,gw_generator=debug cargo test --release --test ethereum_test -- ethereum_test --nocapture
 
     - name: Checksums of generator and validator
       run: |
         ls -lh build
         sha256sum build/generator build/generator_log build/validator build/validator_log
-
-
 
   integration-test:
     uses: nervosnetwork/godwoken-tests/.github/workflows/reusable-integration-test-v1.yml@develop
