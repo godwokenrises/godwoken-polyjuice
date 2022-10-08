@@ -18,7 +18,7 @@ CFLAGS_MBEDTLS := -Ideps/mbedtls/include
 CFLAGS_EVMONE := -Ideps/evmone/lib/evmone -Ideps/evmone/include -Ideps/evmone/evmc/include
 CFLAGS_SMT := -Ideps/godwoken-scripts/c/deps/sparse-merkle-tree/c
 CFLAGS_GODWOKEN := -Ideps/godwoken-scripts/c
-CFLAGS := -Os -Ic/ripemd160 $(CFLAGS_CKB_STD) $(CFLAGS_EVMONE) $(CFLAGS_ETHASH) $(CFLAGS_CRYPTO_ALGORITHMS) $(CFLAGS_MBEDTLS) $(CFLAGS_SMT) $(CFLAGS_GODWOKEN) $(CFLAGS_SECP)
+CFLAGS := -O3 -Ic/ripemd160 $(CFLAGS_CKB_STD) $(CFLAGS_EVMONE) $(CFLAGS_ETHASH) $(CFLAGS_CRYPTO_ALGORITHMS) $(CFLAGS_MBEDTLS) $(CFLAGS_SMT) $(CFLAGS_GODWOKEN) $(CFLAGS_SECP)
 CXXFLAGS := $(CFLAGS) -std=c++1z
 # -Wl,<args> Pass the comma separated arguments in args to the linker(GNU linker)
 # --gc-sections
