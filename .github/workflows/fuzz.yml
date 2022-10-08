@@ -70,7 +70,7 @@ jobs:
       run: |
         mkdir -p corpus
         mkdir -p corpus-cache
-        ls corpus-cache
+        echo "num of corpus: $(ls corpus-cache | wc -l)"
         echo "fuzz time: ${{ env.MAX_FUZZ_TIME }}"
         make build/fuzzer && \
         LLVM_PROFILE_FILE="build/fuzzer.profraw" ./build/fuzzer corpus corpus-cache \
