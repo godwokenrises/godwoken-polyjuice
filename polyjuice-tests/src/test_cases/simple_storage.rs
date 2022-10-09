@@ -57,7 +57,7 @@ fn test_simple_storage() {
         state.finalise().expect("update state");
         println!("return_data: {}", hex::encode(&run_result.return_data[..]));
         // 557534 < 560K
-        helper::check_cycles("Deploy SimpleStorage", run_result.cycles.execution, 830_000);
+        helper::check_cycles("Deploy SimpleStorage", run_result.cycles, 830_000);
     }
 
     let contract_account_script =
@@ -109,7 +109,7 @@ fn test_simple_storage() {
             .expect("construct");
         state.finalise().expect("update state");
         // 489767 < 500K
-        helper::check_cycles("SimpleStorage.set", run_result.cycles.execution, 6_100_000);
+        helper::check_cycles("SimpleStorage.set", run_result.cycles, 6_100_000);
     }
 
     {

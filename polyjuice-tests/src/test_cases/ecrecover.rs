@@ -32,11 +32,7 @@ fn test_ecrecover() {
         1,
     );
     // [Deploy HeadTail Contract] used cycles: 1645593 < 1650K
-    helper::check_cycles(
-        "Deploy HeadTail Contract",
-        run_result.cycles.execution,
-        2_000_000,
-    );
+    helper::check_cycles("Deploy HeadTail Contract", run_result.cycles, 2_000_000);
     // println!(
     //     "result {}",
     //     serde_json::to_string_pretty(&RunResult::from(run_result)).unwrap()
@@ -83,7 +79,7 @@ fn test_ecrecover() {
             )
             .expect("construct");
         // [recover] used cycles: 2604412 < 2660K
-        helper::check_cycles("verify|recover", run_result.cycles.execution, 2_960_000);
+        helper::check_cycles("verify|recover", run_result.cycles, 2_960_000);
         state.finalise().expect("update state");
         assert_eq!(
             run_result.return_data,

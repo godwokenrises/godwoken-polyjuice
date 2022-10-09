@@ -30,11 +30,7 @@ fn test_simple_wallet() {
         block_number,
     );
     // [Deploy SimpleWallet Contract] used cycles: 1803600 < 1810K
-    helper::check_cycles(
-        "Deploy SimpleWallet",
-        run_result.cycles.execution,
-        2_100_000,
-    );
+    helper::check_cycles("Deploy SimpleWallet", run_result.cycles, 2_100_000);
 
     let account_script = new_contract_account_script(&state, from_id, &from_eth_address, false);
     let contract_id = state

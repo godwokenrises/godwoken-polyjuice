@@ -67,11 +67,7 @@ fn test_contract_call_contract() {
     //     serde_json::to_string_pretty(&RunResult::from(run_result)).unwrap()
     // );
     // [Deploy CreateContract] used cycles: 600288 < 610K
-    helper::check_cycles(
-        "Deploy CreateContract",
-        run_result.cycles.execution,
-        880_000,
-    );
+    helper::check_cycles("Deploy CreateContract", run_result.cycles, 880_000);
     let cc_account = MockContractInfo::create(&from_eth_address, 1);
     let cc_contract_id = state
         .get_account_id_by_script_hash(&cc_account.script_hash)
@@ -124,11 +120,7 @@ fn test_contract_call_contract() {
             .expect("CallContract.proxySet");
         state.finalise().expect("update state");
         // [CallContract.proxySet(222)] used cycles: 961599 -> 980564 < 981K
-        helper::check_cycles(
-            "CallContract.proxySet()",
-            run_result.cycles.execution,
-            1_170_000,
-        );
+        helper::check_cycles("CallContract.proxySet()", run_result.cycles, 1_170_000);
     }
 
     let run_result = simple_storage_get(
@@ -173,11 +165,7 @@ fn test_contract_call_non_exists_contract() {
         block_number,
     );
     // [Deploy CallNonExistsContract] used cycles: 657243 < 670K
-    helper::check_cycles(
-        "Deploy CallNonExistsContract",
-        run_result.cycles.execution,
-        950_000,
-    );
+    helper::check_cycles("Deploy CallNonExistsContract", run_result.cycles, 950_000);
 
     let contract = MockContractInfo::create(&from_eth_address, 0);
     let contract_script_hash = contract.script_hash;
@@ -273,7 +261,7 @@ fn test_contract_call_non_exists_contract() {
         // [CallNonExistsContract.rawCall(address eoa_addr)] used cycles: 862060 < 870K
         helper::check_cycles(
             "CallNonExistsContract.rawCall(address eoa_addr)",
-            run_result.cycles.execution,
+            run_result.cycles,
             1_100_000,
         );
     }

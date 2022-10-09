@@ -44,7 +44,7 @@ fn test_erc20() {
     );
     print_gas_used("Deploy ERC20 contract: ", &run_result.logs);
     // [Deploy ERC20] used cycles: 1018075 < 1020K
-    helper::check_cycles("Deploy ERC20", run_result.cycles.execution, 1_400_000);
+    helper::check_cycles("Deploy ERC20", run_result.cycles, 1_400_000);
 
     let erc20_contract = MockContractInfo::create(&from_eth_address1, 0);
     let erc20_contract_id = state
@@ -163,7 +163,7 @@ fn test_erc20() {
         // [ERC20 contract method_x] used cycles: 942107 < 960K
         helper::check_cycles(
             "ERC20 contract method_x",
-            run_result.cycles.execution,
+            run_result.cycles,
             1_400_000,
         );
         state.finalise().expect("update state");

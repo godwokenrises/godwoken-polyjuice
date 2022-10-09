@@ -44,11 +44,7 @@ fn test_recover_account() {
         0,
     );
     // Deploy RecoverAccount Contract used cycles = 690541 < 700K
-    helper::check_cycles(
-        "Deploy RecoverAccount Contract",
-        run_result.cycles.execution,
-        970_000,
-    );
+    helper::check_cycles("Deploy RecoverAccount Contract", run_result.cycles, 970_000);
     let contract_account_script =
         new_contract_account_script(&state, from_id, &from_eth_address, false);
     let new_account_id = state
@@ -109,7 +105,7 @@ fn test_recover_account() {
         // [RecoverAccount.recover(message, signature, code_hash)] used cycles: 648630 < 670K
         helper::check_cycles(
             "RecoverAccount.recover(message, signature, code_hash)",
-            run_result.cycles.execution,
+            run_result.cycles,
             800_000,
         );
         state.finalise().expect("update state");

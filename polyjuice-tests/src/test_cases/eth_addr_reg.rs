@@ -100,11 +100,7 @@ fn test_update_eth_addr_reg_by_contract() {
     assert_eq!(run_result.exit_code, crate::constant::EVMC_SUCCESS);
     state.finalise().expect("update state");
     // cycles(1176198)] < 1200k cycles
-    helper::check_cycles(
-        "eth_address_regiser",
-        run_result.cycles.execution,
-        1_200_000,
-    );
+    helper::check_cycles("eth_address_regiser", run_result.cycles, 1_200_000);
     assert_eq!(
         // make sure the fee was paid
         state

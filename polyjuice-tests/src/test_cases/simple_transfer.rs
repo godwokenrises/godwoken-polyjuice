@@ -108,11 +108,7 @@ fn test_simple_transfer() {
         block_number,
     );
     // [Deploy SimpleTransfer] used cycles: 491894 -> 500005 < 501K
-    helper::check_cycles(
-        "Deploy SimpleTransfer",
-        run_result.cycles.execution,
-        612_000,
-    );
+    helper::check_cycles("Deploy SimpleTransfer", run_result.cycles, 612_000);
 
     let st_contract_account_script =
         new_contract_account_script(&state, from_id, &from_eth_address, false);
@@ -177,7 +173,7 @@ fn test_simple_transfer() {
         // [SimpleTransfer to EoA] used cycles: 725217 < 736K
         helper::check_cycles(
             "SimpleTransfer to EoA",
-            run_result.cycles.execution,
+            run_result.cycles,
             908_000,
         );
         state.finalise().expect("update state");
@@ -284,7 +280,7 @@ fn test_simple_transfer() {
         // [SimpleTransfer.transferToSimpleStorage1] used cycles: 1203332 < 1210K
         helper::check_cycles(
             "SimpleTransfer.transferToSimpleStorage1()",
-            run_result.cycles.execution,
+            run_result.cycles,
             1_480_000,
         );
         state.finalise().expect("update state");
