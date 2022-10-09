@@ -71,7 +71,7 @@ fn receive_ether_test() -> anyhow::Result<()> {
             None,
         )
         .expect("Call receive()");
-    check_cycles("receive()", run_result.cycles.execution, 710_100);
+    check_cycles("receive()", run_result.cycles, 710_100);
     assert!(run_result.return_data.is_empty());
 
     let receive_data = match parse_log(&run_result.logs[1]) {

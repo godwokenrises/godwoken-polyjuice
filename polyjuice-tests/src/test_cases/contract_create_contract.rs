@@ -39,11 +39,7 @@ fn test_contract_create_contract() {
     );
     state.finalise().expect("update state");
     // [Deploy CreateContract] used cycles: 2109521 < 2120K
-    helper::check_cycles(
-        "Deploy CreateContract",
-        run_result.cycles.execution,
-        2_820_000,
-    );
+    helper::check_cycles("Deploy CreateContract", run_result.cycles, 2_820_000);
     // println!(
     //     "result {}",
     //     serde_json::to_string_pretty(&RunResult::from(run_result)).unwrap()

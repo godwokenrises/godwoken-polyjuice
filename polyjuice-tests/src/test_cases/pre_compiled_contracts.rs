@@ -13,6 +13,7 @@ use gw_common::{
     state::{build_data_hash_key, State},
     H256,
 };
+use gw_config::SyscallCyclesConfig;
 use gw_generator::syscalls::store_data;
 use gw_store::traits::chain_store::ChainStore;
 use gw_types::{
@@ -275,7 +276,7 @@ fn test_bn256_pairing() -> anyhow::Result<()> {
                 &new_block_info(block_producer.clone(), block_number, 0),
                 &raw_tx,
                 L2TX_MAX_CYCLES,
-                None,
+                Some(&mut gw_generator::generator::CyclesPool::new(u64::MAX, SyscallCyclesConfig::default())),
             )
             .expect(case_name);
         // time consumed
@@ -289,7 +290,7 @@ fn test_bn256_pairing() -> anyhow::Result<()> {
             hex::decode(expected_output_hex).unwrap()
         );
 
-        crate::helper::check_cycles(case_name, run_result.cycles.execution, 720_000);
+        crate::helper::check_cycles(case_name, run_result.cycles, 860_000 + input_len / 192 * 34_000 * 3);
     }
     Ok(())
 }
@@ -363,7 +364,7 @@ fn test_bn256_add() -> anyhow::Result<()> {
             hex::decode("0000000000000000000000000000000000000000000000000000000000000001")
                 .unwrap()
         );
-        crate::helper::check_cycles("Call Bn256PairingIstanbul", run_result.cycles.execution, 700_000);
+        crate::helper::check_cycles("Call Bn256PairingIstanbul", run_result.cycles, 700_000);
     }
 
     for (input_hex, expected_output_hex, bn_add_gas, case_name) in [(
@@ -481,7 +482,7 @@ fn test_bn256_add() -> anyhow::Result<()> {
             hex::decode(expected_output_hex).unwrap()
         );
 
-        crate::helper::check_cycles(case_name, run_result.cycles.execution, 700_000);
+        crate::helper::check_cycles(case_name, run_result.cycles, 700_000);
     }
     Ok(())
 }
@@ -691,7 +692,7 @@ fn test_bn256_scalar_mul() -> anyhow::Result<()> {
             hex::decode(expected_output_hex).unwrap()
         );
 
-        crate::helper::check_cycles(case_name, run_result.cycles.execution, 700_000);
+        crate::helper::check_cycles(case_name, run_result.cycles, 700_000);
     }
     Ok(())
 }

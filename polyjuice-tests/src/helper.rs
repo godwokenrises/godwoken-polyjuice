@@ -22,7 +22,7 @@ use gw_traits::CodeStore;
 use gw_types::{
     bytes::Bytes,
     core::{AllowedContractType, AllowedEoaType, ScriptHashType},
-    offchain::RunResult,
+    offchain::{RunResult, RunResultCycles},
     packed::{
         AllowedTypeHash, BatchSetMapping, BlockInfo, Fee, LogItem, RawL2Transaction, RollupConfig,
         Script, SetMapping, Uint64,
@@ -56,7 +56,7 @@ pub const SUDT_VALIDATOR_SCRIPT_TYPE_HASH: [u8; 32] = [0xa2u8; 32];
 pub const SECP_DATA: &[u8] = include_bytes!("../../build/secp256k1_data");
 
 // polyjuice
-pub const POLYJUICE_GENERATOR_NAME: &str = "../build/generator_log";
+pub const POLYJUICE_GENERATOR_NAME: &str = "../build/generator";
 pub const POLYJUICE_VALIDATOR_NAME: &str = "../build/validator";
 // ETH Address Registry
 pub const ETH_ADDRESS_REGISTRY_GENERATOR_NAME: &str =
@@ -668,8 +668,6 @@ pub fn simple_storage_get(
             None,
         )
         .expect("execute_transaction");
-    // 491894, 571661 -> 586360 < 587K
-    check_cycles("simple_storage_get", run_result.cycles.execution, 700_000);
 
     run_result
 }
@@ -727,13 +725,15 @@ pub(crate) fn create_eth_eoa_account(
     (account_id, script_hash)
 }
 
-pub(crate) fn check_cycles(l2_tx_label: &str, used_cycles: u64, warning_cycles: u64) {
+pub(crate) fn check_cycles(l2_tx_label: &str, cycles: RunResultCycles, warning_cycles: u64) {
     if POLYJUICE_GENERATOR_NAME.contains("_log") {
         return; // disable cycles check
     }
 
-    if used_cycles > warning_cycles {
-        let overflow_cycles = used_cycles - warning_cycles;
+    let all_cycles = cycles.execution + cycles.r#virtual;
+
+    if all_cycles > warning_cycles {
+        let overflow_cycles = all_cycles - warning_cycles;
         println!(
             "[{}] overflow_cycles: {}({}%)",
             l2_tx_label,
@@ -743,15 +743,15 @@ pub(crate) fn check_cycles(l2_tx_label: &str, used_cycles: u64, warning_cycles: 
     }
 
     println!(
-        "[check_cycles] {l2_tx_label}'s used_cycles: {}",
-        used_cycles
+        "[check_cycles] {l2_tx_label}'s execution_cycles({}) + virtual_cycles({}) = {}",
+        cycles.execution, cycles.r#virtual, all_cycles
     );
     assert!(
-        used_cycles < warning_cycles,
+        all_cycles < warning_cycles,
         "[Warning(cycles: {}): {} used too many cycles({})]",
         warning_cycles,
         l2_tx_label,
-        used_cycles
+        all_cycles
     );
 }
 
