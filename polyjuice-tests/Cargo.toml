@@ -9,13 +9,13 @@ name = "lib"
 path = "src/lib.rs"
 
 [dependencies]
-gw-types = { path = "../integration-test/godwoken/crates/types" }
-gw-common = { path = "../integration-test/godwoken/crates/common" }
-gw-db = { path = "../integration-test/godwoken/crates/db" }
-gw-store = { path = "../integration-test/godwoken/crates/store" }
-gw-config = { path = "../integration-test/godwoken/crates/config" }
-gw-traits = { path = "../integration-test/godwoken/crates/traits" }
-gw-generator = { path = "../integration-test/godwoken/crates/generator"}
+gw-types     = { git = "https://github.com/magicalne/godwoken.git", branch = "inc_ret_data" }
+gw-common    = { git = "https://github.com/magicalne/godwoken.git", branch = "inc_ret_data" }
+gw-db        = { git = "https://github.com/magicalne/godwoken.git", branch = "inc_ret_data" }
+gw-store     = { git = "https://github.com/magicalne/godwoken.git", branch = "inc_ret_data" }
+gw-config    = { git = "https://github.com/magicalne/godwoken.git", branch = "inc_ret_data" }
+gw-traits    = { git = "https://github.com/magicalne/godwoken.git", branch = "inc_ret_data" }
+gw-generator = { git = "https://github.com/magicalne/godwoken.git", branch = "inc_ret_data" }
 ckb-vm = { version = "=0.21.3", features = ["detect-asm"] }
 ckb-vm-definitions = "=0.21.3"
 

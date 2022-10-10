@@ -10,6 +10,7 @@ pub(crate) mod fallback_function;
 pub(crate) mod get_block_info;
 pub(crate) mod get_chain_id;
 pub(crate) mod heap_memory;
+pub(crate) mod multicall3;
 pub(crate) mod native_token_transfer;
 pub(crate) mod parse_log_event;
 pub(crate) mod recursion_contract;
