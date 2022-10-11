@@ -28,3 +28,6 @@
 [submodule "deps/godwoken-scripts"]
 	path = deps/godwoken-scripts
 	url = https://github.com/nervosnetwork/godwoken-scripts.git
+[submodule "deps/gw-syscall-simulator"]
+	path = deps/gw-syscall-simulator
+	url = https://github.com/magicalne/gw-syscall-simulator.git

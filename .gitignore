@@ -59,3 +59,4 @@ integration-test/
 .vscode/c_cpp_properties.json
 
 polyjuice-tests/.vscode/
+corpus/

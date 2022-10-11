@@ -44,6 +44,7 @@
 #define POLYJUICE_SYSTEM_PREFIX 0xFF
 #define POLYJUICE_CONTRACT_CODE 0x01
 #define POLYJUICE_DESTRUCTED 0x02
+#define POLYJUICE_MAX_DEPTH 277
 
 void polyjuice_build_system_key(uint32_t id, uint8_t polyjuice_field_type,
                                 uint8_t key[GW_KEY_BYTES]) {
@@ -614,6 +615,13 @@ struct evmc_result call(struct evmc_host_context* context,
   res.release = release_result;
   gw_context_t* gw_ctx = context->gw_ctx;
 
+  if (msg->depth > POLYJUICE_MAX_DEPTH) {
+    debug_print_int("call depth exceeded", msg->depth);
+    res.status_code = EVMC_CALL_DEPTH_EXCEEDED;
+    context->error_code = FATAL_CALL_DEPTH_EXCEEDED;
+    return res;
+  }
+
   precompiled_contract_gas_fn contract_gas;
   precompiled_contract_fn contract;
   if (match_precompiled_address(&msg->destination, &contract_gas, &contract)) {
@@ -961,6 +969,7 @@ int create_new_account(gw_context_t* ctx,
   uint8_t script_hash[32];
   blake2b_hash(script_hash, new_script_seg.ptr, new_script_seg.size);
   ret = ctx->sys_create(ctx, new_script_seg.ptr, new_script_seg.size, &new_account_id);
+  free(new_script_seg.ptr);
   if (ret != 0) {
     debug_print_int("sys_create error", ret);
 
@@ -970,7 +979,6 @@ int create_new_account(gw_context_t* ctx,
       return ret;
     }
   }
-  free(new_script_seg.ptr);
   *to_id = new_account_id;
   memcpy((uint8_t *)msg->destination.bytes, eth_addr, 20);
   debug_print_int(">> new to id", *to_id);
@@ -1117,6 +1125,7 @@ int handle_native_token_transfer(gw_context_t* ctx, uint32_t from_id,
     uint32_t new_account_id;
     ret = ctx->sys_create(ctx, new_script_seg.ptr, new_script_seg.size,
                           &new_account_id);
+    free(new_script_seg.ptr);
     if (ret != 0) {
       ckb_debug("[handle_native_token_transfer] create new account failed.");
       return ret;
