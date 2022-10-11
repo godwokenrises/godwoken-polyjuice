@@ -57,13 +57,13 @@ jobs:
         if [[ ${{ github.event_name == 'pull_request' }} ]]; then
           echo "MAX_FUZZ_TIME=60" >> $GITHUB_ENV
         elif [[ ${{ startsWith(github.base_ref, 'fuzz') }} ]]; then
-          echo "MAX_FUZZ_TIME=1200" >> $GITHUB_ENV
+          echo "MAX_FUZZ_TIME=3600" >> $GITHUB_ENV
         else
           echo "MAX_FUZZ_TIME=60" >> $GITHUB_ENV
         fi
         echo "trigger type: ${{ github.event.action }}"
         if [[ ${{ github.event_name }} == 'schedule' ]]; then
-          echo "MAX_FUZZ_TIME=1200" >> $GITHUB_ENV
+          echo "MAX_FUZZ_TIME=3600" >> $GITHUB_ENV
         fi
     - name: Fuzzing Polyjuice Generator 
       working-directory: polyjuice-tests/fuzz

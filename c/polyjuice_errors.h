@@ -7,6 +7,7 @@
  */
 #define FATAL_POLYJUICE             -50
 #define FATAL_PRECOMPILED_CONTRACTS -51
+#define FATAL_CALL_DEPTH_EXCEEDED   -52
 
 /* Normal errors in polyjuice */
 #define ERROR_MOD_EXP                           -80

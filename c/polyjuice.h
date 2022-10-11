@@ -44,6 +44,7 @@
 #define POLYJUICE_SYSTEM_PREFIX 0xFF
 #define POLYJUICE_CONTRACT_CODE 0x01
 #define POLYJUICE_DESTRUCTED 0x02
+#define POLYJUICE_MAX_DEPTH 277
 
 void polyjuice_build_system_key(uint32_t id, uint8_t polyjuice_field_type,
                                 uint8_t key[GW_KEY_BYTES]) {
@@ -613,6 +614,13 @@ struct evmc_result call(struct evmc_host_context* context,
   memset(&res, 0, sizeof(res));
   res.release = release_result;
   gw_context_t* gw_ctx = context->gw_ctx;
+
+  if (msg->depth > POLYJUICE_MAX_DEPTH) {
+    debug_print_int("call depth exceeded", msg->depth);
+    res.status_code = EVMC_CALL_DEPTH_EXCEEDED;
+    context->error_code = FATAL_CALL_DEPTH_EXCEEDED;
+    return res;
+  }
 
   precompiled_contract_gas_fn contract_gas;
   precompiled_contract_fn contract;
