@@ -1379,6 +1379,9 @@ int handle_message(gw_context_t* ctx,
     if (ret != 0) {
       return ret;
     }
+    if (g_error_code != EVMC_SUCCESS) {
+      res.status_code = g_error_code;
+    }
   } else {
     ckb_debug("[handle_message] Don't run evm and return empty data");
     res->output_data = NULL;
