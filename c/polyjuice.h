@@ -614,6 +614,17 @@ struct evmc_result call(struct evmc_host_context* context,
   res.release = release_result;
   gw_context_t* gw_ctx = context->gw_ctx;
 
+  /* TODO: Revert in try block has not been implemented. Will fix later.*/
+  if (g_error_code != 0) {
+    res.gas_left = msg->gas;
+    if (is_evmc_error(g_error_code) || is_fatal_error(g_error_code)) {
+      res.status_code = (evmc_status_code)g_error_code;
+    } else {
+      res.status_code = EVMC_INTERNAL_ERROR;
+    }
+    return res;
+  }
+
   precompiled_contract_gas_fn contract_gas;
   precompiled_contract_fn contract;
   if (match_precompiled_address(&msg->destination, &contract_gas, &contract)) {
@@ -645,9 +656,9 @@ struct evmc_result call(struct evmc_host_context* context,
     if (ret != 0) {
       debug_print_int("call pre-compiled contract failed", ret);
       res.status_code = EVMC_INTERNAL_ERROR;
-      return res;
+    } else {
+      res.status_code = EVMC_SUCCESS;
     }
-    res.status_code = EVMC_SUCCESS;
   } else {
     ret = handle_message(gw_ctx, context->from_id, context->to_id,
                          &context->destination, msg, &res);
@@ -663,6 +674,10 @@ struct evmc_result call(struct evmc_host_context* context,
         res.status_code = EVMC_INTERNAL_ERROR;
       }
     }
+  }
+
+  if (ret != 0) {
+    g_error_code = ret;
   }
   debug_print_int("call.res.status_code", res.status_code);
   ckb_debug("END call");
