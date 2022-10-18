@@ -158,7 +158,7 @@ fn without_receive_fallback_test() -> anyhow::Result<()> {
     ))
     .unwrap();
     let args = PolyjuiceArgsBuilder::default()
-        .gas_limit(29997)
+        .gas_limit(59997)
         .gas_price(1)
         .value(0)
         .input(&input)

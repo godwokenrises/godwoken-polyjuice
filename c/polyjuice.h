@@ -615,15 +615,6 @@ struct evmc_result call(struct evmc_host_context* context,
   gw_context_t* gw_ctx = context->gw_ctx;
 
   /* TODO: Revert in try block has not been implemented. Will fix later.*/
-  if (g_error_code != 0) {
-    res.gas_left = msg->gas;
-    if (is_evmc_error(g_error_code) || is_fatal_error(g_error_code)) {
-      res.status_code = (evmc_status_code)g_error_code;
-    } else {
-      res.status_code = EVMC_INTERNAL_ERROR;
-    }
-    return res;
-  }
 
   precompiled_contract_gas_fn contract_gas;
   precompiled_contract_fn contract;
@@ -676,8 +667,8 @@ struct evmc_result call(struct evmc_host_context* context,
     }
   }
 
-  if (ret != 0) {
-    g_error_code = ret;
+  if (is_evmc_error(res.status_code)) {
+    g_error_code = res.status_code;
   }
   debug_print_int("call.res.status_code", res.status_code);
   ckb_debug("END call");
