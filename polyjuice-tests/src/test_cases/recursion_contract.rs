@@ -145,7 +145,7 @@ fn test_recursion_contract_call() {
                 None,
             )
             .unwrap();
-        assert_eq!(err.exit_code, 2);
+        assert_eq!(err.exit_code, 3);
     }
 
     {
