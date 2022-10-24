@@ -866,7 +866,7 @@ dependencies = [
 [[package]]
 name = "gw-ckb-hardfork"
 version = "1.7.0-rc1"
-source = "git+https://github.com/magicalne/godwoken.git?branch=inc_ret_data#ee9381409ed06d976c88faef2ec313945bafcdc2"
+source = "git+https://github.com/godwokenrises/godwoken.git?branch=develop#fa7516aec21faa12c3e42ca2f3cdda44b70419fd"
 dependencies = [
  "arc-swap",
  "ckb-types",
@@ -877,7 +877,7 @@ dependencies = [
 [[package]]
 name = "gw-common"
 version = "1.7.0-rc1"
-source = "git+https://github.com/magicalne/godwoken.git?branch=inc_ret_data#ee9381409ed06d976c88faef2ec313945bafcdc2"
+source = "git+https://github.com/godwokenrises/godwoken.git?branch=develop#fa7516aec21faa12c3e42ca2f3cdda44b70419fd"
 dependencies = [
  "cfg-if 0.1.10",
  "gw-hash",
@@ -890,7 +890,7 @@ dependencies = [
 [[package]]
 name = "gw-config"
 version = "1.7.0-rc1"
-source = "git+https://github.com/magicalne/godwoken.git?branch=inc_ret_data#ee9381409ed06d976c88faef2ec313945bafcdc2"
+source = "git+https://github.com/godwokenrises/godwoken.git?branch=develop#fa7516aec21faa12c3e42ca2f3cdda44b70419fd"
 dependencies = [
  "ckb-fixed-hash",
  "gw-jsonrpc-types",
@@ -901,7 +901,7 @@ dependencies = [
 [[package]]
 name = "gw-db"
 version = "1.7.0-rc1"
-source = "git+https://github.com/magicalne/godwoken.git?branch=inc_ret_data#ee9381409ed06d976c88faef2ec313945bafcdc2"
+source = "git+https://github.com/godwokenrises/godwoken.git?branch=develop#fa7516aec21faa12c3e42ca2f3cdda44b70419fd"
 dependencies = [
  "ckb-rocksdb",
  "gw-config",
@@ -915,7 +915,7 @@ dependencies = [
 [[package]]
 name = "gw-generator"
 version = "1.7.0-rc1"
-source = "git+https://github.com/magicalne/godwoken.git?branch=inc_ret_data#ee9381409ed06d976c88faef2ec313945bafcdc2"
+source = "git+https://github.com/godwokenrises/godwoken.git?branch=develop#fa7516aec21faa12c3e42ca2f3cdda44b70419fd"
 dependencies = [
  "anyhow",
  "arc-swap",
@@ -943,7 +943,7 @@ dependencies = [
 [[package]]
 name = "gw-hash"
 version = "1.7.0-rc1"
-source = "git+https://github.com/magicalne/godwoken.git?branch=inc_ret_data#ee9381409ed06d976c88faef2ec313945bafcdc2"
+source = "git+https://github.com/godwokenrises/godwoken.git?branch=develop#fa7516aec21faa12c3e42ca2f3cdda44b70419fd"
 dependencies = [
  "blake2b-ref 0.3.1",
 ]
@@ -951,7 +951,7 @@ dependencies = [
 [[package]]
 name = "gw-jsonrpc-types"
 version = "1.7.0-rc1"
-source = "git+https://github.com/magicalne/godwoken.git?branch=inc_ret_data#ee9381409ed06d976c88faef2ec313945bafcdc2"
+source = "git+https://github.com/godwokenrises/godwoken.git?branch=develop#fa7516aec21faa12c3e42ca2f3cdda44b70419fd"
 dependencies = [
  "anyhow",
  "ckb-fixed-hash",
@@ -965,7 +965,7 @@ dependencies = [
 [[package]]
 name = "gw-rpc-client"
 version = "1.7.0-rc1"
-source = "git+https://github.com/magicalne/godwoken.git?branch=inc_ret_data#ee9381409ed06d976c88faef2ec313945bafcdc2"
+source = "git+https://github.com/godwokenrises/godwoken.git?branch=develop#fa7516aec21faa12c3e42ca2f3cdda44b70419fd"
 dependencies = [
  "anyhow",
  "arc-swap",
@@ -998,7 +998,7 @@ dependencies = [
 [[package]]
 name = "gw-store"
 version = "1.7.0-rc1"
-source = "git+https://github.com/magicalne/godwoken.git?branch=inc_ret_data#ee9381409ed06d976c88faef2ec313945bafcdc2"
+source = "git+https://github.com/godwokenrises/godwoken.git?branch=develop#fa7516aec21faa12c3e42ca2f3cdda44b70419fd"
 dependencies = [
  "anyhow",
  "arc-swap",
@@ -1015,7 +1015,7 @@ dependencies = [
 [[package]]
 name = "gw-traits"
 version = "1.7.0-rc1"
-source = "git+https://github.com/magicalne/godwoken.git?branch=inc_ret_data#ee9381409ed06d976c88faef2ec313945bafcdc2"
+source = "git+https://github.com/godwokenrises/godwoken.git?branch=develop#fa7516aec21faa12c3e42ca2f3cdda44b70419fd"
 dependencies = [
  "gw-common",
  "gw-db",
@@ -1025,7 +1025,7 @@ dependencies = [
 [[package]]
 name = "gw-types"
 version = "1.7.0-rc1"
-source = "git+https://github.com/magicalne/godwoken.git?branch=inc_ret_data#ee9381409ed06d976c88faef2ec313945bafcdc2"
+source = "git+https://github.com/godwokenrises/godwoken.git?branch=develop#fa7516aec21faa12c3e42ca2f3cdda44b70419fd"
 dependencies = [
  "cfg-if 0.1.10",
  "ckb-fixed-hash",
@@ -1039,7 +1039,7 @@ dependencies = [
 [[package]]
 name = "gw-utils"
 version = "1.7.0-rc1"
-source = "git+https://github.com/magicalne/godwoken.git?branch=inc_ret_data#ee9381409ed06d976c88faef2ec313945bafcdc2"
+source = "git+https://github.com/godwokenrises/godwoken.git?branch=develop#fa7516aec21faa12c3e42ca2f3cdda44b70419fd"
 dependencies = [
  "anyhow",
  "ckb-crypto",

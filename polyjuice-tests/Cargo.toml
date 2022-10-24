@@ -1,6 +1,6 @@
 [package]
 name = "polyjuice-tests"
-version = "1.3.0"
+version = "1.4.4"
 authors = ["Linfeng Qian <thewawar@gmail.com>"]
 edition = "2018"
 
@@ -9,13 +9,13 @@ name = "lib"
 path = "src/lib.rs"
 
 [dependencies]
-gw-types     = { git = "https://github.com/magicalne/godwoken.git", branch = "inc_ret_data" }
-gw-common    = { git = "https://github.com/magicalne/godwoken.git", branch = "inc_ret_data" }
-gw-db        = { git = "https://github.com/magicalne/godwoken.git", branch = "inc_ret_data" }
-gw-store     = { git = "https://github.com/magicalne/godwoken.git", branch = "inc_ret_data" }
-gw-config    = { git = "https://github.com/magicalne/godwoken.git", branch = "inc_ret_data" }
-gw-traits    = { git = "https://github.com/magicalne/godwoken.git", branch = "inc_ret_data" }
-gw-generator = { git = "https://github.com/magicalne/godwoken.git", branch = "inc_ret_data" }
+gw-types     = { git = "https://github.com/godwokenrises/godwoken.git", branch = "develop" }
+gw-common    = { git = "https://github.com/godwokenrises/godwoken.git", branch = "develop" }
+gw-db        = { git = "https://github.com/godwokenrises/godwoken.git", branch = "develop" }
+gw-store     = { git = "https://github.com/godwokenrises/godwoken.git", branch = "develop" }
+gw-config    = { git = "https://github.com/godwokenrises/godwoken.git", branch = "develop" }
+gw-traits    = { git = "https://github.com/godwokenrises/godwoken.git", branch = "develop" }
+gw-generator = { git = "https://github.com/godwokenrises/godwoken.git", branch = "develop" }
 ckb-vm = { version = "=0.21.3", features = ["detect-asm"] }
 ckb-vm-definitions = "=0.21.3"
 
