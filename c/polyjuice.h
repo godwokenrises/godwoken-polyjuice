@@ -1638,6 +1638,7 @@ int run_polyjuice() {
   }
 
   /* Godwoken syscall: SET_RETURN_DATA */
+  debug_print_int("set return data size", res.output_size);
   ret = context.sys_set_program_return_data(&context,
                                             (uint8_t *)res.output_data,
                                             res.output_size);

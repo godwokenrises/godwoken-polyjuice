@@ -81,6 +81,7 @@ pub struct MockChain {
     block_producer: RegistryAddress,
     block_number: u64,
     timestamp: SystemTime,
+    l2tx_cycle_limit: u64,
 }
 
 impl MockChain {
@@ -97,7 +98,12 @@ impl MockChain {
             block_producer,
             block_number: 0u64,
             timestamp,
+            l2tx_cycle_limit: L2TX_MAX_CYCLES,
         })
+    }
+
+    pub fn set_max_cycles(&mut self, max_cycles: u64) {
+        self.l2tx_cycle_limit = max_cycles;
     }
 
     fn new_block_info(&self) -> anyhow::Result<BlockInfo> {
@@ -261,7 +267,7 @@ impl MockChain {
             &self.ctx.state,
             &block_info,
             &raw_tx,
-            L2TX_MAX_CYCLES,
+            self.l2tx_cycle_limit,
             None,
         )?;
 
