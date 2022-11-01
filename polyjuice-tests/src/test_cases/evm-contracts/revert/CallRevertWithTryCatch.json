@@ -1,12 +1,12 @@
 {
   "_format": "hh-sol-artifact-1",
-  "contractName": "DebugBBB",
+  "contractName": "CallRevertWithTryCatch",
   "sourceName": "contracts/try.sol",
   "abi": [
     {
       "inputs": [
         {
-          "internalType": "contract DebugAAA",
+          "internalType": "contract Revert",
           "name": "a",
           "type": "address"
         }

@@ -1,6 +1,6 @@
 pragma solidity ^0.8.4;
 
-contract DebugAAA {
+contract Revert {
     uint public state = 1;
 
     function test() external {
@@ -9,42 +9,61 @@ contract DebugAAA {
     }
 }
 
-contract DebugBBB {
-    uint public x = 1;
+contract CallRevertWithoutTryCatch {
+    uint public state = 1;
 
-    function test(DebugAAA a) external returns (uint) {
-        x = 3;
-        try a.test() {
-            x = 4;
-            return 8;
-        } catch {
-            x = 2;
-            return 9;
-        }
-    }
-}
-
-contract DebugCCC {
-    uint public y = 1;
-
-    function test(DebugBBB b, DebugAAA a) external returns (uint) {
-        y = 3;
-        try b.test(a) {
-            y = 4;
-            return 8;
-        } catch {
-            y = 2;
-            return 9;
-        }
-    }
-}
-
-contract NormalRevert {
-    uint public z = 1;
-
-    function test(DebugAAA a) external returns (uint) {
-        z = 3;
+    // expected result: state = 1, a.state = 1
+    function test(Revert a) external returns (uint) {
+        state = 2;
         a.test();
-        return 9;
+        return 3;
+    }
+}
+
+
+contract CallRevertWithTryCatch {
+    uint public state = 1;
+
+    // expected result: state = 4, a.state = 1
+    function test(Revert a) external returns (uint) {
+        state = 2;
+        try a.test() {
+            state = 3;
+            return 5;
+        } catch {
+            state = 4;
+            return 6;
+        }
+    }
+}
+
+contract CallRevertWithTryCatchInDepth {
+    uint public state = 1;
+
+    // expected result: state = 4, a.state = 1
+    function test(CallRevertWithTryCatch b, Revert a) external returns (uint) {
+        state = 2;
+        try b.test(a) {
+            state = 3;
+            return 5;
+        } catch {
+            state = 4;
+            return 6;
+        }
+    }
+}
+
+
+contract CallRevertWithTryCatchInConstructor {
+    uint public state = 1;
+
+    // expected result: state = 4, a.state = 1
+    constructor(Revert c){
+        state = 2;
+        try c.test() {
+            state = 3;
+        } catch {
+            state = 4;
+        }
     }
 }
