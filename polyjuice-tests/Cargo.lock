@@ -876,8 +876,8 @@ dependencies = [
 
 [[package]]
 name = "gw-common"
-version = "1.7.0-rc1"
-source = "git+https://github.com/godwokenrises/godwoken.git?branch=develop#fa7516aec21faa12c3e42ca2f3cdda44b70419fd"
+version = "1.7.0-rc2"
+source = "git+https://github.com/jjyr/godwoken.git?branch=support-revert-inner-state-and-add-syscalls#9b089e4bcaff3ecceae122b73972088fdf4aaa36"
 dependencies = [
  "cfg-if 0.1.10",
  "gw-hash",
@@ -1014,8 +1014,8 @@ dependencies = [
 
 [[package]]
 name = "gw-traits"
-version = "1.7.0-rc1"
-source = "git+https://github.com/godwokenrises/godwoken.git?branch=develop#fa7516aec21faa12c3e42ca2f3cdda44b70419fd"
+version = "1.7.0-rc2"
+source = "git+https://github.com/jjyr/godwoken.git?branch=support-revert-inner-state-and-add-syscalls#9b089e4bcaff3ecceae122b73972088fdf4aaa36"
 dependencies = [
  "gw-common",
  "gw-db",

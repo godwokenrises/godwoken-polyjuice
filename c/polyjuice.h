@@ -1,4 +1,3 @@
-#include <cstdint>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -617,12 +616,12 @@ struct evmc_result call(struct evmc_host_context* context,
   res.release = release_result;
   gw_context_t* gw_ctx = context->gw_ctx;
 
-  /* TODO: Revert in try block has not been implemented. Will fix later.*/
   /*
    * Take a snapshot for call and revert later if EVM returns an error.
    */
   uint32_t snapshot_id;
   ret = gw_ctx->sys_snapshot(gw_ctx, &snapshot_id);
+  debug_print_int("[call] take a snapshot", snapshot_id);
   if (ret != 0) {
     res.status_code = (evmc_status_code)ret;
     return res;
@@ -659,9 +658,9 @@ struct evmc_result call(struct evmc_host_context* context,
     if (ret != 0) {
       debug_print_int("call pre-compiled contract failed", ret);
       res.status_code = EVMC_INTERNAL_ERROR;
-    } else {
-      res.status_code = EVMC_SUCCESS;
+      return res;
     }
+    res.status_code = EVMC_SUCCESS;
   } else {
     ret = handle_message(gw_ctx, context->from_id, context->to_id,
                          &context->destination, msg, &res, snapshot_id);
@@ -677,10 +676,6 @@ struct evmc_result call(struct evmc_host_context* context,
         res.status_code = EVMC_INTERNAL_ERROR;
       }
     }
-  }
-
-  if (is_evmc_error(res.status_code)) {
-    g_error_code = res.status_code;
   }
   debug_print_int("call.res.status_code", res.status_code);
   ckb_debug("END call");
@@ -1382,12 +1377,15 @@ int handle_message(gw_context_t* ctx,
   if (to_address_exists && code_size > 0) {
     ret = execute_in_evmone(ctx, &msg, parent_from_id, from_id, to_id, code_data, code_size, res);
     if (ret != 0) {
-      /* We must handle revert with snapshot. */
-      ctx->sys_revert(ctx, snapshot_id);
       return ret;
     }
-    if (g_error_code != EVMC_SUCCESS) {
-      res->status_code = (evmc_status_code)g_error_code;
+    if (res->status_code != EVMC_SUCCESS) {
+      /* We must handle revert with snapshot. */
+      ret = ctx->sys_revert(ctx, snapshot_id);
+      debug_print_int("[handle_message] revert with snapshot id", snapshot_id);
+      if (ret != 0) {
+        return ret;
+      }
     }
   } else {
     ckb_debug("[handle_message] Don't run evm and return empty data");
@@ -1632,6 +1630,7 @@ int run_polyjuice() {
    */
   uint32_t snapshot_id;
   ret = context.sys_snapshot(&context, &snapshot_id);
+  debug_print_int("[run_polyjuice] take a snapshot id", snapshot_id);
   if (ret != 0) {
     return ret;
   }

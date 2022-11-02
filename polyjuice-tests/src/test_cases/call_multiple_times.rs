@@ -71,6 +71,7 @@ fn test_call_multiple_times() {
         block_producer_id.clone(),
         block_number,
     );
+    println!("============={:?}", state.get_nonce(from_id));
     // state.apply_run_result(&_run_result).expect("update state");
     block_number += 1;
     // println!(
@@ -92,6 +93,7 @@ fn test_call_multiple_times() {
         from_id,
         ss1_account_id,
     );
+    println!("============={:?}", state.get_nonce(from_id));
     assert_eq!(
         run_result.return_data,
         hex::decode("000000000000000000000000000000000000000000000000000000000000007b").unwrap()

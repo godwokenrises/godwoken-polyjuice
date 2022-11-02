@@ -47,8 +47,6 @@ static uint128_t g_gas_price = UINT128_MAX;
 static bool g_eoa_transfer_flag = false;
 static evmc_address g_eoa_transfer_to_address = {0};
 
-static int g_error_code = 0;
-
 /* Minimal gas of a normal transaction*/
 #define MIN_TX_GAS                      21000
 /* Minimal gas of a transaction that creates a contract */
