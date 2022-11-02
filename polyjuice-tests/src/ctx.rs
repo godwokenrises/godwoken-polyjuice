@@ -17,12 +17,12 @@ use gw_db::schema::{COLUMN_INDEX, COLUMN_META, META_TIP_BLOCK_HASH_KEY};
 use gw_generator::{
     account_lock_manage::{secp256k1::Secp256k1Eth, AccountLockManage},
     backend_manage::BackendManage,
-    dummy_state::DummyState,
     traits::StateExt,
     Generator,
 };
 use gw_store::{
     chain_view::ChainView,
+    state::traits::JournalDB,
     traits::{chain_store::ChainStore, kv_store::KVStoreWrite},
     Store,
 };
@@ -36,11 +36,14 @@ use gw_types::{
     U256,
 };
 
-use crate::helper::{
-    build_eth_l2_script, build_l2_sudt_script, create_block_producer, load_program,
-    PolyjuiceArgsBuilder, CHAIN_ID, CREATOR_ACCOUNT_ID, ETH_ACCOUNT_LOCK_CODE_HASH,
-    L2TX_MAX_CYCLES, META_VALIDATOR_SCRIPT_TYPE_HASH, POLYJUICE_PROGRAM_CODE_HASH,
-    ROLLUP_SCRIPT_HASH, SECP_LOCK_CODE_HASH, SUDT_VALIDATOR_SCRIPT_TYPE_HASH,
+use crate::{
+    helper::{
+        build_eth_l2_script, build_l2_sudt_script, create_block_producer, load_program,
+        PolyjuiceArgsBuilder, CHAIN_ID, CREATOR_ACCOUNT_ID, ETH_ACCOUNT_LOCK_CODE_HASH,
+        L2TX_MAX_CYCLES, META_VALIDATOR_SCRIPT_TYPE_HASH, POLYJUICE_PROGRAM_CODE_HASH,
+        ROLLUP_SCRIPT_HASH, SECP_LOCK_CODE_HASH, SUDT_VALIDATOR_SCRIPT_TYPE_HASH,
+    },
+    new_dummy_state, DummyState,
 };
 
 // meta contract
@@ -221,13 +224,13 @@ impl MockChain {
             .args(Bytes::from(args).pack())
             .build();
         let run_result = self.call(raw_tx)?;
-        self.ctx.state.apply_run_result(&run_result.write)?;
+        self.ctx.state.finalise()?;
         Ok(run_result)
     }
 
     pub fn execute_raw(&mut self, raw_tx: RawL2Transaction) -> anyhow::Result<RunResult> {
         let run_result = self.call(raw_tx)?;
-        self.ctx.state.apply_run_result(&run_result.write)?;
+        self.ctx.state.finalise()?;
         Ok(run_result)
     }
 
@@ -252,19 +255,19 @@ impl MockChain {
             .args(Bytes::from(args).pack())
             .build();
         let run_result = self.call(raw_tx)?;
-        self.ctx.state.apply_run_result(&run_result.write)?;
+        self.ctx.state.finalise()?;
         Ok(run_result)
     }
 
     pub fn call(&mut self, raw_tx: RawL2Transaction) -> anyhow::Result<RunResult> {
-        let db = self.ctx.store.begin_transaction();
+        let db = &self.ctx.store.begin_transaction();
         let tip_block_hash = db.get_tip_block_hash()?;
         let chain = ChainView::new(&db, tip_block_hash);
         let block_info = self.new_block_info()?;
 
         let run_result = self.ctx.generator.execute_transaction(
             &chain,
-            &self.ctx.state,
+            &mut self.ctx.state,
             &block_info,
             &raw_tx,
             self.l2tx_cycle_limit,
@@ -340,7 +343,8 @@ impl Context {
         let config = Config::new(base_path);
 
         let store = Store::open_tmp()?;
-        let mut state = DummyState::default();
+        let snapshot = store.get_snapshot();
+        let mut state = new_dummy_state(snapshot);
 
         let meta_script = Script::new_builder()
             .code_hash(META_VALIDATOR_SCRIPT_TYPE_HASH.clone().pack())
@@ -409,7 +413,7 @@ impl Context {
             Default::default(),
         );
 
-        let tx = store.begin_transaction();
+        let tx = &store.begin_transaction();
         let tip_block_number: Uint64 = 8.pack();
         let tip_block_hash = [8u8; 32];
         tx.insert_raw(COLUMN_META, META_TIP_BLOCK_HASH_KEY, &tip_block_hash[..])

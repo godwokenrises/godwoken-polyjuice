@@ -7,9 +7,8 @@ use crate::helper::{
     PolyjuiceArgsBuilder, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::{builtins::CKB_SUDT_ACCOUNT_ID, state::State};
-use gw_generator::traits::StateExt;
-use gw_store::chain_view::ChainView;
 use gw_store::traits::chain_store::ChainStore;
+use gw_store::{chain_view::ChainView, state::traits::JournalDB};
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
 
 const SS_INIT_CODE: &str = include_str!("./evm-contracts/SimpleStorage.bin");
@@ -126,12 +125,12 @@ fn test_delegatecall() {
             .to_id(delegate_contract_id.pack())
             .args(Bytes::from(args).pack())
             .build();
-        let db = store.begin_transaction();
+        let db = &store.begin_transaction();
         let tip_block_hash = db.get_tip_block_hash().unwrap();
         let run_result = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
-                &state,
+                &mut state,
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
@@ -140,9 +139,7 @@ fn test_delegatecall() {
             .expect("construct");
         // [DelegateCall] used cycles: 1457344 < 1460K
         helper::check_cycles("DelegateCall", run_result.cycles.execution, 1_710_000);
-        state
-            .apply_run_result(&run_result.write)
-            .expect("update state");
+        state.finalise().expect("update state");
         // println!(
         //     "result {}",
         //     serde_json::to_string_pretty(&RunResult::from(run_result)).unwrap()
@@ -150,7 +147,7 @@ fn test_delegatecall() {
 
         let run_result = simple_storage_get(
             &store,
-            &state,
+            &mut state,
             &generator,
             block_number,
             from_id,
@@ -175,7 +172,7 @@ fn test_delegatecall() {
 
     let run_result = simple_storage_get(
         &store,
-        &state,
+        &mut state,
         &generator,
         block_number,
         from_id,

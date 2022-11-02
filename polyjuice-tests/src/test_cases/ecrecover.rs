@@ -1,14 +1,10 @@
-//! Test ecrecover
-//!   See ./evm-contracts/HeadTail.sol
-
 use crate::helper::{
     self, deploy, new_block_info, setup, MockContractInfo, PolyjuiceArgsBuilder,
     CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
-use gw_generator::traits::StateExt;
-use gw_store::chain_view::ChainView;
 use gw_store::traits::chain_store::ChainStore;
+use gw_store::{chain_view::ChainView, state::traits::JournalDB};
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
 
 const INIT_CODE: &str = include_str!("./evm-contracts/HeadTail.bin");
@@ -74,12 +70,12 @@ fn test_ecrecover() {
             .to_id(new_account_id.pack())
             .args(Bytes::from(args).pack())
             .build();
-        let db = store.begin_transaction();
+        let db = &store.begin_transaction();
         let tip_block_hash = db.get_tip_block_hash().unwrap();
         let run_result = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
-                &state,
+                &mut state,
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
@@ -88,9 +84,7 @@ fn test_ecrecover() {
             .expect("construct");
         // [recover] used cycles: 2604412 < 2660K
         helper::check_cycles("verify|recover", run_result.cycles.execution, 2_960_000);
-        state
-            .apply_run_result(&run_result.write)
-            .expect("update state");
+        state.finalise().expect("update state");
         assert_eq!(
             run_result.return_data,
             hex::decode("000000000000000000000000f175db82ceaaadd50a606d70e389e9a1284a6690")

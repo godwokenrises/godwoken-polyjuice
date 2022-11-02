@@ -66,7 +66,7 @@ fn native_token_transfer_unregistered_address_test() -> anyhow::Result<()> {
     let run_result = chain.execute_raw(raw_tx)?;
     assert_eq!(run_result.exit_code, 0);
 
-    let system_log = run_result.write.logs.last().map(parse_log);
+    let system_log = run_result.logs.last().map(parse_log);
     if let Some(Log::PolyjuiceSystem { gas_used, .. }) = system_log {
         assert_eq!(gas_used, 21000 + 25000);
     }

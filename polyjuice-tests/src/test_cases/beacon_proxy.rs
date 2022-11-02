@@ -4,8 +4,7 @@ use gw_common::{
     registry_address::RegistryAddress,
     state::State,
 };
-use gw_generator::traits::StateExt;
-use gw_store::{chain_view::ChainView, traits::chain_store::ChainStore};
+use gw_store::{chain_view::ChainView, state::traits::JournalDB, traits::chain_store::ChainStore};
 use gw_types::{
     bytes::Bytes,
     packed::RawL2Transaction,
@@ -62,12 +61,12 @@ fn test_beacon_proxy() {
         .to_id(contract_account_id.pack())
         .args(Bytes::from(args).pack())
         .build();
-    let db = store.begin_transaction();
+    let db = &store.begin_transaction();
     let tip_block_hash = store.get_tip_block_hash().unwrap();
     let run_result = generator
         .execute_transaction(
             &ChainView::new(&db, tip_block_hash),
-            &state,
+            &mut state,
             &block_info,
             &raw_tx,
             L2TX_MAX_CYCLES,
@@ -75,9 +74,7 @@ fn test_beacon_proxy() {
         )
         .expect("invode initializaion");
     assert_eq!(run_result.exit_code, EVMC_SUCCESS);
-    state
-        .apply_run_result(&run_result.write)
-        .expect("update state");
+    state.finalise().expect("update state");
 
     state
         .mint_sudt(CKB_SUDT_ACCOUNT_ID, &contract.reg_addr, U256::from(200u64))
@@ -102,12 +99,12 @@ fn test_beacon_proxy() {
         .to_id(contract_account_id.pack())
         .args(Bytes::from(args).pack())
         .build();
-    let db = store.begin_transaction();
+    let db = &store.begin_transaction();
     let tip_block_hash = store.get_tip_block_hash().unwrap();
     let run_result = generator
         .execute_transaction(
             &ChainView::new(&db, tip_block_hash),
-            &state,
+            &mut state,
             &block_info,
             &raw_tx,
             L2TX_MAX_CYCLES,
@@ -115,9 +112,7 @@ fn test_beacon_proxy() {
         )
         .expect("Call deployBeaconProxy");
     assert_eq!(run_result.exit_code, EVMC_SUCCESS);
-    state
-        .apply_run_result(&run_result.write)
-        .expect("update state");
+    state.finalise().expect("update state");
 
     // get BeaconProxy public bpx and check it's balance
     block_number += 1;
@@ -134,12 +129,12 @@ fn test_beacon_proxy() {
         .to_id(contract_account_id.pack())
         .args(Bytes::from(args).pack())
         .build();
-    let db = store.begin_transaction();
+    let db = &store.begin_transaction();
     let tip_block_hash = store.get_tip_block_hash().unwrap();
     let run_result = generator
         .execute_transaction(
             &ChainView::new(&db, tip_block_hash),
-            &state,
+            &mut state,
             &block_info,
             &raw_tx,
             L2TX_MAX_CYCLES,
@@ -147,9 +142,7 @@ fn test_beacon_proxy() {
         )
         .expect("get BeaconProxy contract address");
     assert_eq!(run_result.exit_code, EVMC_SUCCESS);
-    state
-        .apply_run_result(&run_result.write)
-        .expect("update state");
+    state.finalise().expect("update state");
     assert_eq!(run_result.return_data.len(), 32);
     let beacon_proxy_ethabi_addr = &run_result.return_data[12..];
     let beacon_reg_addr =

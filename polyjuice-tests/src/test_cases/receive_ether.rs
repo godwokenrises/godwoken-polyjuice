@@ -2,8 +2,7 @@ use std::convert::TryInto;
 
 use ckb_vm::Bytes;
 use gw_common::state::State;
-use gw_generator::traits::StateExt;
-use gw_store::{chain_view::ChainView, traits::chain_store::ChainStore};
+use gw_store::{chain_view::ChainView, state::traits::JournalDB, traits::chain_store::ChainStore};
 use gw_types::{
     packed::RawL2Transaction,
     prelude::{Builder, Entity, Pack},
@@ -60,12 +59,12 @@ fn receive_ether_test() -> anyhow::Result<()> {
         .to_id(new_account_id.pack())
         .args(Bytes::from(args).pack())
         .build();
-    let db = store.begin_transaction();
+    let db = &store.begin_transaction();
     let tip_block_hash = db.get_tip_block_hash().unwrap();
     let run_result = generator
         .execute_transaction(
             &ChainView::new(&db, tip_block_hash),
-            &state,
+            &mut state,
             &block_info,
             &raw_tx,
             L2TX_MAX_CYCLES,
@@ -75,7 +74,7 @@ fn receive_ether_test() -> anyhow::Result<()> {
     check_cycles("receive()", run_result.cycles.execution, 710_100);
     assert!(run_result.return_data.is_empty());
 
-    let receive_data = match parse_log(&run_result.write.logs[1]) {
+    let receive_data = match parse_log(&run_result.logs[1]) {
         crate::helper::Log::PolyjuiceUser {
             address: _,
             data,
@@ -87,11 +86,9 @@ fn receive_ether_test() -> anyhow::Result<()> {
     expect[1..].copy_from_slice(b"receive");
     assert_eq!(receive_data, Some(expect.to_vec()));
 
-    print_gas_used("A simplest receive() call: ", &run_result.write.logs);
+    print_gas_used("A simplest receive() call: ", &run_result.logs);
 
-    state
-        .apply_run_result(&run_result.write)
-        .expect("update state");
+    state.finalise().expect("update state");
     Ok(())
 }
 
@@ -117,7 +114,7 @@ fn without_receive_fallback_test() -> anyhow::Result<()> {
         block_producer.clone(),
         0,
     );
-    print_gas_used("Deploy SimpleTrasfer Contract: ", &run_result.write.logs);
+    print_gas_used("Deploy SimpleTrasfer Contract: ", &run_result.logs);
 
     let st_contract_account = MockContractInfo::create(&from_eth_address, 0);
     let st_account_id = state
@@ -137,10 +134,7 @@ fn without_receive_fallback_test() -> anyhow::Result<()> {
         block_producer.clone(),
         0,
     );
-    print_gas_used(
-        "Deploy RejectedSimpleStorage Contract: ",
-        &run_result.write.logs,
-    );
+    print_gas_used("Deploy RejectedSimpleStorage Contract: ", &run_result.logs);
 
     let ss_contract_account = MockContractInfo::create(&from_eth_address, 1);
     let _ss_account_id = state
@@ -168,11 +162,11 @@ fn without_receive_fallback_test() -> anyhow::Result<()> {
         .to_id(st_account_id.pack())
         .args(Bytes::from(args).pack())
         .build();
-    let db = store.begin_transaction();
+    let db = &store.begin_transaction();
     let tip_block_hash = store.get_tip_block_hash().unwrap();
     let run_result = generator.execute_transaction(
         &ChainView::new(&db, tip_block_hash),
-        &state,
+        &mut state,
         &block_info,
         &raw_tx,
         L2TX_MAX_CYCLES,
@@ -257,11 +251,11 @@ fn over_transfer_test() -> anyhow::Result<()> {
         .to_id(st_account_id.pack())
         .args(Bytes::from(args).pack())
         .build();
-    let db = store.begin_transaction();
+    let db = &store.begin_transaction();
     let tip_block_hash = store.get_tip_block_hash().unwrap();
     let run_result = generator.execute_transaction(
         &ChainView::new(&db, tip_block_hash),
-        &state,
+        &mut state,
         &block_info,
         &raw_tx,
         L2TX_MAX_CYCLES,

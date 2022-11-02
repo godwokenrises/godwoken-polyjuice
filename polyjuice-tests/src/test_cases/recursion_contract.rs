@@ -6,9 +6,8 @@ use crate::helper::{
     CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
-use gw_generator::traits::StateExt;
-use gw_store::chain_view::ChainView;
 use gw_store::traits::chain_store::ChainStore;
+use gw_store::{chain_view::ChainView, state::traits::JournalDB};
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
 
 const RECURSION_INIT_CODE: &str = include_str!("./evm-contracts/RecursionContract.bin");
@@ -61,21 +60,19 @@ fn test_recursion_contract_call() {
             .to_id(recur_account_id.pack())
             .args(Bytes::from(args).pack())
             .build();
-        let db = store.begin_transaction();
+        let db = &store.begin_transaction();
         let tip_block_hash = store.get_tip_block_hash().unwrap();
         let run_result = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
-                &state,
+                &mut state,
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
                 None,
             )
             .expect("recursive call depth to 32");
-        state
-            .apply_run_result(&run_result.write)
-            .expect("update state");
+        state.finalise().expect("update state");
         println!("\t call result {:?}", run_result.return_data);
         let expected_sum = [
             0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0,
@@ -133,12 +130,12 @@ fn test_recursion_contract_call() {
             .to_id(recur_account_id.pack())
             .args(Bytes::from(args).pack())
             .build();
-        let db = store.begin_transaction();
+        let db = &store.begin_transaction();
         let tip_block_hash = store.get_tip_block_hash().unwrap();
         let err = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
-                &state,
+                &mut state,
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
@@ -166,12 +163,12 @@ fn test_recursion_contract_call() {
             .to_id(recur_account_id.pack())
             .args(Bytes::from(args).pack())
             .build();
-        let db = store.begin_transaction();
+        let db = &store.begin_transaction();
         let tip_block_hash = db.get_tip_block_hash().unwrap();
         let err = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
-                &state,
+                &mut state,
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,

@@ -9,12 +9,9 @@ use crate::helper::{
     ROLLUP_SCRIPT_HASH, SECP_LOCK_CODE_HASH,
 };
 use gw_common::state::State;
-use gw_generator::{
-    account_lock_manage::{secp256k1::Secp256k1Eth, LockAlgorithm},
-    traits::StateExt,
-};
-use gw_store::chain_view::ChainView;
+use gw_generator::account_lock_manage::{secp256k1::Secp256k1Eth, LockAlgorithm};
 use gw_store::traits::chain_store::ChainStore;
+use gw_store::{chain_view::ChainView, state::traits::JournalDB};
 use gw_types::{
     bytes::Bytes,
     core::ScriptHashType,
@@ -60,7 +57,7 @@ fn test_recover_account() {
         .unwrap();
 
     // For see the format of returned `bytes`
-    let run_result = simple_storage_get(&store, &state, &generator, 0, from_id, new_account_id);
+    let run_result = simple_storage_get(&store, &mut state, &generator, 0, from_id, new_account_id);
     println!("return bytes: {}", hex::encode(run_result.return_data));
 
     let message_hex = "1cdeae55a5768fe14b628001c6247ae84c70310a7ddcfdc73ac68494251e46ec";
@@ -97,12 +94,12 @@ fn test_recover_account() {
             .to_id(new_account_id.pack())
             .args(Bytes::from(args).pack())
             .build();
-        let db = store.begin_transaction();
+        let db = &store.begin_transaction();
         let tip_block_hash = store.get_tip_block_hash().unwrap();
         let run_result = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
-                &state,
+                &mut state,
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
@@ -115,9 +112,7 @@ fn test_recover_account() {
             run_result.cycles.execution,
             800_000,
         );
-        state
-            .apply_run_result(&run_result.write)
-            .expect("update state");
+        state.finalise().expect("update state");
         let mut script_args = vec![0u8; 32 + 20];
         script_args[0..32].copy_from_slice(&ROLLUP_SCRIPT_HASH);
         script_args[32..32 + 20].copy_from_slice(&hex::decode(lock_args_hex).unwrap());
@@ -154,21 +149,19 @@ fn test_recover_account() {
             .to_id(new_account_id.pack())
             .args(Bytes::from(args).pack())
             .build();
-        let db = store.begin_transaction();
+        let db = &store.begin_transaction();
         let tip_block_hash = store.get_tip_block_hash().unwrap();
         let run_result = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
-                &state,
+                &mut state,
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
                 None,
             )
             .expect("construct");
-        state
-            .apply_run_result(&run_result.write)
-            .expect("update state");
+        state.finalise().expect("update state");
         assert_eq!(run_result.return_data.as_ref(), [0u8; 32]);
     }
 
@@ -196,12 +189,12 @@ fn test_recover_account() {
             .to_id(new_account_id.pack())
             .args(Bytes::from(args).pack())
             .build();
-        let db = store.begin_transaction();
+        let db = &store.begin_transaction();
         let tip_block_hash = db.get_tip_block_hash().unwrap();
         let err = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
-                &state,
+                &mut state,
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,

@@ -8,9 +8,8 @@ use crate::helper::{
 use gw_common::{
     builtins::ETH_REGISTRY_ACCOUNT_ID, registry_address::RegistryAddress, state::State,
 };
-use gw_generator::traits::StateExt;
-use gw_store::chain_view::ChainView;
 use gw_store::traits::chain_store::ChainStore;
+use gw_store::{chain_view::ChainView, state::traits::JournalDB};
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*, U256};
 
 const SD_INIT_CODE: &str = include_str!("./evm-contracts/SelfDestruct.bin");
@@ -130,21 +129,19 @@ fn test_selfdestruct() {
             .to_id(csd_account_id.pack())
             .args(Bytes::from(args).pack())
             .build();
-        let db = store.begin_transaction();
+        let db = &store.begin_transaction();
         let tip_block_hash = db.get_tip_block_hash().unwrap();
         let run_result = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
-                &state,
+                &mut state,
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
                 None,
             )
             .expect("call CallSelfDestruct.proxyDone(sd_account_id)");
-        state
-            .apply_run_result(&run_result.write)
-            .expect("update state");
+        state.finalise().expect("update state");
         // [call CallSelfDestruct.proxyDone(sd_account_id)] used cycles: 1043108 < 1100K
         helper::check_cycles(
             "CallSelfDestruct.proxyDone(sd_account_id)",
@@ -186,12 +183,12 @@ fn test_selfdestruct() {
             .to_id(sd_account_id.pack())
             .args(Bytes::from(args).pack())
             .build();
-        let db = store.begin_transaction();
+        let db = &store.begin_transaction();
         let tip_block_hash = db.get_tip_block_hash().unwrap();
         let result = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
-                &state,
+                &mut state,
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
@@ -217,12 +214,12 @@ fn test_selfdestruct() {
             .to_id(csd_account_id.pack())
             .args(Bytes::from(args).pack())
             .build();
-        let db = store.begin_transaction();
+        let db = &store.begin_transaction();
         let tip_block_hash = db.get_tip_block_hash().unwrap();
         let result = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
-                &state,
+                &mut state,
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,

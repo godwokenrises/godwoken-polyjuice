@@ -6,9 +6,8 @@ use crate::helper::{
     PolyjuiceArgsBuilder, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
-use gw_generator::traits::StateExt;
-use gw_store::chain_view::ChainView;
 use gw_store::traits::chain_store::ChainStore;
+use gw_store::{chain_view::ChainView, state::traits::JournalDB};
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
 
 const INIT_CODE: &str = include_str!("./evm-contracts/FallbackFunction.bin");
@@ -38,12 +37,12 @@ fn test_fallback_function() {
             .to_id(CREATOR_ACCOUNT_ID.pack())
             .args(Bytes::from(args).pack())
             .build();
-        let db = store.begin_transaction();
+        let db = &store.begin_transaction();
         let tip_block_hash = store.get_tip_block_hash().unwrap();
         let run_result = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
-                &state,
+                &mut state,
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
@@ -56,9 +55,7 @@ fn test_fallback_function() {
             run_result.cycles.execution,
             920_000,
         );
-        state
-            .apply_run_result(&run_result.write)
-            .expect("update state");
+        state.finalise().expect("update state");
     }
 
     let contract_account = MockContractInfo::create(&from_eth_address, 0);
@@ -66,7 +63,7 @@ fn test_fallback_function() {
         .get_account_id_by_script_hash(&contract_account.script_hash)
         .unwrap()
         .unwrap();
-    let run_result = simple_storage_get(&store, &state, &generator, 0, from_id, new_account_id);
+    let run_result = simple_storage_get(&store, &mut state, &generator, 0, from_id, new_account_id);
     assert_eq!(
         run_result.return_data,
         hex::decode("000000000000000000000000000000000000000000000000000000000000007b").unwrap()
@@ -87,12 +84,12 @@ fn test_fallback_function() {
             .to_id(new_account_id.pack())
             .args(Bytes::from(args).pack())
             .build();
-        let db = store.begin_transaction();
+        let db = &store.begin_transaction();
         let tip_block_hash = db.get_tip_block_hash().unwrap();
         let run_result = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
-                &state,
+                &mut state,
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
@@ -102,12 +99,10 @@ fn test_fallback_function() {
         // [Call fallback()] used cycles: 514059 < 520K
         helper::check_cycles("Call fallback()", run_result.cycles.execution, 625_000);
         assert!(run_result.return_data.is_empty());
-        state
-            .apply_run_result(&run_result.write)
-            .expect("update state");
+        state.finalise().expect("update state");
     }
 
-    let run_result = simple_storage_get(&store, &state, &generator, 0, from_id, new_account_id);
+    let run_result = simple_storage_get(&store, &mut state, &generator, 0, from_id, new_account_id);
     assert_eq!(
         run_result.return_data,
         hex::decode("00000000000000000000000000000000000000000000000000000000000003e7").unwrap()

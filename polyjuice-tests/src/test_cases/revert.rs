@@ -1,21 +1,19 @@
 //! Test Revert contract
 //!   See ./evm-contracts/revert/*
 
-use std::{
-    env,
-    fs::{self},
-};
+use std::{env, fs};
 
-use crate::helper::{
-    self, deploy, new_block_info, print_gas_used, setup, MockContractInfo, PolyjuiceArgsBuilder,
-    CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
+use crate::{
+    helper::{
+        self, deploy, new_block_info, print_gas_used, setup, MockContractInfo,
+        PolyjuiceArgsBuilder, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
+    },
+    DummyState,
 };
 use gw_common::state::State;
-use gw_generator::traits::StateExt;
-use gw_store::chain_view::ChainView;
 use gw_store::traits::chain_store::ChainStore;
+use gw_store::{chain_view::ChainView, state::traits::JournalDB};
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
-use serde_json;
 
 #[test]
 fn test_revert_with_try_catch() {
@@ -58,23 +56,21 @@ fn test_revert_with_try_catch() {
             .to_id(call_revert_with_try_catch_contract_id.pack())
             .args(Bytes::from(args).pack())
             .build();
-        let db = store.begin_transaction();
+        let db = &store.begin_transaction();
         let tip_block_hash = db.get_tip_block_hash().unwrap();
         let run_result = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
-                &state,
+                &mut state,
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
                 None,
             )
             .expect(operation);
-        print_gas_used(&format!("{}: ", operation), &run_result.write.logs);
+        print_gas_used(&format!("{}: ", operation), &run_result.logs);
 
-        state
-            .apply_run_result(&run_result.write)
-            .expect("update state");
+        state.finalise().expect("update state");
 
         println!("exit code: {}", run_result.exit_code);
         assert_eq!(run_result.exit_code, 0);
@@ -99,19 +95,19 @@ fn test_revert_with_try_catch() {
             .to_id(revert_contract_id.pack())
             .args(Bytes::from(args).pack())
             .build();
-        let db = store.begin_transaction();
+        let db = &store.begin_transaction();
         let tip_block_hash = db.get_tip_block_hash().unwrap();
         let run_result = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
-                &state,
+                &mut state,
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
                 None,
             )
             .expect(operation);
-        print_gas_used(&format!("{}: ", operation), &run_result.write.logs);
+        print_gas_used(&format!("{}: ", operation), &run_result.logs);
         let state = hex::encode(run_result.return_data);
         let state = state.parse::<u32>().unwrap();
         println!("{}: {}", operation, state);
@@ -137,19 +133,19 @@ fn test_revert_with_try_catch() {
             .to_id(call_revert_with_try_catch_contract_id.pack())
             .args(Bytes::from(args).pack())
             .build();
-        let db = store.begin_transaction();
+        let db = &store.begin_transaction();
         let tip_block_hash = db.get_tip_block_hash().unwrap();
         let run_result = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
-                &state,
+                &mut state,
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
                 None,
             )
             .expect(operation);
-        print_gas_used(&format!("{}: ", operation), &run_result.write.logs);
+        print_gas_used(&format!("{}: ", operation), &run_result.logs);
         let state = hex::encode(run_result.return_data);
         let state = state.parse::<u32>().unwrap();
         println!("{}: {}", operation, state);
@@ -179,23 +175,21 @@ fn test_revert_with_try_catch() {
             .to_id(call_revert_with_try_catch_in_depth_contract_id.pack())
             .args(Bytes::from(args).pack())
             .build();
-        let db = store.begin_transaction();
+        let db = &store.begin_transaction();
         let tip_block_hash = db.get_tip_block_hash().unwrap();
         let run_result = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
-                &state,
+                &mut state,
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
                 None,
             )
             .expect(operation);
-        print_gas_used(&format!("{}: ", operation), &run_result.write.logs);
+        print_gas_used(&format!("{}: ", operation), &run_result.logs);
 
-        state
-            .apply_run_result(&run_result.write)
-            .expect("update state");
+        state.finalise().expect("update state");
 
         println!("exit code: {}", run_result.exit_code);
         assert_eq!(run_result.exit_code, 0);
@@ -220,19 +214,19 @@ fn test_revert_with_try_catch() {
             .to_id(revert_contract_id.pack())
             .args(Bytes::from(args).pack())
             .build();
-        let db = store.begin_transaction();
+        let db = &store.begin_transaction();
         let tip_block_hash = db.get_tip_block_hash().unwrap();
         let run_result = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
-                &state,
+                &mut state,
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
                 None,
             )
             .expect(operation);
-        print_gas_used(&format!("{}: ", operation), &run_result.write.logs);
+        print_gas_used(&format!("{}: ", operation), &run_result.logs);
         let state = hex::encode(run_result.return_data);
         let state = state.parse::<u32>().unwrap();
         println!("{}: {}", operation, state);
@@ -258,19 +252,19 @@ fn test_revert_with_try_catch() {
             .to_id(call_revert_with_try_catch_in_depth_contract_id.pack())
             .args(Bytes::from(args).pack())
             .build();
-        let db = store.begin_transaction();
+        let db = &store.begin_transaction();
         let tip_block_hash = db.get_tip_block_hash().unwrap();
         let run_result = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
-                &state,
+                &mut state,
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
                 None,
             )
             .expect(operation);
-        print_gas_used(&format!("{}: ", operation), &run_result.write.logs);
+        print_gas_used(&format!("{}: ", operation), &run_result.logs);
         let state = hex::encode(run_result.return_data);
         let state = state.parse::<u32>().unwrap();
         println!("{}: {}", operation, state);
@@ -319,23 +313,21 @@ fn test_revert_without_try_catch() {
             .to_id(call_revert_without_try_catch_contract_id.pack())
             .args(Bytes::from(args).pack())
             .build();
-        let db = store.begin_transaction();
+        let db = &store.begin_transaction();
         let tip_block_hash = db.get_tip_block_hash().unwrap();
         let run_result = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
-                &state,
+                &mut state,
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
                 None,
             )
             .expect(operation);
-        print_gas_used(&format!("{}: ", operation), &run_result.write.logs);
+        print_gas_used(&format!("{}: ", operation), &run_result.logs);
 
-        state
-            .apply_run_result(&run_result.write)
-            .expect("update state");
+        state.finalise().expect("update state");
 
         println!("exit code: {}", run_result.exit_code);
         assert_eq!(run_result.exit_code, 2);
@@ -360,19 +352,19 @@ fn test_revert_without_try_catch() {
             .to_id(revert_contract_id.pack())
             .args(Bytes::from(args).pack())
             .build();
-        let db = store.begin_transaction();
+        let db = &store.begin_transaction();
         let tip_block_hash = db.get_tip_block_hash().unwrap();
         let run_result = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
-                &state,
+                &mut state,
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
                 None,
             )
             .expect(operation);
-        print_gas_used(&format!("{}: ", operation), &run_result.write.logs);
+        print_gas_used(&format!("{}: ", operation), &run_result.logs);
         let state = hex::encode(run_result.return_data);
         let state = state.parse::<u32>().unwrap();
         println!("{}: {}", operation, state);
@@ -398,19 +390,19 @@ fn test_revert_without_try_catch() {
             .to_id(call_revert_without_try_catch_contract_id.pack())
             .args(Bytes::from(args).pack())
             .build();
-        let db = store.begin_transaction();
+        let db = &store.begin_transaction();
         let tip_block_hash = db.get_tip_block_hash().unwrap();
         let run_result = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
-                &state,
+                &mut state,
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
                 None,
             )
             .expect(operation);
-        print_gas_used(&format!("{}: ", operation), &run_result.write.logs);
+        print_gas_used(&format!("{}: ", operation), &run_result.logs);
         let state = hex::encode(run_result.return_data);
         let state = state.parse::<u32>().unwrap();
         println!("{}: {}", operation, state);
@@ -466,7 +458,7 @@ fn test_revert_with_try_catch_in_constructor() {
         );
         print_gas_used(
             "Deploy callRevertWithTryCatchInConstructor contract: ",
-            &run_result.write.logs,
+            &run_result.logs,
         );
 
         println!("exit_code: {}", run_result.exit_code);
@@ -502,19 +494,19 @@ fn test_revert_with_try_catch_in_constructor() {
             .to_id(revert_contract_id.pack())
             .args(Bytes::from(args).pack())
             .build();
-        let db = store.begin_transaction();
+        let db = &store.begin_transaction();
         let tip_block_hash = db.get_tip_block_hash().unwrap();
         let run_result = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
-                &state,
+                &mut state,
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
                 None,
             )
             .expect(operation);
-        print_gas_used(&format!("{}: ", operation), &run_result.write.logs);
+        print_gas_used(&format!("{}: ", operation), &run_result.logs);
         let state = hex::encode(run_result.return_data);
         let state = state.parse::<u32>().unwrap();
         println!("{}: {}", operation, state);
@@ -540,19 +532,19 @@ fn test_revert_with_try_catch_in_constructor() {
             .to_id(call_revert_with_try_catch_in_constructor_contract_id.pack())
             .args(Bytes::from(args).pack())
             .build();
-        let db = store.begin_transaction();
+        let db = &store.begin_transaction();
         let tip_block_hash = db.get_tip_block_hash().unwrap();
         let run_result = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
-                &state,
+                &mut state,
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
                 None,
             )
             .expect(operation);
-        print_gas_used(&format!("{}: ", operation), &run_result.write.logs);
+        print_gas_used(&format!("{}: ", operation), &run_result.logs);
         let state = hex::encode(run_result.return_data);
         let state = state.parse::<u32>().unwrap();
         println!("{}: {}", operation, state);
@@ -561,7 +553,7 @@ fn test_revert_with_try_catch_in_constructor() {
 }
 
 fn before_each() -> (
-    gw_generator::dummy_state::DummyState,
+    DummyState,
     gw_store::Store,
     gw_generator::Generator,
     u32,
@@ -605,7 +597,7 @@ fn before_each() -> (
             block_producer_id.clone(),
             1,
         );
-        print_gas_used("Deploy revert contract: ", &run_result.write.logs);
+        print_gas_used("Deploy revert contract: ", &run_result.logs);
     }
 
     {
@@ -621,10 +613,7 @@ fn before_each() -> (
             block_producer_id.clone(),
             1,
         );
-        print_gas_used(
-            "Deploy callRevertWithTryCatch contract: ",
-            &run_result.write.logs,
-        );
+        print_gas_used("Deploy callRevertWithTryCatch contract: ", &run_result.logs);
     }
 
     {
@@ -642,7 +631,7 @@ fn before_each() -> (
         );
         print_gas_used(
             "Deploy callRevertWithTryCatchInDepth contract: ",
-            &run_result.write.logs,
+            &run_result.logs,
         );
     }
 
@@ -661,7 +650,7 @@ fn before_each() -> (
         );
         print_gas_used(
             "Deploy callRevertWithoutTryCatch contract: ",
-            &run_result.write.logs,
+            &run_result.logs,
         );
     }
 

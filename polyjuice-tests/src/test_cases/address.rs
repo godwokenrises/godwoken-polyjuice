@@ -56,12 +56,12 @@ fn test_get_contract_code() {
         .to_id(contract_id.pack())
         .args(gw_types::bytes::Bytes::from(args).pack())
         .build();
-    let db = store.begin_transaction();
+    let db = &store.begin_transaction();
     let tip_block_hash = db.get_tip_block_hash().unwrap();
     let run_result = generator
         .execute_transaction(
             &gw_store::chain_view::ChainView::new(&db, tip_block_hash),
-            &state,
+            &mut state,
             &block_info,
             &raw_l2tx,
             gw_generator::constants::L2TX_MAX_CYCLES,
@@ -91,12 +91,12 @@ fn test_get_contract_code() {
         .to_id(contract_id.pack())
         .args(gw_types::bytes::Bytes::from(args).pack())
         .build();
-    let db = store.begin_transaction();
+    let db = &store.begin_transaction();
     let tip_block_hash = db.get_tip_block_hash().unwrap();
     let run_result = generator
         .execute_transaction(
             &gw_store::chain_view::ChainView::new(&db, tip_block_hash),
-            &state,
+            &mut state,
             &block_info,
             &raw_l2tx,
             gw_generator::constants::L2TX_MAX_CYCLES,

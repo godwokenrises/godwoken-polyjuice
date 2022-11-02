@@ -9,9 +9,8 @@ use crate::helper::{
 use gw_common::{
     builtins::ETH_REGISTRY_ACCOUNT_ID, registry_address::RegistryAddress, state::State,
 };
-use gw_generator::traits::StateExt;
-use gw_store::chain_view::ChainView;
 use gw_store::traits::chain_store::ChainStore;
+use gw_store::{chain_view::ChainView, state::traits::JournalDB};
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*, U256};
 use std::convert::TryInto;
 
@@ -82,7 +81,7 @@ fn test_simple_transfer() {
     assert_eq!(ss_balance, U256::zero());
     let run_result = simple_storage_get(
         &store,
-        &state,
+        &mut state,
         &generator,
         block_number,
         from_id,
@@ -163,12 +162,12 @@ fn test_simple_transfer() {
             .to_id(st_contract_id.pack())
             .args(Bytes::from(args).pack())
             .build();
-        let db = store.begin_transaction();
+        let db = &store.begin_transaction();
         let tip_block_hash = store.get_tip_block_hash().unwrap();
         let run_result = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
-                &state,
+                &mut state,
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
@@ -181,9 +180,7 @@ fn test_simple_transfer() {
             run_result.cycles.execution,
             908_000,
         );
-        state
-            .apply_run_result(&run_result.write)
-            .expect("update state");
+        state.finalise().expect("update state");
 
         let new_balance = state
             .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &st_contract_reg_addr)
@@ -272,12 +269,12 @@ fn test_simple_transfer() {
             .to_id(st_contract_id.pack())
             .args(Bytes::from(args).pack())
             .build();
-        let db = store.begin_transaction();
+        let db = &store.begin_transaction();
         let tip_block_hash = store.get_tip_block_hash().unwrap();
         let run_result = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
-                &state,
+                &mut state,
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
@@ -290,9 +287,7 @@ fn test_simple_transfer() {
             run_result.cycles.execution,
             1_480_000,
         );
-        state
-            .apply_run_result(&run_result.write)
-            .expect("update state");
+        state.finalise().expect("update state");
 
         let new_balance = state
             .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &st_contract_reg_addr)
@@ -305,7 +300,7 @@ fn test_simple_transfer() {
         println!("================");
         let run_result = simple_storage_get(
             &store,
-            &state,
+            &mut state,
             &generator,
             block_number,
             from_id,
@@ -339,21 +334,19 @@ fn test_simple_transfer() {
             .to_id(st_contract_id.pack())
             .args(Bytes::from(args).pack())
             .build();
-        let db = store.begin_transaction();
+        let db = &store.begin_transaction();
         let tip_block_hash = db.get_tip_block_hash().unwrap();
-        let run_result = generator
+        let _run_result = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
-                &state,
+                &mut state,
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
                 None,
             )
             .expect("construct");
-        state
-            .apply_run_result(&run_result.write)
-            .expect("update state");
+        state.finalise().expect("update state");
 
         let new_balance = state
             .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &st_contract_reg_addr)
@@ -365,7 +358,7 @@ fn test_simple_transfer() {
         assert_eq!(ss_balance, U256::from(2u64));
         let run_result = simple_storage_get(
             &store,
-            &state,
+            &mut state,
             &generator,
             block_number,
             from_id,

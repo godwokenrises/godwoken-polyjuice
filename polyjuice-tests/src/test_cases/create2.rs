@@ -7,9 +7,8 @@ use crate::helper::{
     CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::{builtins::ETH_REGISTRY_ACCOUNT_ID, state::State};
-use gw_generator::traits::StateExt;
-use gw_store::chain_view::ChainView;
 use gw_store::traits::chain_store::ChainStore;
+use gw_store::{chain_view::ChainView, state::traits::JournalDB};
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*, U256};
 
 const SS_INIT_CODE: &str = include_str!("./evm-contracts/SimpleStorage.bin");
@@ -86,12 +85,12 @@ fn test_create2() {
             .to_id(create2_contract_id.pack())
             .args(Bytes::from(args).pack())
             .build();
-        let db = store.begin_transaction();
+        let db = &store.begin_transaction();
         let tip_block_hash = db.get_tip_block_hash().unwrap();
         let run_result = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
-                &state,
+                &mut state,
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
@@ -104,9 +103,7 @@ fn test_create2() {
             run_result.cycles.execution,
             1_750_000,
         );
-        state
-            .apply_run_result(&run_result.write)
-            .expect("update state");
+        state.finalise().expect("update state");
         run_result
     };
 
@@ -138,7 +135,7 @@ fn test_create2() {
         .get_sudt_balance(CKB_SUDT_ACCOUNT_ID, &address)
         .unwrap();
 
-    let log = parse_log(&run_result.write.logs[1]);
+    let log = parse_log(&run_result.logs[1]);
 
     let balance = match log {
         Log::SudtTransfer {
@@ -161,7 +158,7 @@ fn test_create2() {
 
     let run_result = simple_storage_get(
         &store,
-        &state,
+        &mut state,
         &generator,
         block_number,
         from_id,

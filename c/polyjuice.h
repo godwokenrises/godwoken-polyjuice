@@ -1,3 +1,4 @@
+#include <cstdint>
 #include <stddef.h>
 #include <stdint.h>
 #include <stdio.h>
@@ -88,7 +89,9 @@ int handle_message(gw_context_t* ctx,
                    uint32_t parent_from_id,
                    uint32_t parent_to_id,
                    evmc_address *parent_destination,
-                   const evmc_message* msg, struct evmc_result* res);
+                   const evmc_message* msg,
+                   struct evmc_result* res,
+                   uint32_t snapshot_id);
 typedef int (*stream_data_loader_fn)(gw_context_t* ctx, long data_id,
                                      uint32_t* len, uint32_t offset,
                                      uint8_t* data);
@@ -615,6 +618,15 @@ struct evmc_result call(struct evmc_host_context* context,
   gw_context_t* gw_ctx = context->gw_ctx;
 
   /* TODO: Revert in try block has not been implemented. Will fix later.*/
+  /*
+   * Take a snapshot for call and revert later if EVM returns an error.
+   */
+  uint32_t snapshot_id;
+  ret = gw_ctx->sys_snapshot(gw_ctx, &snapshot_id);
+  if (ret != 0) {
+    res.status_code = (evmc_status_code)ret;
+    return res;
+  }
 
   precompiled_contract_gas_fn contract_gas;
   precompiled_contract_fn contract;
@@ -652,7 +664,7 @@ struct evmc_result call(struct evmc_host_context* context,
     }
   } else {
     ret = handle_message(gw_ctx, context->from_id, context->to_id,
-                         &context->destination, msg, &res);
+                         &context->destination, msg, &res, snapshot_id);
     if (is_fatal_error(ret)) {
       /* stop as soon as possible */
       context->error_code = ret;
@@ -1229,7 +1241,9 @@ int handle_message(gw_context_t* ctx,
                    uint32_t parent_from_id,
                    uint32_t parent_to_id,
                    evmc_address *parent_destination,
-                   const evmc_message* msg_origin, struct evmc_result* res) {
+                   const evmc_message* msg_origin,
+                   struct evmc_result* res,
+                   uint32_t snapshot_id) {
   static const evmc_address zero_address{0};
 
   evmc_message msg = *msg_origin;
@@ -1368,6 +1382,8 @@ int handle_message(gw_context_t* ctx,
   if (to_address_exists && code_size > 0) {
     ret = execute_in_evmone(ctx, &msg, parent_from_id, from_id, to_id, code_data, code_size, res);
     if (ret != 0) {
+      /* We must handle revert with snapshot. */
+      ctx->sys_revert(ctx, snapshot_id);
       return ret;
     }
     if (g_error_code != EVMC_SUCCESS) {
@@ -1611,7 +1627,16 @@ int run_polyjuice() {
   int64_t initial_gas = msg.gas;
   msg.gas -= min_gas;                  // subtract IntrinsicGas
 
-  int ret_handle_message = handle_message(&context, UINT32_MAX, UINT32_MAX, NULL, &msg, &res);
+  /*
+   * Take a snapshot for call/create and revert later if EVM returns an error.
+   */
+  uint32_t snapshot_id;
+  ret = context.sys_snapshot(&context, &snapshot_id);
+  if (ret != 0) {
+    return ret;
+  }
+  int ret_handle_message = handle_message(&context, UINT32_MAX, UINT32_MAX,
+                                          NULL, &msg, &res, snapshot_id);
   // debug_print evmc_result.output_data if the execution failed
   if (res.status_code != 0) {
     debug_print_int("evmc_result.output_size", res.output_size);

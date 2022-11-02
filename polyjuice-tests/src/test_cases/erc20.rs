@@ -6,9 +6,8 @@ use crate::helper::{
     PolyjuiceArgsBuilder, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
-use gw_generator::traits::StateExt;
-use gw_store::chain_view::ChainView;
 use gw_store::traits::chain_store::ChainStore;
+use gw_store::{chain_view::ChainView, state::traits::JournalDB};
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
 
 const INIT_CODE: &str = include_str!("./evm-contracts/ERC20.bin");
@@ -43,7 +42,7 @@ fn test_erc20() {
         block_producer_id.clone(),
         1,
     );
-    print_gas_used("Deploy ERC20 contract: ", &run_result.write.logs);
+    print_gas_used("Deploy ERC20 contract: ", &run_result.logs);
     // [Deploy ERC20] used cycles: 1018075 < 1020K
     helper::check_cycles("Deploy ERC20", run_result.cycles.execution, 1_400_000);
 
@@ -147,19 +146,19 @@ fn test_erc20() {
             .to_id(erc20_contract_id.pack())
             .args(Bytes::from(args).pack())
             .build();
-        let db = store.begin_transaction();
+        let db = &store.begin_transaction();
         let tip_block_hash = db.get_tip_block_hash().unwrap();
         let run_result = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
-                &state,
+                &mut state,
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
                 None,
             )
             .expect(operation);
-        print_gas_used(&format!("ERC20 {}: ", operation), &run_result.write.logs);
+        print_gas_used(&format!("ERC20 {}: ", operation), &run_result.logs);
 
         // [ERC20 contract method_x] used cycles: 942107 < 960K
         helper::check_cycles(
@@ -167,9 +166,7 @@ fn test_erc20() {
             run_result.cycles.execution,
             1_400_000,
         );
-        state
-            .apply_run_result(&run_result.write)
-            .expect("update state");
+        state.finalise().expect("update state");
         assert_eq!(
             run_result.return_data,
             hex::decode(return_data_str).unwrap(),

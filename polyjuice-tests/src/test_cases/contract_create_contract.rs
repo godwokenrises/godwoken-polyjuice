@@ -6,8 +6,7 @@ use crate::helper::{
     PolyjuiceArgsBuilder, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
-use gw_generator::traits::StateExt;
-use gw_store::{chain_view::ChainView, traits::chain_store::ChainStore};
+use gw_store::{chain_view::ChainView, state::traits::JournalDB, traits::chain_store::ChainStore};
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
 use std::convert::TryInto;
 
@@ -38,9 +37,7 @@ fn test_contract_create_contract() {
         block_producer_id.clone(),
         1,
     );
-    state
-        .apply_run_result(&run_result.write)
-        .expect("update state");
+    state.finalise().expect("update state");
     // [Deploy CreateContract] used cycles: 2109521 < 2120K
     helper::check_cycles(
         "Deploy CreateContract",
@@ -97,21 +94,19 @@ fn test_contract_create_contract() {
             .to_id(ss_account_id.pack())
             .args(Bytes::from(args).pack())
             .build();
-        let db = store.begin_transaction();
+        let db = &store.begin_transaction();
         let tip_block_hash = db.get_tip_block_hash().unwrap();
         let run_result = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
-                &state,
+                &mut state,
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
                 None,
             )
             .expect("SimpleStorage.get()");
-        state
-            .apply_run_result(&run_result.write)
-            .expect("update state");
+        state.finalise().expect("update state");
         let mut expected_return_data = vec![0u8; 32];
         expected_return_data[31] = 0xff;
         assert_eq!(run_result.return_data, expected_return_data);

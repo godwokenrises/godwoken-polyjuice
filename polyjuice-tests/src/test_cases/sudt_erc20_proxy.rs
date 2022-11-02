@@ -7,10 +7,12 @@ use crate::helper::{
     CKB_SUDT_ACCOUNT_ID, CREATOR_ACCOUNT_ID, FATAL_PRECOMPILED_CONTRACTS, L2TX_MAX_CYCLES,
     SUDT_ERC20_PROXY_USER_DEFINED_DECIMALS_CODE,
 };
+use crate::DummyState;
 use gw_common::builtins::ETH_REGISTRY_ACCOUNT_ID;
 use gw_common::registry_address::RegistryAddress;
 use gw_common::state::State;
-use gw_generator::{dummy_state::DummyState, error::TransactionError, traits::StateExt, Generator};
+use gw_generator::{error::TransactionError, traits::StateExt, Generator};
+use gw_store::state::traits::JournalDB;
 use gw_store::traits::chain_store::ChainStore;
 use gw_store::{chain_view::ChainView, Store};
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*, U256};
@@ -62,7 +64,7 @@ fn test_sudt_erc20_proxy_inner(
         print!("{:02x}", byte);
     }
     println!();
-    print_gas_used("Deploy SUDT_ERC20_PROXY contract: ", &run_result.write.logs);
+    print_gas_used("Deploy SUDT_ERC20_PROXY contract: ", &run_result.logs);
 
     let contract_account_script =
         new_contract_account_script(state, from_id1, &from_eth_address1, false);
@@ -296,7 +298,7 @@ fn test_sudt_erc20_proxy_inner(
             .to_id(new_account_id.pack())
             .args(Bytes::from(args).pack())
             .build();
-        let db = store.begin_transaction();
+        let db = &store.begin_transaction();
         let tip_block_hash = store.get_tip_block_hash().unwrap();
         let t = std::time::Instant::now();
         let run_result = generator.execute_transaction(
@@ -310,7 +312,7 @@ fn test_sudt_erc20_proxy_inner(
         if run_result.exit_code != 0 {
             return Err(TransactionError::InvalidExitCode(run_result.exit_code));
         }
-        print_gas_used(&format!("SudtERC20Proxy {}: ", action), &run_result.write.logs);
+        print_gas_used(&format!("SudtERC20Proxy {}: ", action), &run_result.logs);
 
         println!(
             "[execute_transaction] {} {}ms",
@@ -318,8 +320,8 @@ fn test_sudt_erc20_proxy_inner(
             t.elapsed().as_millis()
         );
         println!("used_cycles: {}", run_result.cycles.execution);
-        println!("write_values.len: {}", run_result.write.write_values.len());
-        state.apply_run_result(&run_result.write).expect("update state");
+        println!("write_values.len: {}", run_result.write_data_hashes.len());
+        state.finalise().expect("update state");
         assert_eq!(
             run_result.return_data,
             hex::decode(return_data_str).unwrap()
@@ -347,7 +349,7 @@ fn test_sudt_erc20_proxy_inner(
             .to_id(new_account_id.pack())
             .args(Bytes::from(args).pack())
             .build();
-        let db = store.begin_transaction();
+        let db = &store.begin_transaction();
         let tip_block_hash = store.get_tip_block_hash().unwrap();
         let err_run_result = generator
             .execute_transaction(
@@ -384,7 +386,7 @@ fn test_sudt_erc20_proxy_inner(
             .to_id(new_account_id.pack())
             .args(Bytes::from(args).pack())
             .build();
-        let db = store.begin_transaction();
+        let db = &store.begin_transaction();
         let tip_block_hash = db.get_tip_block_hash().unwrap();
         let err_run_result = generator
             .execute_transaction(
