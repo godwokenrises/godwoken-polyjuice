@@ -144,7 +144,7 @@ fn test_contract_call_contract() {
         hex::decode("00000000000000000000000000000000000000000000000000000000000000e1").unwrap()
     );
 
-    assert_eq!(state.get_nonce(from_id).unwrap(), 3);
+    assert_eq!(state.get_nonce(from_id).unwrap(), 5);
     assert_eq!(state.get_nonce(ss_account_id).unwrap(), 0);
     assert_eq!(state.get_nonce(cc_contract_id).unwrap(), 0);
 }

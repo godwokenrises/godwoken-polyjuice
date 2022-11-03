@@ -6,6 +6,7 @@ use crate::helper::{
     CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
+use gw_generator::error::TransactionError;
 use gw_store::traits::chain_store::ChainStore;
 use gw_store::{chain_view::ChainView, state::traits::JournalDB};
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
@@ -142,7 +143,7 @@ fn test_recursion_contract_call() {
                 None,
             )
             .unwrap();
-        assert_eq!(err.exit_code, 3);
+        assert_eq!(err.exit_code, 2);
     }
 
     {
@@ -165,16 +166,14 @@ fn test_recursion_contract_call() {
             .build();
         let db = &store.begin_transaction();
         let tip_block_hash = db.get_tip_block_hash().unwrap();
-        let err = generator
-            .execute_transaction(
-                &ChainView::new(&db, tip_block_hash),
-                &mut state,
-                &block_info,
-                &raw_tx,
-                L2TX_MAX_CYCLES,
-                None,
-            )
-            .unwrap();
-        assert_eq!(err.exit_code, -93);
+        let err = generator.execute_transaction(
+            &ChainView::new(&db, tip_block_hash),
+            &mut state,
+            &block_info,
+            &raw_tx,
+            L2TX_MAX_CYCLES,
+            None,
+        );
+        assert_eq!(err.unwrap_err(), TransactionError::InsufficientBalance);
     }
 }

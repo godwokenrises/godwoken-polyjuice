@@ -40,7 +40,7 @@ contract CallRevertWithTryCatch {
 contract CallRevertWithTryCatchInDepth {
     uint public state = 1;
 
-    // expected result: state = 4, a.state = 1
+    // expected result: state = 3, a.state = 1
     function test(CallRevertWithTryCatch b, Revert a) external returns (uint) {
         state = 2;
         try b.test(a) {

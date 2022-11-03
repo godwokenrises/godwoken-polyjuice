@@ -1,719 +1,257 @@
-//! Test Revert contract
-//!   See ./evm-contracts/revert/*
+use std::convert::TryInto;
 
-use std::{env, fs};
+use anyhow::Ok;
 
-use crate::{
-    helper::{
-        self, deploy, new_block_info, print_gas_used, setup, MockContractInfo,
-        PolyjuiceArgsBuilder, CREATOR_ACCOUNT_ID, L2TX_MAX_CYCLES,
-    },
-    DummyState,
-};
-use gw_common::state::State;
-use gw_store::traits::chain_store::ChainStore;
-use gw_store::{chain_view::ChainView, state::traits::JournalDB};
-use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
-
+use crate::{ctx::MockChain, helper::MockContractInfo};
+const REVERT_CODE: &str = include_str!("./evm-contracts/Revert.bin");
+const CALL_REVERT_CODE: &str = include_str!("./evm-contracts/CallRevertWithTryCatch.bin");
+const CALL_DEEP_REVERT_CODE: &str =
+    include_str!("./evm-contracts/CallRevertWithTryCatchInDepth.bin");
+const CONSTRUCTOR_REVERT_CODE: &str =
+    include_str!("./evm-contracts/CallRevertWithTryCatchInConstructor.bin");
+const CALL_REVERT_WO_TRY: &str = include_str!("./evm-contracts/CallRevertWithoutTryCatch.bin");
 #[test]
-fn test_revert_with_try_catch() {
-    let (
-        mut state,
-        store,
-        generator,
+fn revert_in_try_test() -> anyhow::Result<()> {
+    let mut chain = MockChain::setup("..")?;
+    let eth_address = [9u8; 20];
+    let mint_ckb = 1_000_000;
+    let from_id = chain.create_eoa_account(&eth_address, mint_ckb.into())?;
+    //deploy contracts
+    let gas_limit = 100000;
+    let gas_price = 1;
+    let value = 0;
+    let code = hex::decode(REVERT_CODE).expect("decode code");
+    let run_result = chain.deploy(from_id, &code, gas_limit, gas_price, value)?;
+    assert_eq!(run_result.exit_code, 0);
+    let code = hex::decode(CALL_REVERT_CODE).expect("decode code");
+    let run_result = chain.deploy(from_id, &code, gas_limit, gas_price, value)?;
+    assert_eq!(run_result.exit_code, 0);
+
+    let revert_contract = MockContractInfo::create(&eth_address, 0);
+    let revert_eth_addr = revert_contract.eth_addr.try_into().unwrap();
+    let revert_id = chain
+        .get_account_id_by_eth_address(&revert_eth_addr)?
+        .expect("to id");
+    let call_revert_contract = MockContractInfo::create(&eth_address, 1);
+    let call_revert_eth_addr = call_revert_contract.eth_addr.try_into().unwrap();
+    let call_revert_id = chain
+        .get_account_id_by_eth_address(&call_revert_eth_addr)?
+        .expect("to id");
+
+    //call CallRevertWithTryCatch.test(Revert)
+    let args_str = format!(
+        "bb29998e000000000000000000000000{}",
+        hex::encode(&revert_eth_addr)
+    );
+    let code = hex::decode(args_str)?;
+    let run_result = chain.execute(from_id, call_revert_id, &code, gas_limit, gas_price, value)?;
+    assert_eq!(run_result.exit_code, 0);
+
+    //check state
+    let args_str = "c19d93fb"; //state()
+    let code = hex::decode(args_str)?;
+    let run_result = chain.execute(from_id, revert_id, &code, gas_limit, gas_price, value)?;
+    assert_eq!(run_result.exit_code, 0);
+    let state = hex::encode(run_result.return_data);
+    let state = state.parse::<u32>().unwrap();
+    assert_eq!(state, 1);
+
+    let run_result = chain.execute(from_id, call_revert_id, &code, gas_limit, gas_price, value)?;
+    assert_eq!(run_result.exit_code, 0);
+    let state = hex::encode(run_result.return_data);
+    let state = state.parse::<u32>().unwrap();
+    assert_eq!(state, 4);
+    Ok(())
+}
+#[test]
+fn revert_in_deep_try_test() -> anyhow::Result<()> {
+    let mut chain = MockChain::setup("..")?;
+    let eth_address = [9u8; 20];
+    let mint_ckb = 1_000_000_000;
+    let from_id = chain.create_eoa_account(&eth_address, mint_ckb.into())?;
+    //deploy contracts
+    let gas_limit = 1000000;
+    let gas_price = 1;
+    let value = 0;
+    let code = hex::decode(REVERT_CODE).expect("decode code");
+    let run_result = chain.deploy(from_id, &code, gas_limit, gas_price, value)?;
+    assert_eq!(run_result.exit_code, 0);
+    let code = hex::decode(CALL_REVERT_CODE).expect("decode code");
+    let run_result = chain.deploy(from_id, &code, gas_limit, gas_price, value)?;
+    assert_eq!(run_result.exit_code, 0);
+    let code = hex::decode(CALL_DEEP_REVERT_CODE).expect("decode code");
+    let run_result = chain.deploy(from_id, &code, gas_limit, gas_price, value)?;
+    assert_eq!(run_result.exit_code, 0);
+
+    let revert_contract = MockContractInfo::create(&eth_address, 0);
+    let revert_eth_addr = revert_contract.eth_addr.try_into().unwrap();
+    let revert_id = chain
+        .get_account_id_by_eth_address(&revert_eth_addr)?
+        .expect("to id");
+    let call_revert_contract = MockContractInfo::create(&eth_address, 1);
+    let call_revert_eth_addr = call_revert_contract.eth_addr.try_into().unwrap();
+    let call_revert_id = chain
+        .get_account_id_by_eth_address(&call_revert_eth_addr)?
+        .expect("to id");
+    let call_depth_revert_contract = MockContractInfo::create(&eth_address, 2);
+    let call_depth_revert_eth_addr = call_depth_revert_contract.eth_addr.try_into().unwrap();
+    let call_depth_revert_id = chain
+        .get_account_id_by_eth_address(&call_depth_revert_eth_addr)?
+        .expect("to id");
+
+    //CallRevertWithTryCatchInDepth.test(CallRevertWithTryCatch, Revert)
+    let args_str = format!(
+        "2b6d0ceb000000000000000000000000{}000000000000000000000000{}",
+        hex::encode(&call_revert_eth_addr),
+        hex::encode(&revert_eth_addr)
+    );
+    let code = hex::decode(args_str)?;
+    let run_result = chain.execute(
         from_id,
-        _from_eth_address,
-        block_producer_id,
-        revert_contract,
-        revert_contract_id,
-        call_revert_with_try_catch_contract,
-        call_revert_with_try_catch_contract_id,
-        _call_revert_with_try_catch_in_depth_contract,
-        call_revert_with_try_catch_in_depth_contract_id,
-        _call_revert_without_try_catch_contract,
-        _call_revert_without_try_catch_contract_id,
-    ) = before_each();
+        call_depth_revert_id,
+        &code,
+        gas_limit,
+        gas_price,
+        value,
+    )?;
+    assert_eq!(run_result.exit_code, 0);
 
-    // call try catch revert method
-    {
-        let operation = "CallRevertWithTryCatch.test(Revert)";
-        let args_str = format!(
-            "bb29998e000000000000000000000000{}",
-            hex::encode(&revert_contract.eth_addr)
-        );
-        let block_number = 1 as u64;
-        let block_info = new_block_info(block_producer_id.clone(), block_number, block_number);
-        println!(
-            ">>>>>>>>>>>>>>>>>> [input]: {}<<<<<<<<<<<<<<<<<<<",
-            args_str
-        );
-        let input = hex::decode(args_str).unwrap();
-        let args = PolyjuiceArgsBuilder::default()
-            .gas_limit(100000)
-            .gas_price(1)
-            .value(0)
-            .input(&input)
-            .build();
-        let raw_tx = RawL2Transaction::new_builder()
-            .from_id(from_id.pack())
-            .to_id(call_revert_with_try_catch_contract_id.pack())
-            .args(Bytes::from(args).pack())
-            .build();
-        let db = &store.begin_transaction();
-        let tip_block_hash = db.get_tip_block_hash().unwrap();
-        let run_result = generator
-            .execute_transaction(
-                &ChainView::new(&db, tip_block_hash),
-                &mut state,
-                &block_info,
-                &raw_tx,
-                L2TX_MAX_CYCLES,
-                None,
-            )
-            .expect(operation);
-        print_gas_used(&format!("{}: ", operation), &run_result.logs);
+    //check state
+    let args_str = "c19d93fb"; //state()
+    let code = hex::decode(args_str)?;
+    let run_result = chain.execute(from_id, revert_id, &code, gas_limit, gas_price, value)?;
+    assert_eq!(run_result.exit_code, 0);
+    let state = hex::encode(run_result.return_data);
+    let state = state.parse::<u32>().unwrap();
+    assert_eq!(state, 1);
 
-        state.finalise().expect("update state");
+    let run_result = chain.execute(from_id, call_revert_id, &code, gas_limit, gas_price, value)?;
+    assert_eq!(run_result.exit_code, 0);
+    let state = hex::encode(run_result.return_data);
+    let state = state.parse::<u32>().unwrap();
+    assert_eq!(state, 4);
 
-        println!(">>>>>>>>>>>>exit code: {}", run_result.exit_code);
-        assert_eq!(run_result.exit_code, 0);
-    }
-
-    // check if failed try state(Revert.state) is reverted
-    {
-        let operation = "Revert.state()";
-        let args_str = "c19d93fb";
-        let block_number = 1 as u64;
-        let block_info = new_block_info(block_producer_id.clone(), block_number, block_number);
-        println!(">> [input]: {}", args_str);
-        let input = hex::decode(args_str).unwrap();
-        let args = PolyjuiceArgsBuilder::default()
-            .gas_limit(100000)
-            .gas_price(1)
-            .value(0)
-            .input(&input)
-            .build();
-        let raw_tx = RawL2Transaction::new_builder()
-            .from_id(from_id.pack())
-            .to_id(revert_contract_id.pack())
-            .args(Bytes::from(args).pack())
-            .build();
-        let db = &store.begin_transaction();
-        let tip_block_hash = db.get_tip_block_hash().unwrap();
-        let run_result = generator
-            .execute_transaction(
-                &ChainView::new(&db, tip_block_hash),
-                &mut state,
-                &block_info,
-                &raw_tx,
-                L2TX_MAX_CYCLES,
-                None,
-            )
-            .expect(operation);
-        print_gas_used(&format!("{}: ", operation), &run_result.logs);
-        let state = hex::encode(run_result.return_data);
-        let state = state.parse::<u32>().unwrap();
-        println!("{}: {}", operation, state);
-        assert_eq!(state, 1);
-    }
-
-    // check if try catch state(CallRevertWithTryCatch.state) is updated
-    {
-        let operation = "CallRevertWithTryCatch.state()";
-        let args_str = "c19d93fb";
-        let block_number = 1 as u64;
-        let block_info = new_block_info(block_producer_id.clone(), block_number, block_number);
-        println!(">> [input]: {}", args_str);
-        let input = hex::decode(args_str).unwrap();
-        let args = PolyjuiceArgsBuilder::default()
-            .gas_limit(100000)
-            .gas_price(1)
-            .value(0)
-            .input(&input)
-            .build();
-        let raw_tx = RawL2Transaction::new_builder()
-            .from_id(from_id.pack())
-            .to_id(call_revert_with_try_catch_contract_id.pack())
-            .args(Bytes::from(args).pack())
-            .build();
-        let db = &store.begin_transaction();
-        let tip_block_hash = db.get_tip_block_hash().unwrap();
-        let run_result = generator
-            .execute_transaction(
-                &ChainView::new(&db, tip_block_hash),
-                &mut state,
-                &block_info,
-                &raw_tx,
-                L2TX_MAX_CYCLES,
-                None,
-            )
-            .expect(operation);
-        print_gas_used(&format!("{}: ", operation), &run_result.logs);
-        let state = hex::encode(run_result.return_data);
-        //FIXME: should not revert
-        //let state = state.parse::<u32>().unwrap();
-        //println!("{}: {}", operation, state);
-        //assert_eq!(state, 4);
-    }
-
-    // call try catch revert in two depth
-    {
-        let operation = "CallRevertWithTryCatchInDepth.test(CallRevertWithTryCatch, Revert)";
-        let args_str = format!(
-            "2b6d0ceb000000000000000000000000{}000000000000000000000000{}",
-            hex::encode(&call_revert_with_try_catch_contract.eth_addr),
-            hex::encode(&revert_contract.eth_addr)
-        );
-        let block_number = 1 as u64;
-        let block_info = new_block_info(block_producer_id.clone(), block_number, block_number);
-        println!(">> [input]: {}", args_str);
-        let input = hex::decode(args_str).unwrap();
-        let args = PolyjuiceArgsBuilder::default()
-            .gas_limit(200000)
-            .gas_price(1)
-            .value(0)
-            .input(&input)
-            .build();
-        let raw_tx = RawL2Transaction::new_builder()
-            .from_id(from_id.pack())
-            .to_id(call_revert_with_try_catch_in_depth_contract_id.pack())
-            .args(Bytes::from(args).pack())
-            .build();
-        let db = &store.begin_transaction();
-        let tip_block_hash = db.get_tip_block_hash().unwrap();
-        let run_result = generator
-            .execute_transaction(
-                &ChainView::new(&db, tip_block_hash),
-                &mut state,
-                &block_info,
-                &raw_tx,
-                L2TX_MAX_CYCLES,
-                None,
-            )
-            .expect(operation);
-        print_gas_used(&format!("{}: ", operation), &run_result.logs);
-
-        state.finalise().expect("update state");
-
-        println!("exit code: {}", run_result.exit_code);
-        assert_eq!(run_result.exit_code, 0);
-    }
-
-    // check if failed try state (Revert.state) is reverted in two depth
-    {
-        let operation = "Revert.state()";
-        let args_str = "c19d93fb";
-        let block_number = 1 as u64;
-        let block_info = new_block_info(block_producer_id.clone(), block_number, block_number);
-        println!(">> [input]: {}", args_str);
-        let input = hex::decode(args_str).unwrap();
-        let args = PolyjuiceArgsBuilder::default()
-            .gas_limit(100000)
-            .gas_price(1)
-            .value(0)
-            .input(&input)
-            .build();
-        let raw_tx = RawL2Transaction::new_builder()
-            .from_id(from_id.pack())
-            .to_id(revert_contract_id.pack())
-            .args(Bytes::from(args).pack())
-            .build();
-        let db = &store.begin_transaction();
-        let tip_block_hash = db.get_tip_block_hash().unwrap();
-        let run_result = generator
-            .execute_transaction(
-                &ChainView::new(&db, tip_block_hash),
-                &mut state,
-                &block_info,
-                &raw_tx,
-                L2TX_MAX_CYCLES,
-                None,
-            )
-            .expect(operation);
-        print_gas_used(&format!("{}: ", operation), &run_result.logs);
-        let state = hex::encode(run_result.return_data);
-        let state = state.parse::<u32>().unwrap();
-        println!("{}: {}", operation, state);
-        assert_eq!(state, 1);
-    }
-
-    // check if failed try catch state (CallRevertWithTryCatchInDepth.state) is updated
-    {
-        let operation = "CallRevertWithTryCatchInDepth.state()";
-        let args_str = "c19d93fb";
-        let block_number = 1 as u64;
-        let block_info = new_block_info(block_producer_id.clone(), block_number, block_number);
-        println!(">> [input]: {}", args_str);
-        let input = hex::decode(args_str).unwrap();
-        let args = PolyjuiceArgsBuilder::default()
-            .gas_limit(100000)
-            .gas_price(1)
-            .value(0)
-            .input(&input)
-            .build();
-        let raw_tx = RawL2Transaction::new_builder()
-            .from_id(from_id.pack())
-            .to_id(call_revert_with_try_catch_in_depth_contract_id.pack())
-            .args(Bytes::from(args).pack())
-            .build();
-        let db = &store.begin_transaction();
-        let tip_block_hash = db.get_tip_block_hash().unwrap();
-        let run_result = generator
-            .execute_transaction(
-                &ChainView::new(&db, tip_block_hash),
-                &mut state,
-                &block_info,
-                &raw_tx,
-                L2TX_MAX_CYCLES,
-                None,
-            )
-            .expect(operation);
-        print_gas_used(&format!("{}: ", operation), &run_result.logs);
-        let state = hex::encode(run_result.return_data);
-        //FIXME: should not revert
-        //let state = state.parse::<u32>().unwrap();
-        //println!("{}: {}", operation, state);
-        //assert_eq!(state, 4);
-    }
+    let run_result = chain.execute(
+        from_id,
+        call_depth_revert_id,
+        &code,
+        gas_limit,
+        gas_price,
+        value,
+    )?;
+    assert_eq!(run_result.exit_code, 0);
+    let state = hex::encode(run_result.return_data);
+    let state = state.parse::<u32>().unwrap();
+    assert_eq!(state, 3);
+    Ok(())
 }
 
 #[test]
-fn test_revert_without_try_catch() {
-    let (
-        mut state,
-        store,
-        generator,
-        from_id,
-        _from_eth_address,
-        block_producer_id,
-        revert_contract,
-        revert_contract_id,
-        _call_revert_with_try_catch_contract,
-        _call_revert_with_try_catch_contract_id,
-        _call_revert_with_try_catch_in_depth_contract,
-        _call_revert_with_try_catch_in_depth_contract_id,
-        _call_revert_without_try_catch_contract,
-        call_revert_without_try_catch_contract_id,
-    ) = before_each();
+fn revert_contructor_try_test() -> anyhow::Result<()> {
+    let mut chain = MockChain::setup("..")?;
+    let eth_address = [9u8; 20];
+    let mint_ckb = 1_000_000;
+    let from_id = chain.create_eoa_account(&eth_address, mint_ckb.into())?;
+    //deploy contracts
+    let gas_limit = 1000000;
+    let gas_price = 1;
+    let value = 0;
+    let code = hex::decode(REVERT_CODE).expect("decode code");
+    let run_result = chain.deploy(from_id, &code, gas_limit, gas_price, value)?;
+    let revert_contract = MockContractInfo::create(&eth_address, 0);
+    let revert_eth_addr = revert_contract.eth_addr.try_into().unwrap();
+    let revert_id = chain
+        .get_account_id_by_eth_address(&revert_eth_addr)?
+        .expect("to id");
+    assert_eq!(run_result.exit_code, 0);
 
-    // call normal revert
-    {
-        let operation = "CallRevertWithoutTryCatch.test(Revert)";
-        let args_str = format!(
-            "bb29998e000000000000000000000000{}",
-            hex::encode(&revert_contract.eth_addr)
-        );
-        let block_number = 1 as u64;
-        let block_info = new_block_info(block_producer_id.clone(), block_number, block_number);
-        println!(">> [input]: {}", args_str);
-        let input = hex::decode(args_str).unwrap();
-        let args = PolyjuiceArgsBuilder::default()
-            .gas_limit(100000)
-            .gas_price(1)
-            .value(0)
-            .input(&input)
-            .build();
-        let raw_tx = RawL2Transaction::new_builder()
-            .from_id(from_id.pack())
-            .to_id(call_revert_without_try_catch_contract_id.pack())
-            .args(Bytes::from(args).pack())
-            .build();
-        let db = &store.begin_transaction();
-        let tip_block_hash = db.get_tip_block_hash().unwrap();
-        let run_result = generator
-            .execute_transaction(
-                &ChainView::new(&db, tip_block_hash),
-                &mut state,
-                &block_info,
-                &raw_tx,
-                L2TX_MAX_CYCLES,
-                None,
-            )
-            .expect(operation);
-        print_gas_used(&format!("{}: ", operation), &run_result.logs);
+    let deploy_args = format!("000000000000000000000000{}", hex::encode(&revert_eth_addr));
+    let code = format!("{}{}", CONSTRUCTOR_REVERT_CODE, deploy_args);
+    let code = hex::decode(code).expect("decode code");
+    let run_result = chain.deploy(from_id, &code, gas_limit, gas_price, value)?;
+    assert_eq!(run_result.exit_code, 0);
 
-        state.finalise().expect("update state");
-
-        println!("exit code: {}", run_result.exit_code);
-        assert_eq!(run_result.exit_code, 2);
-    }
-
-    // check if failed state(Revert.state) is reverted
-    {
-        let operation = "Revert.state()";
-        let args_str = "c19d93fb";
-        let block_number = 1 as u64;
-        let block_info = new_block_info(block_producer_id.clone(), block_number, block_number);
-        println!(">> [input]: {}", args_str);
-        let input = hex::decode(args_str).unwrap();
-        let args = PolyjuiceArgsBuilder::default()
-            .gas_limit(100000)
-            .gas_price(1)
-            .value(0)
-            .input(&input)
-            .build();
-        let raw_tx = RawL2Transaction::new_builder()
-            .from_id(from_id.pack())
-            .to_id(revert_contract_id.pack())
-            .args(Bytes::from(args).pack())
-            .build();
-        let db = &store.begin_transaction();
-        let tip_block_hash = db.get_tip_block_hash().unwrap();
-        let run_result = generator
-            .execute_transaction(
-                &ChainView::new(&db, tip_block_hash),
-                &mut state,
-                &block_info,
-                &raw_tx,
-                L2TX_MAX_CYCLES,
-                None,
-            )
-            .expect(operation);
-        print_gas_used(&format!("{}: ", operation), &run_result.logs);
-        let state = hex::encode(run_result.return_data);
-        let state = state.parse::<u32>().unwrap();
-        println!("{}: {}", operation, state);
-        assert_eq!(state, 1);
-    }
-
-    // check if failed state(CallRevertWithoutTryCatch.state) is reverted
-    {
-        let operation = "CallRevertWithoutTryCatch.state()";
-        let args_str = "c19d93fb";
-        let block_number = 1 as u64;
-        let block_info = new_block_info(block_producer_id.clone(), block_number, block_number);
-        println!(">> [input]: {}", args_str);
-        let input = hex::decode(args_str).unwrap();
-        let args = PolyjuiceArgsBuilder::default()
-            .gas_limit(100000)
-            .gas_price(1)
-            .value(0)
-            .input(&input)
-            .build();
-        let raw_tx = RawL2Transaction::new_builder()
-            .from_id(from_id.pack())
-            .to_id(call_revert_without_try_catch_contract_id.pack())
-            .args(Bytes::from(args).pack())
-            .build();
-        let db = &store.begin_transaction();
-        let tip_block_hash = db.get_tip_block_hash().unwrap();
-        let run_result = generator
-            .execute_transaction(
-                &ChainView::new(&db, tip_block_hash),
-                &mut state,
-                &block_info,
-                &raw_tx,
-                L2TX_MAX_CYCLES,
-                None,
-            )
-            .expect(operation);
-        print_gas_used(&format!("{}: ", operation), &run_result.logs);
-        let state = hex::encode(run_result.return_data);
-        let state = state.parse::<u32>().unwrap();
-        println!("{}: {}", operation, state);
-        assert_eq!(state, 1);
-    }
-}
-
-#[test]
-fn test_revert_with_try_catch_in_constructor() {
-    let (
-        mut state,
-        store,
-        generator,
-        from_id,
-        from_eth_address,
-        block_producer_id,
-        revert_contract,
-        revert_contract_id,
-        _call_revert_with_try_catch_contract,
-        _call_revert_with_try_catch_contract_id,
-        _call_revert_with_try_catch_in_depth_contract,
-        _call_revert_with_try_catch_in_depth_contract_id,
-        _call_revert_without_try_catch_contract,
-        _call_revert_without_try_catch_contract_id,
-    ) = before_each();
-
-    // try deploy CallRevertWithTryCatchInConstructor contract
-    let call_revert_with_try_catch_in_constructor_contract;
-    {
-        let call_revert_with_try_catch_in_constructor_bytecode: &str =
-            &load_bytecode_from_json_file(
-                "evm-contracts/revert/CallRevertWithTryCatchInConstructor.json",
-            );
-        let deploy_args = format!(
-            "000000000000000000000000{}",
-            hex::encode(revert_contract.eth_addr)
-        );
-        let contract_bytecode_with_args = format!(
-            "{}{}",
-            call_revert_with_try_catch_in_constructor_bytecode, deploy_args
-        );
-        let run_result = deploy(
-            &generator,
-            &store,
-            &mut state,
-            CREATOR_ACCOUNT_ID,
-            from_id,
-            &contract_bytecode_with_args,
-            199694,
-            0,
-            block_producer_id.clone(),
-            2,
-        );
-        print_gas_used(
-            "Deploy callRevertWithTryCatchInConstructor contract: ",
-            &run_result.logs,
-        );
-
-        println!("exit_code: {}", run_result.exit_code);
-        assert_eq!(run_result.exit_code, 0);
-
-        call_revert_with_try_catch_in_constructor_contract =
-            MockContractInfo::create(&from_eth_address, 4);
-    }
-
-    let call_revert_with_try_catch_in_constructor_contract_id = state
-        .get_account_id_by_script_hash(
-            &call_revert_with_try_catch_in_constructor_contract.script_hash,
-        )
-        .unwrap()
-        .unwrap();
+    let constructor_revert_contract = MockContractInfo::create(&eth_address, 1);
+    let constructor_revert_eth_addr = constructor_revert_contract.eth_addr.try_into().unwrap();
+    let constructor_revert_id = chain
+        .get_account_id_by_eth_address(&constructor_revert_eth_addr)?
+        .expect("to id");
 
     // check if failed try state(Revert.state) is reverted
-    {
-        let operation = "Revert.state()";
-        let args_str = "c19d93fb";
-        let block_number = 1 as u64;
-        let block_info = new_block_info(block_producer_id.clone(), block_number, block_number);
-        println!(">> [input]: {}", args_str);
-        let input = hex::decode(args_str).unwrap();
-        let args = PolyjuiceArgsBuilder::default()
-            .gas_limit(100000)
-            .gas_price(1)
-            .value(0)
-            .input(&input)
-            .build();
-        let raw_tx = RawL2Transaction::new_builder()
-            .from_id(from_id.pack())
-            .to_id(revert_contract_id.pack())
-            .args(Bytes::from(args).pack())
-            .build();
-        let db = &store.begin_transaction();
-        let tip_block_hash = db.get_tip_block_hash().unwrap();
-        let run_result = generator
-            .execute_transaction(
-                &ChainView::new(&db, tip_block_hash),
-                &mut state,
-                &block_info,
-                &raw_tx,
-                L2TX_MAX_CYCLES,
-                None,
-            )
-            .expect(operation);
-        print_gas_used(&format!("{}: ", operation), &run_result.logs);
-        let state = hex::encode(run_result.return_data);
-        let state = state.parse::<u32>().unwrap();
-        println!("{}: {}", operation, state);
-        assert_eq!(state, 1);
-    }
+    let args_str = "c19d93fb";
+    let code = hex::decode(args_str)?;
+    let run_result = chain.execute(from_id, revert_id, &code, gas_limit, gas_price, value)?;
+    assert_eq!(run_result.exit_code, 0);
+    let state = hex::encode(run_result.return_data);
+    let state = state.parse::<u32>().unwrap();
+    assert_eq!(state, 1);
 
     // check if failed try catch state (CallRevertWithTryCatchInConstructor.state) is updated
-    {
-        let operation = "CallRevertWithTryCatchInConstructor.state()";
-        let args_str = "c19d93fb";
-        let block_number = 1 as u64;
-        let block_info = new_block_info(block_producer_id.clone(), block_number, block_number);
-        println!(">> [input]: {}", args_str);
-        let input = hex::decode(args_str).unwrap();
-        let args = PolyjuiceArgsBuilder::default()
-            .gas_limit(100000)
-            .gas_price(1)
-            .value(0)
-            .input(&input)
-            .build();
-        let raw_tx = RawL2Transaction::new_builder()
-            .from_id(from_id.pack())
-            .to_id(call_revert_with_try_catch_in_constructor_contract_id.pack())
-            .args(Bytes::from(args).pack())
-            .build();
-        let db = &store.begin_transaction();
-        let tip_block_hash = db.get_tip_block_hash().unwrap();
-        let run_result = generator
-            .execute_transaction(
-                &ChainView::new(&db, tip_block_hash),
-                &mut state,
-                &block_info,
-                &raw_tx,
-                L2TX_MAX_CYCLES,
-                None,
-            )
-            .expect(operation);
-        print_gas_used(&format!("{}: ", operation), &run_result.logs);
-        let state = hex::encode(run_result.return_data);
-        let state = state.parse::<u32>().unwrap();
-        println!("{}: {}", operation, state);
-        assert_eq!(state, 4);
-    }
-}
-
-fn before_each() -> (
-    DummyState,
-    gw_store::Store,
-    gw_generator::Generator,
-    u32,
-    [u8; 20],
-    gw_common::registry_address::RegistryAddress,
-    MockContractInfo,
-    u32,
-    MockContractInfo,
-    u32,
-    MockContractInfo,
-    u32,
-    MockContractInfo,
-    u32,
-) {
-    let revert_bytecode: &str = &load_bytecode_from_json_file("evm-contracts/revert/Revert.json");
-    let call_revert_with_try_catch_bytecode: &str =
-        &load_bytecode_from_json_file("evm-contracts/revert/CallRevertWithTryCatch.json");
-    let call_revert_with_try_catch_in_depth: &str =
-        &load_bytecode_from_json_file("evm-contracts/revert/CallRevertWithTryCatchInDepth.json");
-    let call_revert_without_try_catch: &str =
-        &load_bytecode_from_json_file("evm-contracts/revert/CallRevertWithoutTryCatch.json");
-
-    let (store, mut state, generator) = setup();
-    let block_producer_id = crate::helper::create_block_producer(&mut state);
-
-    let from_eth_address = [1u8; 20];
-    let (from_id, _from_script_hash) =
-        helper::create_eth_eoa_account(&mut state, &from_eth_address, 2000000u64.into());
-
-    // Deploy all contracts
-    {
-        let run_result = deploy(
-            &generator,
-            &store,
-            &mut state,
-            CREATOR_ACCOUNT_ID,
-            from_id,
-            revert_bytecode,
-            199694,
-            0,
-            block_producer_id.clone(),
-            1,
-        );
-        print_gas_used("Deploy revert contract: ", &run_result.logs);
-    }
-
-    {
-        let run_result = deploy(
-            &generator,
-            &store,
-            &mut state,
-            CREATOR_ACCOUNT_ID,
-            from_id,
-            call_revert_with_try_catch_bytecode,
-            199694,
-            0,
-            block_producer_id.clone(),
-            1,
-        );
-        print_gas_used("Deploy callRevertWithTryCatch contract: ", &run_result.logs);
-    }
-
-    {
-        let run_result = deploy(
-            &generator,
-            &store,
-            &mut state,
-            CREATOR_ACCOUNT_ID,
-            from_id,
-            call_revert_with_try_catch_in_depth,
-            199694,
-            0,
-            block_producer_id.clone(),
-            1,
-        );
-        print_gas_used(
-            "Deploy callRevertWithTryCatchInDepth contract: ",
-            &run_result.logs,
-        );
-    }
-
-    {
-        let run_result = deploy(
-            &generator,
-            &store,
-            &mut state,
-            CREATOR_ACCOUNT_ID,
-            from_id,
-            call_revert_without_try_catch,
-            199694,
-            0,
-            block_producer_id.clone(),
-            1,
-        );
-        print_gas_used(
-            "Deploy callRevertWithoutTryCatch contract: ",
-            &run_result.logs,
-        );
-    }
-
-    let revert_contract = MockContractInfo::create(&from_eth_address, 0);
-    let revert_contract_id = state
-        .get_account_id_by_script_hash(&revert_contract.script_hash)
-        .unwrap()
-        .unwrap();
-
-    let call_revert_with_try_catch_contract = MockContractInfo::create(&from_eth_address, 1);
-    let call_revert_with_try_catch_contract_id = state
-        .get_account_id_by_script_hash(&call_revert_with_try_catch_contract.script_hash)
-        .unwrap()
-        .unwrap();
-
-    let call_revert_with_try_catch_in_depth_contract =
-        MockContractInfo::create(&from_eth_address, 2);
-    let call_revert_with_try_catch_in_depth_contract_id = state
-        .get_account_id_by_script_hash(&call_revert_with_try_catch_in_depth_contract.script_hash)
-        .unwrap()
-        .unwrap();
-
-    let call_revert_without_try_catch_contract = MockContractInfo::create(&from_eth_address, 3);
-    let call_revert_without_try_catch_contract_id = state
-        .get_account_id_by_script_hash(&call_revert_without_try_catch_contract.script_hash)
-        .unwrap()
-        .unwrap();
-    state.finalise().unwrap();
-
-    return (
-        state,
-        store,
-        generator,
+    let run_result = chain.execute(
         from_id,
-        from_eth_address,
-        block_producer_id,
-        revert_contract,
-        revert_contract_id,
-        call_revert_with_try_catch_contract,
-        call_revert_with_try_catch_contract_id,
-        call_revert_with_try_catch_in_depth_contract,
-        call_revert_with_try_catch_in_depth_contract_id,
-        call_revert_without_try_catch_contract,
-        call_revert_without_try_catch_contract_id,
-    );
+        constructor_revert_id,
+        &code,
+        gas_limit,
+        gas_price,
+        value,
+    )?;
+    assert_eq!(run_result.exit_code, 0);
+    let state = hex::encode(run_result.return_data);
+    let state = state.parse::<u32>().unwrap();
+    assert_eq!(state, 4);
+    Ok(())
 }
 
-// todo move to helper file
-fn load_bytecode_from_json_file(path: &str) -> String {
-    let mut file_path = env::current_dir().expect("base path");
-    file_path.push("src/test_cases/");
-    file_path.push(path);
+#[test]
+fn revert_test() -> anyhow::Result<()> {
+    let mut chain = MockChain::setup("..")?;
+    let eth_address = [9u8; 20];
+    let mint_ckb = 1_000_000;
+    let from_id = chain.create_eoa_account(&eth_address, mint_ckb.into())?;
+    //deploy contracts
+    let gas_limit = 100000;
+    let gas_price = 1;
+    let value = 0;
+    let code = hex::decode(REVERT_CODE).expect("decode code");
+    let run_result = chain.deploy(from_id, &code, gas_limit, gas_price, value)?;
+    assert_eq!(run_result.exit_code, 0);
+    let code = hex::decode(CALL_REVERT_WO_TRY).expect("decode code");
+    let run_result = chain.deploy(from_id, &code, gas_limit, gas_price, value)?;
+    assert_eq!(run_result.exit_code, 0);
 
-    let data = fs::read_to_string(file_path).expect("Unable to read json file");
-    let revert_json: serde_json::Value = serde_json::from_str(&data).expect("json format");
-    let bytecode = revert_json["bytecode"]
-        .to_string()
-        .replace("0x", "")
-        .replace('"', "");
-    bytecode
+    let revert_contract = MockContractInfo::create(&eth_address, 0);
+    let revert_eth_addr = revert_contract.eth_addr.try_into().unwrap();
+    let revert_id = chain
+        .get_account_id_by_eth_address(&revert_eth_addr)?
+        .expect("to id");
+    let call_revert_contract = MockContractInfo::create(&eth_address, 1);
+    let call_revert_eth_addr = call_revert_contract.eth_addr.try_into().unwrap();
+    let call_revert_id = chain
+        .get_account_id_by_eth_address(&call_revert_eth_addr)?
+        .expect("to id");
+
+    //call CallRevertWithoutTryCatch.test(Revert)
+    let args_str = format!(
+        "bb29998e000000000000000000000000{}",
+        hex::encode(&revert_eth_addr)
+    );
+    let code = hex::decode(args_str)?;
+    let run_result = chain.execute(from_id, call_revert_id, &code, gas_limit, gas_price, value)?;
+    assert_eq!(run_result.exit_code, 2);
+
+    //check state
+    let args_str = "c19d93fb"; //state()
+    let code = hex::decode(args_str)?;
+    let run_result = chain.execute(from_id, revert_id, &code, gas_limit, gas_price, value)?;
+    assert_eq!(run_result.exit_code, 0);
+    let state = hex::encode(run_result.return_data);
+    let state = state.parse::<u32>().unwrap();
+    assert_eq!(state, 1);
+
+    let run_result = chain.execute(from_id, call_revert_id, &code, gas_limit, gas_price, value)?;
+    assert_eq!(run_result.exit_code, 0);
+    let state = hex::encode(run_result.return_data);
+    let state = state.parse::<u32>().unwrap();
+    assert_eq!(state, 1);
+    Ok(())
 }

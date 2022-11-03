@@ -665,6 +665,7 @@ pub fn simple_storage_get(
         .expect("execute_transaction");
     // 491894, 571661 -> 586360 < 587K
     check_cycles("simple_storage_get", run_result.cycles.execution, 700_000);
+
     run_result
 }
 

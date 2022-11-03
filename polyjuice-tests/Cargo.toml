@@ -9,13 +9,13 @@ name = "lib"
 path = "src/lib.rs"
 
 [dependencies]
-gw-types     = { git = "https://github.com/jjyr/godwoken.git", branch = "support-revert-inner-state-and-add-syscalls" }
-gw-common    = { git = "https://github.com/jjyr/godwoken.git", branch = "support-revert-inner-state-and-add-syscalls" }
-gw-db        = { git = "https://github.com/jjyr/godwoken.git", branch = "support-revert-inner-state-and-add-syscalls" }
-gw-store     = { git = "https://github.com/jjyr/godwoken.git", branch = "support-revert-inner-state-and-add-syscalls" }
-gw-config    = { git = "https://github.com/jjyr/godwoken.git", branch = "support-revert-inner-state-and-add-syscalls" }
-gw-traits    = { git = "https://github.com/jjyr/godwoken.git", branch = "support-revert-inner-state-and-add-syscalls" }
-gw-generator = { git = "https://github.com/jjyr/godwoken.git", branch = "support-revert-inner-state-and-add-syscalls" }
+gw-types     = { git = "https://github.com/godwokenrises/godwoken.git", branch = "develop" }
+gw-common    = { git = "https://github.com/godwokenrises/godwoken.git", branch = "develop" }
+gw-db        = { git = "https://github.com/godwokenrises/godwoken.git", branch = "develop" }
+gw-store     = { git = "https://github.com/godwokenrises/godwoken.git", branch = "develop" }
+gw-config    = { git = "https://github.com/godwokenrises/godwoken.git", branch = "develop" }
+gw-traits    = { git = "https://github.com/godwokenrises/godwoken.git", branch = "develop" }
+gw-generator = { git = "https://github.com/godwokenrises/godwoken.git", branch = "develop" }
 ckb-vm = { version = "=0.21.3", features = ["detect-asm"] }
 ckb-vm-definitions = "=0.21.3"
 

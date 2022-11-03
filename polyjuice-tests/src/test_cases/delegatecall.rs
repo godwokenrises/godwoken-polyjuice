@@ -21,7 +21,7 @@ fn test_delegatecall() {
 
     let from_eth_address = [1u8; 20];
     let (from_id, _from_script_hash) =
-        helper::create_eth_eoa_account(&mut state, &from_eth_address, 400000u64.into());
+        helper::create_eth_eoa_account(&mut state, &from_eth_address, 500000u64.into());
 
     // Deploy SimpleStorage
     let mut block_number = 1;
@@ -166,7 +166,6 @@ fn test_delegatecall() {
         delegate_contract_balance,
         gw_types::U256::from(MSG_VALUE * 3)
     );
-    assert_eq!(state.get_nonce(from_id).unwrap(), 5);
     assert_eq!(state.get_nonce(ss_account_id).unwrap(), 0);
     assert_eq!(state.get_nonce(delegate_contract_id).unwrap(), 0);
 
