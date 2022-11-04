@@ -622,7 +622,7 @@ struct evmc_result call(struct evmc_host_context* context,
   ret = gw_ctx->sys_snapshot(gw_ctx, &snapshot_id);
   debug_print_int("[call] take a snapshot", snapshot_id);
   if (ret != 0) {
-    res.status_code = (evmc_status_code)ret;
+    res.status_code = EVMC_INTERNAL_ERROR;
     return res;
   }
 
@@ -657,6 +657,14 @@ struct evmc_result call(struct evmc_host_context* context,
     if (ret != 0) {
       debug_print_int("call pre-compiled contract failed", ret);
       res.status_code = EVMC_INTERNAL_ERROR;
+      int revert_ret = gw_ctx->sys_revert(gw_ctx, snapshot_id);
+      debug_print_int("[call precompiled] revert with snapshot id", snapshot_id);
+      if (ret != 0) {
+        if (is_fatal_error(revert_ret)) {
+          context->error_code = ret;
+        }
+      }
+
       return res;
     }
     res.status_code = EVMC_SUCCESS;
@@ -665,7 +673,6 @@ struct evmc_result call(struct evmc_host_context* context,
                          &context->destination, msg, &res);
     if (res.status_code != EVMC_SUCCESS) {
       int revert_ret = gw_ctx->sys_revert(gw_ctx, snapshot_id);
-      /* It's a creation polyjuice transaction. */
       debug_print_int("[call] revert with snapshot id", snapshot_id);
       if (ret != 0) {
         if (is_fatal_error(revert_ret)) {
