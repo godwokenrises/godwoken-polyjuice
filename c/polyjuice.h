@@ -659,12 +659,9 @@ struct evmc_result call(struct evmc_host_context* context,
       res.status_code = EVMC_INTERNAL_ERROR;
       int revert_ret = gw_ctx->sys_revert(gw_ctx, snapshot_id);
       debug_print_int("[call precompiled] revert with snapshot id", snapshot_id);
-      if (ret != 0) {
-        if (is_fatal_error(revert_ret)) {
-          context->error_code = ret;
-        }
+      if (is_fatal_error(revert_ret)) {
+        context->error_code = ret;
       }
-
       return res;
     }
     res.status_code = EVMC_SUCCESS;
@@ -674,10 +671,8 @@ struct evmc_result call(struct evmc_host_context* context,
     if (res.status_code != EVMC_SUCCESS) {
       int revert_ret = gw_ctx->sys_revert(gw_ctx, snapshot_id);
       debug_print_int("[call] revert with snapshot id", snapshot_id);
-      if (ret != 0) {
-        if (is_fatal_error(revert_ret)) {
-          context->error_code = ret;
-        }
+      if (is_fatal_error(revert_ret)) {
+        context->error_code = ret;
       }
     }
     if (is_fatal_error(ret)) {
