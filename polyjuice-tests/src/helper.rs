@@ -22,7 +22,7 @@ use gw_traits::CodeStore;
 use gw_types::{
     bytes::Bytes,
     core::{AllowedContractType, AllowedEoaType, ScriptHashType},
-    offchain::{RunResult, RunResultCycles},
+    offchain::{RunResult, CycleMeter},
     packed::{
         AllowedTypeHash, BatchSetMapping, BlockInfo, Fee, LogItem, RawL2Transaction, RollupConfig,
         Script, SetMapping, Uint64,
@@ -725,7 +725,7 @@ pub(crate) fn create_eth_eoa_account(
     (account_id, script_hash)
 }
 
-pub(crate) fn check_cycles(l2_tx_label: &str, cycles: RunResultCycles, warning_cycles: u64) {
+pub(crate) fn check_cycles(l2_tx_label: &str, cycles: CycleMeter, warning_cycles: u64) {
     if POLYJUICE_GENERATOR_NAME.contains("_log") {
         return; // disable cycles check
     }

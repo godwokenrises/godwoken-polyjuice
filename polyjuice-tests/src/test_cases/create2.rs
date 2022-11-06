@@ -100,7 +100,7 @@ fn test_create2() {
         // [Create2Impl.deploy(...)] used cycles: 1197555 < 1230K
         helper::check_cycles(
             "Create2Impl.deploy(...)",
-            run_result.cycles,
+            run_result.cycles.to_owned(),
             1_750_000,
         );
         state.finalise().expect("update state");
