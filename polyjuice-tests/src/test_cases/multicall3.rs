@@ -29,6 +29,6 @@ fn multicall3_test() -> anyhow::Result<()> {
     // used_cycles: 276137907
     let result = chain.execute(from_id, contract_account_id, &input, 1000000000, 1, 0)?;
     assert_eq!(result.exit_code, 0);
-    check_cycles("Multicall3", result.cycles.execution, 280_000_000);
+    check_cycles("Multicall3", result.cycles, 280_000_000);
     Ok(())
 }
