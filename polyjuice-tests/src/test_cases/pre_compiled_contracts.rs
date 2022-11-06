@@ -265,14 +265,14 @@ fn test_bn256_pairing() -> anyhow::Result<()> {
             .to_id(contract_account_id.pack())
             .args(Bytes::from(args).pack())
             .build();
-        let db = store.begin_transaction();
+        let db = &store.begin_transaction();
         let tip_block_hash = db.get_tip_block_hash().unwrap();
 
         let t = std::time::Instant::now();
         let run_result = generator
             .execute_transaction(
                 &gw_store::chain_view::ChainView::new(&db, tip_block_hash),
-                &state,
+                &mut state,
                 &new_block_info(block_producer.clone(), block_number, 0),
                 &raw_tx,
                 L2TX_MAX_CYCLES,
@@ -282,7 +282,7 @@ fn test_bn256_pairing() -> anyhow::Result<()> {
         // time consumed
         println!("[Bn256Pairing] {case_name} elapsed {}ms", t.elapsed().as_millis());
 
-        crate::helper::print_gas_used(case_name, &run_result.write.logs);
+        crate::helper::print_gas_used(case_name, &run_result.logs);
 
         assert_eq!(run_result.exit_code, crate::constant::EVMC_SUCCESS);
         assert_eq!(
@@ -290,7 +290,7 @@ fn test_bn256_pairing() -> anyhow::Result<()> {
             hex::decode(expected_output_hex).unwrap()
         );
 
-        crate::helper::check_cycles(case_name, run_result.cycles, 860_000 + input_len / 192 * 34_000 * 3);
+        crate::helper::check_cycles(case_name, run_result.cycles, 1_320_000 + input_len / 192 * 34_000 * 3);
     }
     Ok(())
 }
@@ -346,12 +346,12 @@ fn test_bn256_add() -> anyhow::Result<()> {
             .to_id(contract_account_id.pack())
             .args(Bytes::from(args).pack())
             .build();
-        let db = store.begin_transaction();
+        let db = &store.begin_transaction();
         let tip_block_hash = db.get_tip_block_hash().unwrap();
         let run_result = generator
             .execute_transaction(
                 &gw_store::chain_view::ChainView::new(&db, tip_block_hash),
-                &state,
+                &mut state,
                 &new_block_info(block_producer.clone(), block_number, 0),
                 &raw_tx,
                 L2TX_MAX_CYCLES,
@@ -457,14 +457,14 @@ fn test_bn256_add() -> anyhow::Result<()> {
             .to_id(contract_account_id.pack())
             .args(Bytes::from(args).pack())
             .build();
-        let db = store.begin_transaction();
+        let db = &store.begin_transaction();
         let tip_block_hash = db.get_tip_block_hash().unwrap();
 
         let t = std::time::Instant::now();
         let run_result = generator
             .execute_transaction(
                 &gw_store::chain_view::ChainView::new(&db, tip_block_hash),
-                &state,
+                &mut state,
                 &new_block_info(block_producer.clone(), block_number, 0),
                 &raw_tx,
                 L2TX_MAX_CYCLES,
@@ -474,7 +474,7 @@ fn test_bn256_add() -> anyhow::Result<()> {
         // time consumed
         println!("[Bn256Add] {case_name} elapsed {}ms", t.elapsed().as_millis());
 
-        crate::helper::print_gas_used(case_name, &run_result.write.logs);
+        crate::helper::print_gas_used(case_name, &run_result.logs);
 
         assert_eq!(run_result.exit_code, crate::constant::EVMC_SUCCESS);
         assert_eq!(
@@ -538,12 +538,12 @@ fn test_bn256_scalar_mul() -> anyhow::Result<()> {
             .to_id(contract_account_id.pack())
             .args(Bytes::from(args).pack())
             .build();
-        let db = store.begin_transaction();
+        let db = &store.begin_transaction();
         let tip_block_hash = db.get_tip_block_hash().unwrap();
         let run_result = generator
             .execute_transaction(
                 &gw_store::chain_view::ChainView::new(&db, tip_block_hash),
-                &state,
+                &mut state,
                 &new_block_info(block_producer.clone(), block_number, 0),
                 &raw_tx,
                 L2TX_MAX_CYCLES,
@@ -668,14 +668,14 @@ fn test_bn256_scalar_mul() -> anyhow::Result<()> {
             .to_id(contract_account_id.pack())
             .args(Bytes::from(args).pack())
             .build();
-        let db = store.begin_transaction();
+        let db = &store.begin_transaction();
         let tip_block_hash = db.get_tip_block_hash().unwrap();
 
         let t = std::time::Instant::now();
         let run_result = generator
             .execute_transaction(
                 &gw_store::chain_view::ChainView::new(&db, tip_block_hash),
-                &state,
+                &mut state,
                 &new_block_info(block_producer.clone(), block_number, 0),
                 &raw_tx,
                 L2TX_MAX_CYCLES,
@@ -684,7 +684,7 @@ fn test_bn256_scalar_mul() -> anyhow::Result<()> {
             .expect(case_name);
         // time consumed
         println!("[bn256ScalarMul] {case_name} elapsed {}ms", t.elapsed().as_millis());
-        crate::helper::print_gas_used(case_name, &run_result.write.logs);
+        crate::helper::print_gas_used(case_name, &run_result.logs);
 
         assert_eq!(run_result.exit_code, crate::constant::EVMC_SUCCESS);
         assert_eq!(
