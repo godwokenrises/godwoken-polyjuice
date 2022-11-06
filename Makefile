@@ -9,6 +9,7 @@ OBJCOPY := $(TARGET)-objcopy
 
 SECP_DIR := deps/secp256k1-fix
 SECP256K1_SRC := $(SECP_DIR)/src/ecmult_static_pre_context.h
+
 CFLAGS_CKB_STD = -Ideps/ckb-c-stdlib -Ideps/ckb-c-stdlib/molecule
 CFLAGS_SECP := -isystem $(SECP_DIR)/src -isystem $(SECP_DIR)
 CFLAGS_INTX := -Ideps/intx/lib/intx -Ideps/intx/include
@@ -18,8 +19,11 @@ CFLAGS_MBEDTLS := -Ideps/mbedtls/include
 CFLAGS_EVMONE := -Ideps/evmone/lib/evmone -Ideps/evmone/include -Ideps/evmone/evmc/include
 CFLAGS_SMT := -Ideps/godwoken-scripts/c/deps/sparse-merkle-tree/c
 CFLAGS_GODWOKEN := -Ideps/godwoken-scripts/c
-CFLAGS := -O3 -Ic/ripemd160 $(CFLAGS_CKB_STD) $(CFLAGS_EVMONE) $(CFLAGS_ETHASH) $(CFLAGS_CRYPTO_ALGORITHMS) $(CFLAGS_MBEDTLS) $(CFLAGS_SMT) $(CFLAGS_GODWOKEN) $(CFLAGS_SECP)
+
+# -O3: Higher level of optmization. Slower compile-time, better for production builds.
+CFLAGS := -O3 -Ic/ripemd160 $(CFLAGS_INTX) $(CFLAGS_CKB_STD) $(CFLAGS_EVMONE) $(CFLAGS_ETHASH) $(CFLAGS_CRYPTO_ALGORITHMS) $(CFLAGS_MBEDTLS) $(CFLAGS_SMT) $(CFLAGS_GODWOKEN) $(CFLAGS_SECP)
 CXXFLAGS := $(CFLAGS) -std=c++1z
+
 # -Wl,<args> Pass the comma separated arguments in args to the linker(GNU linker)
 # --gc-sections
 #   This will perform a garbage collection of code and data never referenced.
@@ -156,23 +160,23 @@ build/test_ripemd160: c/ripemd160/test_ripemd160.c c/ripemd160/ripemd160.h c/rip
 	riscv64-unknown-elf-run build/test_ripemd160
 
 build/execution_state.o: deps/evmone/lib/evmone/execution_state.cpp
-	$(CXX) $(CXXFLAGS) $(CFLAGS_INTX) $(LDFLAGS) -c -o $@ $<
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -c -o $@ $<
 build/baseline.o: deps/evmone/lib/evmone/baseline.cpp
-	$(CXX) $(CXXFLAGS) $(CFLAGS_INTX) $(LDFLAGS) -c -o $@ $<
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -c -o $@ $<
 build/analysis.o: deps/evmone/lib/evmone/analysis.cpp
-	$(CXX) $(CXXFLAGS) $(CFLAGS_INTX) $(LDFLAGS) -c -o $@ $<
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -c -o $@ $<
 build/execution.o: deps/evmone/lib/evmone/execution.cpp
-	$(CXX) $(CXXFLAGS) $(CFLAGS_INTX) $(LDFLAGS) -c -o $@ $<
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -c -o $@ $<
 build/instructions.o: deps/evmone/lib/evmone/instructions.cpp
-	$(CXX) $(CXXFLAGS) $(CFLAGS_INTX) $(LDFLAGS) -c -o $@ $<
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -c -o $@ $<
 build/instruction_metrics.o: deps/evmone/evmc/lib/instructions/instruction_metrics.c
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -c -o $@ $<
 build/instruction_names.o: deps/evmone/evmc/lib/instructions/instruction_names.c
 	$(CXX) $(CXXFLAGS) $(LDFLAGS) -c -o $@ $<
 build/instructions_calls.o: deps/evmone/lib/evmone/instructions_calls.cpp
-	$(CXX) $(CXXFLAGS) $(CFLAGS_INTX) $(LDFLAGS) -c -o $@ $<
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -c -o $@ $<
 build/evmone.o: deps/evmone/lib/evmone/evmone.cpp
-	$(CXX) $(CXXFLAGS) $(CFLAGS_INTX) $(LDFLAGS) -c -o $@ $< -DPROJECT_VERSION=\"0.6.0-dev\"
+	$(CXX) $(CXXFLAGS) $(LDFLAGS) -c -o $@ $< -DPROJECT_VERSION=\"0.6.0-dev\"
 
 build/keccak.o: deps/ethash/lib/keccak/keccak.c build/keccakf800.o
 	$(CC) $(CFLAGS) $(LDFLAGS) -c -o $@ $<
