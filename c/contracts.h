@@ -9,6 +9,16 @@
 #include "sudt_contracts.h"
 #include "other_contracts.h"
 
+#include <intx/intx.hpp>
+using intx::uint256;
+/**
+ * This unused function will activate compiler optimization for size.
+ * It reduces Polyjuice generator and validator by ~100KB.
+ */
+uint256 _activate_size_optimization(uint256 x, uint256 y) {
+  return intx::udivrem(x, y).quot;
+}
+
 /* Protocol Params:
    [Referenced]:
    https://github.com/ethereum/go-ethereum/blob/master/params/protocol_params.go
