@@ -9,10 +9,9 @@ use crate::helper::{
 };
 use gw_common::state::State;
 use gw_db::schema::COLUMN_INDEX;
-use gw_generator::traits::StateExt;
-use gw_store::chain_view::ChainView;
 use gw_store::traits::chain_store::ChainStore;
 use gw_store::traits::kv_store::KVStoreWrite;
+use gw_store::{chain_view::ChainView, state::traits::JournalDB};
 use gw_types::{
     bytes::Bytes,
     packed::{RawL2Transaction, Uint64},
@@ -29,7 +28,7 @@ fn test_get_block_info() {
         let genesis_number: Uint64 = 0.pack();
         // See: BlockInfo.sol
         let block_hash = [7u8; 32];
-        let tx = store.begin_transaction();
+        let tx = &store.begin_transaction();
         tx.insert_raw(COLUMN_INDEX, genesis_number.as_slice(), &block_hash[..])
             .unwrap();
         tx.commit().unwrap();
@@ -61,21 +60,19 @@ fn test_get_block_info() {
         .to_id(CREATOR_ACCOUNT_ID.pack())
         .args(Bytes::from(args).pack())
         .build();
-    let db = store.begin_transaction();
+    let db = &store.begin_transaction();
     let tip_block_hash = store.get_tip_block_hash().unwrap();
-    let run_result = generator
+    let _run_result = generator
         .execute_transaction(
             &ChainView::new(&db, tip_block_hash),
-            &state,
+            &mut state,
             &block_info,
             &raw_tx,
             L2TX_MAX_CYCLES,
             None,
         )
         .expect("Deploy BlockInfo");
-    state
-        .apply_run_result(&run_result.write)
-        .expect("update state");
+    state.finalise().expect("update state");
     block_number += 1;
     // println!(
     //     "result {}",
@@ -133,12 +130,12 @@ fn test_get_block_info() {
             .to_id(new_account_id.pack())
             .args(Bytes::from(args).pack())
             .build();
-        let db = store.begin_transaction();
+        let db = &store.begin_transaction();
         let tip_block_hash = db.get_tip_block_hash().unwrap();
         let run_result = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
-                &state,
+                &mut state,
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,

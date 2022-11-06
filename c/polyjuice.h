@@ -88,7 +88,8 @@ int handle_message(gw_context_t* ctx,
                    uint32_t parent_from_id,
                    uint32_t parent_to_id,
                    evmc_address *parent_destination,
-                   const evmc_message* msg, struct evmc_result* res);
+                   const evmc_message* msg,
+                   struct evmc_result* res);
 typedef int (*stream_data_loader_fn)(gw_context_t* ctx, long data_id,
                                      uint32_t* len, uint32_t offset,
                                      uint8_t* data);
@@ -614,7 +615,16 @@ struct evmc_result call(struct evmc_host_context* context,
   res.release = release_result;
   gw_context_t* gw_ctx = context->gw_ctx;
 
-  /* TODO: Revert in try block has not been implemented. Will fix later.*/
+  /*
+   * Take a snapshot for call and revert later if EVM returns an error.
+   */
+  uint32_t snapshot_id;
+  ret = gw_ctx->sys_snapshot(gw_ctx, &snapshot_id);
+  debug_print_int("[call] take a snapshot", snapshot_id);
+  if (ret != 0) {
+    res.status_code = EVMC_INTERNAL_ERROR;
+    return res;
+  }
 
   precompiled_contract_gas_fn contract_gas;
   precompiled_contract_fn contract;
@@ -647,12 +657,24 @@ struct evmc_result call(struct evmc_host_context* context,
     if (ret != 0) {
       debug_print_int("call pre-compiled contract failed", ret);
       res.status_code = EVMC_INTERNAL_ERROR;
-    } else {
-      res.status_code = EVMC_SUCCESS;
+      int revert_ret = gw_ctx->sys_revert(gw_ctx, snapshot_id);
+      debug_print_int("[call precompiled] revert with snapshot id", snapshot_id);
+      if (is_fatal_error(revert_ret)) {
+        context->error_code = ret;
+      }
+      return res;
     }
+    res.status_code = EVMC_SUCCESS;
   } else {
     ret = handle_message(gw_ctx, context->from_id, context->to_id,
                          &context->destination, msg, &res);
+    if (res.status_code != EVMC_SUCCESS) {
+      int revert_ret = gw_ctx->sys_revert(gw_ctx, snapshot_id);
+      debug_print_int("[call] revert with snapshot id", snapshot_id);
+      if (is_fatal_error(revert_ret)) {
+        context->error_code = ret;
+      }
+    }
     if (is_fatal_error(ret)) {
       /* stop as soon as possible */
       context->error_code = ret;
@@ -665,10 +687,6 @@ struct evmc_result call(struct evmc_host_context* context,
         res.status_code = EVMC_INTERNAL_ERROR;
       }
     }
-  }
-
-  if (is_evmc_error(res.status_code)) {
-    g_error_code = res.status_code;
   }
   debug_print_int("call.res.status_code", res.status_code);
   ckb_debug("END call");
@@ -1229,7 +1247,8 @@ int handle_message(gw_context_t* ctx,
                    uint32_t parent_from_id,
                    uint32_t parent_to_id,
                    evmc_address *parent_destination,
-                   const evmc_message* msg_origin, struct evmc_result* res) {
+                   const evmc_message* msg_origin,
+                   struct evmc_result* res) {
   static const evmc_address zero_address{0};
 
   evmc_message msg = *msg_origin;
@@ -1369,9 +1388,6 @@ int handle_message(gw_context_t* ctx,
     ret = execute_in_evmone(ctx, &msg, parent_from_id, from_id, to_id, code_data, code_size, res);
     if (ret != 0) {
       return ret;
-    }
-    if (g_error_code != EVMC_SUCCESS) {
-      res->status_code = (evmc_status_code)g_error_code;
     }
   } else {
     ckb_debug("[handle_message] Don't run evm and return empty data");
@@ -1611,9 +1627,27 @@ int run_polyjuice() {
   int64_t initial_gas = msg.gas;
   msg.gas -= min_gas;                  // subtract IntrinsicGas
 
-  int ret_handle_message = handle_message(&context, UINT32_MAX, UINT32_MAX, NULL, &msg, &res);
+  /*
+   * Take a snapshot for call/create and revert later if EVM returns an error.
+   */
+  uint32_t snapshot_id;
+  ret = context.sys_snapshot(&context, &snapshot_id);
+  debug_print_int("[run_polyjuice] take a snapshot id", snapshot_id);
+  if (ret != 0) {
+    return ret;
+  }
+  int ret_handle_message = handle_message(&context, UINT32_MAX, UINT32_MAX,
+                                          NULL, &msg, &res);
   // debug_print evmc_result.output_data if the execution failed
   if (res.status_code != 0) {
+    /* We must handle revert with snapshot. */
+    g_created_id = UINT32_MAX; // revert if new account is created
+    memset(g_created_address, 0, 20);
+    ret = context.sys_revert(&context, snapshot_id);
+    debug_print_int("[run_polyjuice] revert with snapshot id", snapshot_id);
+    if (ret != 0) {
+      return ret;
+    }
     debug_print_int("evmc_result.output_size", res.output_size);
     // The output contains data coming from REVERT opcode
     debug_print_data("evmc_result.output_data:", res.output_data,

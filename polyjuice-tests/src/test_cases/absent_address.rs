@@ -56,12 +56,12 @@ fn absent_address_test() -> anyhow::Result<()> {
         .to_id(new_account_id.pack())
         .args(Bytes::from(args).pack())
         .build();
-    let db = store.begin_transaction();
+    let db = &store.begin_transaction();
     let tip_block_hash = db.get_tip_block_hash().unwrap();
     let run_result = generator
         .execute_transaction(
             &ChainView::new(&db, tip_block_hash),
-            &state,
+            &mut state,
             &block_info,
             &raw_tx,
             L2TX_MAX_CYCLES,
@@ -85,12 +85,12 @@ fn absent_address_test() -> anyhow::Result<()> {
         .to_id(new_account_id.pack())
         .args(Bytes::from(args).pack())
         .build();
-    let db = store.begin_transaction();
+    let db = &store.begin_transaction();
     let tip_block_hash = db.get_tip_block_hash().unwrap();
     let run_result = generator
         .execute_transaction(
             &ChainView::new(&db, tip_block_hash),
-            &state,
+            &mut state,
             &block_info,
             &raw_tx,
             L2TX_MAX_CYCLES,
@@ -114,12 +114,12 @@ fn absent_address_test() -> anyhow::Result<()> {
         .to_id(new_account_id.pack())
         .args(Bytes::from(args).pack())
         .build();
-    let db = store.begin_transaction();
+    let db = &store.begin_transaction();
     let tip_block_hash = db.get_tip_block_hash().unwrap();
     let run_result = generator
         .execute_transaction(
             &ChainView::new(&db, tip_block_hash),
-            &state,
+            &mut state,
             &block_info,
             &raw_tx,
             L2TX_MAX_CYCLES,
@@ -143,12 +143,12 @@ fn absent_address_test() -> anyhow::Result<()> {
         .to_id(new_account_id.pack())
         .args(Bytes::from(args).pack())
         .build();
-    let db = store.begin_transaction();
+    let db = &store.begin_transaction();
     let tip_block_hash = db.get_tip_block_hash().unwrap();
     let run_result = generator
         .execute_transaction(
             &ChainView::new(&db, tip_block_hash),
-            &state,
+            &mut state,
             &block_info,
             &raw_tx,
             L2TX_MAX_CYCLES,

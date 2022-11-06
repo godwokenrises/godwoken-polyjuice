@@ -12,13 +12,12 @@ use gw_generator::error::TransactionError;
 pub use gw_generator::{
     account_lock_manage::{secp256k1::Secp256k1Eth, AccountLockManage},
     backend_manage::{Backend, BackendManage},
-    dummy_state::DummyState,
     traits::StateExt,
     Generator,
 };
-use gw_store::traits::chain_store::ChainStore;
 use gw_store::traits::kv_store::KVStoreWrite;
 pub use gw_store::{chain_view::ChainView, Store};
+use gw_store::{state::traits::JournalDB, traits::chain_store::ChainStore};
 use gw_traits::CodeStore;
 use gw_types::{
     bytes::Bytes,
@@ -39,6 +38,8 @@ use rlp::RlpStream;
 use std::{convert::TryInto, fs, io::Read, path::PathBuf};
 
 pub use gw_common::builtins::{CKB_SUDT_ACCOUNT_ID, ETH_REGISTRY_ACCOUNT_ID, RESERVED_ACCOUNT_ID};
+
+use crate::{new_dummy_state, DummyState};
 pub const CREATOR_ACCOUNT_ID: u32 = 3;
 pub const CHAIN_ID: u64 = 202204;
 
@@ -381,7 +382,8 @@ impl PolyjuiceArgsBuilder {
 pub fn setup() -> (Store, DummyState, Generator) {
     let _ = env_logger::try_init();
     let store = Store::open_tmp().unwrap();
-    let mut state = DummyState::default();
+    let snapshot = store.get_snapshot();
+    let mut state = new_dummy_state(snapshot);
 
     let meta_script = Script::new_builder()
         .code_hash(META_VALIDATOR_SCRIPT_TYPE_HASH.clone().pack())
@@ -505,7 +507,7 @@ pub fn setup() -> (Store, DummyState, Generator) {
         Default::default(),
     );
 
-    let tx = store.begin_transaction();
+    let tx = &store.begin_transaction();
     let tip_block_number: Uint64 = 8.pack();
     let tip_block_hash = [8u8; 32];
     tx.insert_raw(COLUMN_META, META_TIP_BLOCK_HASH_KEY, &tip_block_hash[..])
@@ -553,7 +555,7 @@ pub fn deploy(
         .to_id(creator_account_id.pack())
         .args(Bytes::from(args).pack())
         .build();
-    let db = store.begin_transaction();
+    let db = &store.begin_transaction();
     let tip_block_hash = db.get_tip_block_hash().unwrap();
     let run_result = generator
         .execute_transaction(
@@ -565,9 +567,7 @@ pub fn deploy(
             None,
         )
         .expect("deploy Polyjuice contract");
-    state
-        .apply_run_result(&run_result.write)
-        .expect("update state");
+    state.finalise().expect("update state");
     // println!("[deploy contract] used cycles: {}", run_result.used_cycles);
     run_result
 }
@@ -630,7 +630,7 @@ impl MockContractInfo {
 
 pub fn simple_storage_get(
     store: &Store,
-    state: &DummyState,
+    state: &mut DummyState,
     generator: &Generator,
     block_number: u64,
     from_id: u32,
@@ -651,7 +651,7 @@ pub fn simple_storage_get(
         .to_id(ss_account_id.pack())
         .args(Bytes::from(args).pack())
         .build();
-    let db = store.begin_transaction();
+    let db = &store.begin_transaction();
     let tip_block_hash = db.get_tip_block_hash().unwrap();
     let run_result = generator
         .execute_transaction(
@@ -665,6 +665,7 @@ pub fn simple_storage_get(
         .expect("execute_transaction");
     // 491894, 571661 -> 586360 < 587K
     check_cycles("simple_storage_get", run_result.cycles.execution, 700_000);
+
     run_result
 }
 
@@ -809,7 +810,7 @@ pub(crate) fn eth_address_regiser(
         .to_id(ETH_REGISTRY_ACCOUNT_ID.pack())
         .args(args)
         .build();
-    let db = store.begin_transaction();
+    let db = &store.begin_transaction();
     let tip_block_hash = store.get_tip_block_hash().unwrap();
     generator.execute_transaction(
         &ChainView::new(&db, tip_block_hash),

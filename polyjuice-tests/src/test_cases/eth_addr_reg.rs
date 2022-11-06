@@ -4,7 +4,7 @@ use crate::helper::{
 };
 use gw_common::{registry_address::RegistryAddress, state::State};
 use gw_generator::traits::StateExt;
-use gw_store::{chain_view::ChainView, traits::chain_store::ChainStore};
+use gw_store::{chain_view::ChainView, state::traits::JournalDB, traits::chain_store::ChainStore};
 use gw_types::{packed::RawL2Transaction, prelude::*, U256};
 
 const SS_INIT_CODE: &str = include_str!("./evm-contracts/SimpleStorage.bin");
@@ -98,9 +98,7 @@ fn test_update_eth_addr_reg_by_contract() {
     )
     .expect("execute the MSG_SET_MAPPING method of `ETH Address Registry` layer2 contract");
     assert_eq!(run_result.exit_code, 0);
-    state
-        .apply_run_result(&run_result.write)
-        .expect("update state");
+    state.finalise().expect("update state");
     // cycles(1176198)] < 1200k cycles
     helper::check_cycles(
         "eth_address_regiser",
@@ -141,11 +139,11 @@ fn test_update_eth_addr_reg_by_contract() {
         .args(args.pack())
         .build();
     let tip_block_hash = store.get_tip_block_hash().unwrap();
-    let db = store.begin_transaction();
+    let db = &store.begin_transaction();
     let run_result = generator
         .execute_transaction(
             &ChainView::new(&db, tip_block_hash),
-            &state,
+            &mut state,
             &new_block_info(block_producer_id.clone(), 3, 3),
             &raw_l2tx,
             L2TX_MAX_CYCLES,
@@ -164,13 +162,13 @@ fn test_update_eth_addr_reg_by_contract() {
         .to_id(ETH_REGISTRY_ACCOUNT_ID.pack())
         .args(args.pack())
         .build();
-    let db = store.begin_transaction();
+    let db = &store.begin_transaction();
     let tip_block_hash = db.get_tip_block_hash().unwrap();
     let block_info = new_block_info(block_producer_id.clone(), 3, 0);
     let run_result = generator
         .execute_transaction(
             &ChainView::new(&db, tip_block_hash),
-            &state,
+            &mut state,
             &block_info,
             &raw_l2tx,
             L2TX_MAX_CYCLES,
@@ -244,9 +242,7 @@ fn test_batch_set_mapping_by_contract() {
     )
     .expect("eth address registered");
     assert_eq!(run_result.exit_code, 0);
-    state
-        .apply_run_result(&run_result.write)
-        .expect("update state");
+    state.finalise().expect("update state");
 
     for (eth_eoa_address, eth_eoa_account_script_hash) in
         eth_eoa_addresses.into_iter().zip(eth_eoa_script_hashes)
@@ -264,11 +260,11 @@ fn test_batch_set_mapping_by_contract() {
             .args(args.pack())
             .build();
         let tip_block_hash = store.get_tip_block_hash().unwrap();
-        let db = store.begin_transaction();
+        let db = &store.begin_transaction();
         let run_result = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
-                &state,
+                &mut state,
                 &new_block_info(block_producer_id.clone(), 3, 3),
                 &raw_l2tx,
                 L2TX_MAX_CYCLES,
@@ -287,12 +283,12 @@ fn test_batch_set_mapping_by_contract() {
             .to_id(ETH_REGISTRY_ACCOUNT_ID.pack())
             .args(args.pack())
             .build();
-        let db = store.begin_transaction();
+        let db = &store.begin_transaction();
         let tip_block_hash = db.get_tip_block_hash().unwrap();
         let run_result = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
-                &state,
+                &mut state,
                 &new_block_info(block_producer_id.clone(), 3, 3),
                 &raw_l2tx,
                 L2TX_MAX_CYCLES,

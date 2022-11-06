@@ -8,8 +8,7 @@ use crate::helper::{
 use gw_common::{
     builtins::ETH_REGISTRY_ACCOUNT_ID, registry_address::RegistryAddress, state::State,
 };
-use gw_generator::traits::StateExt;
-use gw_store::{chain_view::ChainView, traits::chain_store::ChainStore};
+use gw_store::{chain_view::ChainView, state::traits::JournalDB, traits::chain_store::ChainStore};
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
 
 const INIT_CODE: &str = include_str!("./evm-contracts/SimpleStorage.bin");
@@ -43,21 +42,19 @@ fn test_simple_storage() {
             .to_id(CREATOR_ACCOUNT_ID.pack())
             .args(Bytes::from(args).pack())
             .build();
-        let db = store.begin_transaction();
+        let db = &store.begin_transaction();
         let tip_block_hash = store.get_tip_block_hash().unwrap();
         let run_result = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
-                &state,
+                &mut state,
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
                 None,
             )
             .expect("construct");
-        state
-            .apply_run_result(&run_result.write)
-            .expect("update state");
+        state.finalise().expect("update state");
         println!("return_data: {}", hex::encode(&run_result.return_data[..]));
         // 557534 < 560K
         helper::check_cycles("Deploy SimpleStorage", run_result.cycles.execution, 830_000);
@@ -98,21 +95,19 @@ fn test_simple_storage() {
             .to_id(new_account_id.pack())
             .args(Bytes::from(args).pack())
             .build();
-        let db = store.begin_transaction();
+        let db = &store.begin_transaction();
         let tip_block_hash = db.get_tip_block_hash().unwrap();
         let run_result = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
-                &state,
+                &mut state,
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
                 None,
             )
             .expect("construct");
-        state
-            .apply_run_result(&run_result.write)
-            .expect("update state");
+        state.finalise().expect("update state");
         // 489767 < 500K
         helper::check_cycles("SimpleStorage.set", run_result.cycles.execution, 6_100_000);
     }
@@ -132,26 +127,24 @@ fn test_simple_storage() {
             .to_id(new_account_id.pack())
             .args(Bytes::from(args).pack())
             .build();
-        let db = store.begin_transaction();
+        let db = &store.begin_transaction();
         let tip_block_hash = db.get_tip_block_hash().unwrap();
         let run_result = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
-                &state,
+                &mut state,
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
                 None,
             )
             .expect("construct");
-        state
-            .apply_run_result(&run_result.write)
-            .expect("update state");
+        state.finalise().expect("update state");
         let mut expected_return_data = vec![0u8; 32];
         expected_return_data[30] = 0x0d;
         expected_return_data[31] = 0x10;
         assert_eq!(run_result.return_data, expected_return_data);
     }
 
-    helper::simple_storage_get(&store, &state, &generator, 4, from_id, new_account_id);
+    helper::simple_storage_get(&store, &mut state, &generator, 4, from_id, new_account_id);
 }

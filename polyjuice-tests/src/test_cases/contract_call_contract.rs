@@ -7,9 +7,8 @@ use crate::helper::{
     L2TX_MAX_CYCLES,
 };
 use gw_common::state::State;
-use gw_generator::traits::StateExt;
-use gw_store::chain_view::ChainView;
 use gw_store::traits::chain_store::ChainStore;
+use gw_store::{chain_view::ChainView, state::traits::JournalDB};
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*};
 
 const SS_INIT_CODE: &str = include_str!("./evm-contracts/SimpleStorage.bin");
@@ -82,7 +81,7 @@ fn test_contract_call_contract() {
     block_number += 1;
     let run_result = simple_storage_get(
         &store,
-        &state,
+        &mut state,
         &generator,
         block_number,
         from_id,
@@ -111,21 +110,19 @@ fn test_contract_call_contract() {
             .to_id(cc_contract_id.pack())
             .args(Bytes::from(args).pack())
             .build();
-        let db = store.begin_transaction();
+        let db = &store.begin_transaction();
         let tip_block_hash = db.get_tip_block_hash().unwrap();
         let run_result = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
-                &state,
+                &mut state,
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
                 None,
             )
             .expect("CallContract.proxySet");
-        state
-            .apply_run_result(&run_result.write)
-            .expect("update state");
+        state.finalise().expect("update state");
         // [CallContract.proxySet(222)] used cycles: 961599 -> 980564 < 981K
         helper::check_cycles(
             "CallContract.proxySet()",
@@ -136,7 +133,7 @@ fn test_contract_call_contract() {
 
     let run_result = simple_storage_get(
         &store,
-        &state,
+        &mut state,
         &generator,
         block_number,
         from_id,
@@ -147,7 +144,7 @@ fn test_contract_call_contract() {
         hex::decode("00000000000000000000000000000000000000000000000000000000000000e1").unwrap()
     );
 
-    assert_eq!(state.get_nonce(from_id).unwrap(), 3);
+    assert_eq!(state.get_nonce(from_id).unwrap(), 5);
     assert_eq!(state.get_nonce(ss_account_id).unwrap(), 0);
     assert_eq!(state.get_nonce(cc_contract_id).unwrap(), 0);
 }
@@ -207,13 +204,13 @@ fn test_contract_call_non_exists_contract() {
             .to_id(contract_account_id.pack())
             .args(Bytes::from(args).pack())
             .build();
-        let db = store.begin_transaction();
+        let db = &store.begin_transaction();
         let tip_block_hash = db.get_tip_block_hash().unwrap();
         // [contract debug]: [handle_message] Warn: Call non-exists address
         let run_result = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
-                &state,
+                &mut state,
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,
@@ -247,13 +244,13 @@ fn test_contract_call_non_exists_contract() {
             .to_id(contract_account_id.pack())
             .args(Bytes::from(args).pack())
             .build();
-        let db = store.begin_transaction();
+        let db = &store.begin_transaction();
         let tip_block_hash = db.get_tip_block_hash().unwrap();
         // [handle_message] Don't run evm and return empty data
         let run_result = generator
             .execute_transaction(
                 &ChainView::new(&db, tip_block_hash),
-                &state,
+                &mut state,
                 &block_info,
                 &raw_tx,
                 L2TX_MAX_CYCLES,

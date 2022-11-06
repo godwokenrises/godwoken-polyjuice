@@ -232,7 +232,7 @@ impl<'a, 'b> SubTestCase<'a, 'b> {
 fn rlp_log_hash(run_result: &RunResult) -> H256 {
     let mut stream = rlp::RlpStream::new();
     stream.begin_unbounded_list();
-    run_result.write.logs.iter().for_each(|l| {
+    run_result.logs.iter().for_each(|l| {
         let log = parse_log(l);
         if let Log::PolyjuiceUser {
             address,

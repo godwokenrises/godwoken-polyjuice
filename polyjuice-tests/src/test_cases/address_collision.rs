@@ -5,8 +5,8 @@ use ckb_vm::Bytes;
 use gw_common::{
     builtins::ETH_REGISTRY_ACCOUNT_ID, registry_address::RegistryAddress, state::State,
 };
-use gw_generator::traits::StateExt;
-use gw_store::{chain_view::ChainView, traits::chain_store::ChainStore};
+
+use gw_store::{chain_view::ChainView, state::traits::JournalDB, traits::chain_store::ChainStore};
 use gw_types::{
     packed::RawL2Transaction,
     prelude::{Builder, Entity, Pack},
@@ -178,21 +178,19 @@ fn create2_address_collision_overwrite() -> Result<()> {
         .to_id(create2_contract_id.pack())
         .args(Bytes::from(args).pack())
         .build();
-    let db = store.begin_transaction();
+    let db = &store.begin_transaction();
     let tip_block_hash = db.get_tip_block_hash().unwrap();
     let run_result = generator
         .execute_transaction(
             &ChainView::new(&db, tip_block_hash),
-            &state,
+            &mut state,
             &block_info,
             &raw_tx,
             L2TX_MAX_CYCLES,
             None,
         )
         .expect("Create2Impl.deploy(uint256 value, bytes32 salt, bytes memory code)");
-    state
-        .apply_run_result(&run_result.write)
-        .expect("update state");
+    state.finalise().expect("update state");
 
     let create2_script = compute_create2_script(
         create2_contract.eth_addr.as_slice(),
@@ -291,11 +289,11 @@ fn create2_address_collision_duplicate() -> Result<()> {
         .to_id(create2_contract_id.pack())
         .args(Bytes::from(args).pack())
         .build();
-    let db = store.begin_transaction();
+    let db = &store.begin_transaction();
     let tip_block_hash = db.get_tip_block_hash().unwrap();
     let run_result = generator.execute_transaction(
         &ChainView::new(&db, tip_block_hash),
-        &state,
+        &mut state,
         &block_info,
         &raw_tx,
         L2TX_MAX_CYCLES,

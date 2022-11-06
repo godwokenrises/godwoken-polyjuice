@@ -7,8 +7,8 @@ use crate::helper::{
 };
 use gw_common::{builtins::ETH_REGISTRY_ACCOUNT_ID, state::State};
 use gw_generator::traits::StateExt;
-use gw_store::chain_view::ChainView;
 use gw_store::traits::chain_store::ChainStore;
+use gw_store::{chain_view::ChainView, state::traits::JournalDB};
 use gw_types::{bytes::Bytes, packed::RawL2Transaction, prelude::*, U256};
 
 const INVALID_SUDT_ERC20_PROXY_CODE: &str =
@@ -140,11 +140,11 @@ fn test_invalid_sudt_erc20_proxy() {
             .to_id(invalid_proxy_account_id.pack())
             .args(Bytes::from(args).pack())
             .build();
-        let db = store.begin_transaction();
+        let db = &store.begin_transaction();
         let tip_block_hash = db.get_tip_block_hash().unwrap();
         let result = generator.execute_transaction(
             &ChainView::new(&db, tip_block_hash),
-            &state,
+            &mut state,
             &block_info,
             &raw_tx,
             L2TX_MAX_CYCLES,
@@ -159,9 +159,7 @@ fn test_invalid_sudt_erc20_proxy() {
                 run_result.cycles.execution,
                 1_011_000,
             );
-            state
-                .apply_run_result(&run_result.write)
-                .expect("update state");
+            state.finalise().expect("update state");
             assert_eq!(
                 run_result.return_data,
                 hex::decode(return_data_str).unwrap()
