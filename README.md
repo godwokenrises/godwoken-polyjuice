@@ -6,6 +6,8 @@ Polyjuice provides an [Ethereum](https://ethereum.org/en/) compatible layer on [
 
 Polyjuice aims at 100% EVM compatibility as a goal, meaning we plan to support all smart contracts supported by the latest Ethereum hardfork version. See [EVM-compatible.md](docs/EVM-compatible.md) and [Addition-Features.md](docs/Addition-Features.md) for more details.
 
+> This repo is deprecated, the code is moved to the monorepo https://github.com/godwokenrises/godwoken/tree/develop/gwos-evm
+
 ## Features
 - [x] All [Ethereum Virtual Machine Opcodes](https://ethervm.io/)
 - [x] Value transfer
