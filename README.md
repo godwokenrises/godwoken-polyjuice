@@ -2,6 +2,8 @@
 # Godwoken Polyjuice
 An Ethereum compatible backend for [Godwoken](https://github.com/nervosnetwork/godwoken) (a generic optimistic rollup framework). It includes [generator](./c/generator.c) and [validator](./c/validator.c) implementations.
 
+This repo is deprecated, the code in moved to the monorepo https://github.com/godwokenrises/godwoken/tree/develop/gwos-evm
+
 Polyjuice provides an [Ethereum](https://ethereum.org/en/) compatible layer on [Nervos CKB](https://github.com/nervosnetwork/ckb). It leverages account model as well as scalability provided by [Godwoken](https://github.com/nervosnetwork/godwoken/blob/develop/docs/life_of_a_godwoken_transaction.md), then integrates [evmone](https://github.com/ethereum/evmone) as an EVM engine for running Ethereum smart contracts.
 
 Polyjuice aims at 100% EVM compatibility as a goal, meaning we plan to support all smart contracts supported by the latest Ethereum hardfork version. See [EVM-compatible.md](docs/EVM-compatible.md) and [Addition-Features.md](docs/Addition-Features.md) for more details.
